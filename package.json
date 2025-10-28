@@ -1,5 +1,5 @@
 {
-	"name": "mud-command2",
+	"name": "mud3",
 	"version": "1.0.0",
 	"description": "",
 	"license": "ISC",
@@ -19,5 +19,9 @@
 		"mud-ext": "github:jackindisguise/mud-ext",
 		"typedoc": "^0.28.14",
 		"typescript": "^5.9.3"
+	},
+	"dependencies": {
+		"package-loader": "github:jackindisguise/package-loader",
+		"winston": "^3.18.3"
 	}
 }

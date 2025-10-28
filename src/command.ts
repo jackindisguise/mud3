@@ -1,4 +1,11 @@
-import { DungeonObject, Mob, Item, Room, DIRECTION } from "./dungeon.js";
+import {
+	DungeonObject,
+	Mob,
+	Item,
+	Room,
+	DIRECTION,
+	text2dir,
+} from "./dungeon.js";
 
 /**
  * Context provided to command execution.
@@ -155,6 +162,11 @@ export interface ArgumentConfig {
 	type: ArgumentType;
 	required?: boolean;
 	source?: "room" | "inventory" | "all";
+}
+
+export interface CommandOptions {
+	pattern: string;
+	aliases?: string[];
 }
 
 /**
@@ -328,11 +340,8 @@ export abstract class Command {
 	 * - `"put <item:object@inventory> in <container:object@room>"` - Multiple object arguments with different sources
 	 * - `"look <direction:direction?>"` - Optional direction argument
 	 * - `"drop <quantity:number> <item:item@inventory>"` - Number and item arguments
-	 *
-	 * @abstract
-	 * @type {string}
 	 */
-	abstract pattern: string;
+	readonly pattern!: string;
 
 	/**
 	 * Optional aliases for the command.
@@ -350,17 +359,61 @@ export abstract class Command {
 	 * @example
 	 * ```typescript
 	 * class TellCommand extends Command {
-	 *   pattern = "tell <target:mob> <message:text>";
-	 *   aliases = [
-	 *     "whisper <target:mob> <message:text>",
-	 *     "t <target:mob> <message:text>"
-	 *   ];
+	 *   constructor() {
+	 *     super("tell <target:mob> <message:text>", [
+	 *       "whisper <target:mob> <message:text>",
+	 *       "t <target:mob> <message:text>"
+	 *     ]);
+	 *   }
 	 *   // ... execute implementation
 	 * }
 	 * // Now "tell bob hi", "whisper bob hi", and "t bob hi" all work
 	 * ```
 	 */
-	aliases?: string[];
+	readonly aliases?: string[];
+
+	/**
+	 * Cached pattern information for efficient parsing.
+	 * Built once during construction to avoid rebuilding regex patterns on every parse.
+	 * @private
+	 */
+	private patternCache: Array<{
+		pattern: string;
+		regex: RegExp;
+		argConfigs: ArgumentConfig[];
+	}> = [];
+
+	/**
+	 * Initialize the command and build cached regex patterns.
+	 * This constructor builds the pattern cache immediately with the provided patterns.
+	 *
+	 * @param pattern - The main command pattern
+	 * @param aliases - Optional array of alias patterns
+	 */
+	constructor(options?: CommandOptions) {
+		if (options) {
+			if (options.pattern) this.pattern = options.pattern;
+			if (options.aliases) this.aliases = options.aliases;
+		}
+		this.buildPatternCache();
+	}
+
+	/**
+	 * Build cached regex patterns for efficient parsing.
+	 * This is called once during construction.
+	 * @private
+	 */
+	private buildPatternCache(): void {
+		const patterns = [this.pattern, ...(this.aliases || [])];
+
+		for (const pattern of patterns) {
+			this.patternCache.push({
+				pattern,
+				regex: this.buildRegex(pattern),
+				argConfigs: this.extractArgumentConfigs(pattern),
+			});
+		}
+	}
 
 	/**
 	 * Execute the command with parsed arguments.
@@ -452,7 +505,7 @@ export abstract class Command {
 	 *
 	 * The parsing process:
 	 * 1. Try the main pattern, then each alias in order
-	 * 2. For each pattern, build a regex and attempt to match the input
+	 * 2. For each pattern, use the cached regex and attempt to match the input
 	 * 3. Extract argument values from the regex capture groups
 	 * 4. Parse and validate each argument based on its type
 	 * 5. Return success with parsed args, or failure with an error message
@@ -480,11 +533,10 @@ export abstract class Command {
 	 * ```
 	 */
 	parse(input: string, context: CommandContext): ParseResult {
-		const patterns = [this.pattern, ...(this.aliases || [])];
 		let lastError = "Input does not match command pattern";
 
-		for (const pattern of patterns) {
-			const result = this.parsePattern(pattern, input, context);
+		for (const cachedPattern of this.patternCache) {
+			const result = this.parseWithCachedPattern(cachedPattern, input, context);
 			if (result.success) return result;
 			// Keep the most specific error message
 			if (result.error && result.error !== "Input does not match pattern") {
@@ -500,30 +552,29 @@ export abstract class Command {
 	}
 
 	/**
-	 * Parse input against a specific pattern.
+	 * Parse input against a cached pattern.
 	 *
-	 * This internal method handles the parsing logic for a single pattern string.
-	 * It builds a regex from the pattern, matches it against the input, extracts
-	 * argument values from capture groups, and validates/parses each argument.
-	 *
-	 * The method makes all arguments optional in the regex so that missing required
-	 * arguments can be detected and reported with specific error messages, rather
-	 * than just failing to match.
+	 * This internal method handles the parsing logic using pre-built regex patterns
+	 * and argument configurations. It matches the input against the cached regex,
+	 * extracts argument values from capture groups, and validates/parses each argument.
 	 *
 	 * @private
-	 * @param pattern - The pattern string to parse against (main pattern or alias)
+	 * @param cachedPattern - The cached pattern with regex and argument configs
 	 * @param input - The user's input string
 	 * @param context - The execution context for object/player lookups
 	 * @returns {ParseResult} Success with args, or failure with specific error message
 	 */
-	private parsePattern(
-		pattern: string,
+	private parseWithCachedPattern(
+		cachedPattern: {
+			pattern: string;
+			regex: RegExp;
+			argConfigs: ArgumentConfig[];
+		},
 		input: string,
 		context: CommandContext
 	): ParseResult {
 		const args = new Map<string, any>();
-		const argConfigs = this.extractArgumentConfigs(pattern);
-		const regex = this.buildRegex(pattern);
+		const { regex, argConfigs } = cachedPattern;
 
 		const match = input.match(regex);
 		if (!match) {
@@ -970,18 +1021,17 @@ export abstract class Command {
  * all registered commands in order, executing the first command that
  * successfully matches.
  *
- * This class uses static methods to maintain a single global registry for
- * processing user commands in a MUD application. Register all your command
- * classes at startup, then call execute() for each line of user input.
+ * This class can be instantiated to create separate command registries
+ * (e.g., for skill commands, admin commands, etc.), or you can use the
+ * default static instance for general commands.
  *
  * ## Usage Pattern
  *
  * ```typescript
- * // Setup phase: Register commands
- * CommandRegistry.register(new SayCommand());
- * CommandRegistry.register(new GetCommand());
- * CommandRegistry.register(new LookCommand());
- * // ... register more commands
+ * // Using the default registry
+ * CommandRegistry.default.register(new SayCommand());
+ * CommandRegistry.default.register(new GetCommand());
+ * CommandRegistry.default.register(new LookCommand());
  *
  * // Runtime: Process user input
  * const context: CommandContext = {
@@ -990,9 +1040,27 @@ export abstract class Command {
  *   input: userInput
  * };
  *
- * const executed = CommandRegistry.execute(userInput, context);
+ * const executed = CommandRegistry.default.execute(userInput, context);
  * if (!executed) {
  *   console.log("Unknown command. Type 'help' for assistance.");
+ * }
+ * ```
+ *
+ * ## Multiple Registries
+ *
+ * ```typescript
+ * // Create separate registries for different command types
+ * const skillRegistry = new CommandRegistry();
+ * const adminRegistry = new CommandRegistry();
+ *
+ * skillRegistry.register(new FireballCommand());
+ * adminRegistry.register(new BanCommand());
+ *
+ * // Check skill commands first, then regular commands
+ * if (!skillRegistry.execute(input, context)) {
+ *   if (!CommandRegistry.default.execute(input, context)) {
+ *     console.log("Unknown command.");
+ *   }
  * }
  * ```
  *
@@ -1003,8 +1071,8 @@ export abstract class Command {
  *
  * ```typescript
  * // These will be automatically ordered correctly regardless of registration order
- * CommandRegistry.register(new GetCommand());           // "get <item:object>"
- * CommandRegistry.register(new GetFromCommand());       // "get <item:object> from <container:object>"
+ * registry.register(new GetCommand());           // "get <item:object>"
+ * registry.register(new GetFromCommand());       // "get <item:object> from <container:object>"
  * // GetFromCommand will be tried first due to longer pattern
  * ```
  *
@@ -1019,12 +1087,18 @@ export abstract class Command {
  * @class
  */
 export class CommandRegistry {
-	private static commands: Command[] = [];
+	/**
+	 * Default global command registry instance.
+	 * Use this for general commands that are always available.
+	 */
+	static readonly default = new CommandRegistry();
+
+	private commands: Command[] = [];
 
 	/**
-	 * Register a command in the registry.
+	 * Register a command in this registry.
 	 *
-	 * Adds a command instance to the global command registry. Once registered,
+	 * Adds a command instance to the command registry. Once registered,
 	 * the command will be considered when execute() is called with user input.
 	 *
 	 * Commands are automatically sorted by pattern length (longest first) to ensure
@@ -1047,22 +1121,22 @@ export class CommandRegistry {
 	 *
 	 * @example
 	 * ```typescript
-	 * CommandRegistry.register(new SayCommand());
-	 * CommandRegistry.register(new GetFromContainerCommand()); // Longer pattern
-	 * CommandRegistry.register(new GetCommand()); // Shorter pattern
+	 * CommandRegistry.default.register(new SayCommand());
+	 * CommandRegistry.default.register(new GetFromContainerCommand()); // Longer pattern
+	 * CommandRegistry.default.register(new GetCommand()); // Shorter pattern
 	 * // GetFromContainerCommand will be tried first automatically
 	 * ```
 	 */
-	static register(command: Command): void {
+	register(command: Command): void {
 		this.commands.push(command);
 		// Sort by pattern length (longest first) to prioritize more specific commands
 		this.commands.sort((a, b) => b.pattern.length - a.pattern.length);
 	}
 
 	/**
-	 * Unregister a command from the registry.
+	 * Unregister a command from this registry.
 	 *
-	 * Removes a previously registered command instance from the global registry.
+	 * Removes a previously registered command instance from the registry.
 	 * After unregistering, the command will no longer be considered for
 	 * execution when execute() is called.
 	 *
@@ -1084,12 +1158,12 @@ export class CommandRegistry {
 	 * @example
 	 * ```typescript
 	 * const sayCommand = new SayCommand();
-	 * CommandRegistry.register(sayCommand);
+	 * CommandRegistry.default.register(sayCommand);
 	 * // ... later
-	 * CommandRegistry.unregister(sayCommand); // Removes the command
+	 * CommandRegistry.default.unregister(sayCommand); // Removes the command
 	 * ```
 	 */
-	static unregister(command: Command): void {
+	unregister(command: Command): void {
 		const index = this.commands.indexOf(command);
 		if (index !== -1) {
 			this.commands.splice(index, 1);
@@ -1130,7 +1204,7 @@ export class CommandRegistry {
 	 *
 	 * @example
 	 * ```typescript
-	 * const executed = CommandRegistry.execute("say hello world", context);
+	 * const executed = CommandRegistry.default.execute("say hello world", context);
 	 * if (executed) {
 	 *   // Command was found (executed successfully or onError was called)
 	 * } else {
@@ -1148,11 +1222,11 @@ export class CommandRegistry {
 	 *   return;
 	 * }
 	 *
-	 * const executed = CommandRegistry.execute(input, context);
+	 * const executed = CommandRegistry.default.execute(input, context);
 	 * // ...
 	 * ```
 	 */
-	static execute(input: string, context: CommandContext): boolean {
+	execute(input: string, context: CommandContext): boolean {
 		input = input.trim();
 		if (!input) return false;
 
@@ -1199,7 +1273,7 @@ export class CommandRegistry {
 	 * @example
 	 * ```typescript
 	 * // Display all available commands
-	 * const commands = CommandRegistry.getCommands();
+	 * const commands = CommandRegistry.default.getCommands();
 	 * console.log("Available commands:");
 	 * for (const command of commands) {
 	 *   console.log(`  ${command.pattern}`);
@@ -1212,11 +1286,11 @@ export class CommandRegistry {
 	 * @example
 	 * Check if a specific command is registered:
 	 * ```typescript
-	 * const hasSayCommand = CommandRegistry.getCommands()
+	 * const hasSayCommand = CommandRegistry.default.getCommands()
 	 *   .some(cmd => cmd instanceof SayCommand);
 	 * ```
 	 */
-	static getCommands(): Command[] {
+	getCommands(): Command[] {
 		return [...this.commands];
 	}
 }

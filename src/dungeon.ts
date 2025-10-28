@@ -1,4 +1,5 @@
 import { string } from "mud-ext";
+import logger from "./logger.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -58,9 +59,9 @@ export enum DIRECTION {
  *   });
  * }
  * // Output:
- * // 0: north
- * // 1: south
- * // 2: east
+ * // DIRECTION.NORTH: north
+ * // DIRECTION.SOUTH: south
+ * // DIRECTION.EAST: east
  * // ...
  * ```
  *
@@ -525,14 +526,6 @@ export function dir2text(dir: DIRECTION, short: boolean = false) {
  * ```
  *
  * @example
- * Case-insensitive:
- * ```typescript
- * text2dir("NORTH"); // DIRECTION.NORTH
- * text2dir("North"); // DIRECTION.NORTH
- * text2dir("NE"); // DIRECTION.NORTHEAST
- * ```
- *
- * @example
  * Use in command parsing:
  * ```typescript
  * function processMove(input: string) {
@@ -551,11 +544,15 @@ export function dir2text(dir: DIRECTION, short: boolean = false) {
  */
 export function text2dir(text: DirectionText): DIRECTION;
 export function text2dir(text: DirectionTextShort): DIRECTION;
-export function text2dir(text: DirectionText | DirectionTextShort): DIRECTION {
+export function text2dir(text: string): DIRECTION | undefined;
+export function text2dir(
+	text: DirectionText | DirectionTextShort | string
+): DIRECTION | undefined {
 	let result = TEXT2DIR.get(text as DirectionText);
 	if (result === undefined)
 		result = TEXT2DIR_SHORT.get(text as DirectionTextShort);
-	return result!;
+	if (result === undefined) return undefined;
+	return result;
 }
 
 /**
@@ -891,6 +888,14 @@ export class Dungeon {
 			throw new Error(`Dungeon id "${value}" is already in use`);
 		this._id = value;
 		DUNGEON_REGISTRY.set(value, this);
+
+		const roomCount =
+			this._dimensions.width *
+			this._dimensions.height *
+			this._dimensions.layers;
+		logger.info(
+			`Registered dungeon "${value}" with ${roomCount} rooms (${this._dimensions.width}x${this._dimensions.height}x${this._dimensions.layers})`
+		);
 	}
 
 	/**
@@ -2411,6 +2416,17 @@ export class RoomLink {
 		if (!link._oneWay) link._to.room.addLink(link);
 		// Register in the global link registry for persistence/inspection
 		ROOM_LINKS.push(link);
+
+		const fromRef =
+			fromRoom.getRoomRef() || `${fromRoom.x},${fromRoom.y},${fromRoom.z}`;
+		const toRef = toRoom.getRoomRef() || `${toRoom.x},${toRoom.y},${toRoom.z}`;
+		const dirText = dir2text(direction);
+		logger.debug(
+			`Created ${
+				oneWay ? "one-way" : "bidirectional"
+			} room link: ${fromRef} ${dirText} -> ${toRef}`
+		);
+
 		return link;
 	}
 
@@ -2464,6 +2480,19 @@ export class RoomLink {
 	 * wish.
 	 */
 	remove() {
+		const fromRef =
+			this._from.room.getRoomRef() ||
+			`${this._from.room.x},${this._from.room.y},${this._from.room.z}`;
+		const toRef =
+			this._to.room.getRoomRef() ||
+			`${this._to.room.x},${this._to.room.y},${this._to.room.z}`;
+		const dirText = dir2text(this._from.direction);
+		logger.debug(
+			`Removing ${
+				this._oneWay ? "one-way" : "bidirectional"
+			} room link: ${fromRef} ${dirText} -> ${toRef}`
+		);
+
 		// Remove from connected rooms
 		this._from.room.removeLink(this);
 		this._to.room.removeLink(this);

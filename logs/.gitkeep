@@ -1,0 +1,7 @@
+# Logs directory
+
+This directory contains application log files:
+- `app.log` - All application logs (info, warn, error, debug, etc.)
+- `error.log` - Error-level logs only
+
+These files are gitignored.

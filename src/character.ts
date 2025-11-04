@@ -8,7 +8,7 @@ import type { MudClient } from "./io.js";
  * When a character receives a message whose group differs from the last one
  * they received, we append a blank line and then show the prompt.
  */
-export enum MessageGroup {
+export enum MESSAGE_GROUP {
 	INFO = "INFO",
 	COMBAT = "COMBAT",
 	COMMAND_RESPONSE = "COMMAND_RESPONSE",
@@ -107,7 +107,7 @@ export interface PlayerSession {
 	/** The connected client for this session (if any) */
 	client: MudClient;
 	/** Last message group received in this session */
-	lastMessageGroup?: MessageGroup;
+	lastMessageGroup?: MESSAGE_GROUP;
 }
 
 /**
@@ -150,6 +150,7 @@ export interface SerializedCharacter {
  * The Character and its associated Mob have a bidirectional relationship:
  * - Character.mob points to the Mob instance
  * - Mob.character points back to the Character instance
+ *
  * This allows code working with either object to access the other when needed.
  *
  * Session management is handled through the session field, which tracks
@@ -453,7 +454,7 @@ export class Character {
 	}
 
 	/** Core routine for group-aware sending */
-	public sendMessage(text: string, group: MessageGroup): void {
+	public sendMessage(text: string, group: MESSAGE_GROUP): void {
 		const session = this.session;
 		const client = session?.client;
 		if (!session || !client || !client.isConnected()) return;

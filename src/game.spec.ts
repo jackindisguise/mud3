@@ -1,7 +1,7 @@
 import { describe, it, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { EventEmitter } from "events";
-import { Game, LoginState, type LoginSession } from "./game.js";
+import { Game, LOGIN_STATE, type LoginSession } from "./game.js";
 import { MudClient, MudServer } from "./io.js";
 import { Character } from "./character.js";
 import { Mob, Dungeon } from "./dungeon.js";
@@ -319,7 +319,7 @@ describe("Game", () => {
 			);
 
 			const session = Array.from(loginSessions)[0];
-			assert.strictEqual(session.state, LoginState.ASKING_USERNAME);
+			assert.strictEqual(session.state, LOGIN_STATE.ASKING_USERNAME);
 			assert.strictEqual(session.passwordAttempts, 0);
 		});
 	});
@@ -495,7 +495,7 @@ describe("Game", () => {
 			client.clearMessages();
 
 			// Manually set session to playing state without character
-			session.state = LoginState.PLAYING;
+			session.state = LOGIN_STATE.PLAYING;
 			session.character = undefined;
 
 			client.simulateInput("look");

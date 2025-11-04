@@ -16,7 +16,7 @@ import logger from "./logger.js";
 /**
  * Player authentication states during login process
  */
-export enum LoginState {
+export enum LOGIN_STATE {
 	CONNECTED = "connected",
 	ASKING_USERNAME = "asking_username",
 	ASKING_PASSWORD = "asking_password",
@@ -32,7 +32,7 @@ export enum LoginState {
  */
 export interface LoginSession {
 	client: MudClient;
-	state: LoginState;
+	state: LOGIN_STATE;
 	username?: string;
 	passwordAttempts: number;
 	tempPassword?: string;
@@ -124,7 +124,7 @@ export class Game {
 		// Create login session
 		const session: LoginSession = {
 			client,
-			state: LoginState.CONNECTED,
+			state: LOGIN_STATE.CONNECTED,
 			passwordAttempts: 0,
 			lastActivity: new Date(),
 		};
@@ -173,7 +173,7 @@ export class Game {
 			session.lastActivity = new Date();
 		}
 
-		if (session && session.state !== LoginState.PLAYING) {
+		if (session && session.state !== LOGIN_STATE.PLAYING) {
 			// Handle login/authentication input
 			this.handleLoginInput(session, input);
 		} else if (username) {
@@ -188,7 +188,7 @@ export class Game {
 	private startLoginProcess(session: LoginSession): void {
 		session.client.sendLine("Welcome to the MUD!");
 		session.client.sendLine("What is your name?");
-		session.state = LoginState.ASKING_USERNAME;
+		session.state = LOGIN_STATE.ASKING_USERNAME;
 	}
 
 	/**
@@ -198,23 +198,23 @@ export class Game {
 		const trimmedInput = input.trim();
 
 		switch (session.state) {
-			case LoginState.ASKING_USERNAME:
+			case LOGIN_STATE.ASKING_USERNAME:
 				this.handleUsernameInput(session, trimmedInput);
 				break;
 
-			case LoginState.ASKING_PASSWORD:
+			case LOGIN_STATE.ASKING_PASSWORD:
 				this.handlePasswordInput(session, trimmedInput);
 				break;
 
-			case LoginState.ASKING_NEW_PASSWORD:
+			case LOGIN_STATE.ASKING_NEW_PASSWORD:
 				this.handleNewPasswordInput(session, trimmedInput);
 				break;
 
-			case LoginState.ASKING_CONFIRM_PASSWORD:
+			case LOGIN_STATE.ASKING_CONFIRM_PASSWORD:
 				this.handleConfirmPasswordInput(session, trimmedInput);
 				break;
 
-			case LoginState.CHARACTER_CREATION:
+			case LOGIN_STATE.CHARACTER_CREATION:
 				this.handleCharacterCreationInput(session, trimmedInput);
 				break;
 		}
@@ -242,7 +242,7 @@ export class Game {
 	private handleUsernameInput(session: LoginSession, username: string): void {
 		session.username = username;
 		session.client.send("Password:");
-		session.state = LoginState.ASKING_PASSWORD;
+		session.state = LOGIN_STATE.ASKING_PASSWORD;
 	}
 
 	private async handlePasswordInput(
@@ -263,14 +263,14 @@ export class Game {
 			} else {
 				session.client.sendLine("Invalid credentials. Try again.");
 				session.client.sendLine("What is your name?");
-				session.state = LoginState.ASKING_USERNAME;
+				session.state = LOGIN_STATE.ASKING_USERNAME;
 				session.passwordAttempts++;
 			}
 		} catch (error) {
 			logger.error("Authentication error:", error);
 			session.client.sendLine("Authentication failed. Please try again.");
 			session.client.sendLine("What is your name?");
-			session.state = LoginState.ASKING_USERNAME;
+			session.state = LOGIN_STATE.ASKING_USERNAME;
 		}
 	}
 
@@ -281,7 +281,7 @@ export class Game {
 		// TODO: Implement new password creation
 		session.tempPassword = password;
 		session.client.sendLine("Confirm password:");
-		session.state = LoginState.ASKING_CONFIRM_PASSWORD;
+		session.state = LOGIN_STATE.ASKING_CONFIRM_PASSWORD;
 	}
 
 	private handleConfirmPasswordInput(
@@ -342,7 +342,7 @@ export class Game {
 		character.startSession(connectionId, session.client);
 
 		// Move to playing state
-		session.state = LoginState.PLAYING;
+		session.state = LOGIN_STATE.PLAYING;
 		session.character = character;
 
 		// Track active character

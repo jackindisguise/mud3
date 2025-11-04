@@ -1,0 +1,7 @@
+{
+	"entryPoints": ["src"],
+	"entryPointStrategy": "expand",
+	"exclude": ["**/*.spec.ts", "**/logger.ts"],
+	"tsconfig": "tsconfig.json",
+	"out": "docs"
+}

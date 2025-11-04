@@ -110,7 +110,7 @@ export interface ParseResult {
  * ArgumentType.DIRECTION // "north" or "n" -> DIRECTION.NORTH
  * ```
  */
-export enum ArgumentType {
+export enum ARGUMENT_TYPE {
 	TEXT = "text",
 	WORD = "word",
 	NUMBER = "number",
@@ -156,7 +156,7 @@ export enum ArgumentType {
  */
 export interface ArgumentConfig {
 	name: string;
-	type: ArgumentType;
+	type: ARGUMENT_TYPE;
 	required?: boolean;
 	source?: "room" | "inventory" | "all";
 }
@@ -656,7 +656,7 @@ export abstract class Command {
 		while ((match = argRegex.exec(pattern)) !== null) {
 			const [, name, typeStr, optional] = match;
 			const parts = typeStr.split("@");
-			const type = parts[0] as ArgumentType;
+			const type = parts[0] as ARGUMENT_TYPE;
 			const source = parts[1] as "room" | "inventory" | "all" | undefined;
 
 			configs.push({
@@ -785,26 +785,26 @@ export abstract class Command {
 		context: CommandContext
 	): any {
 		switch (config.type) {
-			case ArgumentType.TEXT:
+			case ARGUMENT_TYPE.TEXT:
 				return value;
 
-			case ArgumentType.WORD:
+			case ARGUMENT_TYPE.WORD:
 				return value.split(/\s+/)[0];
 
-			case ArgumentType.NUMBER:
+			case ARGUMENT_TYPE.NUMBER:
 				const num = parseInt(value, 10);
 				return isNaN(num) ? undefined : num;
 
-			case ArgumentType.OBJECT:
+			case ARGUMENT_TYPE.OBJECT:
 				return this.findObject(value, config.source || "all", context);
 
-			case ArgumentType.MOB:
+			case ARGUMENT_TYPE.MOB:
 				return this.findMob(value, context);
 
-			case ArgumentType.ITEM:
+			case ARGUMENT_TYPE.ITEM:
 				return this.findItem(value, config.source || "all", context);
 
-			case ArgumentType.DIRECTION:
+			case ARGUMENT_TYPE.DIRECTION:
 				return this.parseDirection(value);
 
 			default:

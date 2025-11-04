@@ -1,5 +1,5 @@
 import { string } from "mud-ext";
-import { Character, MessageGroup } from "./character.js";
+import { Character, MESSAGE_GROUP } from "./character.js";
 import logger from "./logger.js";
 
 /**
@@ -2579,7 +2579,7 @@ export class Mob extends Movable {
 		this.character?.sendLine(text);
 	}
 
-	public sendMessage(text: string, group: MessageGroup) {
+	public sendMessage(text: string, group: MESSAGE_GROUP) {
 		this.character?.sendMessage(text, group);
 	}
 

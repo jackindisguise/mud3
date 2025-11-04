@@ -4,7 +4,7 @@ import {
 	Command,
 	CommandContext,
 	CommandRegistry,
-	ArgumentType,
+	ARGUMENT_TYPE,
 	ParseResult,
 } from "./command.js";
 import { JavaScriptCommandAdapter } from "./package/commands.js";

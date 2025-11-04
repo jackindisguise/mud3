@@ -8,6 +8,7 @@
 	"main": "index.js",
 	"scripts": {
 		"build": "tsc",
+		"test:build": "npm run build && npm run test",
 		"test": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
 		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test",
 		"deploy": "npm run build && npm run test && npm run coverage",

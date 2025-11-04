@@ -2545,23 +2545,21 @@ export class Mob extends Movable {
 
 	/**
 	 * Sets the Character that controls this mob and establishes bidirectional reference.
-	 * @param newCharacter The Character instance to associate with this mob
+	 * @param char The Character instance to associate with this mob
 	 */
-	public set character(newCharacter: Character | undefined) {
-		// Clear old relationship if it exists
-		if (this._character && (this._character as any)._mob === this) {
-			(this._character as any)._mob = undefined;
+	public set character(char: Character | undefined) {
+		if (this.character === char) return;
+		const ochar = this.character;
+		this._character = char;
+
+		// If we're clearing or there was no change for the new character, still detach previous owner
+		if (ochar && ochar.mob === this) {
+			ochar.mob = new Mob();
 		}
 
-		this._character = newCharacter;
-
-		// Set up new bidirectional relationship
-		if (newCharacter && (newCharacter as any)._mob !== this) {
-			// Clear the new character's existing mob relationship if any
-			if ((newCharacter as any)._mob) {
-				((newCharacter as any)._mob as any)._character = undefined;
-			}
-			(newCharacter as any)._mob = this;
+		// Ensure the new character points to this mob
+		if (char && char.mob !== this) {
+			char.mob = this;
 		}
 	}
 

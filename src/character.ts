@@ -128,9 +128,26 @@ export interface CharacterOptions {
  * Serialized character data for persistence.
  * Contains all character information except runtime data like the mob instance.
  */
+export interface SerializedPlayerCredentials {
+	/** Player's username/login name */
+	username: string;
+	/** Hashed password (never store plain text) */
+	passwordHash: string;
+	/** Email address for account recovery */
+	email?: string;
+	/** Account creation timestamp (ISO string) */
+	createdAt: string;
+	/** Last login timestamp (ISO string) */
+	lastLogin?: string;
+	/** Account status flags */
+	isActive: boolean;
+	isBanned: boolean;
+	isAdmin: boolean;
+}
+
 export interface SerializedCharacter {
-	/** Player's account credentials and authentication info */
-	credentials: PlayerCredentials;
+	/** Player's account credentials and authentication info (serialized) */
+	credentials: SerializedPlayerCredentials;
 	/** Player's game settings and preferences */
 	settings: PlayerSettings;
 	/** Player's gameplay statistics and progression */
@@ -224,6 +241,7 @@ export class Character {
 	 * @param mob The new Mob instance to associate with this character
 	 */
 	public set mob(mob: Mob) {
+		if (this.mob === mob) return;
 		const omob = this._mob;
 		this._mob = mob; // start be silently setting new mob
 		// this ensures other setters in the bidirectional link
@@ -593,8 +611,20 @@ export class Character {
 	 * ```
 	 */
 	public serialize(): SerializedCharacter {
+		const c = this.credentials;
+		const serializedCreds: SerializedPlayerCredentials = {
+			username: c.username,
+			passwordHash: c.passwordHash,
+			email: c.email,
+			createdAt: c.createdAt.toISOString(),
+			lastLogin: c.lastLogin ? c.lastLogin.toISOString() : undefined,
+			isActive: c.isActive,
+			isBanned: c.isBanned,
+			isAdmin: c.isAdmin,
+		};
+
 		return {
-			credentials: this.credentials,
+			credentials: serializedCreds,
 			settings: this.settings,
 			stats: this.stats,
 			mob: this.mob.serialize() as SerializedMob,
@@ -617,8 +647,21 @@ export class Character {
 		// Deserialize the mob using the dungeon system's deserializer
 		const mob = Mob.deserialize(data.mob);
 
+		const creds: PlayerCredentials = {
+			username: data.credentials.username,
+			passwordHash: data.credentials.passwordHash,
+			email: data.credentials.email,
+			createdAt: new Date(data.credentials.createdAt),
+			lastLogin: data.credentials.lastLogin
+				? new Date(data.credentials.lastLogin)
+				: undefined,
+			isActive: data.credentials.isActive,
+			isBanned: data.credentials.isBanned,
+			isAdmin: data.credentials.isAdmin,
+		};
+
 		const character = new Character({
-			credentials: data.credentials,
+			credentials: creds,
 			settings: data.settings,
 			stats: data.stats,
 			mob: mob,

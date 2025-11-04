@@ -37,18 +37,6 @@ export async function saveCharacter(character: Character): Promise<void> {
 	await ensureDir();
 	const data: SerializedCharacter = character.serialize();
 	const filePath = getCharacterFilePath(character.credentials.username);
-	// Ensure Date fields are Date instances so YAML emits timestamps
-	if (data.credentials && data.credentials.createdAt) {
-		(data.credentials as any).createdAt = new Date(
-			data.credentials.createdAt as any
-		);
-	}
-	if (data.credentials && data.credentials.lastLogin) {
-		(data.credentials as any).lastLogin = new Date(
-			data.credentials.lastLogin as any
-		);
-	}
-
 	const yaml = YAML.dump(data as any, { noRefs: true, lineWidth: 120 });
 	await writeFile(filePath, yaml, "utf-8");
 	logger.debug(
@@ -74,24 +62,9 @@ export async function loadCharacter(
 	}
 
 	const content = await readFile(filePath, "utf-8");
-	const rawAny: any = YAML.load(content);
+	const raw = YAML.load(content) as SerializedCharacter;
 
-	const raw = rawAny as SerializedCharacter & {
-		credentials: { createdAt: string | Date; lastLogin?: string | Date };
-	};
-
-	// Rehydrate dates
-	const cr = raw.credentials as any;
-	if (cr) {
-		if (cr.createdAt && !(cr.createdAt instanceof Date)) {
-			cr.createdAt = new Date(cr.createdAt);
-		}
-		if (cr.lastLogin && !(cr.lastLogin instanceof Date)) {
-			cr.lastLogin = new Date(cr.lastLogin);
-		}
-	}
-
-	const character = Character.deserialize(raw as SerializedCharacter);
+	const character = Character.deserialize(raw);
 	return character;
 }
 

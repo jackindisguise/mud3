@@ -12,6 +12,7 @@ import {
 	DEFAULT_PLAYER_CREDENTIALS,
 } from "./character.js";
 import { Mob, Dungeon } from "./dungeon.js";
+import type { MudClient } from "./io.js";
 
 suite("Character", () => {
 	// Helper function to create test credentials
@@ -42,6 +43,18 @@ suite("Character", () => {
 		};
 
 		return new Character({ ...defaultOptions, ...overrides });
+	}
+
+	// Helper to create a lightweight mock MudClient for session tests
+	function createMockClient(): MudClient {
+		const mock = {
+			send: (_text: string) => {},
+			sendLine: (_text: string) => {},
+			close: () => {},
+			getAddress: () => "test:0",
+			isConnected: () => true,
+		};
+		return mock as unknown as MudClient;
 	}
 
 	suite("Constructor", () => {
@@ -156,7 +169,7 @@ suite("Character", () => {
 			const beforeLogin = Date.now();
 			const connectionId = 12345;
 
-			character.startSession(connectionId);
+			character.startSession(connectionId, createMockClient());
 
 			assert(character.session !== undefined);
 			assert.strictEqual(character.session.connectionId, connectionId);
@@ -173,7 +186,7 @@ suite("Character", () => {
 			const initialPlaytime = character.stats.playtime;
 			const connectionId = 12345;
 
-			character.startSession(connectionId);
+			character.startSession(connectionId, createMockClient());
 			// Simulate some time passing by modifying the session start time
 			const sessionStart = character.session!.startTime;
 			character.session!.startTime = new Date(sessionStart.getTime() - 5000); // 5 seconds ago
@@ -201,7 +214,7 @@ suite("Character", () => {
 			// No session
 			assert.strictEqual(character.getSessionDuration(), 0);
 
-			character.startSession(connectionId);
+			character.startSession(connectionId, createMockClient());
 			// Set session start to 10 seconds ago
 			character.session!.startTime = new Date(Date.now() - 10000);
 
@@ -293,7 +306,7 @@ suite("Character", () => {
 			character.stats.playtime = 30 * 60 * 1000; // 30 minutes base
 			const connectionId = 12345;
 
-			character.startSession(connectionId);
+			character.startSession(connectionId, createMockClient());
 			character.session!.startTime = new Date(Date.now() - 15 * 60 * 1000); // 15 minutes ago
 
 			const formatted = character.getFormattedPlaytime();
@@ -364,7 +377,7 @@ suite("Character", () => {
 		test("should exclude runtime data from serialization", () => {
 			const character = createTestCharacter();
 			const connectionId = 12345;
-			character.startSession(connectionId);
+			character.startSession(connectionId, createMockClient());
 
 			const serialized = character.serialize();
 

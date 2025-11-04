@@ -1,6 +1,19 @@
-import { Mob, SerializedMob, DungeonObject } from "./dungeon.js";
+import { Mob, SerializedMob } from "./dungeon.js";
 import { createHash } from "crypto";
 import { CONFIG } from "./package/config.js";
+import type { MudClient } from "./io.js";
+
+/**
+ * Message groups categorize outgoing messages to control when a prompt is shown.
+ * When a character receives a message whose group differs from the last one
+ * they received, we append a blank line and then show the prompt.
+ */
+export enum MessageGroup {
+	INFO = "INFO",
+	COMBAT = "COMBAT",
+	COMMAND_RESPONSE = "COMMAND_RESPONSE",
+	SYSTEM = "SYSTEM",
+}
 
 /**
  * Player-specific settings and configuration.
@@ -91,6 +104,10 @@ export interface PlayerSession {
 	startTime: Date;
 	/** Connection identifier for this session */
 	connectionId: number;
+	/** The connected client for this session (if any) */
+	client: MudClient;
+	/** Last message group received in this session */
+	lastMessageGroup?: MessageGroup;
 }
 
 /**
@@ -311,10 +328,11 @@ export class Character {
 	 * console.log(`Session started for ${character.credentials.username}`);
 	 * ```
 	 */
-	public startSession(connectionId: number): void {
+	public startSession(connectionId: number, client: MudClient): void {
 		this.session = {
 			startTime: new Date(),
 			connectionId,
+			client,
 		};
 		this.updateLastLogin(this.session.startTime);
 	}
@@ -416,6 +434,37 @@ export class Character {
 	 */
 	public recordKill(): void {
 		this.stats.kills++;
+	}
+
+	/**
+	 * Send raw text to the currently connected client for this character.
+	 * If no client is connected, this is a no-op.
+	 */
+	public send(text: string) {
+		this.session?.client.send(text);
+	}
+
+	/**
+	 * Send a line of text (with newline) to the currently connected client.
+	 * If no client is connected, this is a no-op.
+	 */
+	public sendLine(text: string) {
+		this.session?.client.sendLine(text);
+	}
+
+	/** Core routine for group-aware sending */
+	public sendMessage(text: string, group: MessageGroup): void {
+		const session = this.session;
+		const client = session?.client;
+		if (!session || !client || !client.isConnected()) return;
+		else client.sendLine(text);
+
+		const last = session.lastMessageGroup;
+		if (last !== undefined && last !== group) {
+			client.sendLine("");
+			client.send(this.settings.prompt ?? "> ");
+		}
+		session.lastMessageGroup = group;
 	}
 
 	/**

@@ -1,5 +1,5 @@
 import { string } from "mud-ext";
-import { Character } from "./character.js";
+import { Character, MessageGroup } from "./character.js";
 import logger from "./logger.js";
 
 /**
@@ -2563,6 +2563,24 @@ export class Mob extends Movable {
 			}
 			(newCharacter as any)._mob = this;
 		}
+	}
+
+	/**
+	 * Send text to the controlling character's client, if any.
+	 */
+	public send(text: string): void {
+		this.character?.send(text);
+	}
+
+	/**
+	 * Send a line to the controlling character's client, if any.
+	 */
+	public sendLine(text: string): void {
+		this.character?.sendLine(text);
+	}
+
+	public sendMessage(text: string, group: MessageGroup) {
+		this.character?.sendMessage(text, group);
 	}
 
 	/**

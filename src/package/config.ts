@@ -1,11 +1,11 @@
 import { Package } from "package-loader";
 import { join, relative } from "path";
 import { readFile, writeFile } from "fs/promises";
-import TOML from "smol-toml";
+import YAML from "js-yaml";
 import logger from "../logger.js";
 
 const DATA_DIRECTORY = join(process.cwd(), "data");
-const CONFIG_PATH = join(DATA_DIRECTORY, "config.toml");
+const CONFIG_PATH = join(DATA_DIRECTORY, "config.yaml");
 
 export type GameConfig = {
 	name: string;
@@ -51,11 +51,12 @@ export const CONFIG: Config = {
 export default {
 	name: "config",
 	loader: async () => {
-		// read config.toml
+		// read config.yaml
 		logger.info(`Loading config from ${relative(process.cwd(), CONFIG_PATH)}`);
 		try {
 			const content = await readFile(CONFIG_PATH, "utf-8");
-			const config = TOML.parse(content) as Partial<Config>;
+			const parsed = YAML.load(content) as Partial<Config> | undefined;
+			const config = parsed ?? {};
 
 			// merge game config
 			if (config.game) {
@@ -111,7 +112,7 @@ export default {
 			logger.debug(
 				`Config file not found or unreadable, creating default at ${CONFIG_PATH}`
 			);
-			const defaultContent = TOML.stringify(CONFIG_DEFAULT);
+			const defaultContent = YAML.dump(CONFIG_DEFAULT, { noRefs: true, lineWidth: 120 });
 			await writeFile(CONFIG_PATH, defaultContent, "utf-8");
 			logger.info("Default config file created");
 		}

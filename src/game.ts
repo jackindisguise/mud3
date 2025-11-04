@@ -2,7 +2,10 @@ import { MudServer, MudClient } from "./io.js";
 import { Character, SerializedCharacter } from "./character.js";
 import { Mob } from "./dungeon.js";
 import { CONFIG } from "./package/config.js";
-import { characterPersistence } from "./package/character/index.js";
+import {
+	saveCharacter as saveCharacterFile,
+	loadCharacter as loadCharacterFile,
+} from "./package/character.js";
 import logger from "./logger.js";
 
 /**
@@ -63,12 +66,9 @@ export class Game {
 	 * Start the game server and begin accepting connections
 	 */
 	async start(): Promise<void> {
-		// Initialize character persistence
-		await characterPersistence.initialize();
-
 		// Set up server event handlers
 		this.server.on("listening", () => {
-			logger.info(`MUD server listening on port ${this.config.server.port}`);
+			//logger.info(`MUD server listening on port ${this.config.server.port}`);
 		});
 
 		this.server.on("connection", (client: MudClient) => {
@@ -338,8 +338,8 @@ export class Game {
 		const connectionId = this.nextConnectionId++;
 		const clientAddress = session.client.getAddress();
 
-		// Start character session
-		character.startSession(connectionId);
+		// Start character session (attach client for convenience send helpers)
+		character.startSession(connectionId, session.client);
 
 		// Move to playing state
 		session.state = LoginState.PLAYING;
@@ -390,8 +390,7 @@ export class Game {
 	 * Save a single character to persistence
 	 */
 	private async saveCharacter(character: Character): Promise<void> {
-		// TODO: Implement proper persistence (file system, database, etc.)
-		const serialized = character.serialize();
+		await saveCharacterFile(character);
 		logger.debug(`Saved character: ${character.credentials.username}`);
 	}
 
@@ -401,8 +400,8 @@ export class Game {
 	private async loadCharacter(
 		username: string
 	): Promise<SerializedCharacter | null> {
-		// TODO: Implement proper persistence loading
-		return null;
+		const character = await loadCharacterFile(username);
+		return character ? character.serialize() : null;
 	}
 
 	/**

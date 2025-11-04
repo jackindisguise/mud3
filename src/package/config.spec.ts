@@ -3,11 +3,11 @@ import assert from "node:assert";
 import { readFile, writeFile, unlink, copyFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
-import TOML from "smol-toml";
+import YAML from "js-yaml";
 import config, { CONFIG, CONFIG_DEFAULT } from "./config.js";
 
-const CONFIG_PATH = join(process.cwd(), "data", "config.toml");
-const BACKUP_PATH = join(process.cwd(), "data", "config.toml.backup");
+const CONFIG_PATH = join(process.cwd(), "data", "config.yaml");
+const BACKUP_PATH = join(process.cwd(), "data", "config.yaml.backup");
 
 suite("config.ts", () => {
 	before(async () => {
@@ -42,7 +42,7 @@ suite("config.ts", () => {
 
 		// Verify file content matches default
 		const content = await readFile(CONFIG_PATH, "utf-8");
-		const parsedConfig = TOML.parse(content);
+		const parsedConfig = YAML.load(content);
 		assert.deepStrictEqual(parsedConfig, CONFIG_DEFAULT);
 	});
 
@@ -58,7 +58,11 @@ suite("config.ts", () => {
 				inactivity_timeout: 3600,
 			},
 		};
-		await writeFile(CONFIG_PATH, TOML.stringify(testConfig), "utf-8");
+		await writeFile(
+			CONFIG_PATH,
+			YAML.dump(testConfig, { noRefs: true, lineWidth: 120 }),
+			"utf-8"
+		);
 
 		// Reset CONFIG to default
 		Object.assign(CONFIG.game, CONFIG_DEFAULT.game);
@@ -84,7 +88,11 @@ suite("config.ts", () => {
 				port: 9000,
 			},
 		};
-		await writeFile(CONFIG_PATH, TOML.stringify(testConfig), "utf-8");
+		await writeFile(
+			CONFIG_PATH,
+			YAML.dump(testConfig, { noRefs: true, lineWidth: 120 }),
+			"utf-8"
+		);
 
 		// Reset CONFIG to default
 		Object.assign(CONFIG.game, CONFIG_DEFAULT.game);
@@ -117,7 +125,11 @@ suite("config.ts", () => {
 				anotherBadField: 999,
 			},
 		};
-		await writeFile(CONFIG_PATH, TOML.stringify(testConfig), "utf-8");
+		await writeFile(
+			CONFIG_PATH,
+			YAML.dump(testConfig, { noRefs: true, lineWidth: 120 }),
+			"utf-8"
+		);
 
 		// Reset CONFIG to default
 		Object.assign(CONFIG.game, CONFIG_DEFAULT.game);
@@ -143,7 +155,11 @@ suite("config.ts", () => {
 				creator: "TestCreator",
 			},
 		};
-		await writeFile(CONFIG_PATH, TOML.stringify(testConfig), "utf-8");
+		await writeFile(
+			CONFIG_PATH,
+			YAML.dump(testConfig, { noRefs: true, lineWidth: 120 }),
+			"utf-8"
+		);
 
 		// Reset CONFIG to default
 		Object.assign(CONFIG.game, CONFIG_DEFAULT.game);
@@ -176,7 +192,11 @@ suite("config.ts", () => {
 				inactivity_timeout: 1200,
 			},
 		};
-		await writeFile(CONFIG_PATH, TOML.stringify(testConfig), "utf-8");
+		await writeFile(
+			CONFIG_PATH,
+			YAML.dump(testConfig, { noRefs: true, lineWidth: 120 }),
+			"utf-8"
+		);
 
 		// Reset config
 		Object.assign(CONFIG.game, CONFIG_DEFAULT.game);

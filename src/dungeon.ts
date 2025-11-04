@@ -1,4 +1,5 @@
 import { string } from "mud-ext";
+import { Character } from "./character.js";
 import logger from "./logger.js";
 
 /**
@@ -1293,6 +1294,91 @@ export interface RoomOptions extends DungeonObjectOptions {
 }
 
 /**
+ * Base serialized form for all DungeonObject types.
+ * Contains the core properties that all dungeon objects share when serialized.
+ *
+ * @property type - The class name of the original object for proper deserialization
+ * @property keywords - Space-delimited identification keywords
+ * @property display - Human-readable display name
+ * @property description - Detailed object description
+ * @property contents - Array of serialized contained objects
+ * @property dungeonId - ID of the dungeon this object belongs to (if any)
+ */
+export interface SerializedDungeonObject {
+	type: SerializedDungeonObjectType;
+	keywords: string;
+	display: string;
+	description: string;
+	contents?: SerializedDungeonObject[];
+	location?: string; // RoomRef value
+}
+
+/**
+ * Serialized form for Room objects.
+ * Extends the base serialized form with room-specific coordinate data.
+ *
+ * @property coordinates - The room's position in the dungeon grid
+ */
+export interface SerializedRoom extends SerializedDungeonObject {
+	type: "Room";
+	coordinates: Coordinates;
+}
+
+/**
+ * Serialized form for Movable objects.
+ * Currently identical to base form but defined for type safety and future extensions.
+ */
+export interface SerializedMovable extends SerializedDungeonObject {
+	type: "Movable";
+}
+
+/**
+ * Serialized form for Mob objects.
+ * Currently identical to Movable form but defined for type safety and future extensions.
+ */
+export interface SerializedMob extends SerializedDungeonObject {
+	type: "Mob";
+}
+
+/**
+ * Serialized form for Item objects.
+ * Currently identical to Movable form but defined for type safety and future extensions.
+ */
+export interface SerializedItem extends SerializedDungeonObject {
+	type: "Item";
+}
+
+/**
+ * Serialized form for Prop objects.
+ * Currently identical to base form but defined for type safety and future extensions.
+ */
+export interface SerializedProp extends SerializedDungeonObject {
+	type: "Prop";
+}
+
+/**
+ * Union type representing valid serialized object types.
+ */
+export type SerializedDungeonObjectType =
+	| "DungeonObject"
+	| "Room"
+	| "Movable"
+	| "Mob"
+	| "Item"
+	| "Prop";
+
+/**
+ * Union type representing any valid serialized dungeon object form.
+ */
+export type AnySerializedDungeonObject =
+	| SerializedDungeonObject
+	| SerializedRoom
+	| SerializedMovable
+	| SerializedMob
+	| SerializedItem
+	| SerializedProp;
+
+/**
  * Base class for all objects that can exist in the dungeon.
  * Provides core functionality for object identification, containment, and location management.
  *
@@ -1658,6 +1744,114 @@ export class DungeonObject {
 	move(dobj: DungeonObject | undefined) {
 		this.location = dobj;
 	}
+
+	/**
+	 * Serializes the dungeon object data for persistence.
+	 * Includes dungeon ID when the object belongs to a registered dungeon.
+	 * Contents are serialized recursively to preserve the object hierarchy.
+	 *
+	 * @returns Serializable object data with type information
+	 *
+	 * @example
+	 * ```typescript
+	 * const chest = new DungeonObject({
+	 *   keywords: "wooden chest",
+	 *   display: "Wooden Chest",
+	 *   description: "A sturdy wooden chest with iron hinges."
+	 * });
+	 *
+	 * const coin = new DungeonObject({ keywords: "gold coin" });
+	 * chest.add(coin);
+	 *
+	 * const saveData = chest.serialize();
+	 * // saveData contains type, keywords, display, description, contents, and dungeonId (if any)
+	 * ```
+	 */
+	serialize(): SerializedDungeonObject {
+		const locationRef =
+			this.location instanceof Room ? this.location.getRoomRef() : undefined;
+		const serializedContents = this._contents.map((obj) => obj.serialize());
+		return {
+			type: this.constructor.name as SerializedDungeonObjectType,
+			keywords: this.keywords,
+			display: this.display,
+			description: this.description,
+			...(serializedContents.length > 0 && { contents: serializedContents }),
+			...(locationRef && { location: locationRef }),
+		};
+	}
+
+	/**
+	 * Creates a DungeonObject instance from serialized data.
+	 * Recursively deserializes contained objects to restore the object hierarchy.
+	 * Note: This creates a new object hierarchy separate from any existing dungeon.
+	 * The dungeonId field is preserved but objects are not automatically added to dungeons.
+	 *
+	 * @param data Serialized object data
+	 * @returns New DungeonObject instance with restored hierarchy
+	 *
+	 * @example
+	 * ```typescript
+	 * const saveData: SerializedDungeonObject = {
+	 *   type: "DungeonObject",
+	 *   keywords: "wooden chest",
+	 *   display: "Wooden Chest",
+	 *   description: "A sturdy wooden chest.",
+	 *   contents: [
+	 *     {
+	 *       type: "Item",
+	 *       keywords: "gold coin",
+	 *       display: "Gold Coin",
+	 *       description: "A shiny gold coin.",
+	 *       contents: [],
+	 *     }
+	 *   ],
+	 *   dungeonId: "main-dungeon"
+	 * };
+	 *
+	 * const chest = DungeonObject.deserialize(saveData);
+	 * console.log(chest.keywords); // "wooden chest"
+	 * console.log(chest.contents.length); // 1
+	 * console.log(chest.contents[0].keywords); // "gold coin"
+	 * // Note: dungeonId is preserved in the serialized data but objects
+	 * // are not automatically added to dungeons during deserialization
+	 * ```
+	 */
+	public static deserialize(data: AnySerializedDungeonObject): DungeonObject {
+		/** shortcut support */
+		switch (data.type) {
+			case "Room":
+				// Delegate to Room-specific deserializer
+				return Room.deserialize(data as SerializedRoom);
+			case "Movable":
+				return Movable.deserialize(data as SerializedMovable);
+			case "Mob":
+				return Mob.deserialize(data as SerializedMob);
+			case "Item":
+				return Item.deserialize(data as SerializedItem);
+			case "Prop":
+				return Prop.deserialize(data as SerializedProp);
+			case "DungeonObject":
+				// handled in main body
+				break;
+			default: // type is not recognized or not set
+				// we never get to the main body!
+				throw new Error("no valid type to deserialize");
+		}
+
+		// DungeonObjects in particular
+		let obj: DungeonObject = new DungeonObject(data);
+
+		// Handle contents for all object types
+		if (data.contents) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				obj.add(contentObj);
+			}
+		}
+
+		return obj;
+	}
 }
 
 /**
@@ -1727,10 +1921,6 @@ export interface Coordinates {
  * - Container functionality (inherited)
  */
 export class Room extends DungeonObject {
-	keywords = "room";
-	display = "A Room";
-	description = "It's a room.";
-
 	/**
 	 * The position of this room in the dungeon's coordinate system.
 	 * Set during construction and immutable afterwards.
@@ -1805,6 +1995,20 @@ export class Room extends DungeonObject {
 	constructor(options: RoomOptions) {
 		super(options);
 		this._coordinates = options.coordinates;
+	}
+
+	/**
+	 * Deserialize a SerializedRoom into a Room instance.
+	 */
+	public static deserialize(data: SerializedRoom): Room {
+		const room = new Room(data);
+		if (data.contents && Array.isArray(data.contents)) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				room.add(contentObj);
+			}
+		}
+		return room;
 	}
 
 	/**
@@ -1987,6 +2191,34 @@ export class Room extends DungeonObject {
 		if (!this.dungeon?.id) return undefined;
 		return `@${this.dungeon.id}{${this.x},${this.y},${this.z}}`;
 	}
+
+	/**
+	 * Serializes the room data for persistence.
+	 * Includes coordinates in addition to the base DungeonObject data.
+	 *
+	 * @returns Serializable room data with type information
+	 *
+	 * @example
+	 * ```typescript
+	 * const room = new Room({
+	 *   coordinates: { x: 5, y: 3, z: 1 },
+	 *   keywords: "throne room",
+	 *   display: "Royal Throne Room",
+	 *   description: "A magnificent throne room with golden pillars."
+	 * });
+	 *
+	 * const saveData = room.serialize();
+	 * // saveData includes coordinates along with other room properties
+	 * ```
+	 */
+	serialize(): SerializedRoom {
+		const baseData = super.serialize();
+		return {
+			...baseData,
+			type: "Room" as const,
+			coordinates: this.coordinates,
+		};
+	}
 }
 
 /**
@@ -2031,6 +2263,20 @@ export class Movable extends DungeonObject {
 	 * @private
 	 */
 	private _coordinates: Coordinates | undefined;
+
+	/**
+	 * Deserialize a SerializedMovable into a Movable instance.
+	 */
+	public static deserialize(data: AnySerializedDungeonObject): Movable {
+		const movable = new Movable(data as SerializedMovable);
+		if (data.contents && Array.isArray(data.contents)) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				movable.add(contentObj);
+			}
+		}
+		return movable;
+	}
 
 	/**
 	 * Set the location (container) of this movable object.
@@ -2266,17 +2512,92 @@ export class Movable extends DungeonObject {
  * They will be used to generate extra descriptions for the room, or they might
  * be a sign that is in the room that can be read.
  */
-export class Prop extends DungeonObject {}
+export class Prop extends DungeonObject {
+	/**
+	 * Deserialize a SerializedProp into a Prop instance.
+	 */
+	public static deserialize(data: SerializedProp): Prop {
+		const prop = new Prop(data);
+		if (data.contents && Array.isArray(data.contents)) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				prop.add(contentObj);
+			}
+		}
+		return prop;
+	}
+}
 
 /**
  * These are mobs. They get into fights, interact with stuff, and die.
  */
-export class Mob extends Movable {}
+export class Mob extends Movable {
+	/** Private storage for the Character reference */
+	private _character?: Character;
+
+	/**
+	 * Gets the Character that controls this mob (if any).
+	 * @returns The Character instance or undefined for NPCs
+	 */
+	public get character(): Character | undefined {
+		return this._character;
+	}
+
+	/**
+	 * Sets the Character that controls this mob and establishes bidirectional reference.
+	 * @param newCharacter The Character instance to associate with this mob
+	 */
+	public set character(newCharacter: Character | undefined) {
+		// Clear old relationship if it exists
+		if (this._character && (this._character as any)._mob === this) {
+			(this._character as any)._mob = undefined;
+		}
+
+		this._character = newCharacter;
+
+		// Set up new bidirectional relationship
+		if (newCharacter && (newCharacter as any)._mob !== this) {
+			// Clear the new character's existing mob relationship if any
+			if ((newCharacter as any)._mob) {
+				((newCharacter as any)._mob as any)._character = undefined;
+			}
+			(newCharacter as any)._mob = this;
+		}
+	}
+
+	/**
+	 * Deserialize a SerializedMob into a Mob instance.
+	 */
+	public static deserialize(data: SerializedMob): Mob {
+		const mob = new Mob(data);
+		if (data.contents && Array.isArray(data.contents)) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				mob.add(contentObj);
+			}
+		}
+		return mob;
+	}
+}
 
 /**
  * There are items. They are the things that mobs pick up, equip, use, drop, throw, etc.
  */
-export class Item extends Movable {}
+export class Item extends Movable {
+	/**
+	 * Deserialize a SerializedItem into an Item instance.
+	 */
+	public static deserialize(data: SerializedItem): Item {
+		const item = new Item(data);
+		if (data.contents && Array.isArray(data.contents)) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				item.add(contentObj);
+			}
+		}
+		return item;
+	}
+}
 
 /**
  * Global registry of created RoomLink instances.

@@ -31,7 +31,7 @@ suite("command.ts", () => {
 			const actor = new Mob({ keywords: "player" });
 			room?.add(actor);
 
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = command.parse("ooc Hello, world!", context);
 
 			assert.strictEqual(result.success, true);
@@ -49,7 +49,7 @@ suite("command.ts", () => {
 			});
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 
 			const result1 = command.parse("look north", context);
 			assert.strictEqual(result1.success, true);
@@ -66,7 +66,7 @@ suite("command.ts", () => {
 			});
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 
 			const result = command.parse("drop 5 gold coins", context);
 			assert.strictEqual(result.success, true);
@@ -88,7 +88,7 @@ suite("command.ts", () => {
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			room?.add(actor);
 			room?.add(sword);
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = command.parse("get sword", context);
 
 			assert.strictEqual(result.success, true);
@@ -104,7 +104,7 @@ suite("command.ts", () => {
 			const actor = new Mob({ keywords: "player" });
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			actor.add(sword);
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 			const result = command.parse("drop sword", context);
 
 			assert.strictEqual(result.success, true);
@@ -128,7 +128,7 @@ suite("command.ts", () => {
 			room?.add(actor);
 			actor.add(coin);
 			room?.add(bag);
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = command.parse("put coin in bag", context);
 
 			assert.strictEqual(result.success, true);
@@ -151,7 +151,7 @@ suite("command.ts", () => {
 			const target = new Mob({ keywords: "bob" });
 			room?.add(actor);
 			room?.add(target);
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 
 			const result1 = command.parse("tell bob hello", context);
 			assert.strictEqual(result1.success, true);
@@ -169,7 +169,7 @@ suite("command.ts", () => {
 			});
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 
 			const result = command.parse("say", context);
 			assert.strictEqual(result.success, false);
@@ -188,7 +188,7 @@ suite("command.ts", () => {
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 			const actor = new Mob({ keywords: "player" });
 			room?.add(actor);
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = command.parse("get sword", context);
 
 			assert.strictEqual(result.success, false);
@@ -209,7 +209,7 @@ suite("command.ts", () => {
 			});
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 
 			const result = command.parse("say", context);
 			assert.strictEqual(result.success, false);
@@ -248,7 +248,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(command);
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "test hello" };
+			const context: CommandContext = { actor };
 
 			const result = CommandRegistry.default.execute("test hello", context);
 			assert.strictEqual(result, true);
@@ -266,7 +266,7 @@ suite("command.ts", () => {
 			);
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "unknown command" };
+			const context: CommandContext = { actor };
 
 			const result = CommandRegistry.default.execute(
 				"unknown command",
@@ -298,7 +298,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(command);
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "say" };
+			const context: CommandContext = { actor };
 
 			const result = CommandRegistry.default.execute("say", context);
 			assert.strictEqual(result, true); // Command matched
@@ -337,7 +337,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(cmd2);
 
 			const actor = new Mob();
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 
 			CommandRegistry.default.execute("cmd2 test", context);
 			assert.strictEqual(executed1, false);
@@ -382,7 +382,7 @@ suite("command.ts", () => {
 			});
 
 			const actor = new Mob({ display: "Player" });
-			const context: CommandContext = { actor, input: "" };
+			const context: CommandContext = { actor };
 
 			const result = command.parse("ooc Hello everyone!", context);
 			assert.strictEqual(result.success, true);
@@ -413,7 +413,7 @@ suite("command.ts", () => {
 			room?.add(actor);
 			room?.add(sword);
 
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = getCommand.parse("get sword", context);
 
 			assert.strictEqual(result.success, true);
@@ -444,7 +444,7 @@ suite("command.ts", () => {
 			room?.add(chest);
 			chest.add(coin);
 
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = getFromCommand.parse("get coin from chest", context);
 
 			assert.strictEqual(result.success, true);
@@ -474,12 +474,212 @@ suite("command.ts", () => {
 			room?.add(actor);
 			room?.add(goblin);
 
-			const context: CommandContext = { actor, room, input: "" };
+			const context: CommandContext = { actor, room };
 			const result = killCommand.parse("kill goblin", context);
 
 			assert.strictEqual(result.success, true);
 			killCommand.execute(context, result.args);
 			assert.strictEqual(attacked, goblin);
+		});
+	});
+
+	suite("Error Message Patterns", () => {
+		test('should return "Missing required argument" when required argument is empty', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "say <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("say", context);
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Missing required argument: message");
+		});
+
+		test('should return "Missing required argument" when required word argument is missing', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "greet <name:word>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("greet", context);
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Missing required argument: name");
+		});
+
+		test('should return "Input does not match command pattern" when number contains non-digits', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "give <amount:number>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("give notanumber", context);
+			assert.strictEqual(result.success, false);
+			// Non-digit input doesn't match the \d+ regex pattern for numbers
+			assert.strictEqual(result.error, "Input does not match command pattern");
+		});
+
+		test('should return "Could not parse argument" when object is not found', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "get <item:object>",
+				execute() {},
+			});
+
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+			const actor = new Mob({ keywords: "player" });
+			room?.add(actor);
+
+			const context: CommandContext = { actor, room };
+			const result = command.parse("get sword", context);
+
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Could not parse argument: item");
+		});
+
+		test('should return "Could not parse argument" when mob is not found', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "tell <target:mob> <message:text>",
+				execute() {},
+			});
+
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+			const actor = new Mob({ keywords: "player" });
+			room?.add(actor);
+
+			const context: CommandContext = { actor, room };
+			const result = command.parse("tell bob hi", context);
+
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Could not parse argument: target");
+		});
+
+		test('should return "Could not parse argument" when item is not found', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "drop <item:item>",
+				execute() {},
+			});
+
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+			const actor = new Mob({ keywords: "player" });
+			room?.add(actor);
+
+			const context: CommandContext = { actor, room };
+			const result = command.parse("drop sword", context);
+
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Could not parse argument: item");
+		});
+
+		test('should return "Could not parse argument: X" when direction is invalid', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "go <dir:direction>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("go sideways", context);
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Could not parse argument: dir");
+		});
+
+		test("should succeed with optional argument missing", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "look <direction:direction?>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("look", context);
+			assert.strictEqual(result.success, true);
+			assert.strictEqual(result.args.has("direction"), false);
+		});
+
+		test("should succeed when optional argument parsing fails", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "look <direction:direction?>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("look invalid", context);
+			// Optional args that fail to parse don't cause errors
+			assert.strictEqual(result.success, true);
+			assert.strictEqual(result.args.has("direction"), false);
+		});
+
+		test("should handle multiple required arguments with specific error for first missing", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "give <item:item> to <target:mob>",
+				execute() {},
+			});
+
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+			const actor = new Mob({ keywords: "player" });
+			room?.add(actor);
+
+			const context: CommandContext = {
+				actor,
+				room,
+			};
+			const result = command.parse("give sword to bob", context);
+
+			assert.strictEqual(result.success, false);
+			// When the item doesn't exist, parsing fails for the first argument
+			assert.strictEqual(result.error, "Could not parse argument: item");
+		});
+
+		test('should return "Input does not match command pattern" when regex fails to match', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "say <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("shout hello", context);
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Input does not match command pattern");
+		});
+
+		test('should return "Input does not match command pattern" when literal text does not match', () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "give <amount:number> gold",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const result = command.parse("give 10 silver", context);
+			assert.strictEqual(result.success, false);
+			assert.strictEqual(result.error, "Input does not match command pattern");
 		});
 	});
 });

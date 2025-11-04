@@ -10,7 +10,11 @@ const __dirname = path.dirname(__filename);
 const isTestMode = process.env.NODE_TEST_CONTEXT;
 
 // Generate timestamp for log filenames (YYYY-MM-DD)
-const logTimestamp = new Date().toISOString().split("T")[0];
+const timestamp = new Date().toISOString().split("T");
+const date = timestamp[0];
+const hmsTimestamp = timestamp[1];
+const zTimestamp = hmsTimestamp.split(".")[0];
+const HMS = zTimestamp.split(":").join("");
 const testSuffix = isTestMode ? ".test" : "";
 
 /**
@@ -48,15 +52,16 @@ const logger = winston.createLogger({
 		winston.format.splat(),
 		winston.format.json()
 	),
-	defaultMeta: { service: "mud-command" },
+	defaultMeta: { service: "mud3" },
 	transports: [
 		// File transport - plain text without colors
 		new winston.transports.File({
 			filename: path.join(
 				__dirname,
 				"..",
+				"..",
 				"logs",
-				`error-${logTimestamp}${testSuffix}.log`
+				`error-${date}-${HMS}${testSuffix}.log`
 			),
 			level: "error",
 			format: winston.format.combine(
@@ -74,8 +79,9 @@ const logger = winston.createLogger({
 			filename: path.join(
 				__dirname,
 				"..",
+				"..",
 				"logs",
-				`app-${logTimestamp}${testSuffix}.log`
+				`app-${date}-${HMS}${testSuffix}.log`
 			),
 			level: "debug", // File gets all logs including debug
 			format: winston.format.combine(

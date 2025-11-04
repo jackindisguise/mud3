@@ -13,8 +13,17 @@ import {
 	getDungeonById,
 	getRoomByRef,
 	Movable,
+	Mob,
+	Item,
+	Prop,
 	RoomLink,
 	DIRECTIONS,
+	type SerializedDungeonObject,
+	type SerializedRoom,
+	type SerializedMovable,
+	type SerializedMob,
+	type SerializedItem,
+	type SerializedProp,
 } from "./dungeon.js";
 
 suite("dungeon.ts", () => {
@@ -1136,6 +1145,824 @@ suite("dungeon.ts", () => {
 			// Return to center
 			movable.step(DIRECTION.NORTHEAST);
 			assert.deepStrictEqual(movable.coordinates, { x: 1, y: 1, z: 1 });
+		});
+	});
+
+	suite("Serialization", () => {
+		suite("DungeonObject", () => {
+			test("should serialize basic properties correctly", () => {
+				const obj = new DungeonObject({
+					keywords: "wooden chest treasure",
+					display: "Wooden Treasure Chest",
+					description: "A sturdy wooden chest bound with iron bands.",
+				});
+
+				const serialized = obj.serialize();
+
+				assert.strictEqual(serialized.type, "DungeonObject");
+				assert.strictEqual(serialized.keywords, "wooden chest treasure");
+				assert.strictEqual(serialized.display, "Wooden Treasure Chest");
+				assert.strictEqual(
+					serialized.description,
+					"A sturdy wooden chest bound with iron bands."
+				);
+				assert.strictEqual(serialized.contents, undefined);
+				assert.strictEqual(serialized.location, undefined);
+			});
+
+			test("should serialize nested contents recursively", () => {
+				const chest = new DungeonObject({
+					keywords: "wooden chest",
+					display: "Wooden Chest",
+				});
+				const coin = new DungeonObject({
+					keywords: "gold coin",
+					display: "Gold Coin",
+				});
+				const gem = new DungeonObject({
+					keywords: "ruby gem",
+					display: "Ruby Gem",
+				});
+
+				chest.add(coin, gem);
+				const serialized = chest.serialize();
+
+				assert.ok(serialized.contents);
+				assert.strictEqual(serialized.contents.length, 2);
+				assert.strictEqual(serialized.contents[0].type, "DungeonObject");
+				assert.strictEqual(serialized.contents[0].keywords, "gold coin");
+				assert.strictEqual(serialized.contents[1].type, "DungeonObject");
+				assert.strictEqual(serialized.contents[1].keywords, "ruby gem");
+			});
+
+			test("should include location when object is in a room with dungeon ID", () => {
+				const dungeonId = "test-serialization-dungeon";
+				const dungeon = Dungeon.generateEmptyDungeon({
+					id: dungeonId,
+					dimensions: { width: 5, height: 5, layers: 2 },
+				});
+
+				try {
+					const room = dungeon.getRoom({ x: 2, y: 3, z: 1 });
+					assert(room);
+
+					const obj = new DungeonObject({
+						keywords: "test object",
+						display: "Test Object",
+					});
+					room.add(obj);
+
+					const serialized = obj.serialize();
+					assert.strictEqual(
+						serialized.location,
+						"@test-serialization-dungeon{2,3,1}"
+					);
+				} finally {
+					DUNGEON_REGISTRY.delete(dungeonId);
+				}
+			});
+
+			test("should not include location when object is not in a room", () => {
+				const obj = new DungeonObject();
+				const container = new DungeonObject();
+				container.add(obj);
+
+				const serialized = obj.serialize();
+				assert.strictEqual(serialized.location, undefined);
+			});
+
+			test("should not include location when room has no dungeon ID", () => {
+				const dungeon = Dungeon.generateEmptyDungeon({
+					dimensions: { width: 3, height: 3, layers: 1 },
+				});
+				const room = dungeon.getRoom({ x: 1, y: 1, z: 0 });
+				assert(room);
+
+				const obj = new DungeonObject();
+				room.add(obj);
+
+				const serialized = obj.serialize();
+				assert.strictEqual(serialized.location, undefined);
+			});
+
+			test("should serialize deeply nested hierarchies", () => {
+				const backpack = new DungeonObject({
+					keywords: "leather backpack",
+					display: "Leather Backpack",
+				});
+				const pouch = new DungeonObject({
+					keywords: "small pouch",
+					display: "Small Pouch",
+				});
+				const coin = new DungeonObject({
+					keywords: "gold coin",
+					display: "Gold Coin",
+				});
+
+				backpack.add(pouch);
+				pouch.add(coin);
+
+				const serialized = backpack.serialize();
+				assert.ok(serialized.contents);
+				assert.strictEqual(serialized.contents.length, 1);
+				assert.strictEqual(serialized.contents[0].keywords, "small pouch");
+				assert.ok(serialized.contents[0].contents);
+				assert.strictEqual(serialized.contents[0].contents.length, 1);
+				assert.strictEqual(
+					serialized.contents[0].contents[0].keywords,
+					"gold coin"
+				);
+			});
+		});
+
+		suite("Room", () => {
+			test("should serialize with coordinates", () => {
+				const room = new Room({
+					coordinates: { x: 5, y: 3, z: 1 },
+					keywords: "start room",
+					display: "Starting Room",
+					description: "This is where your adventure begins.",
+				});
+
+				const serialized = room.serialize();
+
+				assert.strictEqual(serialized.type, "Room");
+				assert.strictEqual(serialized.keywords, "start room");
+				assert.strictEqual(serialized.display, "Starting Room");
+				assert.strictEqual(
+					serialized.description,
+					"This is where your adventure begins."
+				);
+				assert.deepStrictEqual(serialized.coordinates, { x: 5, y: 3, z: 1 });
+				assert.strictEqual(serialized.contents, undefined);
+			});
+
+			test("should serialize room contents", () => {
+				const room = new Room({
+					coordinates: { x: 0, y: 0, z: 0 },
+					keywords: "treasure room",
+					display: "Treasure Room",
+				});
+				const chest = new DungeonObject({
+					keywords: "wooden chest",
+					display: "Wooden Chest",
+				});
+				const sword = new DungeonObject({
+					keywords: "steel sword",
+					display: "Steel Sword",
+				});
+
+				room.add(chest, sword);
+				const serialized = room.serialize();
+
+				assert.ok(serialized.contents);
+				assert.strictEqual(serialized.contents.length, 2);
+				assert.strictEqual(serialized.contents[0].keywords, "wooden chest");
+				assert.strictEqual(serialized.contents[1].keywords, "steel sword");
+			});
+		});
+
+		suite("Subclass Serialization", () => {
+			test("should serialize Movable objects with correct type", () => {
+				const movable = new Movable({
+					keywords: "player character",
+					display: "Player Character",
+				});
+
+				const serialized = movable.serialize();
+				assert.strictEqual(serialized.type, "Movable");
+				assert.strictEqual(serialized.keywords, "player character");
+			});
+
+			test("should serialize Mob objects with correct type", () => {
+				const mob = new Mob({
+					keywords: "orc warrior",
+					display: "Orc Warrior",
+				});
+
+				const serialized = mob.serialize();
+				assert.strictEqual(serialized.type, "Mob");
+				assert.strictEqual(serialized.keywords, "orc warrior");
+			});
+
+			test("should serialize Item objects with correct type", () => {
+				const item = new Item({
+					keywords: "magic potion",
+					display: "Magic Potion",
+				});
+
+				const serialized = item.serialize();
+				assert.strictEqual(serialized.type, "Item");
+				assert.strictEqual(serialized.keywords, "magic potion");
+			});
+
+			test("should serialize Prop objects with correct type", () => {
+				const prop = new Prop({
+					keywords: "stone statue",
+					display: "Stone Statue",
+				});
+
+				const serialized = prop.serialize();
+				assert.strictEqual(serialized.type, "Prop");
+				assert.strictEqual(serialized.keywords, "stone statue");
+			});
+		});
+	});
+
+	suite("Deserialization", () => {
+		suite("DungeonObject", () => {
+			test("should deserialize basic properties correctly", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "wooden chest treasure",
+					display: "Wooden Treasure Chest",
+					description: "A sturdy wooden chest bound with iron bands.",
+					contents: [],
+				};
+
+				const obj = DungeonObject.deserialize(data);
+
+				assert(obj instanceof DungeonObject);
+				assert.strictEqual(obj.keywords, "wooden chest treasure");
+				assert.strictEqual(obj.display, "Wooden Treasure Chest");
+				assert.strictEqual(
+					obj.description,
+					"A sturdy wooden chest bound with iron bands."
+				);
+				assert.strictEqual(obj.contents.length, 0);
+			});
+
+			test("should deserialize nested contents recursively", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "wooden chest",
+					display: "Wooden Chest",
+					description: "A wooden chest.",
+					contents: [
+						{
+							type: "DungeonObject",
+							keywords: "gold coin",
+							display: "Gold Coin",
+							description: "A shiny gold coin.",
+							contents: [],
+						},
+						{
+							type: "Item",
+							keywords: "ruby gem",
+							display: "Ruby Gem",
+							description: "A brilliant red ruby.",
+							contents: [],
+						},
+					],
+				};
+
+				const chest = DungeonObject.deserialize(data);
+
+				assert.strictEqual(chest.contents.length, 2);
+				assert.strictEqual(chest.contents[0].keywords, "gold coin");
+				assert.strictEqual(chest.contents[1].keywords, "ruby gem");
+				assert(chest.contents[1] instanceof Item);
+				assert.strictEqual(chest.contents[0].location, chest);
+				assert.strictEqual(chest.contents[1].location, chest);
+			});
+
+			test("should preserve location field but not place object in dungeon", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "test object",
+					display: "Test Object",
+					description: "A test object.",
+					contents: [],
+					location: "@test-dungeon{2,3,1}",
+				};
+
+				const obj = DungeonObject.deserialize(data);
+
+				// Object should be created correctly
+				assert(obj instanceof DungeonObject);
+				assert.strictEqual(obj.keywords, "test object");
+
+				// Object should not be automatically placed in any dungeon
+				assert.strictEqual(obj.location, undefined);
+				assert.strictEqual(obj.dungeon, undefined);
+
+				// Location data is available in the serialized data for loaders to use
+				assert.strictEqual(data.location, "@test-dungeon{2,3,1}");
+			});
+
+			test("should handle deeply nested hierarchies", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "leather backpack",
+					display: "Leather Backpack",
+					description: "A worn leather backpack.",
+					contents: [
+						{
+							type: "DungeonObject",
+							keywords: "small pouch",
+							display: "Small Pouch",
+							description: "A small cloth pouch.",
+							contents: [
+								{
+									type: "DungeonObject",
+									keywords: "gold coin",
+									display: "Gold Coin",
+									description: "A shiny gold coin.",
+									contents: [],
+								},
+							],
+						},
+					],
+				};
+
+				const backpack = DungeonObject.deserialize(data);
+				const pouch = backpack.contents[0];
+				const coin = pouch.contents[0];
+
+				assert.strictEqual(backpack.keywords, "leather backpack");
+				assert.strictEqual(pouch.keywords, "small pouch");
+				assert.strictEqual(coin.keywords, "gold coin");
+				assert.strictEqual(pouch.location, backpack);
+				assert.strictEqual(coin.location, pouch);
+			});
+		});
+
+		suite("Room", () => {
+			test("should deserialize rooms with coordinates", () => {
+				const data: SerializedRoom = {
+					type: "Room",
+					keywords: "treasure room",
+					display: "Treasure Room",
+					description: "A room filled with treasure.",
+					contents: [],
+					coordinates: { x: 5, y: 3, z: 1 },
+				};
+
+				const room = DungeonObject.deserialize(data);
+
+				assert(room instanceof Room);
+				assert.strictEqual(room.keywords, "treasure room");
+				assert.strictEqual(room.display, "Treasure Room");
+				assert.strictEqual(room.description, "A room filled with treasure.");
+				assert.deepStrictEqual(room.coordinates, { x: 5, y: 3, z: 1 });
+				assert.strictEqual(room.x, 5);
+				assert.strictEqual(room.y, 3);
+				assert.strictEqual(room.z, 1);
+			});
+
+			test("should deserialize room contents", () => {
+				const data: SerializedRoom = {
+					type: "Room",
+					keywords: "start room",
+					display: "Starting Room",
+					description: "Where the adventure begins.",
+					coordinates: { x: 0, y: 0, z: 0 },
+					contents: [
+						{
+							type: "DungeonObject",
+							keywords: "wooden table",
+							display: "Wooden Table",
+							description: "A simple wooden table.",
+							contents: [],
+						},
+						{
+							type: "Movable",
+							keywords: "player character",
+							display: "Player Character",
+							description: "The main character.",
+							contents: [],
+						},
+					],
+				};
+
+				const room = DungeonObject.deserialize(data);
+
+				assert(room instanceof Room);
+				assert.strictEqual(room.contents.length, 2);
+				assert.strictEqual(room.contents[0].keywords, "wooden table");
+				assert.strictEqual(room.contents[1].keywords, "player character");
+				assert(room.contents[1] instanceof Movable);
+			});
+		});
+
+		suite("Subclass Deserialization", () => {
+			test("should deserialize Movable objects correctly", () => {
+				const data: SerializedMovable = {
+					type: "Movable",
+					keywords: "player character",
+					display: "Player Character",
+					description: "The main character.",
+					contents: [],
+				};
+
+				const movable = DungeonObject.deserialize(data);
+
+				assert(movable instanceof Movable);
+				assert.strictEqual(movable.keywords, "player character");
+			});
+
+			test("should deserialize Mob objects correctly", () => {
+				const data: SerializedMob = {
+					type: "Mob",
+					keywords: "orc warrior",
+					display: "Orc Warrior",
+					description: "A fierce orc warrior.",
+					contents: [],
+				};
+
+				const mob = DungeonObject.deserialize(data);
+
+				assert(mob instanceof Mob);
+				assert.strictEqual(mob.keywords, "orc warrior");
+			});
+
+			test("should deserialize Item objects correctly", () => {
+				const data: SerializedItem = {
+					type: "Item",
+					keywords: "magic sword",
+					display: "Magic Sword",
+					description: "A sword imbued with magical power.",
+					contents: [],
+				};
+
+				const item = DungeonObject.deserialize(data);
+
+				assert(item instanceof Item);
+				assert.strictEqual(item.keywords, "magic sword");
+			});
+
+			test("should deserialize Prop objects correctly", () => {
+				const data: SerializedProp = {
+					type: "Prop",
+					keywords: "stone altar",
+					display: "Stone Altar",
+					description: "An ancient stone altar.",
+					contents: [],
+				};
+
+				const prop = DungeonObject.deserialize(data);
+
+				assert(prop instanceof Prop);
+				assert.strictEqual(prop.keywords, "stone altar");
+			});
+		});
+
+		suite("Mixed Type Hierarchies", () => {
+			test("should deserialize mixed object types in the same hierarchy", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "treasure chest",
+					display: "Treasure Chest",
+					description: "A chest full of various treasures.",
+					contents: [
+						{
+							type: "Item",
+							keywords: "magic sword",
+							display: "Magic Sword",
+							description: "A magical blade.",
+							contents: [],
+						},
+						{
+							type: "DungeonObject",
+							keywords: "coin purse",
+							display: "Coin Purse",
+							description: "A small purse.",
+							contents: [
+								{
+									type: "Item",
+									keywords: "gold coin",
+									display: "Gold Coin",
+									description: "A shiny coin.",
+									contents: [],
+								},
+							],
+						},
+						{
+							type: "Prop",
+							keywords: "decorative gem",
+							display: "Decorative Gem",
+							description: "A beautiful ornamental gem.",
+							contents: [],
+						},
+					],
+				};
+
+				const chest = DungeonObject.deserialize(data);
+
+				assert.strictEqual(chest.contents.length, 3);
+				assert(chest.contents[0] instanceof Item);
+				assert(chest.contents[1] instanceof DungeonObject);
+				assert(chest.contents[2] instanceof Prop);
+
+				// Check nested content
+				const coinPurse = chest.contents[1];
+				assert.strictEqual(coinPurse.contents.length, 1);
+				assert(coinPurse.contents[0] instanceof Item);
+				assert.strictEqual(coinPurse.contents[0].keywords, "gold coin");
+			});
+		});
+	});
+
+	suite("Serialization Round-trip", () => {
+		test("should maintain object hierarchy through serialize/deserialize cycle", () => {
+			// Create a complex hierarchy
+			const backpack = new DungeonObject({
+				keywords: "leather backpack",
+				display: "Leather Backpack",
+				description: "A well-worn leather backpack.",
+			});
+			const weapon = new Item({
+				keywords: "steel dagger",
+				display: "Steel Dagger",
+				description: "A sharp steel dagger.",
+			});
+			const pouch = new DungeonObject({
+				keywords: "coin pouch",
+				display: "Coin Pouch",
+				description: "A small leather pouch.",
+			});
+			const coin1 = new Item({
+				keywords: "gold coin",
+				display: "Gold Coin",
+			});
+			const coin2 = new Item({
+				keywords: "silver coin",
+				display: "Silver Coin",
+			});
+
+			// Build hierarchy
+			backpack.add(weapon, pouch);
+			pouch.add(coin1, coin2);
+
+			// Serialize
+			const serialized = backpack.serialize();
+
+			// Deserialize
+			const restored = DungeonObject.deserialize(serialized);
+
+			// Verify structure
+			assert.strictEqual(restored.keywords, "leather backpack");
+			assert.strictEqual(restored.contents.length, 2);
+
+			const restoredWeapon = restored.contents[0];
+			const restoredPouch = restored.contents[1];
+
+			assert(restoredWeapon instanceof Item);
+			assert.strictEqual(restoredWeapon.keywords, "steel dagger");
+			assert.strictEqual(restoredWeapon.location, restored);
+
+			assert.strictEqual(restoredPouch.keywords, "coin pouch");
+			assert.strictEqual(restoredPouch.contents.length, 2);
+			assert.strictEqual(restoredPouch.location, restored);
+
+			const restoredCoin1 = restoredPouch.contents[0];
+			const restoredCoin2 = restoredPouch.contents[1];
+
+			assert(restoredCoin1 instanceof Item);
+			assert(restoredCoin2 instanceof Item);
+			assert.strictEqual(restoredCoin1.keywords, "gold coin");
+			assert.strictEqual(restoredCoin2.keywords, "silver coin");
+			assert.strictEqual(restoredCoin1.location, restoredPouch);
+			assert.strictEqual(restoredCoin2.location, restoredPouch);
+		});
+
+		test("should recreate mob with contents and restore to correct room location", () => {
+			const dungeonId = "test-mob-restoration";
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: dungeonId,
+				dimensions: { width: 5, height: 5, layers: 2 },
+			});
+
+			try {
+				// Get a specific room
+				const room = dungeon.getRoom({ x: 2, y: 3, z: 1 });
+				assert(room);
+
+				// Create a mob with an item in its inventory
+				const mob = new Mob({
+					keywords: "orc warrior guard",
+					display: "Orc Warrior",
+					description: "A fierce orc warrior standing guard.",
+				});
+				const weapon = new Item({
+					keywords: "rusty sword blade",
+					display: "Rusty Sword",
+					description: "A rusty but still dangerous sword.",
+				});
+				const potion = new Item({
+					keywords: "healing potion bottle",
+					display: "Healing Potion",
+					description: "A small bottle containing red liquid.",
+				});
+
+				// Give the mob some inventory
+				mob.add(weapon, potion);
+
+				// Place mob in the room
+				room.add(mob);
+
+				// Verify initial setup
+				assert.strictEqual(mob.location, room);
+				assert.strictEqual(mob.dungeon, dungeon);
+				assert.strictEqual(mob.contents.length, 2);
+				assert(room.contains(mob));
+				assert(dungeon.contains(mob));
+
+				// Serialize the mob
+				const serializedMob = mob.serialize();
+
+				// Verify serialization includes location
+				assert.strictEqual(serializedMob.location, `@${dungeonId}{2,3,1}`);
+				assert.ok(serializedMob.contents);
+				assert.strictEqual(serializedMob.contents.length, 2);
+				assert.strictEqual(
+					serializedMob.contents[0].keywords,
+					"rusty sword blade"
+				);
+				assert.strictEqual(
+					serializedMob.contents[1].keywords,
+					"healing potion bottle"
+				);
+
+				// Remove/delete the mob from the dungeon
+				room.remove(mob);
+				assert(!room.contains(mob));
+				assert(!dungeon.contains(mob));
+				assert.strictEqual(mob.location, undefined);
+				assert.strictEqual(mob.dungeon, undefined);
+
+				// Recreate the mob from serialized data
+				const restoredMob = DungeonObject.deserialize(serializedMob);
+
+				// Verify the restored mob is correct type and has correct properties
+				assert(restoredMob instanceof Mob);
+				assert.strictEqual(restoredMob.keywords, "orc warrior guard");
+				assert.strictEqual(restoredMob.display, "Orc Warrior");
+				assert.strictEqual(
+					restoredMob.description,
+					"A fierce orc warrior standing guard."
+				);
+
+				// Verify contents were restored
+				assert.strictEqual(restoredMob.contents.length, 2);
+				assert(restoredMob.contents[0] instanceof Item);
+				assert(restoredMob.contents[1] instanceof Item);
+				assert.strictEqual(
+					restoredMob.contents[0].keywords,
+					"rusty sword blade"
+				);
+				assert.strictEqual(
+					restoredMob.contents[1].keywords,
+					"healing potion bottle"
+				);
+				assert.strictEqual(restoredMob.contents[0].location, restoredMob);
+				assert.strictEqual(restoredMob.contents[1].location, restoredMob);
+
+				// Initially, the restored mob should not be placed anywhere
+				assert.strictEqual(restoredMob.location, undefined);
+				assert.strictEqual(restoredMob.dungeon, undefined);
+
+				// Use the saved location to place the mob back in the correct room
+				const locationRef = serializedMob.location;
+				assert(locationRef); // Should be "@test-mob-restoration{2,3,1}"
+
+				const targetRoom = getRoomByRef(locationRef);
+				assert(targetRoom);
+				assert.strictEqual(targetRoom, room); // Should be the same room
+
+				// Place the restored mob in the target room
+				targetRoom.add(restoredMob);
+
+				// Verify the mob is correctly placed
+				assert.strictEqual(restoredMob.location, targetRoom);
+				assert.strictEqual(restoredMob.dungeon, dungeon);
+				assert(targetRoom.contains(restoredMob));
+				assert(dungeon.contains(restoredMob));
+
+				// Verify contents are still intact after placement
+				assert.strictEqual(restoredMob.contents.length, 2);
+				assert.strictEqual(
+					restoredMob.contents[0].keywords,
+					"rusty sword blade"
+				);
+				assert.strictEqual(
+					restoredMob.contents[1].keywords,
+					"healing potion bottle"
+				);
+				assert.strictEqual(restoredMob.contents[0].dungeon, dungeon);
+				assert.strictEqual(restoredMob.contents[1].dungeon, dungeon);
+
+				// Verify the room now contains the restored mob
+				const roomMobs = room.contents.filter((obj) => obj instanceof Mob);
+				assert.strictEqual(roomMobs.length, 1);
+				assert.strictEqual(roomMobs[0], restoredMob);
+			} finally {
+				DUNGEON_REGISTRY.delete(dungeonId);
+			}
+		});
+
+		test("should preserve room coordinates through serialize/deserialize cycle", () => {
+			const room = new Room({
+				coordinates: { x: 7, y: 2, z: 3 },
+				keywords: "magic library",
+				display: "Magic Library",
+				description: "A library filled with ancient tomes.",
+			});
+
+			const book = new Item({
+				keywords: "ancient tome",
+				display: "Ancient Tome",
+			});
+			room.add(book);
+
+			// Serialize
+			const serialized = room.serialize();
+
+			// Deserialize
+			const restored = DungeonObject.deserialize(serialized);
+
+			// Verify it's a room with correct coordinates
+			assert(restored instanceof Room);
+			assert.deepStrictEqual(restored.coordinates, { x: 7, y: 2, z: 3 });
+			assert.strictEqual(restored.x, 7);
+			assert.strictEqual(restored.y, 2);
+			assert.strictEqual(restored.z, 3);
+
+			// Verify contents
+			assert.strictEqual(restored.contents.length, 1);
+			assert(restored.contents[0] instanceof Item);
+			assert.strictEqual(restored.contents[0].keywords, "ancient tome");
+		});
+
+		test("should handle location preservation correctly", () => {
+			const dungeonId = "test-roundtrip-dungeon";
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: dungeonId,
+				dimensions: { width: 5, height: 5, layers: 2 },
+			});
+
+			try {
+				const room = dungeon.getRoom({ x: 3, y: 4, z: 1 });
+				assert(room);
+
+				const item = new Item({
+					keywords: "magic crystal",
+					display: "Magic Crystal",
+				});
+				room.add(item);
+
+				// Serialize
+				const serialized = item.serialize();
+
+				// Verify location is preserved in serialized data
+				assert.strictEqual(
+					serialized.location,
+					"@test-roundtrip-dungeon{3,4,1}"
+				);
+
+				// Deserialize
+				const restored = DungeonObject.deserialize(serialized);
+
+				// Verify object is created but not placed
+				assert(restored instanceof Item);
+				assert.strictEqual(restored.keywords, "magic crystal");
+				assert.strictEqual(restored.location, undefined);
+				assert.strictEqual(restored.dungeon, undefined);
+
+				// Location data is still available in the original serialized data
+				assert.strictEqual(
+					serialized.location,
+					"@test-roundtrip-dungeon{3,4,1}"
+				);
+			} finally {
+				DUNGEON_REGISTRY.delete(dungeonId);
+			}
+		});
+
+		test("should handle objects without location correctly", () => {
+			const container = new DungeonObject({
+				keywords: "storage box",
+				display: "Storage Box",
+			});
+			const item = new Item({
+				keywords: "small key",
+				display: "Small Key",
+			});
+			container.add(item);
+
+			// Serialize
+			const serialized = item.serialize();
+
+			// Should not have location
+			assert.strictEqual(serialized.location, undefined);
+
+			// Deserialize
+			const restored = DungeonObject.deserialize(serialized);
+
+			// Verify restoration
+			assert(restored instanceof Item);
+			assert.strictEqual(restored.keywords, "small key");
+			assert.strictEqual(restored.location, undefined);
 		});
 	});
 });

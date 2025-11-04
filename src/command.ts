@@ -11,26 +11,23 @@ import {
  * Context provided to command execution.
  *
  * This interface encapsulates all the necessary context information needed for
- * a command to execute. It provides access to the actor performing the command,
- * their current location (if any), and the raw input string that triggered the command.
+ * a command to execute. It provides access to the actor performing the command
+ * and their current location (if any).
  *
  * @property actor - The Mob entity executing the command (typically a player or NPC)
  * @property room - The current room where the actor is located (undefined if not in a room)
- * @property input - The original unprocessed input string that triggered this command
  *
  * @example
  * ```typescript
  * const context: CommandContext = {
  *   actor: player,
- *   room: currentRoom,
- *   input: "get sword from chest"
+ *   room: currentRoom
  * };
  * ```
  */
 export interface CommandContext {
 	actor: Mob;
 	room?: Room;
-	input: string;
 }
 
 /**
@@ -426,7 +423,7 @@ export abstract class Command {
 	 * names from the pattern. Optional arguments may not be present in the map
 	 * if they weren't provided in the input.
 	 *
-	 * @param context - The execution context containing the actor, their location, and raw input
+	 * @param context - The execution context containing the actor and their location
 	 * @param args - Map of argument names to their parsed values
 	 *
 	 * @example
@@ -1036,8 +1033,7 @@ export abstract class Command {
  * // Runtime: Process user input
  * const context: CommandContext = {
  *   actor: currentPlayer,
- *   room: currentRoom,
- *   input: userInput
+ *   room: currentRoom
  * };
  *
  * const executed = CommandRegistry.default.execute(userInput, context);
@@ -1199,7 +1195,7 @@ export class CommandRegistry {
 	 * "invalid command".
 	 *
 	 * @param input - The user's input string (will be trimmed)
-	 * @param context - The execution context with actor, room, and original input
+	 * @param context - The execution context with actor and room
 	 * @returns {boolean} True if a command pattern was matched, false if no command matched
 	 *
 	 * @example

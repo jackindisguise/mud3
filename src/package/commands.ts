@@ -6,9 +6,19 @@ import {
 } from "../command.js";
 import { Package } from "package-loader";
 import { readdir } from "fs/promises";
-import { join } from "path";
+import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import logger from "../logger.js";
+
+/**
+ * Interface for command objects (JavaScript or TypeScript plain objects)
+ */
+export interface CommandObject {
+	pattern: string;
+	aliases?: string[];
+	execute: (context: CommandContext, args: Map<string, any>) => void;
+	onError?: (context: CommandContext, result: ParseResult) => void;
+}
 
 /**
  * Adapter class to convert JavaScript command objects into Command instances
@@ -23,7 +33,7 @@ export class JavaScriptCommandAdapter extends Command {
 		result: ParseResult
 	) => void;
 
-	constructor(commandObj: any) {
+	constructor(commandObj: CommandObject) {
 		super({ pattern: commandObj.pattern, aliases: commandObj.aliases });
 		this.executeFunction = commandObj.execute;
 		this.errorFunction = commandObj.onError;
@@ -42,37 +52,89 @@ export class JavaScriptCommandAdapter extends Command {
 	}
 }
 
-const COMMAND_DIRECTORY = join(process.cwd(), "data", "commands");
+const DATA_COMMAND_DIRECTORY = join(process.cwd(), "data", "commands");
+const SRC_COMMAND_DIRECTORY = join(process.cwd(), "dist", "src", "commands");
 
 export default {
 	name: "commands",
 	loader: async () => {
-		try {
-			const files = await readdir(COMMAND_DIRECTORY);
-			const jsFiles = files.filter((file) => file.endsWith(".js"));
+		const directories = [DATA_COMMAND_DIRECTORY, SRC_COMMAND_DIRECTORY];
 
-			for (const file of jsFiles) {
-				try {
-					const filePath = join(COMMAND_DIRECTORY, file);
-					const fileUrl = pathToFileURL(filePath).href;
-					const commandModule = await import(fileUrl);
-					const commandObj = commandModule.default;
-
-					if (commandObj && commandObj.pattern && commandObj.execute) {
-						const command = new JavaScriptCommandAdapter(commandObj);
-						CommandRegistry.default.register(command);
-						logger.info(`Loaded command "${commandObj.pattern}" from ${file}`);
-					} else {
-						logger.warn(`Invalid command structure in ${file}`);
-					}
-				} catch (error) {
-					logger.error(`Failed to load command from ${file}: ${error}`);
-				}
-			}
-		} catch (error) {
-			logger.error(
-				`Failed to read commands directory ${COMMAND_DIRECTORY}: ${error}`
+		for (const commandDir of directories) {
+			logger.info(
+				`Loading commands from ${relative(process.cwd(), commandDir)}`
 			);
+			try {
+				const files = await readdir(commandDir);
+				logger.debug(
+					`Found ${files.length} files in ${relative(
+						process.cwd(),
+						commandDir
+					)}`
+				);
+				const jsFiles = files.filter(
+					(file) => file.endsWith(".js") && !file.startsWith("_")
+				);
+				logger.debug(
+					`Found ${jsFiles.length} JavaScript command files in ${relative(
+						process.cwd(),
+						commandDir
+					)}`
+				);
+
+				for (const file of jsFiles) {
+					logger.debug(`Processing command file: ${file}`);
+					try {
+						const filePath = join(commandDir, file);
+						const fileUrl = pathToFileURL(filePath).href;
+						logger.debug(
+							`Importing command from ${relative(process.cwd(), filePath)}`
+						);
+						const commandModule = await import(fileUrl);
+						const commandObj = commandModule.default;
+
+						if (commandObj && commandObj.pattern && commandObj.execute) {
+							const command = new JavaScriptCommandAdapter(commandObj);
+							CommandRegistry.default.register(command);
+							logger.info(
+								`Loaded command "${commandObj.pattern}" from ${relative(
+									process.cwd(),
+									filePath
+								)}`
+							);
+							if (commandObj.aliases) {
+								logger.debug(`  Aliases: ${commandObj.aliases.join(", ")}`);
+							}
+						} else {
+							logger.warn(
+								`Invalid command structure in ${relative(
+									process.cwd(),
+									filePath
+								)}`
+							);
+						}
+					} catch (error) {
+						logger.error(
+							`Failed to load command from ${relative(
+								process.cwd(),
+								join(commandDir, file)
+							)}: ${error}`
+						);
+					}
+				}
+			} catch (error) {
+				logger.warn(
+					`Failed to read commands directory ${relative(
+						process.cwd(),
+						commandDir
+					)}: ${error}`
+				);
+			}
 		}
+		logger.debug(
+			`Command loading complete. Total commands registered: ${
+				CommandRegistry.default.getCommands().length
+			}`
+		);
 	},
 } as Package;

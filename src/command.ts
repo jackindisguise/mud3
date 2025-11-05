@@ -52,6 +52,7 @@ import {
 	DIRECTION,
 	text2dir,
 } from "./dungeon.js";
+import logger from "./logger.js";
 
 /**
  * Context provided to command execution.
@@ -822,24 +823,27 @@ export abstract class Command {
 				autocompletePattern += `(?:${word[i]}`;
 			}
 			// Close all the optional groups
-			autocompletePattern += ')?'.repeat(word.length - 1);
+			autocompletePattern += ")?".repeat(word.length - 1);
 			return autocompletePattern;
 		});
 
 		// Now replace the placeholders with actual regex patterns
-		// For arguments with a preceding space, make the space part of the optional group
+		// For arguments with a preceding space, the space is required but the argument is optional
 		regexStr = regexStr
 			.replace(/ ___OPTIONAL_TEXT___/g, "(?: (.+))?")
 			.replace(/ ___OPTIONAL_WORD___/g, "(?: (\\S+))?")
 			.replace(/ ___OPTIONAL_NUMBER___/g, "(?: (\\d+))?")
 			.replace(/ ___OPTIONAL_GENERIC___/g, "(?: (.+?))?")
 			// Handle any remaining placeholders without preceding spaces
-			.replace(/___OPTIONAL_TEXT___/g, "(?:\\s+(.+))?")
-			.replace(/___OPTIONAL_WORD___/g, "(?:\\s+(\\S+))?")
-			.replace(/___OPTIONAL_NUMBER___/g, "(?:\\s+(\\d+))?")
-			.replace(/___OPTIONAL_GENERIC___/g, "(?:\\s+(.+?))?");
+			// No space required, argument can immediately follow the previous literal
+			.replace(/___OPTIONAL_TEXT___/g, "(?:(.+))?")
+			.replace(/___OPTIONAL_WORD___/g, "(?:(\\S+))?")
+			.replace(/___OPTIONAL_NUMBER___/g, "(?:(\\d+))?")
+			.replace(/___OPTIONAL_GENERIC___/g, "(?:(.+?))?");
 
-		return new RegExp(`^${regexStr}$`, "i");
+		const regex = new RegExp(`^${regexStr}$`, "i");
+		logger.debug(`> ${this.pattern}: '${regex}'`);
+		return regex;
 	}
 
 	/**

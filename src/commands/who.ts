@@ -8,6 +8,8 @@
  * @example
  * ```
  * who
+ * w (autocomplete to "who")
+ * wh (autocomplete to "who")
  * ```
  *
  * **Output:**
@@ -20,7 +22,7 @@
  * Total Connections: 2
  * ```
  *
- * **Pattern:** `who`
+ * **Pattern:** `who~`
  * @module commands/who
  */
 
@@ -30,7 +32,7 @@ import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
 
 export default {
-	pattern: "who",
+	pattern: "who~",
 
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor } = context;

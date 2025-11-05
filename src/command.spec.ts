@@ -298,6 +298,45 @@ suite("command.ts", () => {
 			assert.strictEqual(result3.args.get("message"), "hey");
 		});
 
+		test("should require space when pattern has space before argument", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "say <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Should match with space
+			const result1 = command.parse("say hello world", context);
+			assert.strictEqual(result1.success, true);
+			assert.strictEqual(result1.args.get("message"), "hello world");
+
+			// Should fail without space (pattern requires space)
+			const result2 = command.parse("sayhello", context);
+			assert.strictEqual(result2.success, false);
+		});
+
+		test("should not require space when pattern has no space before argument", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "'<message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Should match without space
+			const result1 = command.parse("'hello world", context);
+			assert.strictEqual(result1.success, true);
+			assert.strictEqual(result1.args.get("message"), "hello world");
+
+			// Should also match with space (space becomes part of the message)
+			const result2 = command.parse("' hello world", context);
+			assert.strictEqual(result2.success, true);
+			assert.strictEqual(result2.args.get("message"), "hello world");
+		});
+
 		test("should work with autocomplete and optional arguments", () => {
 			const command = new JavaScriptCommandAdapter({
 				pattern: "look~ <direction:word?>",

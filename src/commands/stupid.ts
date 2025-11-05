@@ -23,8 +23,7 @@ import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 export default {
-	pattern: "say~ <message:text>",
-	aliases: ["'<message:text>"],
+	pattern: "this~is~a~stupid~command~<message:text>",
 
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;

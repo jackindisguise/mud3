@@ -7,14 +7,14 @@
  * @example
  * ```
  * ooc Hello everyone!
- * o Testing the OOC channel (autocomplete)
- * oo Also works! (autocomplete)
+ * o Testing the OOC channel (autocomplete to "ooc")
+ * oo Also works! (autocomplete to "ooc")
  * " Quick OOC message
  * ```
  *
  * **Aliases:** `"`
  *
- * **Pattern:** `ooc~ <message:text>` (supports autocomplete: o, oo, ooc)
+ * **Pattern:** `ooc~ <message:text>`
  * @module commands/ooc
  */
 
@@ -26,7 +26,7 @@ import { Game } from "../game.js";
 
 export default {
 	pattern: "ooc~ <message:text>",
-	aliases: ['" <message:text>'],
+	aliases: ['"<message:text>'],
 
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;

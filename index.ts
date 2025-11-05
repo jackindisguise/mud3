@@ -15,7 +15,7 @@ await loadPackage(character);
 
 // Start a game instance and automatically stop after 10 seconds
 const game = new Game();
-const timeout = 1000 * 60;
+const timeout = 1000 * 10;
 await game.start();
 logger.info(
 	`Game server started. It will shut down automatically in ${

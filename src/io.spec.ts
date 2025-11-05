@@ -345,7 +345,7 @@ describe("io.ts", () => {
 			assert.strictEqual(mudClient!.isConnected(), false);
 		});
 
-		it("should ignore empty lines", async () => {
+		it("should accept empty lines", async () => {
 			assert.notStrictEqual(mudClient, null);
 
 			const inputs: string[] = [];
@@ -356,7 +356,7 @@ describe("io.ts", () => {
 			testSocket.write("\n\n  \n");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			assert.strictEqual(inputs.length, 0);
+			assert.strictEqual(inputs.length, 3);
 		});
 
 		it("should trim whitespace from input lines", async () => {

@@ -12,7 +12,7 @@ import lockfilePackage, {
 	LockInfo,
 } from "./lockfile.js";
 
-suite("lockfile.ts", () => {
+suite("package/lockfile.ts", () => {
 	beforeEach(async () => {
 		// Clean up any existing lockfile before each test
 		if (existsSync(LOCKFILE_PATH)) {

@@ -1,3 +1,23 @@
+/**
+ * Package: config — YAML configuration loader
+ *
+ * Loads `data/config.yaml` (creating it with sensible defaults if missing),
+ * merges it into the in-memory `CONFIG` object, and exposes typed config
+ * shapes for game, server, and security settings.
+ *
+ * Behavior
+ * - Reads YAML from `data/config.yaml`
+ * - Merges only known keys from file into `CONFIG` (unknown keys ignored)
+ * - If the file is absent/unreadable, writes `CONFIG_DEFAULT` to disk
+ * - Logs details at `info`/`debug` levels, including default vs overridden
+ *
+ * @example
+ * import configPkg, { CONFIG } from './package/config.js';
+ * await configPkg.loader();
+ * console.log(CONFIG.server.port);
+ *
+ * @module package/config
+ */
 import { Package } from "package-loader";
 import { join, relative } from "path";
 import { readFile, writeFile } from "fs/promises";
@@ -112,7 +132,10 @@ export default {
 			logger.debug(
 				`Config file not found or unreadable, creating default at ${CONFIG_PATH}`
 			);
-			const defaultContent = YAML.dump(CONFIG_DEFAULT, { noRefs: true, lineWidth: 120 });
+			const defaultContent = YAML.dump(CONFIG_DEFAULT, {
+				noRefs: true,
+				lineWidth: 120,
+			});
 			await writeFile(CONFIG_PATH, defaultContent, "utf-8");
 			logger.info("Default config file created");
 		}

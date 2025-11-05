@@ -9,7 +9,7 @@ import { Dungeon, Mob } from "../dungeon.js";
 
 const COMMANDS_DIR = join(process.cwd(), "data", "commands");
 
-suite("commands.ts", () => {
+suite("package/commands.ts", () => {
 	let initialCommandCount: number;
 
 	before(async () => {

@@ -1,18 +1,72 @@
+/**
+ * Provides the `Character` class (a player's persistent profile and runtime session),
+ * message grouping utilities, sane defaults for new players, and serialization helpers.
+ * It is the primary integration point between authentication/session state and the
+ * world model (`Mob` in `dungeon.ts`).
+ *
+ * What you get
+ * - `Character`: persistent credentials, settings, and stats + runtime session handling
+ * - `MESSAGE_GROUP`: controls how messages are grouped to show prompts cleanly
+ * - Defaults: `DEFAULT_PLAYER_SETTINGS`, `DEFAULT_PLAYER_CREDENTIALS`, `DEFAULT_PLAYER_STATS`
+ * - Types: `PlayerSettings`, `PlayerCredentials`, `PlayerStats`, `PlayerSession`,
+ *   `CharacterOptions`, `SerializedCharacter`, and related helpers
+ * - Utilities: `Character.hashPassword()`, `character.serialize()` and `Character.deserialize()`
+ *
+ * Typical usage
+ * ```ts
+ * import { Character, MESSAGE_GROUP } from "./character.js";
+ * import { MudClient } from "./io.js";
+ * import { Mob } from "./dungeon.js";
+ *
+ * // 1) Create a character (only username is required)
+ * const hero = new Character({
+ *   credentials: { username: "alice" },
+ *   mob: new Mob(),
+ * });
+ *
+ * // 2) Set a password (stored as a salted SHA-256 hash)
+ * hero.setPassword("super-secret");
+ *
+ * // 3) Start a session when a client connects
+ * // const client: MudClient = ... (created by the game server)
+ * // hero.startSession(42, client);
+ *
+ * // 4) Send messages (prompt will be emitted on group changes)
+ * hero.sendMessage("Welcome to the realm!", MESSAGE_GROUP.SYSTEM);
+ *
+ * // 5) Serialize to save; deserialize to restore later
+ * const data = hero.serialize();
+ * const restored = Character.deserialize(data);
+ *
+ * // 6) End the session on disconnect
+ * // hero.endSession();
+ * ```
+ *
+ * Notes
+ * - Password hashing uses `CONFIG.security.password_salt` — ensure it is configured.
+ * - `Character.mob` establishes a bidirectional link with `Mob.character` so the
+ *   in-world entity can reference its player (and vice versa).
+ * - `serialize()` returns a plain object suitable for JSON/YAML persistence; runtime
+ *   fields like the active session and MudClient are intentionally excluded.
+ * @module character
+ */
+
 import { Mob, SerializedMob } from "./dungeon.js";
 import { createHash } from "crypto";
 import { CONFIG } from "./package/config.js";
 import type { MudClient } from "./io.js";
 
 /**
- * Message groups categorize outgoing messages to control when a prompt is shown.
- * When a character receives a message whose group differs from the last one
- * they received, we append a blank line and then show the prompt.
+ * Message groups categorize outbound messages and control prompt emission.
+ * If a message arrives with a different group than the previous one, the client
+ * receives a blank line followed by the prompt to visually separate contexts.
  */
 export enum MESSAGE_GROUP {
 	INFO = "INFO",
 	COMBAT = "COMBAT",
 	COMMAND_RESPONSE = "COMMAND_RESPONSE",
 	SYSTEM = "SYSTEM",
+	CHANNELS = "CHANNELS",
 }
 
 /**
@@ -35,6 +89,19 @@ export interface PlayerSettings {
 
 /**
  * Default player settings applied to new characters.
+ *
+ * @example
+ * ```ts
+ * // Default values
+ * const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
+ *   receiveOOC: true,
+ *   verboseMode: true,
+ *   prompt: "> ",
+ *   colorEnabled: true,
+ *   autoLook: true,
+ *   briefMode: false,
+ * };
+ * ```
  */
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	receiveOOC: true,
@@ -46,7 +113,10 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 };
 
 /**
- * Authentication and account information.
+ * Authentication and account information (runtime form).
+ *
+ * Note: `createdAt` and `lastLogin` are Date objects in memory. When persisted,
+ * these become ISO strings via `SerializedPlayerCredentials`.
  */
 export interface PlayerCredentials {
 	/** Player's username/login name */
@@ -57,19 +127,35 @@ export interface PlayerCredentials {
 	email?: string;
 	/** Account creation timestamp */
 	createdAt: Date;
-	/** Last login timestamp */
-	lastLogin?: Date;
-	/** Account status flags */
+	/** Last login timestamp (updated by startSession) */
+	lastLogin: Date;
+	/** Character is active / playable */
 	isActive: boolean;
+	/** Character is banned */
 	isBanned: boolean;
+	/** Character is an admin */
 	isAdmin: boolean;
 }
 
 /**
- * Default credential values for new accounts.
- * Note: username, passwordHash, and createdAt must be provided during creation.
+ * Default credential flags for new accounts.
+ *
+ * @example
+ * ```ts
+ * // Default flags
+ * const DEFAULT_PLAYER_CREDENTIALS: Pick<PlayerCredentials, "isActive" | "isBanned" | "isAdmin"> = {
+ *   isActive: true,
+ *   isBanned: false,
+ *   isAdmin: false,
+ * };
+ * // Other fields are set by Character constructor:
+ * // passwordHash: "", createdAt: now, lastLogin: now
+ * ```
  */
-export const DEFAULT_PLAYER_CREDENTIALS: Partial<PlayerCredentials> = {
+export const DEFAULT_PLAYER_CREDENTIALS: Pick<
+	PlayerCredentials,
+	"isActive" | "isBanned" | "isAdmin"
+> = {
 	isActive: true,
 	isBanned: false,
 	isAdmin: false,
@@ -89,6 +175,16 @@ export interface PlayerStats {
 
 /**
  * Default player statistics for new characters.
+ *
+ * @example
+ * ```ts
+ * // Default stats
+ * const DEFAULT_PLAYER_STATS: PlayerStats = {
+ * 	playtime: 0,
+ * 	deaths: 0,
+ * 	kills: 0
+ * };
+ * ```
  */
 export const DEFAULT_PLAYER_STATS: PlayerStats = {
 	playtime: 0,
@@ -111,11 +207,26 @@ export interface PlayerSession {
 }
 
 /**
+ * Uses Partial<T> as a base and then manually sets fields to required by name.
+ */
+export type RequireOnly<T, K extends keyof T> = Partial<T> &
+	Required<Pick<T, K>>;
+
+/**
+ * These are the only fields required to be provided for CharacterOptions.
+ * Other fields will be automatically generated.
+ */
+export type RequiredPlayerCredentials = RequireOnly<
+	PlayerCredentials,
+	"username"
+>;
+
+/**
  * Options for creating a new Character instance.
  */
 export interface CharacterOptions {
-	/** Player's authentication and account information */
-	credentials: PlayerCredentials;
+	/** Player's authentication and account information. Only `username` is required; other fields get sane defaults. */
+	credentials: RequiredPlayerCredentials;
 	/** Optional initial settings (defaults applied if not provided) */
 	settings?: Partial<PlayerSettings>;
 	/** Optional initial stats (defaults applied if not provided) */
@@ -126,7 +237,7 @@ export interface CharacterOptions {
 
 /**
  * Serialized character data for persistence.
- * Contains all character information except runtime data like the mob instance.
+ * Dates are represented as ISO strings; runtime-only fields (like session) are excluded.
  */
 export interface SerializedPlayerCredentials {
 	/** Player's username/login name */
@@ -138,10 +249,12 @@ export interface SerializedPlayerCredentials {
 	/** Account creation timestamp (ISO string) */
 	createdAt: string;
 	/** Last login timestamp (ISO string) */
-	lastLogin?: string;
-	/** Account status flags */
+	lastLogin: string;
+	/** Character is active / playable */
 	isActive: boolean;
+	/** Character is banned */
 	isBanned: boolean;
+	/** Character is an admin */
 	isAdmin: boolean;
 }
 
@@ -157,68 +270,33 @@ export interface SerializedCharacter {
 }
 
 /**
- * Character represents a player's persistent data and avatar in the MUD world.
+ * Character represents a player's persistent data and avatar in the world.
  *
- * This class wraps around a Mob to provide player-specific functionality
- * such as authentication, settings, progression tracking, and persistent
- * data management. Characters contain persistent data that survives across
- * sessions, plus runtime session state for the current active session.
+ * Responsibilities
+ * - Authentication data and player preferences
+ * - Runtime session tracking
+ * - Message sending with group-aware prompt behavior
+ * - Serialization/deserialization for persistence
+ * - Bidirectional relationship with `Mob` (Character.mob ↔ Mob.character)
  *
- * The Character and its associated Mob have a bidirectional relationship:
- * - Character.mob points to the Mob instance
- * - Mob.character points back to the Character instance
+ * Example
+ * ```ts
+ * import { Character, MESSAGE_GROUP } from "./character.js";
+ * import { Mob } from "./dungeon.js";
  *
- * This allows code working with either object to access the other when needed.
- *
- * Session management is handled through the session field, which tracks
- * runtime state like session start time and connection ID. This allows
- * the character to calculate current session duration without external
- * session management complexity.
- *
- * @example
- * ```typescript
- * // Create a new character (typically done during character creation)
- * const character = new Character({
- *   credentials: {
- *     username: "playerOne",
- *     passwordHash: await hashPassword("secretPassword"),
- *     email: "player@example.com",
- *     createdAt: new Date(),
- *     isActive: true,
- *     isBanned: false,
- *     isAdmin: false
- *   },
- *   mob: new Mob()
+ * const c = new Character({
+ *   credentials: { username: "playerOne" },
+ *   mob: new Mob(),
  * });
+ * c.setPassword("secretPassword");
  *
- * // Configure the character's mob representation
- * character.mob.keywords = "player adventurer";
- * character.mob.display = "Player One";
- * character.mob.description = "A brave adventurer ready for action.";
+ * // Typically called by the Game when a client connects
+ * // c.startSession(1, client);
  *
- * // Session management
- * character.startSession("socket_123"); // Start a new session
- * console.log(`Session duration: ${character.getSessionDuration()}ms`);
- * character.endSession(); // End session and update playtime
- *
- * // Update persistent settings
- * character.updateSettings({
- *   verboseMode: true,
- *   colorEnabled: true,
- *   autoLook: true
- * });
- *
- * // Track gameplay statistics
- * character.recordDeath();
- * character.recordKill();
+ * c.sendMessage("Welcome!", MESSAGE_GROUP.SYSTEM);
+ * const data = c.serialize();
+ * const restored = Character.deserialize(data);
  * ```
- *
- * Features:
- * - Player authentication and account management
- * - Persistent settings and preferences
- * - Gameplay statistics and progression tracking
- * - Character save/load functionality
- * - Bidirectional Character ↔ Mob relationship
  */
 export class Character {
 	/**
@@ -270,35 +348,39 @@ export class Character {
 	 * @param options Character creation options containing credentials, settings, stats, and mob
 	 *
 	 * @example
-	 * ```typescript
-	 * // Create a mob first
-	 * const playerMob = new Mob();
+	 * ```ts
+	 * import { Character } from "./character.js";
+	 * import { Mob } from "./dungeon.js";
 	 *
-	 * // Create character with plain text password (will be hashed automatically)
-	 * const newCharacter = new Character({
-	 *   credentials: {
-	 *     username: "hero123",
-	 *     passwordHash: "", // Will be set by password option
-	 *     email: "hero@example.com",
-	 *     createdAt: new Date(),
-	 *     isActive: true,
-	 *     isBanned: false,
-	 *     isAdmin: false
-	 *   },
-	 *   password: "mySecretPassword", // This will be hashed automatically
-	 *   settings: {
-	 *     verboseMode: false,
-	 *     colorEnabled: true
-	 *   },
-	 *   stats: {
-	 *     playtime: 1000
-	 *   },
-	 *   mob: playerMob
+	 * // Minimal setup: only username is required; other fields get sensible defaults
+	 * const character = new Character({
+	 *   credentials: { username: "hero123" },
+	 *   mob: new Mob(),
 	 * });
+	 *
+	 * // Set a password (stored as a salted SHA-256 hash)
+	 * character.setPassword("super-secret");
+	 *
+	 * // Optional: customize settings/stats on creation
+	 * const c2 = new Character({
+	 *   credentials: { username: "mage" },
+	 *   settings: { prompt: "> ", colorEnabled: true },
+	 *   stats: { playtime: 5000, deaths: 0, kills: 3 },
+	 *   mob: new Mob(),
+	 * });
+	 *
+	 * // When a client connects (handled by the Game), start a session:
+	 * // c2.startSession(1, client);
 	 * ```
 	 */
 	constructor(options: CharacterOptions) {
-		this.credentials = options.credentials;
+		const now = new Date();
+		this.credentials = {
+			...{ passwordHash: "" },
+			...{ createdAt: now, lastLogin: now },
+			...DEFAULT_PLAYER_CREDENTIALS, // defaults
+			...options.credentials,
+		};
 
 		// Apply default settings
 		this.settings = {
@@ -314,6 +396,10 @@ export class Character {
 
 		// Set up the provided mob
 		this.mob = options.mob;
+	}
+
+	toString(): string {
+		return this.mob.display;
 	}
 
 	/**
@@ -336,15 +422,14 @@ export class Character {
 	}
 
 	/**
-	 * Starts a new session for this character.
-	 * Should be called by the game engine when the player logs in.
+	 * Starts a new session for this character. Called by the game when a player logs in.
 	 *
-	 * @param connectionId Optional connection identifier for this session
+	 * @param connectionId Numeric connection identifier for this session
+	 * @param client The connected MudClient for this session
 	 *
 	 * @example
-	 * ```typescript
-	 * character.startSession("socket_123");
-	 * console.log(`Session started for ${character.credentials.username}`);
+	 * ```ts
+	 * character.startSession(1, client);
 	 * ```
 	 */
 	public startSession(connectionId: number, client: MudClient): void {
@@ -617,7 +702,7 @@ export class Character {
 			passwordHash: c.passwordHash,
 			email: c.email,
 			createdAt: c.createdAt.toISOString(),
-			lastLogin: c.lastLogin ? c.lastLogin.toISOString() : undefined,
+			lastLogin: c.lastLogin.toISOString(),
 			isActive: c.isActive,
 			isBanned: c.isBanned,
 			isAdmin: c.isAdmin,
@@ -652,9 +737,7 @@ export class Character {
 			passwordHash: data.credentials.passwordHash,
 			email: data.credentials.email,
 			createdAt: new Date(data.credentials.createdAt),
-			lastLogin: data.credentials.lastLogin
-				? new Date(data.credentials.lastLogin)
-				: undefined,
+			lastLogin: new Date(data.credentials.lastLogin),
 			isActive: data.credentials.isActive,
 			isBanned: data.credentials.isBanned,
 			isAdmin: data.credentials.isAdmin,

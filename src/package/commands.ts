@@ -1,3 +1,29 @@
+/**
+ * Package: commands — dynamic command loader
+ *
+ * Loads command modules from two locations at startup:
+ * - `data/commands` (runtime-extensible JS commands)
+ * - `dist/src/commands` (compiled built-in commands)
+ *
+ * Each command file should export a default plain object with:
+ * - `pattern: string` — the command pattern
+ * - `aliases?: string[]` — optional aliases
+ * - `execute(context, args)` — handler function
+ * - `onError?(context, result)` — optional error handler
+ *
+ * Files beginning with `_` are ignored. Only `.js` files are loaded.
+ * The loader logs progress and registers commands into `CommandRegistry.default`.
+ *
+ * @example
+ * // data/commands/say.js
+ * export default {
+ *   pattern: 'say <...text:any>';
+ *   aliases: ['"'],
+ *   execute(ctx, args) { ctx.client.sendLine(args.get('text')); }
+ * };
+ *
+ * @module package/commands
+ */
 import {
 	CommandRegistry,
 	Command,
@@ -14,9 +40,13 @@ import logger from "../logger.js";
  * Interface for command objects (JavaScript or TypeScript plain objects)
  */
 export interface CommandObject {
+	/** Command matching pattern */
 	pattern: string;
+	/** Optional aliases for the command */
 	aliases?: string[];
+	/** Execute handler invoked after successful parse */
 	execute: (context: CommandContext, args: Map<string, any>) => void;
+	/** Optional parse error handler */
 	onError?: (context: CommandContext, result: ParseResult) => void;
 }
 
@@ -52,7 +82,9 @@ export class JavaScriptCommandAdapter extends Command {
 	}
 }
 
+/** Directory for runtime command files (user-editable) */
 const DATA_COMMAND_DIRECTORY = join(process.cwd(), "data", "commands");
+/** Directory for compiled built-in commands */
 const SRC_COMMAND_DIRECTORY = join(process.cwd(), "dist", "src", "commands");
 
 export default {

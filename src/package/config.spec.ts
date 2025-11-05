@@ -9,7 +9,7 @@ import config, { CONFIG, CONFIG_DEFAULT } from "./config.js";
 const CONFIG_PATH = join(process.cwd(), "data", "config.yaml");
 const BACKUP_PATH = join(process.cwd(), "data", "config.yaml.backup");
 
-suite("config.ts", () => {
+suite("package/config.ts", () => {
 	before(async () => {
 		// Backup existing config if present
 		if (existsSync(CONFIG_PATH)) {

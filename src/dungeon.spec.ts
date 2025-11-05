@@ -268,7 +268,7 @@ suite("dungeon.ts", () => {
 			const obj = new DungeonObject();
 			assert.strictEqual(obj.keywords, "dungeon object");
 			assert.strictEqual(obj.display, "Dungeon Object");
-			assert.strictEqual(obj.description, "It's an object.");
+			assert.strictEqual(obj.description, undefined);
 			assert.deepStrictEqual(obj.contents, []);
 			assert.strictEqual(obj.dungeon, undefined);
 			assert.strictEqual(obj.location, undefined);

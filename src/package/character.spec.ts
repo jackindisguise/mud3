@@ -3,15 +3,15 @@ import assert from "node:assert";
 import { access } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
-import { Character } from "./character.js";
-import { Mob } from "./dungeon.js";
-import { saveCharacter, loadCharacter } from "./package/character.js";
+import { Character } from "../character.js";
+import { Mob } from "../dungeon.js";
+import { saveCharacter, loadCharacter } from "./character.js";
 
 function filePathFor(username: string): string {
 	return join(process.cwd(), "data", "characters", `${username}.yaml`);
 }
 
-describe("Character YAML persistence", () => {
+describe("package/character.ts", () => {
 	it("saves and loads a character round-trip via YAML", async () => {
 		const username = `specuser_${Date.now()}`;
 		const password = "specPassword123";

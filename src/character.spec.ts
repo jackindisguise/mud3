@@ -10,11 +10,12 @@ import {
 	DEFAULT_PLAYER_SETTINGS,
 	DEFAULT_PLAYER_STATS,
 	DEFAULT_PLAYER_CREDENTIALS,
+	RequiredPlayerCredentials,
 } from "./character.js";
 import { Mob, Dungeon } from "./dungeon.js";
 import type { MudClient } from "./io.js";
 
-suite("Character", () => {
+suite("character.ts", () => {
 	// Helper function to create test credentials
 	function createTestCredentials(
 		overrides: Partial<PlayerCredentials> = {}
@@ -502,21 +503,14 @@ suite("Character", () => {
 
 	suite("Edge Cases", () => {
 		test("should handle creating character with minimal credentials", () => {
-			const credentials: PlayerCredentials = {
-				username: "minimal",
-				passwordHash: "hash",
-				createdAt: new Date(),
-				isActive: true,
-				isBanned: false,
-				isAdmin: false,
-			};
+			const credentials: RequiredPlayerCredentials = { username: "minimal" };
 
 			const mob = new Mob();
 			const character = new Character({ credentials, mob });
 
 			assert.strictEqual(character.credentials.username, "minimal");
 			assert.strictEqual(character.credentials.email, undefined);
-			assert.strictEqual(character.credentials.lastLogin, undefined);
+			assert.notStrictEqual(character.credentials.lastLogin, undefined);
 		});
 
 		test("should handle zero playtime formatting", () => {

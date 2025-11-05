@@ -8,8 +8,10 @@
 	"main": "index.js",
 	"scripts": {
 		"build": "tsc",
-		"test:build": "npm run build && npm run test",
-		"test": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
+		"retest": "npm run build && npm run test",
+		"test": "npm run test:compiled",
+		"test:compiled": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
+		"test:raw": "node --loader ts-node/esm --test --test-reporter=spec \"src/**/*.spec.ts\"",
 		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test",
 		"deploy": "npm run build && npm run test && npm run coverage",
 		"doc": "npx typedoc"
@@ -21,6 +23,7 @@
 		"@types/xml2js": "^0.4.14",
 		"c8": "^10.1.3",
 		"mud-ext": "github:jackindisguise/mud-ext",
+		"ts-node": "^10.9.2",
 		"typedoc": "^0.28.14",
 		"typescript": "^5.9.3"
 	},

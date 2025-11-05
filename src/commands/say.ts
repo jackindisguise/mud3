@@ -1,4 +1,6 @@
 import { CommandContext, ParseResult } from "../command.js";
+import { MESSAGE_GROUP } from "../character.js";
+import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 export default {
@@ -7,12 +9,25 @@ export default {
 
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
-		console.log(`You say: ${message}`);
+		const { actor, room } = context;
+
+		actor.sendMessage(`You say, "${message}"`, MESSAGE_GROUP.CHANNELS);
+
+		if (room) {
+			for (const mob of room.contents) {
+				if (mob instanceof Mob && mob !== actor) {
+					mob.sendMessage(
+						`${actor} says, "${message}"`,
+						MESSAGE_GROUP.CHANNELS
+					);
+				}
+			}
+		}
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {
 		if (result.error === "Missing required argument: message") {
-			console.log("What do you want to say?");
+			context.actor.sendLine("What do you want to say?");
 			return;
 		}
 	},

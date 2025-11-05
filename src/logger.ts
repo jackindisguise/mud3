@@ -1,3 +1,38 @@
+/**
+ * Logger module — structured application logging
+ *
+ * Provides a preconfigured Winston logger used across the project.
+ * It writes JSON-formatted logs to files and colorized human-readable logs
+ * to the console (console output is disabled during tests).
+ *
+ * Transports
+ * - File (errors): `logs/error-YYYY-MM-DD-HHMMSS[.test].log` at level `error`
+ * - File (app):    `logs/app-YYYY-MM-DD-HHMMSS[.test].log` at level `debug`
+ * - Console: colorized output at `LOG_LEVEL` (default `info`), disabled when
+ *   `process.env.NODE_TEST_CONTEXT` is set
+ *
+ * Formatting
+ * - Files: timestamp + uppercase level + message + JSON meta (no colors)
+ * - Console: timestamp + colorized level + message (+ meta when provided)
+ *
+ * Usage
+ * ```ts
+ * import logger from './logger.js';
+ *
+ * logger.info('Server started on port %d', 4000);
+ * logger.warn('Low memory warning');
+ * logger.error('Failure', { err });
+ * logger.debug('Details', { payload });
+ * ```
+ *
+ * Notes
+ * - Set `LOG_LEVEL` to control console verbosity (files always log at `debug`).
+ * - Console output is disabled in test runs via `NODE_TEST_CONTEXT` to keep
+ *   test output clean; file transports remain active.
+ * - All logged metadata is serialized to JSON in files for easy parsing.
+ *
+ * @module logger
+ */
 import winston from "winston";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -100,7 +135,7 @@ const logger = winston.createLogger({
 		...(!isTestMode
 			? [
 					new winston.transports.Console({
-						level: process.env.LOG_LEVEL || "info", // Console respects LOG_LEVEL or defaults to info
+						level: process.env.LOG_LEVEL || "debug", // Console respects LOG_LEVEL or defaults to info
 						format: winston.format.combine(
 							winston.format.colorize(),
 							winston.format.timestamp({ format: "HH:mm:ss" }),

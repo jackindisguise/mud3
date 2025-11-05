@@ -1,3 +1,62 @@
+/**
+ * Three-dimensional dungeon/world model with rooms, movement, links, and serialization.
+ *
+ * Provides direction utilities, a grid-based `Dungeon` with `Room`s, movable entities,
+ * a global dungeon registry, and helpers for converting between directions and text
+ * or resolving room references from strings. This is the core world module.
+ *
+ * What you get
+ * - Direction utilities: `DIRECTION`, `DIRECTIONS`, `dir2text`, `text2dir`, `dir2reverse`,
+ *   `DIR2TEXT`, `DIR2TEXT_SHORT`, `TEXT2DIR`, `TEXT2DIR_SHORT`, and helpers like
+ *   `isNorthward`/`isSouthward`/`isEastward`/`isWestward`
+ * - Core types: `Coordinates`, `MapDimensions`, `DungeonOptions`
+ * - Registry and lookup: `DUNGEON_REGISTRY`, `getDungeonById(id)`, `ROOM_LINKS`
+ * - Reference parsing: `getRoomByRef("@id{x,y,z}")`
+ * - Classes: `Dungeon`, `DungeonObject`, `Room`, `Movable`, `Mob`, `Item`, `Prop`, `RoomLink`
+ * - Serialization types: `Serialized*`, `AnySerializedDungeonObject`
+ *
+ * Quick start
+ * ```ts
+ * import { Dungeon, DIRECTION, Movable, RoomLink, getDungeonById, getRoomByRef } from "./dungeon.js";
+ *
+ * // 1) Create a 3x3x1 dungeon with an id and pre-generated rooms
+ * const dungeon = Dungeon.generateEmptyDungeon({
+ * 	id: "midgar",
+ * 	dimensions: { width: 3, height: 3, layers: 1 }
+ * });
+ *
+ * // 2) Place a player (Movable) in the center room
+ * const start = dungeon.getRoom({ x: 1, y: 1, z: 0 })!;
+ * const player = new Movable();
+ * start.add(player);
+ *
+ * // 3) Move around using directions
+ * if (player.canStep(DIRECTION.NORTH)) player.step(DIRECTION.NORTH);
+ *
+ * // 4) Register lookup by id (automatic via id) and fetch later
+ * const again = getDungeonById("midgar");
+ * console.log(again === dungeon); // true
+ *
+ * // 5) Create a tunnel between rooms (even across dungeons)
+ * const a = dungeon.getRoom({ x: 2, y: 2, z: 0 })!;
+ * const b = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+ * RoomLink.createTunnel(a, DIRECTION.NORTH, b);
+ *
+ * // 6) Resolve a room by string reference
+ * const refRoom = getRoomByRef("@midgar{1,1,0}");
+ * ```
+ *
+ * Notes
+ * - Coordinates are `{ x, y, z }` with increasing `x` = east, increasing `y` = south,
+ *   increasing `z` = up. `getStep` and movement helpers use this convention.
+ * - `Dungeon.generateEmptyDungeon()` allocates and connects all rooms eagerly.
+ * - Setting `Dungeon.id` registers the dungeon in `DUNGEON_REGISTRY` for global lookup.
+ * - Serialization helpers on `DungeonObject` and subclasses capture hierarchy and types;
+ *   deserialization reconstructs objects.
+ *
+ * @module dungeon
+ */
+
 import { string } from "mud-ext";
 import { Character, MESSAGE_GROUP } from "./character.js";
 import logger from "./logger.js";
@@ -7,9 +66,17 @@ import logger from "./logger.js";
  *
  * @example
  * ```typescript
- * // Using basic directions
- * player.step(DIRECTION.NORTH);
- * player.step(DIRECTION.UP);
+ * import { Dungeon, DIRECTION, Movable } from "./dungeon.js";
+ *
+ * // Create a small 2x2x1 dungeon and place a player in the bottom-left room
+ * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 2, height: 2, layers: 1 } });
+ * const start = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+ * const player = new Movable();
+ * start.add(player);
+ *
+ * // Move north (y - 1) and then up (if your world uses vertical layers)
+ * if (player.canStep(DIRECTION.NORTH)) player.step(DIRECTION.NORTH);
+ * if (player.canStep(DIRECTION.UP)) player.step(DIRECTION.UP);
  * ```
  */
 export enum DIRECTION {
@@ -28,58 +95,20 @@ export enum DIRECTION {
 /**
  * Array containing all possible direction values.
  *
- * This constant provides a convenient way to iterate over all available
- * directions without manually listing each DIRECTION enum value. Useful
- * for checking multiple directions, generating exit lists, or implementing
- * omnidirectional searches.
- *
- * The array includes all ten standard directions in a fixed order:
- * cardinal (N/S/E/W), diagonal (NE/NW/SE/SW), and vertical (U/D).
+ * Useful for iterating exits, generating UI labels, or scanning around the player.
+ * Order is: cardinal (N/S/E/W), diagonal (NE/NW/SE/SW), vertical (U/D).
  *
  * @example
- * Check all directions for available exits:
  * ```typescript
- * function getAvailableExits(room: Room): DIRECTION[] {
- *   const exits: DIRECTION[] = [];
- *   for (const dir of DIRECTIONS) {
- *     const adjacent = room.getStep(dir);
- *     if (adjacent) {
- *       exits.push(dir);
- *     }
- *   }
- *   return exits;
- * }
- * ```
+ * import { Dungeon, DIRECTIONS, dir2text } from "./dungeon.js";
  *
- * @example
- * Display all possible exits with their names:
- * ```typescript
- * function showAllDirections() {
- *   DIRECTIONS.forEach(dir => {
- *     console.log(`${dir}: ${dir2text(dir)}`);
- *   });
- * }
- * // Output:
- * // DIRECTION.NORTH: north
- * // DIRECTION.SOUTH: south
- * // DIRECTION.EAST: east
- * // ...
- * ```
+ * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
+ * const room = dungeon.getRoom({ x: 1, y: 1, z: 0 })!;
  *
- * @example
- * Find first available exit in any direction:
- * ```typescript
- * function findAnyExit(room: Room): Room | undefined {
- *   for (const dir of DIRECTIONS) {
- *     const nextRoom = room.getStep(dir);
- *     if (nextRoom) return nextRoom;
- *   }
- *   return undefined;
- * }
+ * // Gather exits from the center room
+ * const exits = DIRECTIONS.filter((dir) => !!room.getStep(dir));
+ * console.log(exits.map((d) => dir2text(d)).join(", ")); // e.g., "north, south, east, west, ..."
  * ```
- *
- * @see {@link DIRECTION} - The direction enum
- * @see {@link dir2text} - Convert directions to text
  */
 export const DIRECTIONS: DIRECTION[] = [
 	DIRECTION.NORTH,
@@ -869,6 +898,29 @@ export class Dungeon {
 		this._rooms = this.generateGrid();
 	}
 
+	/**
+	 * Persistent unique identifier for this dungeon.
+	 *
+	 * Can be set at construction time (via the `id` option) or set directly.
+	 * The dungeon will be registered in the global {@link DUNGEON_REGISTRY}.
+	 * You can retrieve it later from anywhere using {@link getDungeonById}.
+	 *
+	 * @example
+	 * ```typescript
+	 * import { Dungeon, getDungeonById } from "./dungeon.js";
+	 *
+	 * const dungeon = Dungeon.generateEmptyDungeon({
+	 *   id: "midgar",
+	 *   dimensions: { width: 2, height: 2, layers: 1 },
+	 * });
+	 *
+	 * // The dungeon is automatically registered under its id
+	 * console.log(getDungeonById("midgar") === dungeon); // true
+	 * ```
+	 *
+	 * Note: Internally, changing the id updates its registration; clearing it
+	 * unregisters the dungeon.
+	 */
 	get id(): string | undefined {
 		return this._id;
 	}
@@ -1057,14 +1109,14 @@ export class Dungeon {
 	/**
 	 * Instantiate `Room` objects for every slot in the internal grid.
 	 *
-	 * This walks the `_rooms` 3D array created by `generateGrid()` and replaces
+	 * This walks the `rooms` 3D array created by `generateGrid()` and replaces
 	 * `undefined` placeholders with actual `Room` instances that are linked back
-	 * to this dungeon. If the internal grid is not present, the method is a
-	 * no-op. Use this to eagerly allocate every room in the dungeon.
+	 * to this dungeon. Use this to eagerly allocate every room in the dungeon.
 	 *
 	 * @example
 	 * ```typescript
-	 * // After generateGrid (done in constructor) the grid is empty; populate it now
+	 * const dungeon = new Dungeon({ dimensions: { width: 10, height: 10, layers: 2 }});
+	 * // after generateGrid (done in constructor) the grid is empty; populate it now
 	 * dungeon.generateRooms();
 	 * const start = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 	 * console.log(start instanceof Room); // true
@@ -1252,17 +1304,20 @@ export class Dungeon {
  * @property keywords - Space-delimited identification keywords (e.g. "small coin").
  * @property display - Short, human-friendly name for the object (e.g. "Gold Coin").
  * @property description - Longer descriptive text shown when examining the object.
- * @property dungeon - Optional `Dungeon` instance. When provided the object will be added to that dungeon's contents and inherit its dungeon reference.
+ * @property dungeon - Optional `Dungeon` instance. If provided, the object is added to that dungeon.
  *
  * @example
  * ```typescript
- * const dungeon = new Dungeon();
+ * import { Dungeon, DungeonObject } from "./dungeon.js";
+ *
+ * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 2, height: 1, layers: 1 } });
  * const coin = new DungeonObject({
  *   keywords: "coin gold",
  *   display: "Gold Coin",
  *   description: "A small, shiny gold coin.",
- *   dungeon
+ *   dungeon,
  * });
+ * // coin is now tracked by dungeon.contents
  * ```
  */
 export interface DungeonObjectOptions {
@@ -1308,7 +1363,7 @@ export interface SerializedDungeonObject {
 	type: SerializedDungeonObjectType;
 	keywords: string;
 	display: string;
-	description: string;
+	description?: string;
 	contents?: SerializedDungeonObject[];
 	location?: string; // RoomRef value
 }
@@ -1384,19 +1439,24 @@ export type AnySerializedDungeonObject =
  *
  * @example
  * ```typescript
- * // Create a basic object
- * const sword = new DungeonObject();
- * sword.keywords = "longsword sword";
- * sword.display = "A Sharp Longsword";
- * sword.description = "A well-crafted steel longsword.";
+ * import { Dungeon, DungeonObject } from "./dungeon.js";
  *
- * // Add items to a container
- * const bag = new DungeonObject();
- * bag.add(sword); // sword is now inside bag
+ * // Create a dungeon and a starting room
+ * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 1, height: 1, layers: 1 } });
+ * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+ *
+ * // Create a sword and a bag
+ * const sword = new DungeonObject({ keywords: "longsword sword", display: "A Sharp Longsword" });
+ * const bag = new DungeonObject({ keywords: "bag", display: "Leather Bag" });
+ *
+ * // Place bag in the room and put sword in the bag
+ * room.add(bag);
+ * bag.add(sword);
  *
  * // Check containment
  * console.log(bag.contains(sword)); // true
  * console.log(sword.location === bag); // true
+ * console.log(dungeon.contains(sword)); // true (registered via containment)
  * ```
  */
 export class DungeonObject {
@@ -1416,7 +1476,7 @@ export class DungeonObject {
 	 * Can include multiple sentences and rich descriptive text about the
 	 * object's appearance, state, and notable features.
 	 */
-	description: string = "It's an object.";
+	description?: string;
 
 	/**
 	 * Array of objects directly contained by this object. Acts as a container
@@ -2626,19 +2686,22 @@ export const ROOM_LINKS: RoomLink[] = [];
 
 /**
  * Represents a bidirectional portal between two rooms.
- * Links override normal spatial relationships to create connections
- * between any two rooms, regardless of their position in their respective dungeons.
+ * Links override normal spatial relationships to connect arbitrary rooms.
  *
  * @example
  * ```typescript
- * // Create a portal between Midgar and Sector 7
- * const midgarRoom = midgarDungeon.getRoom({ x: 5, y: 5, z: 0 });
- * const sectorRoom = sector7Dungeon.getRoom({ x: 0, y: 0, z: 0 });
- * const link = RoomLink.createTunnel(midgarRoom, DIRECTION.NORTH, sectorRoom);
+ * import { Dungeon, RoomLink, DIRECTION } from "./dungeon.js";
+ *
+ * const midgar = Dungeon.generateEmptyDungeon({ dimensions: { width: 6, height: 6, layers: 1 } });
+ * const sector7 = Dungeon.generateEmptyDungeon({ dimensions: { width: 1, height: 1, layers: 1 } });
+ * const midgarRoom = midgar.getRoom({ x: 5, y: 5, z: 0 })!;
+ * const sectorRoom = sector7.getRoom({ x: 0, y: 0, z: 0 })!;
+ *
+ * RoomLink.createTunnel(midgarRoom, DIRECTION.NORTH, sectorRoom);
  *
  * // The rooms are now connected via these directions
- * assert(midgarRoom.getStep(DIRECTION.NORTH) === sectorRoom);
- * assert(sectorRoom.getStep(DIRECTION.SOUTH) === midgarRoom);
+ * console.log(midgarRoom.getStep(DIRECTION.NORTH) === sectorRoom); // true
+ * console.log(sectorRoom.getStep(DIRECTION.SOUTH) === midgarRoom); // true
  * ```
  */
 export class RoomLink {

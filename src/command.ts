@@ -1,3 +1,48 @@
+/**
+ * Pattern-based command system for the MUD.
+ *
+ * Provides a small framework to declare commands with human-readable patterns,
+ * parse user input into typed arguments, and execute the matching command.
+ *
+ * What you get
+ * - `Command`: abstract base class with pattern parsing and `execute()` hook
+ * - `CommandRegistry`: register commands and execute user input centrally
+ * - `ARGUMENT_TYPE`: built-in argument types (text, word, number, object, mob, item, direction)
+ * - Types: `CommandContext`, `ParseResult`, `ArgumentConfig`, `CommandOptions`
+ *
+ * Pattern basics
+ * - Placeholders: `<name:type>` (required), `<name:type?>` (optional)
+ * - Object sources: `<item:object@room>`, `<item:object@inventory>`, `<item:object@all>`
+ * - Common types: `text`, `word`, `number`, `object`, `mob`, `item`, `direction`
+ *
+ * Quick start
+ * ```ts
+ * import { Command, CommandRegistry } from "./command.js";
+ * import { Mob } from "./dungeon.js";
+ *
+ * // Define a simple command: say <message:text>
+ * class Say extends Command {
+ *   readonly pattern = "say <message:text>";
+ *   execute(ctx, args) {
+ *     const msg = args.get("message");
+ *     ctx.actor.sendLine(msg);
+ *   }
+ * }
+ *
+ * // Register and execute
+ * CommandRegistry.default.register(new Say());
+ * const actor = new Mob();
+ * CommandRegistry.default.execute("say Hello there!", { actor, room: actor.location as any });
+ * ```
+ *
+ * Notes
+ * - Commands are matched longest pattern first (more specific first) in the registry.
+ * - Implement `onError()` to customize parsing failure messages for your command.
+ * - You can call `parse()` directly for custom flows, but `CommandRegistry` is preferred.
+ *
+ * @module command
+ */
+
 import {
 	DungeonObject,
 	Mob,
@@ -74,40 +119,24 @@ export interface ParseResult {
  * This enum defines all the valid argument types that can be used in command
  * patterns. Each type has specific parsing logic and validation rules.
  *
- * @property TEXT - Captures all remaining input text (greedy match). Use for
- *                  messages, descriptions, or any freeform text. Always last argument.
- *
- * @property WORD - Captures a single word (non-whitespace). Use for single-word
- *                  arguments like names, identifiers, or keywords.
- *
- * @property NUMBER - Parses and validates as an integer. Returns undefined if
- *                    input is not a valid number. Use for quantities, IDs, etc.
- *
- * @property OBJECT - Searches for a DungeonObject by matching keywords. Supports
- *                    source modifiers (@room, @inventory, @all) to specify search
- *                    location. Returns the found object or undefined.
- *
- * @property MOB - Searches for a Mob entity by matching keywords in the current room.
- *                 Use for targeting players or NPCs in commands like "tell", "give",
- *                 "attack", etc. Returns the found Mob or undefined.
- *
- * @property ITEM - Searches for an Item entity by matching keywords. Supports source
- *                  modifiers (@room, @inventory, @all) to specify search location.
- *                  Use for item-specific commands. Returns the found Item or undefined.
- *
- * @property DIRECTION - Parses direction names/abbreviations into DIRECTION enum values.
- *                       Supports full names ("north") and abbreviations ("n"). Returns
- *                       DIRECTION enum value or undefined if not recognized.
+ * - TEXT: Captures all remaining input text (greedy). Use for messages, descriptions,
+ *         or any freeform text. Should be the final argument in a pattern.
+ * - WORD: Captures a single word (non-whitespace). Use for names, identifiers, keywords.
+ * - NUMBER: Parses an integer. Returns undefined if input is not a valid integer.
+ * - OBJECT: Looks up a DungeonObject by keywords. Respects \@source modifiers.
+ * - MOB: Looks up a Mob in the current room by keywords.
+ * - ITEM: Looks up an Item by keywords. Respects \@source modifiers.
+ * - DIRECTION: Parses direction names/abbreviations into DIRECTION values.
  *
  * @example
  * ```typescript
- * ArgumentType.TEXT    // "hello world" -> "hello world"
- * ArgumentType.WORD    // "hello world" -> "hello"
- * ArgumentType.NUMBER  // "42 items" -> 42
- * ArgumentType.OBJECT  // "sword" -> DungeonObject (if found)
- * ArgumentType.MOB     // "bob" -> Mob (if found in room)
- * ArgumentType.ITEM    // "potion" -> Item (if found)
- * ArgumentType.DIRECTION // "north" or "n" -> DIRECTION.NORTH
+ * ARGUMENT_TYPE.TEXT       // "hello world" -> "hello world"
+ * ARGUMENT_TYPE.WORD       // "hello world" -> "hello"
+ * ARGUMENT_TYPE.NUMBER     // "42 items" -> 42
+ * ARGUMENT_TYPE.OBJECT     // "sword" -> DungeonObject (if found)
+ * ARGUMENT_TYPE.MOB        // "bob" -> Mob (if found in room)
+ * ARGUMENT_TYPE.ITEM       // "potion" -> Item (if found)
+ * ARGUMENT_TYPE.DIRECTION  // "north" or "n" -> DIRECTION.NORTH
  * ```
  */
 export enum ARGUMENT_TYPE {
@@ -130,7 +159,7 @@ export enum ARGUMENT_TYPE {
  * @property name - The identifier for this argument, used as the key in the args Map.
  *                  Extracted from the pattern placeholder (e.g., "message" from "<message:text>").
  *
- * @property type - The ArgumentType defining how to parse this argument's value.
+ * @property type - The ARGUMENT_TYPE defining how to parse this argument's value.
  *                  Determines validation rules and the type of value returned.
  *
  * @property required - Whether this argument must be provided. Defaults to true unless
@@ -148,7 +177,7 @@ export enum ARGUMENT_TYPE {
  * ```typescript
  * {
  *   name: "item",
- *   type: ArgumentType.OBJECT,
+ *   type: ARGUMENT_TYPE.OBJECT,
  *   required: true,
  *   source: "room"
  * }
@@ -382,10 +411,34 @@ export abstract class Command {
 
 	/**
 	 * Initialize the command and build cached regex patterns.
-	 * This constructor builds the pattern cache immediately with the provided patterns.
+	 * Builds the pattern cache immediately using the provided options (if any)
+	 * or the subclass’s own `pattern`/`aliases` fields.
 	 *
-	 * @param pattern - The main command pattern
-	 * @param aliases - Optional array of alias patterns
+	 * @param options - Optional CommandOptions: `{ pattern, aliases }`
+	 *
+	 * @example
+	 * ```typescript
+	 * // Define pattern via subclass fields
+	 * class Say extends Command {
+	 *   readonly pattern = "say <message:text>";
+	 *   constructor() { super(); }
+	 *   execute(ctx: CommandContext, args: Map<string, any>) { // ... }
+	 * }
+	 * ```
+	 *
+	 * @example
+	 * ```typescript
+	 * // Define pattern via options
+	 * class Tell extends Command {
+	 *   constructor() {
+	 *     super({
+	 *       pattern: "tell <target:mob> <message:text>",
+	 *       aliases: ["whisper <target:mob> <message:text>"]
+	 *     });
+	 *   }
+	 *   execute(ctx: CommandContext, args: Map<string, any>) { // ... }
+	 * }
+	 * ```
 	 */
 	constructor(options?: CommandOptions) {
 		if (options) {
@@ -643,8 +696,8 @@ export abstract class Command {
 	 * Returns:
 	 * ```typescript
 	 * [
-	 *   { name: "item", type: ArgumentType.OBJECT, required: true, source: "room" },
-	 *   { name: "container", type: ArgumentType.OBJECT, required: false, source: "all" }
+	 *   { name: "item", type: ARGUMENT_TYPE.OBJECT, required: true, source: "room" },
+	 *   { name: "container", type: ARGUMENT_TYPE.OBJECT, required: false, source: "all" }
 	 * ]
 	 * ```
 	 */
@@ -768,15 +821,15 @@ export abstract class Command {
 	 * @returns {any} The parsed value, or undefined if parsing fails
 	 *
 	 * @example
-	 * parseArgument("5", { type: ArgumentType.NUMBER }, context)
+	 * parseArgument("5", { type: ARGUMENT_TYPE.NUMBER }, context)
 	 * // Returns: 5
 	 *
 	 * @example
-	 * parseArgument("sword", { type: ArgumentType.OBJECT, source: "room" }, context)
+	 * parseArgument("sword", { type: ARGUMENT_TYPE.OBJECT, source: "room" }, context)
 	 * // Returns: <DungeonObject> or undefined
 	 *
 	 * @example
-	 * parseArgument("bob", { type: ArgumentType.MOB }, context)
+	 * parseArgument("bob", { type: ARGUMENT_TYPE.MOB }, context)
 	 * // Returns: <Mob> or undefined
 	 */
 	private parseArgument(

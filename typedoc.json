@@ -1,7 +1,8 @@
 {
 	"entryPoints": ["src"],
 	"entryPointStrategy": "expand",
-	"exclude": ["**/*.spec.ts", "**/logger.ts"],
+	"exclude": ["**/*.spec.ts"],
 	"tsconfig": "tsconfig.json",
-	"out": "docs"
+	"out": "docs",
+	"readme": "README.md"
 }

@@ -127,6 +127,59 @@ export async function characterExists(username: string): Promise<boolean> {
 	return await fileExists(filePath);
 }
 
+/**
+ * Check if a password matches the character's stored password hash.
+ * Returns the serialized character data if the password matches, undefined otherwise.
+ *
+ * @param username The username to check
+ * @param password The plaintext password to verify
+ * @returns SerializedCharacter if password matches, undefined otherwise
+ */
+export async function checkCharacterPassword(
+	username: string,
+	password: string
+): Promise<SerializedCharacter | undefined> {
+	await ensureDir();
+	const filePath = getCharacterFilePath(username);
+
+	if (!(await characterExists(username))) {
+		logger.debug(
+			`Character file not found: ${relative(
+				process.cwd(),
+				filePath
+			)} (username=${username})`
+		);
+		return undefined;
+	}
+
+	const content = await readFile(filePath, "utf-8");
+	const raw = YAML.load(content) as SerializedCharacter;
+
+	// Hash the input password and compare with stored hash
+	const hashedPassword = Character.hashPassword(password);
+	if (raw.credentials.passwordHash !== hashedPassword) {
+		logger.debug(`Password mismatch for user: ${username}`);
+		return undefined;
+	}
+
+	return raw;
+}
+
+/**
+ * Load a character from serialized data and register it as active.
+ *
+ * @param data The serialized character data
+ * @returns The deserialized Character instance
+ */
+export function loadCharacterFromSerialized(
+	data: SerializedCharacter
+): Character {
+	const character = Character.deserialize(data);
+	// Auto-register as active upon successful load
+	registerActiveCharacter(character);
+	return character;
+}
+
 export async function loadCharacter(
 	username: string
 ): Promise<Character | undefined> {

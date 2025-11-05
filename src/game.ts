@@ -30,7 +30,7 @@
 
 import { MudServer, MudClient } from "./io.js";
 import { CommandContext, CommandRegistry } from "./command.js";
-import { Character, SerializedCharacter } from "./character.js";
+import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Mob, Room } from "./dungeon.js";
 import { CONFIG } from "./package/config.js";
 import {
@@ -40,6 +40,8 @@ import {
 	isCharacterActive,
 	registerActiveCharacter,
 	unregisterActiveCharacter,
+	checkCharacterPassword,
+	loadCharacterFromSerialized,
 } from "./package/character.js";
 import logger from "./logger.js";
 
@@ -100,6 +102,9 @@ export class Game {
 
 	private saveTimer?: NodeJS.Timeout;
 	private nextConnectionId = 1;
+
+	/** Static singleton instance of the Game */
+	public static game?: Game;
 
 	constructor() {
 		// Use package config
@@ -240,29 +245,22 @@ export class Game {
 	 * Handle client disconnection: clean session and end active gameplay session (if any).
 	 */
 	private async handleDisconnection(client: MudClient) {
-		const session = this.findSessionByClient(client);
-		const username = session
-			? session.character?.credentials.username
-			: undefined;
-
-		logger.info(
-			`Client disconnected: ${client.getAddress()}${
-				username ? ` (${username})` : ""
-			}`
-		);
+		logger.info(`Client disconnected: ${client}`);
 
 		// Clean up login session
-		if (session) {
-			// Clear inactivity timer if set
-			if (session.inactivityTimer) {
-				clearTimeout(session.inactivityTimer);
-				session.inactivityTimer = undefined;
-			}
-			this.loginSessions.delete(session);
+		const session = this.findSessionByClient(client);
+		if (!session) return;
+		// Clear inactivity timer if set
+		if (session.inactivityTimer) {
+			clearTimeout(session.inactivityTimer);
+			session.inactivityTimer = undefined;
 		}
 
-		// End player session if they were playing
-		if (session) await this.endPlayerSession(session);
+		// remove from session tracking
+		this.loginSessions.delete(session);
+
+		// end player session if they were playing
+		await this.endPlayerSession(session);
 	}
 
 	/**
@@ -300,13 +298,33 @@ export class Game {
 				// new name, start making a character
 				if (!(await characterExists(input))) {
 					return confirmCharacterCreation();
+				} else {
+					return confirmExistingCharacterPassword();
 				}
 
 				askName();
+			});
+		};
 
-				// existing character that's not online
-				// try to log in
-				//askPassword();
+		const confirmExistingCharacterPassword = () => {
+			client.ask("Password:", async (_password) => {
+				// Check password and get serialized character data
+				const serializedCharacter = await checkCharacterPassword(
+					username,
+					_password
+				);
+				if (!serializedCharacter) {
+					client.sendLine("Invalid password. Disconnecting.");
+					client.close();
+					return;
+				}
+
+				// Load the character from serialized data
+				const loadedCharacter =
+					loadCharacterFromSerialized(serializedCharacter);
+
+				// Password is correct, show MOTD and start session
+				MOTD(loadedCharacter);
 			});
 		};
 
@@ -343,19 +361,28 @@ export class Game {
 			});
 		};
 
-		const MOTD = () => {
+		const MOTD = (existingCharacter?: Character) => {
 			client.sendLine("This is the MOTD.");
 			client.ask("Press any key to continue...", () => {
-				const mob = new Mob({
-					display: username,
-					keywords: username,
-				});
-				const character = new Character({
-					credentials: { username },
-					mob,
-				});
-				character.setPassword(password);
-				saveCharacterFile(character);
+				let character: Character;
+
+				if (existingCharacter) {
+					// Use the loaded existing character
+					character = existingCharacter;
+				} else {
+					// Create a new character
+					const mob = new Mob({
+						display: username,
+						keywords: username,
+					});
+					character = new Character({
+						credentials: { username },
+						mob,
+					});
+					character.setPassword(password);
+					saveCharacterFile(character);
+				}
+
 				self.startPlayerSession(session, character);
 			});
 		};
@@ -376,11 +403,9 @@ export class Game {
 			return;
 		}
 
-		// TODO: Implement command parsing and execution
-		// This is where you'd integrate with your command system
 		logger.debug(`${character.credentials.username} input: ${input}`);
 
-		// For now, just echo back
+		// generate the context
 		const context: CommandContext = {
 			actor: character.mob,
 			room:
@@ -395,43 +420,11 @@ export class Game {
 	}
 
 	/**
-	 * Authenticate a player and return their character.
-	 *
-	 * Replace with your persistence and hashing logic. This default flow creates
-	 * a trivial character for demonstration.
-	 */
-	static async authenticatePlayer(
-		username: string,
-		password: string
-	): Promise<Character | undefined> {
-		// Try to load an existing character
-		const existing = await loadCharacterFile(username);
-		if (existing) {
-			if (existing.verifyPassword(password)) return existing;
-			return undefined; // invalid password
-		}
-
-		// Create a new character if none exists
-		const mob = new Mob();
-		mob.keywords = username;
-		mob.display = username;
-		const character = new Character({
-			credentials: { username: username },
-			mob,
-		});
-		character.setPassword(password);
-		await saveCharacterFile(character);
-		return character;
-	}
-
-	/**
 	 * Start a gameplay session for an authenticated character.
-	 *
 	 * Associates the connection, transitions to PLAYING, and welcomes the player.
 	 */
 	private startPlayerSession(session: LoginSession, character: Character) {
 		const connectionId = this.nextConnectionId++;
-		const clientAddress = session.client.getAddress();
 
 		// Start character session (attach client for convenience send helpers)
 		character.startSession(connectionId, session.client);
@@ -474,7 +467,7 @@ export class Game {
 		session.character.endSession();
 
 		// Save character
-		await this.saveCharacter(session.character);
+		await saveCharacterFile(session.character);
 
 		// Clean up tracking
 		this.activeCharacters.delete(session.character);
@@ -493,38 +486,17 @@ export class Game {
 		logger.info(`Saving ${this.activeCharacters.size} active characters...`);
 
 		const savePromises = Array.from(this.activeCharacters.values()).map(
-			(character) => this.saveCharacter(character)
+			(character) => saveCharacterFile(character)
 		);
 
 		await Promise.all(savePromises);
 	}
 
 	/**
-	 * Save a single character to persistence.
-	 */
-	private async saveCharacter(character: Character) {
-		await saveCharacterFile(character);
-	}
-
-	/**
-	 * Load a character from persistence.
-	 *
-	 * Returns serialized data for external consumers; not used in the default flow.
-	 */
-	private async loadCharacter(
-		username: string
-	): Promise<SerializedCharacter | undefined> {
-		const character = await loadCharacterFile(username);
-		return character ? character.serialize() : undefined;
-	}
-
-	/**
 	 * Find a login session by client.
 	 */
 	private findSessionByClient(client: MudClient): LoginSession | undefined {
-		for (const s of this.loginSessions) {
-			if (s.client === client) return s;
-		}
+		for (const s of this.loginSessions) if (s.client === client) return s;
 	}
 
 	/**
@@ -536,8 +508,80 @@ export class Game {
 		return {
 			activeConnections: this.loginSessions.size,
 			playersOnline: this.activeCharacters.size,
-			loginSessions: Array.from(this.loginSessions.values()).length,
 		};
+	}
+
+	/**
+	 * Broadcast a message to all active playing characters.
+	 *
+	 * @param text The message to send
+	 * @param group The message group to use (defaults to INFO)
+	 *
+	 * @example
+	 * ```ts
+	 * game.broadcast("Server restart in 5 minutes!", MESSAGE_GROUP.SYSTEM);
+	 * ```
+	 */
+	public broadcast(text: string, group?: MESSAGE_GROUP): void {
+		for (const character of this.activeCharacters) {
+			if (group !== undefined) {
+				character.sendMessage(text, group);
+			} else {
+				character.sendLine(text);
+			}
+		}
+	}
+
+	/**
+	 * Announce a message to all connected clients, regardless of login state.
+	 *
+	 * @param text The message to send
+	 *
+	 * @example
+	 * ```ts
+	 * game.announce("Server is shutting down NOW!");
+	 * ```
+	 */
+	public announce(text: string): void {
+		for (const session of this.loginSessions) {
+			try {
+				session.client.sendLine(text);
+			} catch (error) {
+				logger.error(`Failed to send broadcast to client: ${error}`);
+			}
+		}
+	}
+
+	/**
+	 * Execute a function for each login session.
+	 *
+	 * @param callback The function to call with each login session
+	 *
+	 * @example
+	 * ```ts
+	 * game.forEachSession((session) => {
+	 *   console.log(`Session state: ${session.state}`);
+	 * });
+	 * ```
+	 */
+	public forEachSession(callback: (session: LoginSession) => void): void {
+		for (const session of this.loginSessions) callback(session);
+	}
+
+	/**
+	 * Execute a function for each active playing character.
+	 *
+	 * @param callback The function to call with each character
+	 *
+	 * @example
+	 * ```ts
+	 * game.forEachCharacter((character) => {
+	 *   console.log(`Character: ${character.credentials.username}`);
+	 * });
+	 * ```
+	 */
+	public forEachCharacter(callback: (character: Character) => void): void {
+		for (const character of this.activeCharacters) callback(character);
 	}
 }
 
@@ -553,7 +597,10 @@ export class Game {
  * ```
  */
 export async function startGame(): Promise<Game> {
-	const game = new Game();
+	if (!Game.game) {
+		Game.game = new Game();
+	}
+	const game = Game.game;
 
 	// Handle graceful shutdown
 	process.on("SIGINT", async () => {

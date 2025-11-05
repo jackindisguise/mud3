@@ -4,7 +4,7 @@ import config from "./src/package/config.js";
 import character from "./src/package/character.js";
 import lockfile from "./src/package/lockfile.js";
 import logger from "./src/logger.js";
-import { Game } from "./src/game.js";
+import { startGame } from "./src/game.js";
 
 await loadPackage(lockfile); // always load first
 await loadPackage(lockfile); // always load first
@@ -13,10 +13,9 @@ await loadPackage(commands);
 await loadPackage(config);
 await loadPackage(character);
 
-// Start a game instance and automatically stop after 10 seconds
-const game = new Game();
+// Start the game using startGame() to properly set Game.game singleton
+const game = await startGame();
 const timeout = 1000 * 10;
-await game.start();
 logger.info(
 	`Game server started. It will shut down automatically in ${
 		timeout / 1000

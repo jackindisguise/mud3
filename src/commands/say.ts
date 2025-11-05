@@ -1,3 +1,22 @@
+/**
+ * Say command for in-character speech.
+ *
+ * Sends a message to all mobs in the same room as the actor. Used for in-character
+ * dialogue and communication with other players/NPCs in the immediate vicinity.
+ *
+ * @example
+ * ```
+ * say Hello, traveler!
+ * s How are you doing today?
+ * ' This is a shortcut for say
+ * ```
+ *
+ * **Aliases:** `s`, `'`
+ *
+ * **Pattern:** `say <message:text>`
+ * @module commands/say
+ */
+
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Mob } from "../dungeon.js";

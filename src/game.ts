@@ -56,9 +56,11 @@ export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 /**
  * Player authentication states during the login process.
  *
- * State flow (typical):
- * - CONNECTED → ASKING_USERNAME → ASKING_PASSWORD → AUTHENTICATED → PLAYING
- * - For new users: ASKING_NEW_PASSWORD → ASKING_CONFIRM_PASSWORD → CHARACTER_CREATION
+ * The login flow uses a callback-based approach (nanny) rather than explicit states.
+ * These states track the high-level phase of the connection:
+ * - CONNECTED: Initial connection, going through login prompts via nanny()
+ * - CHARACTER_CREATION: Creating a new character (currently unused, may be used for extended creation)
+ * - PLAYING: Authenticated and actively playing in the game world
  */
 export enum LOGIN_STATE {
 	CONNECTED = "connected",
@@ -80,15 +82,15 @@ export interface LoginSession {
  *
  * Features
  * - Starts/stops the TCP server and listens for clients
- * - Guides clients through a simple login flow (username/password)
+ * - Guides clients through a callback-based login flow (username/password) via `nanny()`
  * - Creates/loads `Character`s and starts/stops player sessions
  * - Tracks active characters and login sessions
  * - Periodically auto-saves all active characters
  *
  * Integration points
  * - Wire your command system in `handleGameplayInput()`
- * - Customize authentication in `authenticatePlayer()`
- * - Adjust save cadence via the interval inside `start()`
+ * - Customize authentication flow in `nanny()`
+ * - Adjust save cadence via DEFAULT_SAVE_INTERVAL_MS constant
  */
 export class Game {
 	private server: MudServer;

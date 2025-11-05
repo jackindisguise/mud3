@@ -13,6 +13,7 @@
  * Pattern basics
  * - Placeholders: `<name:type>` (required), `<name:type?>` (optional)
  * - Object sources: `<item:object@room>`, `<item:object@inventory>`, `<item:object@all>`
+ * - Autocomplete: `word~` (matches partial input like "o", "oo", "ooc" for "ooc~")
  * - Common types: `text`, `word`, `number`, `object`, `mob`, `item`, `direction`
  *
  * Quick start
@@ -208,6 +209,7 @@ export interface CommandOptions {
  * - `<name:type>` - Required argument
  * - `<name:type?>` - Optional argument (with ? suffix)
  * - `<name:type@source>` - Object/Item argument with search source modifier
+ * - `word~` - Literal word with autocomplete (matches partial input)
  *
  * ### Available Argument Types
  * - `text` - Captures all remaining input text (greedy match, should be last argument)
@@ -222,6 +224,12 @@ export interface CommandOptions {
  * - `@room` - Search only in the current room's contents
  * - `@inventory` - Search only in the actor's inventory
  * - `@all` - Search both room and inventory (default if not specified)
+ *
+ * ### Autocomplete Suffix (`~`)
+ * - Words followed by `~` can be partially matched from left to right
+ * - Example: `"ooc~"` matches `"o"`, `"oo"`, or `"ooc"`
+ * - Useful for frequently used commands or commands with long names
+ * - Only works on literal words, not on argument placeholders
  *
  * ## Examples
  *
@@ -292,6 +300,21 @@ export interface CommandOptions {
  * // Args: { item: <coin from inventory>, container: <bag from room> }
  * ```
  *
+ * ### Autocomplete matching
+ * ```typescript
+ * class OocCommand extends Command {
+ *   pattern = "ooc~ <message:text>";
+ *
+ *   execute(context: CommandContext, args: Map<string, any>) {
+ *     const message = args.get("message");
+ *     console.log(`[OOC] ${context.actor.display}: ${message}`);
+ *   }
+ * }
+ *
+ * // Matches: "o hello", "oo hello", or "ooc hello"
+ * // All produce: { message: "hello" }
+ * ```
+ *
  * ### Mob targeting
  * ```typescript
  * class TellCommand extends Command {
@@ -357,6 +380,7 @@ export abstract class Command {
 	 * - `<name:type>` - Required argument
 	 * - `<name:type?>` - Optional argument (with ? suffix)
 	 * - `<name:type@source>` - Object/Item/Mob argument with search source modifier
+	 * - `word~` - Literal word with autocomplete (matches partial input)
 	 *
 	 * Examples:
 	 * - `"say <message:text>"` - Simple command with one required text argument
@@ -366,6 +390,7 @@ export abstract class Command {
 	 * - `"put <item:object@inventory> in <container:object@room>"` - Multiple object arguments with different sources
 	 * - `"look <direction:direction?>"` - Optional direction argument
 	 * - `"drop <quantity:number> <item:item@inventory>"` - Number and item arguments
+	 * - `"ooc~ <message:text>"` - Autocomplete: matches "o", "oo", or "ooc"
 	 */
 	readonly pattern!: string;
 
@@ -731,6 +756,7 @@ export abstract class Command {
 	 * 1. Match the literal parts of the pattern exactly (case-insensitive)
 	 * 2. Capture argument values in groups for extraction
 	 * 3. Make all arguments optional so missing required args can be detected
+	 * 4. Support autocomplete matching with `~` suffix on literal words
 	 *
 	 * The conversion process:
 	 * 1. Replace all argument placeholders with temporary markers
@@ -742,6 +768,11 @@ export abstract class Command {
 	 * All arguments are made optional in the regex (using `?` quantifier) so that
 	 * we can provide better error messages by detecting which specific argument
 	 * is missing, rather than just failing to match entirely.
+	 *
+	 * Autocomplete suffix (`~`):
+	 * - Words followed by `~` can be partially matched
+	 * - Example: "ooc~" matches "o", "oo", or "ooc"
+	 * - Useful for commands with long names or frequently used shortcuts
 	 *
 	 * @private
 	 * @param pattern - The command pattern with placeholders
@@ -755,6 +786,11 @@ export abstract class Command {
 	 * @example
 	 * Pattern: "get <item:object> from <container:object>"
 	 * Regex: /^get(?: (.+?))? from(?: (.+?))?$/i
+	 *
+	 * @example
+	 * Pattern: "ooc~ <message:text>"
+	 * Regex: /^o(?:o(?:c)?)?(?: (.+))?$/i
+	 * Matches: "o hello", "oo hello", or "ooc hello"
 	 */
 	private buildRegex(pattern: string): RegExp {
 		let regexStr = pattern;
@@ -775,6 +811,20 @@ export abstract class Command {
 
 		// Escape special regex characters in the literal parts
 		regexStr = regexStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+		// Handle autocomplete suffix (~) for literal words
+		// Convert "word~" into a pattern that matches partial input
+		// Example: "ooc~" becomes "o(?:o(?:c)?)?" which matches "o", "oo", or "ooc"
+		regexStr = regexStr.replace(/([a-z]+)~/gi, (match, word) => {
+			// Build nested optional groups for each character after the first
+			let autocompletePattern = word[0];
+			for (let i = 1; i < word.length; i++) {
+				autocompletePattern += `(?:${word[i]}`;
+			}
+			// Close all the optional groups
+			autocompletePattern += ')?'.repeat(word.length - 1);
+			return autocompletePattern;
+		});
 
 		// Now replace the placeholders with actual regex patterns
 		// For arguments with a preceding space, make the space part of the optional group

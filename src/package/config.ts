@@ -1,5 +1,5 @@
 /**
- * Package: config — YAML configuration loader
+ * Package: config - YAML configuration loader
  *
  * Loads `data/config.yaml` (creating it with sensible defaults if missing),
  * merges it into the in-memory `CONFIG` object, and exposes typed config

@@ -1,15 +1,15 @@
 /**
- * Package: commands — dynamic command loader
+ * Package: commands - dynamic command loader
  *
  * Loads command modules from two locations at startup:
  * - `data/commands` (runtime-extensible JS commands)
  * - `dist/src/commands` (compiled built-in commands)
  *
  * Each command file should export a default plain object with:
- * - `pattern: string` — the command pattern
- * - `aliases?: string[]` — optional aliases
- * - `execute(context, args)` — handler function
- * - `onError?(context, result)` — optional error handler
+ * - `pattern: string` - the command pattern
+ * - `aliases?: string[]` - optional aliases
+ * - `execute(context, args)` - handler function
+ * - `onError?(context, result)` - optional error handler
  *
  * Files beginning with `_` are ignored. Only `.js` files are loaded.
  * The loader logs progress and registers commands into `CommandRegistry.default`.

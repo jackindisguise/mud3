@@ -1076,7 +1076,7 @@ export class Dungeon {
 	 *
 	 * This creates a three-dimensional array sized according to `dimensions` and
 	 * fills it with `undefined` placeholders. It does not allocate `Room`
-	 * instances — that work is performed by `generateEmptyRooms()` (or you can
+	 * instances - that work is performed by `generateEmptyRooms()` (or you can
 	 * allocate rooms yourself and assign them into the grid). Splitting
 	 * allocation from instantiation allows faster, low-cost grid setup in cases
 	 * where rooms are created lazily or populated from external data.
@@ -2843,7 +2843,7 @@ export class RoomLink {
 	 * - Otherwise return `undefined` to indicate this link does not handle the
 	 *   requested traversal.
 	 *
-	 * This method does not perform permission checks (canEnter/canExit) — it
+	 * This method does not perform permission checks (canEnter/canExit) - it
 	 * only resolves spatial/linked connectivity. Permission checks are done
 	 * by the calling code (e.g., Movable.canStep).
 	 *
@@ -2876,7 +2876,7 @@ export class RoomLink {
 	 *
 	 * After calling `remove()` there are no references to this link left in
 	 * the connected rooms' _links arrays, but the RoomLink object itself is
-	 * not modified further — callers may keep or discard the instance as they
+	 * not modified further - callers may keep or discard the instance as they
 	 * wish.
 	 */
 	remove() {

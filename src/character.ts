@@ -43,7 +43,7 @@
  * ```
  *
  * Notes
- * - Password hashing uses `CONFIG.security.password_salt` — ensure it is configured.
+ * - Password hashing uses `CONFIG.security.password_salt` - ensure it is configured.
  * - `Character.mob` establishes a bidirectional link with `Mob.character` so the
  *   in-world entity can reference its player (and vice versa).
  * - `serialize()` returns a plain object suitable for JSON/YAML persistence; runtime

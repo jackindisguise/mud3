@@ -1,5 +1,5 @@
 /**
- * IO module — networking primitives for the MUD
+ * IO module - networking primitives for the MUD
  *
  * This module provides a small, well-documented wrapper around Node's TCP
  * sockets tailored to the MUD server. It exposes two main primitives:

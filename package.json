@@ -14,7 +14,9 @@
 		"test:raw": "node --loader ts-node/esm --test --test-reporter=spec \"src/**/*.spec.ts\"",
 		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test",
 		"deploy": "npm run build && npm run test && npm run coverage",
-		"doc": "npx typedoc"
+		"doc": "npx typedoc",
+		"start": "node dist/index",
+		"rerun": "npm run build && npm run start"
 	},
 	"devDependencies": {
 		"@types/ini": "^4.1.1",

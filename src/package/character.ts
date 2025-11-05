@@ -1,5 +1,5 @@
 /**
- * Package: character — YAML persistence for Characters
+ * Package: character - YAML persistence for Characters
  *
  * Persists `Character` entities to `data/characters/<username>.yaml` and
  * restores them back, using the `Character.serialize()`/`deserialize()`
@@ -9,7 +9,7 @@
  * - Filenames are derived from a sanitized, lowercased username
  * - On save, directories are created as needed; YAML is written without
  *   references and with a wide line width for readability
- * - On load, returns `null` if the character file doesn’t exist
+ * - On load, returns `undefined` if the character file doesn't exist
  *
  * Active registry (local lock)
  * - This package maintains a lightweight registry of characters considered
@@ -19,13 +19,22 @@
  * - Exported helpers let the game start/stop tracking explicitly:
  *   - `registerActiveCharacter(character)`
  *   - `unregisterActiveCharacter(username)`
- *   - `isCharacterActive(username)` / `getActiveCharacters()`
+ * - `isCharacterActive(username)` / `getActiveCharacters()`
+ *
+ * Authentication helpers
+ * - `checkCharacterPassword(username, password)` - Verify password without full deserialization
+ * - `loadCharacterFromSerialized(data)` - Load from already-verified serialized data
  *
  * @example
- * import characterPkg, { saveCharacter, loadCharacter } from './package/character.js';
+ * import characterPkg, { saveCharacter, loadCharacter, checkCharacterPassword, loadCharacterFromSerialized } from './package/character.js';
  * await characterPkg.loader();
  * await saveCharacter(player);
  * const reloaded = await loadCharacter(player.credentials.username);
+ * // Efficient authentication:
+ * const serialized = await checkCharacterPassword('username', 'password');
+ * if (serialized) {
+ *   const char = loadCharacterFromSerialized(serialized);
+ * }
  *
  * @module package/character
  */

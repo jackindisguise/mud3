@@ -15,7 +15,7 @@ await loadPackage(character);
 
 // Start the game using startGame() to properly set Game.game singleton
 const game = await startGame();
-const timeout = 1000 * 10;
+const timeout = 1000 * 60;
 logger.info(
 	`Game server started. It will shut down automatically in ${
 		timeout / 1000

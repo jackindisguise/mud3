@@ -1,5 +1,5 @@
 /**
- * Package: lockfile — single-instance process lock
+ * Package: lockfile - single-instance process lock
  *
  * Ensures only one instance of the app runs at a time by maintaining a
  * `.lock` file in the project root. On startup, the loader checks for an
@@ -8,9 +8,9 @@
  * cleans it up on normal exit or common failure signals.
  *
  * Exports utility functions for direct use when needed:
- * - `isProcessRunning(pid)` — probe whether a process exists
- * - `createLock()` / `removeLock()` — manage the lock file
- * - `checkLock()` — check and prune stale locks
+ * - `isProcessRunning(pid)` - probe whether a process exists
+ * - `createLock()` / `removeLock()` - manage the lock file
+ * - `checkLock()` - check and prune stale locks
  *
  * @module package/lockfile
  */

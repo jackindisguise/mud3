@@ -1,5 +1,5 @@
 /**
- * Logger module — structured application logging
+ * Logger module - structured application logging
  *
  * Provides a preconfigured Winston logger used across the project.
  * It writes JSON-formatted logs to files and colorized human-readable logs

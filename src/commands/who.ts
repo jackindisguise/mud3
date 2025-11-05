@@ -1,3 +1,29 @@
+/**
+ * Who command - displays all currently connected players.
+ *
+ * Shows a list of active player names along with summary statistics about
+ * total players online and active connections. Useful for seeing who else
+ * is currently in the game.
+ *
+ * @example
+ * ```
+ * who
+ * ```
+ *
+ * **Output:**
+ * ```
+ * === Players Online ===
+ * > username1
+ * > username2
+ *
+ * Total Players: 2
+ * Total Connections: 2
+ * ```
+ *
+ * **Pattern:** `who`
+ * @module commands/who
+ */
+
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";

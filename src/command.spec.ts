@@ -226,6 +226,127 @@ suite("command.ts", () => {
 			assert.strictEqual(errorCalled, true);
 			assert(errorMessage.includes("Missing required argument"));
 		});
+
+		test("should support autocomplete with ~ suffix", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "ooc~ <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Test single character autocomplete
+			const result1 = command.parse("o hello world", context);
+			assert.strictEqual(result1.success, true);
+			assert.strictEqual(result1.args.get("message"), "hello world");
+
+			// Test two character autocomplete
+			const result2 = command.parse("oo testing autocomplete", context);
+			assert.strictEqual(result2.success, true);
+			assert.strictEqual(result2.args.get("message"), "testing autocomplete");
+
+			// Test full word
+			const result3 = command.parse("ooc full command", context);
+			assert.strictEqual(result3.success, true);
+			assert.strictEqual(result3.args.get("message"), "full command");
+		});
+
+		test("should not match invalid autocomplete prefixes", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "ooc~ <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Test non-matching prefix
+			const result1 = command.parse("x hello", context);
+			assert.strictEqual(result1.success, false);
+
+			// Test completely different word
+			const result2 = command.parse("say hello", context);
+			assert.strictEqual(result2.success, false);
+		});
+
+		test("should support multiple words with autocomplete", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "tell~ <target:word> <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Test single character autocomplete
+			const result1 = command.parse("t bob hello there", context);
+			assert.strictEqual(result1.success, true);
+			assert.strictEqual(result1.args.get("target"), "bob");
+			assert.strictEqual(result1.args.get("message"), "hello there");
+
+			// Test partial word
+			const result2 = command.parse("tel alice greetings", context);
+			assert.strictEqual(result2.success, true);
+			assert.strictEqual(result2.args.get("target"), "alice");
+			assert.strictEqual(result2.args.get("message"), "greetings");
+
+			// Test full word
+			const result3 = command.parse("tell charlie hey", context);
+			assert.strictEqual(result3.success, true);
+			assert.strictEqual(result3.args.get("target"), "charlie");
+			assert.strictEqual(result3.args.get("message"), "hey");
+		});
+
+		test("should work with autocomplete and optional arguments", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "look~ <direction:word?>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Test with optional argument provided
+			const result1 = command.parse("l north", context);
+			assert.strictEqual(result1.success, true);
+			assert.strictEqual(result1.args.get("direction"), "north");
+
+			// Test without optional argument
+			const result2 = command.parse("loo", context);
+			assert.strictEqual(result2.success, true);
+			assert.strictEqual(result2.args.has("direction"), false);
+
+			// Test full word without optional argument
+			const result3 = command.parse("look", context);
+			assert.strictEqual(result3.success, true);
+			assert.strictEqual(result3.args.has("direction"), false);
+		});
+
+		test("should support case-insensitive autocomplete", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "ooc~ <message:text>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Test uppercase input
+			const result1 = command.parse("O hello", context);
+			assert.strictEqual(result1.success, true);
+			assert.strictEqual(result1.args.get("message"), "hello");
+
+			// Test mixed case
+			const result2 = command.parse("Oo test", context);
+			assert.strictEqual(result2.success, true);
+			assert.strictEqual(result2.args.get("message"), "test");
+
+			// Test all uppercase
+			const result3 = command.parse("OOC message", context);
+			assert.strictEqual(result3.success, true);
+			assert.strictEqual(result3.args.get("message"), "message");
+		});
 	});
 
 	suite("CommandRegistry", () => {

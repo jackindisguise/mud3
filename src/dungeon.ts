@@ -79,7 +79,7 @@ import logger from "./logger.js";
  * if (player.canStep(DIRECTION.UP)) player.step(DIRECTION.UP);
  * ```
  */
-export enum DIRECTION {
+export const enum DIRECTION {
 	NORTH,
 	SOUTH,
 	EAST,
@@ -110,7 +110,7 @@ export enum DIRECTION {
  * console.log(exits.map((d) => dir2text(d)).join(", ")); // e.g., "north, south, east, west, ..."
  * ```
  */
-export const DIRECTIONS: DIRECTION[] = [
+export const DIRECTIONS: ReadonlyArray<DIRECTION> = [
 	DIRECTION.NORTH,
 	DIRECTION.SOUTH,
 	DIRECTION.EAST,
@@ -140,7 +140,10 @@ export const DIRECTIONS: DIRECTION[] = [
  * room.onEnter(player, DIR2REVERSE.get(exitDirection)); // Get entry direction from exit
  * ```
  */
-const DIR2REVERSE = new Map<DIRECTION, DIRECTION>([
+const DIR2REVERSE: Readonly<Map<DIRECTION, DIRECTION>> = new Map<
+	DIRECTION,
+	DIRECTION
+>([
 	[DIRECTION.NORTH, DIRECTION.SOUTH],
 	[DIRECTION.SOUTH, DIRECTION.NORTH],
 	[DIRECTION.EAST, DIRECTION.WEST],
@@ -276,7 +279,10 @@ export type DirectionText =
  * @see {@link dir2text} - Recommended function for converting directions to text
  * @see {@link DIR2TEXT_SHORT} - Abbreviated version of this map
  */
-export const DIR2TEXT = new Map<DIRECTION, DirectionText>([
+export const DIR2TEXT: ReadonlyMap<DIRECTION, DirectionText> = new Map<
+	DIRECTION,
+	DirectionText
+>([
 	[DIRECTION.NORTH, "north"],
 	[DIRECTION.SOUTH, "south"],
 	[DIRECTION.EAST, "east"],
@@ -365,21 +371,19 @@ export type DirectionTextShort =
  * @see {@link dir2text} - Recommended function for converting directions to text
  * @see {@link DIR2TEXT} - Full-name version of this map
  */
-export const DIR2TEXT_SHORT: Map<DIRECTION, DirectionTextShort> = new Map<
-	DIRECTION,
-	DirectionTextShort
->([
-	[DIRECTION.NORTH, "n"],
-	[DIRECTION.SOUTH, "s"],
-	[DIRECTION.EAST, "e"],
-	[DIRECTION.WEST, "w"],
-	[DIRECTION.NORTHEAST, "ne"],
-	[DIRECTION.NORTHWEST, "nw"],
-	[DIRECTION.SOUTHEAST, "se"],
-	[DIRECTION.SOUTHWEST, "sw"],
-	[DIRECTION.UP, "u"],
-	[DIRECTION.DOWN, "d"],
-]);
+export const DIR2TEXT_SHORT: ReadonlyMap<DIRECTION, DirectionTextShort> =
+	new Map<DIRECTION, DirectionTextShort>([
+		[DIRECTION.NORTH, "n"],
+		[DIRECTION.SOUTH, "s"],
+		[DIRECTION.EAST, "e"],
+		[DIRECTION.WEST, "w"],
+		[DIRECTION.NORTHEAST, "ne"],
+		[DIRECTION.NORTHWEST, "nw"],
+		[DIRECTION.SOUTHEAST, "se"],
+		[DIRECTION.SOUTHWEST, "sw"],
+		[DIRECTION.UP, "u"],
+		[DIRECTION.DOWN, "d"],
+	]);
 
 /**
  * Maps full direction text to their DIRECTION enum values.
@@ -421,7 +425,10 @@ export const DIR2TEXT_SHORT: Map<DIRECTION, DirectionTextShort> = new Map<
  * @see {@link TEXT2DIR_SHORT} - Abbreviated version of this map
  * @see {@link DIR2TEXT} - Full-name reverse map (direction to text)
  */
-export const TEXT2DIR = new Map<DirectionText, DIRECTION>([
+export const TEXT2DIR: ReadonlyMap<DirectionText, DIRECTION> = new Map<
+	DirectionText,
+	DIRECTION
+>([
 	["north", DIRECTION.NORTH],
 	["south", DIRECTION.SOUTH],
 	["east", DIRECTION.EAST],
@@ -474,21 +481,19 @@ export const TEXT2DIR = new Map<DirectionText, DIRECTION>([
  * @see {@link TEXT2DIR} - Full-name version of this map
  * @see {@link DIR2TEXT_SHORT} - Abbreviated reverse map (direction to text)
  */
-export const TEXT2DIR_SHORT: Map<DirectionTextShort, DIRECTION> = new Map<
-	DirectionTextShort,
-	DIRECTION
->([
-	["n", DIRECTION.NORTH],
-	["s", DIRECTION.SOUTH],
-	["e", DIRECTION.EAST],
-	["w", DIRECTION.WEST],
-	["ne", DIRECTION.NORTHEAST],
-	["nw", DIRECTION.NORTHWEST],
-	["se", DIRECTION.SOUTHEAST],
-	["sw", DIRECTION.SOUTHWEST],
-	["u", DIRECTION.UP],
-	["d", DIRECTION.DOWN],
-]);
+export const TEXT2DIR_SHORT: ReadonlyMap<DirectionTextShort, DIRECTION> =
+	new Map<DirectionTextShort, DIRECTION>([
+		["n", DIRECTION.NORTH],
+		["s", DIRECTION.SOUTH],
+		["e", DIRECTION.EAST],
+		["w", DIRECTION.WEST],
+		["ne", DIRECTION.NORTHEAST],
+		["nw", DIRECTION.NORTHWEST],
+		["se", DIRECTION.SOUTHEAST],
+		["sw", DIRECTION.SOUTHWEST],
+		["u", DIRECTION.UP],
+		["d", DIRECTION.DOWN],
+	]);
 
 /**
  * Converts a DIRECTION enum value to its text representation.
@@ -725,7 +730,9 @@ export interface DungeonOptions {
  *
  * Note: only dungeons with an assigned `id` are present in this map.
  */
-export const DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
+const SAFE_DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
+export const DUNGEON_REGISTRY: ReadonlyMap<string, Dungeon> =
+	SAFE_DUNGEON_REGISTRY;
 
 /**
  * Lookup a dungeon previously registered with an ID.
@@ -930,24 +937,18 @@ export class Dungeon {
 	 * will unregister the dungeon. Setting to a string will register it or
 	 * throw if the id is already in use by another dungeon.
 	 */
-	private set id(value: string) {
-		// unregister old id
-		/*if (this._id) {
-			DUNGEON_REGISTRY.delete(this._id);
-			this._id = undefined;
-		}*/
-
-		if (DUNGEON_REGISTRY.has(value))
-			throw new Error(`Dungeon id "${value}" is already in use`);
-		this._id = value;
-		DUNGEON_REGISTRY.set(value, this);
+	private set id(id: string) {
+		if (DUNGEON_REGISTRY.has(id))
+			throw new Error(`Dungeon id "${id}" is already in use`);
+		this._id = id;
+		SAFE_DUNGEON_REGISTRY.set(id, this);
 
 		const roomCount =
 			this._dimensions.width *
 			this._dimensions.height *
 			this._dimensions.layers;
 		logger.info(
-			`Registered dungeon "${value}" with ${roomCount} rooms (${this._dimensions.width}x${this._dimensions.height}x${this._dimensions.layers})`
+			`Registered dungeon "${id}" with ${roomCount} cells (${this._dimensions.width}x${this._dimensions.height}x${this._dimensions.layers})`
 		);
 	}
 
@@ -1069,6 +1070,68 @@ export class Dungeon {
 	 */
 	contains(dobj: DungeonObject) {
 		return this._contents.indexOf(dobj) !== -1;
+	}
+
+	/**
+	 * Completely destroy this dungeon, unregister it, and remove all its contents.
+	 * This clears all rooms, objects, and the dungeon's registration from the global registry.
+	 * After calling this method, the dungeon should not be used anymore.
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({
+	 *   id: "temp-dungeon",
+	 *   dimensions: { width: 5, height: 5, layers: 1 }
+	 * });
+	 *
+	 * // Use the dungeon...
+	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+	 * const mob = new Movable();
+	 * room.add(mob);
+	 *
+	 * // Clean up when done
+	 * dungeon.destroy();
+	 *
+	 * // Dungeon is now unregistered and empty
+	 * console.log(getDungeonById("temp-dungeon")); // undefined
+	 * console.log(dungeon.contents.length); // 0
+	 * ```
+	 */
+	destroy() {
+		// Remove any room links that reference this dungeon's rooms
+		// Make a copy to avoid modifying array during iteration
+		const linksToRemove: RoomLink[] = [];
+		for (const link of ROOM_LINKS) {
+			// Check if either end of the link is in this dungeon
+			if (link.referencesDungeon(this)) {
+				linksToRemove.push(link);
+			}
+		}
+		for (const link of linksToRemove) {
+			link.remove();
+		}
+
+		// Unregister from global registry
+		if (this._id) {
+			SAFE_DUNGEON_REGISTRY.delete(this._id);
+			this._id = undefined;
+		}
+
+		// Remove all objects from contents
+		// Make a copy to avoid modifying array during iteration
+		const allContents = [...this._contents];
+		for (const obj of allContents) {
+			// Unset the object's dungeon reference
+			if (obj.dungeon === this) {
+				obj.dungeon = undefined;
+			}
+		}
+
+		// Clear the contents array
+		this._contents = [];
+
+		// Clear the rooms grid
+		this._rooms = [];
 	}
 
 	/**
@@ -1521,6 +1584,10 @@ export class DungeonObject {
 		if (options.keywords) this.keywords = options.keywords;
 		if (options.display) this.display = options.display;
 		if (options.description) this.description = options.description;
+	}
+
+	toString() {
+		return this.display;
 	}
 
 	/**
@@ -2682,7 +2749,8 @@ export class Item extends Movable {
  * and persist links across dungeons. Links created by `RoomLink.createTunnel`
  * are pushed here; `RoomLink.remove()` removes links from this array.
  */
-export const ROOM_LINKS: RoomLink[] = [];
+const SAFE_ROOM_LINKS: RoomLink[] = [];
+export const ROOM_LINKS: ReadonlyArray<RoomLink> = [];
 
 /**
  * Represents a bidirectional portal between two rooms.
@@ -2815,7 +2883,7 @@ export class RoomLink {
 		// Register with the "to" room only for two-way links
 		if (!link._oneWay) link._to.room.addLink(link);
 		// Register in the global link registry for persistence/inspection
-		ROOM_LINKS.push(link);
+		SAFE_ROOM_LINKS.push(link);
 
 		const fromRef =
 			fromRoom.getRoomRef() || `${fromRoom.x},${fromRoom.y},${fromRoom.z}`;
@@ -2828,6 +2896,31 @@ export class RoomLink {
 		);
 
 		return link;
+	}
+
+	/**
+	 * Check if this link references a room in the specified dungeon.
+	 * Returns true if either endpoint of the link is in the given dungeon.
+	 *
+	 * @param dungeon The dungeon to check against
+	 * @returns true if either the from or to room is in the dungeon
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon1 = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
+	 * const dungeon2 = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
+	 * const room1 = dungeon1.getRoom({ x: 0, y: 0, z: 0 });
+	 * const room2 = dungeon2.getRoom({ x: 0, y: 0, z: 0 });
+	 * const link = RoomLink.createTunnel(room1, DIRECTION.NORTH, room2);
+	 *
+	 * console.log(link.referencesDungeon(dungeon1)); // true
+	 * console.log(link.referencesDungeon(dungeon2)); // true
+	 * ```
+	 */
+	referencesDungeon(dungeon: Dungeon): boolean {
+		return (
+			this._from.room.dungeon === dungeon || this._to.room.dungeon === dungeon
+		);
 	}
 
 	/**
@@ -2899,6 +2992,6 @@ export class RoomLink {
 
 		// Remove from the global registry if present
 		const index = ROOM_LINKS.indexOf(this);
-		if (index !== -1) ROOM_LINKS.splice(index, 1);
+		if (index !== -1) SAFE_ROOM_LINKS.splice(index, 1);
 	}
 }

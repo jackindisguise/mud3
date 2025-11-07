@@ -287,14 +287,25 @@ export class Game {
 		const self = this;
 		let username = "";
 		let password = "";
-		client.sendLine("Welcome to the MUD!");
+		let colorEnabled = true;
+
+		const send = (line: string) => client.send(line, colorEnabled);
+		const sendLine = (line: string) => client.sendLine(line, colorEnabled);
+		const ask = (question: string, callback: (input: string) => void) =>
+			client.ask(question, callback, colorEnabled);
+		const yesno = (
+			question: string,
+			callback: (yesorno: boolean | undefined) => void
+		) => client.yesno(question, callback, colorEnabled);
+
+		sendLine("Welcome to the MUD!");
 
 		const askName = () => {
-			client.ask("What is your name?", async (input) => {
+			ask("What is your name?", async (input) => {
 				if (!input) return askName();
 				// can't login to character that's online
 				if (isCharacterActive(input))
-					return client.sendLine("That character is already playing.");
+					return sendLine("That character is already playing.");
 
 				username = input; // save username
 				// new name, start making a character
@@ -309,14 +320,14 @@ export class Game {
 		};
 
 		const confirmExistingCharacterPassword = () => {
-			client.ask("Password:", async (_password) => {
+			ask("Password:", async (_password) => {
 				// Check password and get serialized character data
 				const serializedCharacter = await checkCharacterPassword(
 					username,
 					_password
 				);
 				if (!serializedCharacter) {
-					client.sendLine("Invalid password. Disconnecting.");
+					sendLine("Invalid password. Disconnecting.");
 					client.close();
 					return;
 				}
@@ -331,7 +342,7 @@ export class Game {
 		};
 
 		const confirmCharacterCreation = () => {
-			client.yesno(
+			yesno(
 				`Do you wish to create a character named '${username}'?`,
 				(yesorno) => {
 					if (yesorno === true) return getNewPassword();
@@ -342,10 +353,10 @@ export class Game {
 		};
 
 		const getNewPassword = () => {
-			client.ask("Please enter a password:", (_password) => {
+			ask("Please enter a password:", (_password) => {
 				if (!_password) return getNewPassword();
 				if (_password.length < 5) {
-					client.sendLine("It needs to be longer than 5 characters.");
+					sendLine("It needs to be longer than 5 characters.");
 					return getNewPassword();
 				}
 				password = _password;
@@ -354,9 +365,9 @@ export class Game {
 		};
 
 		const confirmNewPassword = () => {
-			client.ask("Please re-type your password:", (_password) => {
+			ask("Please re-type your password:", (_password) => {
 				if (_password != password) {
-					client.sendLine("Those passwords don't match! Try again.");
+					sendLine("Those passwords don't match! Try again.");
 					return getNewPassword();
 				}
 				MOTD();
@@ -364,8 +375,8 @@ export class Game {
 		};
 
 		const MOTD = (existingCharacter?: Character) => {
-			client.sendLine("This is the MOTD.");
-			client.ask("Press any key to continue...", () => {
+			sendLine("This is the MOTD.");
+			ask("Press any key to continue...", () => {
 				let character: Character;
 
 				if (existingCharacter) {
@@ -407,6 +418,11 @@ export class Game {
 
 		logger.debug(`${character.credentials.username} input: ${input}`);
 
+		// Reset message group on new input to ensure clean prompt behavior
+		if (character.session) {
+			character.session.lastMessageGroup = undefined;
+		}
+
 		// generate the context
 		const context: CommandContext = {
 			actor: character.mob,
@@ -417,7 +433,7 @@ export class Game {
 		};
 		const executed = CommandRegistry.default.execute(input, context);
 		if (!executed) {
-			session.client.sendLine("Do what?");
+			character.sendMessage("Do what?", MESSAGE_GROUP.COMMAND_RESPONSE);
 		}
 	}
 
@@ -442,8 +458,8 @@ export class Game {
 		registerActiveCharacter(character);
 
 		// Welcome the player
-		session.client.sendLine(`Welcome back, ${character.credentials.username}!`);
-		session.client.sendLine("You are now playing.");
+		character.sendLine(`Welcome back, ${character.credentials.username}!`);
+		character.sendLine("You are now playing.");
 
 		logger.info(`${character.credentials.username} has entered the game`);
 
@@ -547,7 +563,8 @@ export class Game {
 	public announce(text: string): void {
 		for (const session of this.loginSessions) {
 			try {
-				session.client.sendLine(text);
+				if (session.character) session.character.sendLine(text);
+				else session.client.sendLine(text);
 			} catch (error) {
 				logger.error(`Failed to send broadcast to client: ${error}`);
 			}

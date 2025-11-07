@@ -1,0 +1,34 @@
+keyword: communication
+aliases: [chat, talking, speak]
+related: [say, ooc, commands]
+topic: [communication, speaking, speech, chat, roleplay, talking]
+content: |
+  COMMUNICATION - Talking in the Game
+  
+  There are several ways to communicate with other players in the game:
+  
+  In-Character (Say):
+    Use the 'say' command or apostrophe shortcut to speak to players and NPCs
+    in the same room as you. This is for in-character roleplay and conversation.
+    
+    Examples:
+      say Hello, friend!
+      'How are you doing?
+  
+  Out of Character (OOC):
+    Use the 'ooc' command or quote shortcut to send messages that are not part
+    of the in-game roleplay. These are visible to all connected players.
+    
+    Examples:
+      ooc Hello everyone!
+      "How do I find the market?
+  
+  Key Differences:
+    - SAY is in-character, only heard by those in your room
+    - OOC is out-of-character, heard by all players online
+    - Use SAY for roleplay, OOC for game questions/chat
+  
+  Related Topics:
+    help say          - In-character speech command
+    help ooc          - Out-of-character communication
+    help commands     - Full list of available commands

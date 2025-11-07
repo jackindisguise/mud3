@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { access } from "fs/promises";
+import { access, unlink } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
 import { Character } from "../character.js";
@@ -74,5 +74,8 @@ describe("package/character.ts", () => {
 		// Mob basics round-trip
 		assert.strictEqual(loaded!.mob.display, username);
 		assert.ok(loaded!.mob.character === loaded);
+
+		// Clean up - delete the test file
+		await unlink(filePathFor(username));
 	});
 });

@@ -27,13 +27,13 @@ import { Game } from "../game.js";
 export default {
 	pattern: "ooc~ <message:text>",
 	aliases: ['"<message:text>'],
-
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor } = context;
 
 		actor.sendMessage(`You OOC: "${message}"`, MESSAGE_GROUP.CHANNELS);
 		Game.game!.forEachCharacter((character) => {
+			if (actor === character.mob) return;
 			character.sendMessage(
 				`${actor} OOC: "${message}"`,
 				MESSAGE_GROUP.CHANNELS
@@ -43,7 +43,10 @@ export default {
 
 	onError(context: CommandContext, result: ParseResult): void {
 		if (result.error === "Missing required argument: message") {
-			context.actor.sendLine("What do you want to OOC?");
+			context.actor.sendMessage(
+				"What do you want to OOC?",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
 			return;
 		}
 	},

@@ -25,7 +25,6 @@ import { CommandObject } from "../package/commands.js";
 export default {
 	pattern: "say~ <message:text>",
 	aliases: ["'<message:text>"],
-
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor, room } = context;
@@ -46,7 +45,10 @@ export default {
 
 	onError(context: CommandContext, result: ParseResult): void {
 		if (result.error === "Missing required argument: message") {
-			context.actor.sendLine("What do you want to say?");
+			context.actor.sendMessage(
+				"What do you want to say?",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
 			return;
 		}
 	},

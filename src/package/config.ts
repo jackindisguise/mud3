@@ -59,7 +59,7 @@ export const CONFIG_DEFAULT: Config = {
 	security: {
 		password_salt: "changeme_default_salt_12345",
 	},
-};
+} as const;
 
 // make a copy of the default, don't reference it directly plz
 export const CONFIG: Config = {

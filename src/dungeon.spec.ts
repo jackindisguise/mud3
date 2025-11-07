@@ -579,7 +579,7 @@ suite("dungeon.ts", () => {
 				assert.strictEqual(DUNGEON_REGISTRY.get(id), d);
 			} finally {
 				// cleanup so registry doesn't leak into other tests
-				DUNGEON_REGISTRY.delete(id);
+				//DUNGEON_REGISTRY.delete(id);
 			}
 		});
 
@@ -600,7 +600,7 @@ suite("dungeon.ts", () => {
 					});
 				}, Error);
 			} finally {
-				DUNGEON_REGISTRY.delete(id);
+				//DUNGEON_REGISTRY.delete(id);
 			}
 		});
 	});
@@ -618,7 +618,7 @@ suite("dungeon.ts", () => {
 				assert.deepStrictEqual(room.coordinates, { x: 2, y: 3, z: 1 });
 				assert.strictEqual(room.dungeon, dungeon);
 			} finally {
-				DUNGEON_REGISTRY.delete(id);
+				//DUNGEON_REGISTRY.delete(id);
 			}
 		});
 
@@ -658,7 +658,7 @@ suite("dungeon.ts", () => {
 				assert.strictEqual(getRoomByRef(`@${id}{0,3,0}`), undefined);
 				assert.strictEqual(getRoomByRef(`@${id}{0,0,2}`), undefined);
 			} finally {
-				DUNGEON_REGISTRY.delete(id);
+				//DUNGEON_REGISTRY.delete(id);
 			}
 		});
 
@@ -673,7 +673,7 @@ suite("dungeon.ts", () => {
 				assert(room instanceof Room);
 				assert.deepStrictEqual(room.coordinates, { x: 0, y: 1, z: 0 });
 			} finally {
-				DUNGEON_REGISTRY.delete(id);
+				//DUNGEON_REGISTRY.delete(id);
 			}
 		});
 	});
@@ -714,7 +714,8 @@ suite("dungeon.ts", () => {
 				const parsedRoom = getRoomByRef(ref!);
 				assert.strictEqual(parsedRoom, room);
 			} finally {
-				DUNGEON_REGISTRY.delete(id);
+				dungeon.destroy();
+				//DUNGEON_REGISTRY.delete(id);
 			}
 		});
 
@@ -1218,10 +1219,9 @@ suite("dungeon.ts", () => {
 						"@test-serialization-dungeon{2,3,1}"
 					);
 				} finally {
-					DUNGEON_REGISTRY.delete(dungeonId);
+					dungeon.destroy();
 				}
 			});
-
 			test("should not include location when object is not in a room", () => {
 				const obj = new DungeonObject();
 				const container = new DungeonObject();
@@ -1857,10 +1857,9 @@ suite("dungeon.ts", () => {
 				assert.strictEqual(roomMobs.length, 1);
 				assert.strictEqual(roomMobs[0], restoredMob);
 			} finally {
-				DUNGEON_REGISTRY.delete(dungeonId);
+				dungeon.destroy();
 			}
 		});
-
 		test("should preserve room coordinates through serialize/deserialize cycle", () => {
 			const room = new Room({
 				coordinates: { x: 7, y: 2, z: 3 },
@@ -1935,10 +1934,9 @@ suite("dungeon.ts", () => {
 					"@test-roundtrip-dungeon{3,4,1}"
 				);
 			} finally {
-				DUNGEON_REGISTRY.delete(dungeonId);
+				dungeon.destroy();
 			}
 		});
-
 		test("should handle objects without location correctly", () => {
 			const container = new DungeonObject({
 				keywords: "storage box",

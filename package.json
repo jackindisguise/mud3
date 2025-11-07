@@ -7,6 +7,7 @@
 	"type": "module",
 	"main": "index.js",
 	"scripts": {
+		"prebuild": "rimraf dist",
 		"build": "tsc",
 		"retest": "npm run build && npm run test",
 		"test": "npm run test:compiled",
@@ -24,17 +25,16 @@
 		"@types/node": "^24.9.1",
 		"@types/xml2js": "^0.4.14",
 		"c8": "^10.1.3",
+		"js-yaml": "^4.1.0",
 		"mud-ext": "github:jackindisguise/mud-ext",
+		"rimraf": "^6.0.1",
+		"smol-toml": "^1.4.2",
 		"ts-node": "^10.9.2",
 		"typedoc": "^0.28.14",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"winston": "^3.18.3"
 	},
 	"dependencies": {
-		"ini": "^6.0.0",
-		"js-yaml": "^4.1.0",
-		"package-loader": "github:jackindisguise/package-loader",
-		"smol-toml": "^1.4.2",
-		"winston": "^3.18.3",
-		"xml2js": "^0.6.2"
+		"package-loader": "github:jackindisguise/package-loader"
 	}
 }

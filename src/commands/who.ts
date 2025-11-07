@@ -33,14 +33,11 @@ import { Game } from "../game.js";
 
 export default {
 	pattern: "who~",
-
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor } = context;
 		const game = Game.game!;
-		console.log(Game, game);
 
 		const stats = game.getGameStats();
-		console.log(stats);
 		const players: string[] = [];
 
 		// Collect all active player names

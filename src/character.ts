@@ -110,7 +110,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	colorEnabled: true,
 	autoLook: true,
 	briefMode: false,
-};
+} as const;
 
 /**
  * Authentication and account information (runtime form).
@@ -159,7 +159,7 @@ export const DEFAULT_PLAYER_CREDENTIALS: Pick<
 	isActive: true,
 	isBanned: false,
 	isAdmin: false,
-};
+} as const;
 
 /**
  * Character progression and gameplay statistics.
@@ -190,7 +190,7 @@ export const DEFAULT_PLAYER_STATS: PlayerStats = {
 	playtime: 0,
 	deaths: 0,
 	kills: 0,
-};
+} as const;
 
 /**
  * Current session information (runtime data, not persisted).
@@ -545,7 +545,7 @@ export class Character {
 	 * If no client is connected, this is a no-op.
 	 */
 	public send(text: string) {
-		this.session?.client.send(text);
+		this.session?.client.send(text, this.settings.colorEnabled);
 	}
 
 	/**
@@ -553,7 +553,7 @@ export class Character {
 	 * If no client is connected, this is a no-op.
 	 */
 	public sendLine(text: string) {
-		this.session?.client.sendLine(text);
+		this.send(`${text}\r\n`);
 	}
 
 	/** Core routine for group-aware sending */
@@ -561,12 +561,12 @@ export class Character {
 		const session = this.session;
 		const client = session?.client;
 		if (!session || !client || !client.isConnected()) return;
-		else client.sendLine(text);
+		else this.sendLine(text);
 
 		const last = session.lastMessageGroup;
-		if (last !== undefined && last !== group) {
-			client.sendLine("");
-			client.send(this.settings.prompt ?? "> ");
+		if (last !== group) {
+			this.sendLine("");
+			this.send(this.settings.prompt ?? "> ");
 		}
 		session.lastMessageGroup = group;
 	}

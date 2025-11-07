@@ -1,0 +1,20 @@
+export default {
+	pattern: "ooc~ <message:text>",
+	aliases: ['"<message:text>'],
+	execute: function () {
+		const message = args.get("message");
+		actor.sendMessage(`You OOC: "${message}"`, MESSAGE_GROUP.CHANNELS);
+		game.forEachCharacter((character) => {
+			if (character.mob === actor) return;
+			character.sendMessage(
+				`${actor} OOC: "${message}"`,
+				MESSAGE_GROUP.CHANNELS
+			);
+		});
+	},
+	onError: function () {
+		if (result.error === "Missing required argument: message") {
+			actor.sendLine("What do you want to OOC?");
+		}
+	},
+};

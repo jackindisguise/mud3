@@ -40,6 +40,7 @@ import { EventEmitter } from "events";
 import { createServer, Server, Socket } from "net";
 import logger from "./logger.js";
 import { string } from "mud-ext";
+import { colorize as _colorize, stripColors } from "./color.js";
 
 /**
  * Represents a connected MUD client.
@@ -151,18 +152,17 @@ export class MudClient extends EventEmitter {
 	 * Send text to the client
 	 * @param text The text to send
 	 */
-	public send(text: string): void {
-		if (!this.socket.destroyed) {
-			this.socket.write(text);
-		}
+	public send(text: string, colorize: boolean = false): void {
+		const escaped = colorize ? _colorize(text) : stripColors(text);
+		if (!this.socket.destroyed) this.socket.write(escaped);
 	}
 
 	/**
 	 * Send a line of text to the client (adds newline)
 	 * @param text The text to send
 	 */
-	public sendLine(text: string): void {
-		this.send(text + "\r\n");
+	public sendLine(text: string, colorize: boolean = false): void {
+		this.send(text + "\r\n", colorize);
 	}
 
 	/**
@@ -180,8 +180,12 @@ export class MudClient extends EventEmitter {
 	 * event for one line only. Subsequent lines will resume normal
 	 * event emission unless ask() is called again.
 	 */
-	public ask(question: string, callback: (line: string) => void) {
-		this.send(`${question} `);
+	public ask(
+		question: string,
+		callback: (line: string) => void,
+		colorize: boolean = false
+	) {
+		this.send(`${question} `, colorize);
 		this.pendingAskCallback = callback;
 	}
 

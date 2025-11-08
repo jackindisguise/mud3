@@ -27,10 +27,16 @@ content: |
     {ww{x - Silver       {WW{x - White
   
   {WBACKGROUND COLORS{x
-    Use numbers 0-7 for background colors (same order as above).
+    Use numbers 0-7 for background colors (same order as foreground).
   
-    {00{x - Black        {11{x - Red          {22{x - Green        {33{x - Yellow
-    {44{x - Blue         {55{x - Magenta      {66{x - Cyan         {77{x - White
+    {W{00{x - Black
+    {W{11{x - Maroon
+    {W{22{x - Dark Green
+    {W{33{x - Olive
+    {W{44{x - Dark Blue
+    {W{55{x - Purple
+    {W{66{x - Teal
+    {W{77{x - Silver
   
   {WTEXT STYLES{x
     {dd{x - Bold         {ii{x - Italic       {uu{x - Underline
@@ -43,7 +49,7 @@ content: |
     {RThis is crimson{x
     {GLime{x {Cand{x {Ycyan{x
     {dBold{X {uunderlined{x
-    {Y{6Yellow on blue background{x
+    {Y{4Yellow on dark blue background{x
   
   {WESCAPING{x
     Use {W{{{{{x to produce a literal {{ character.

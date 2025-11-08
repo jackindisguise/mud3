@@ -40,23 +40,13 @@ export const BG = {
 
 	// Standard colors
 	BLACK: `${ESC}40m`,
-	RED: `${ESC}41m`,
-	GREEN: `${ESC}42m`,
-	YELLOW: `${ESC}43m`,
-	BLUE: `${ESC}44m`,
-	MAGENTA: `${ESC}45m`,
-	CYAN: `${ESC}46m`,
-	WHITE: `${ESC}47m`,
-
-	// Bright colors
-	BRIGHT_BLACK: `${ESC}100m`,
-	BRIGHT_RED: `${ESC}101m`,
-	BRIGHT_GREEN: `${ESC}102m`,
-	BRIGHT_YELLOW: `${ESC}103m`,
-	BRIGHT_BLUE: `${ESC}104m`,
-	BRIGHT_MAGENTA: `${ESC}105m`,
-	BRIGHT_CYAN: `${ESC}106m`,
-	BRIGHT_WHITE: `${ESC}107m`,
+	MAROON: `${ESC}41m`,
+	DARK_GREEN: `${ESC}42m`,
+	OLIVE: `${ESC}43m`,
+	DARK_BLUE: `${ESC}44m`,
+	PURPLE: `${ESC}45m`,
+	TEAL: `${ESC}46m`,
+	SILVER: `${ESC}47m`,
 } as const;
 
 /**

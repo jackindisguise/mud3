@@ -29,13 +29,13 @@ suite("color.ts", () => {
 
 		test("should convert number codes to background colors", () => {
 			assert.strictEqual(colorize("{0"), BG.BLACK);
-			assert.strictEqual(colorize("{1"), BG.RED);
-			assert.strictEqual(colorize("{2"), BG.GREEN);
-			assert.strictEqual(colorize("{3"), BG.YELLOW);
-			assert.strictEqual(colorize("{4"), BG.BLUE);
-			assert.strictEqual(colorize("{5"), BG.MAGENTA);
-			assert.strictEqual(colorize("{6"), BG.CYAN);
-			assert.strictEqual(colorize("{7"), BG.WHITE);
+			assert.strictEqual(colorize("{1"), BG.MAROON);
+			assert.strictEqual(colorize("{2"), BG.DARK_GREEN);
+			assert.strictEqual(colorize("{3"), BG.OLIVE);
+			assert.strictEqual(colorize("{4"), BG.DARK_BLUE);
+			assert.strictEqual(colorize("{5"), BG.PURPLE);
+			assert.strictEqual(colorize("{6"), BG.TEAL);
+			assert.strictEqual(colorize("{7"), BG.SILVER);
 		});
 
 		test("should convert style codes", () => {
@@ -74,7 +74,7 @@ suite("color.ts", () => {
 		test("should leave unknown codes unchanged", () => {
 			assert.strictEqual(colorize("{z"), "{z");
 			assert.strictEqual(colorize("{9"), "{9");
-			assert.strictEqual(colorize("{@"), "{@");
+			assert.strictEqual(colorize("{*"), "{*");
 			assert.strictEqual(colorize("text{?more"), "text{?more");
 		});
 
@@ -91,8 +91,8 @@ suite("color.ts", () => {
 		});
 
 		test("should handle complex mixed content", () => {
-			const input = "{RBright{x {{escaped}} {1{WWhite on red{X normal";
-			const expected = `${FG.CRIMSON}Bright${STYLE.RESET} {escaped}} ${BG.RED}${FG.WHITE}White on red${STYLE.RESET} normal`;
+			const input = "{RBright{x {{escaped}} {1{WWhite on maroon{X normal";
+			const expected = `${FG.CRIMSON}Bright${STYLE.RESET} {escaped}} ${BG.MAROON}${FG.WHITE}White on maroon${STYLE.RESET} normal`;
 			assert.strictEqual(colorize(input), expected);
 		});
 	});

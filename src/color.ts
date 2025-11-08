@@ -31,13 +31,13 @@ const COLOR_MAP: Record<string, string> = {
 
 	// Background colors - using numbers
 	"0": BG.BLACK,
-	"1": BG.RED,
-	"2": BG.GREEN,
-	"3": BG.YELLOW,
-	"4": BG.BLUE,
-	"5": BG.MAGENTA,
-	"6": BG.CYAN,
-	"7": BG.WHITE,
+	"1": BG.MAROON,
+	"2": BG.DARK_GREEN,
+	"3": BG.OLIVE,
+	"4": BG.DARK_BLUE,
+	"5": BG.PURPLE,
+	"6": BG.TEAL,
+	"7": BG.SILVER,
 
 	// Styles
 	d: STYLE.BOLD, // bold (dark/dim would conflict, using bold)

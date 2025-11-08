@@ -9,13 +9,12 @@
 	"scripts": {
 		"prebuild": "rimraf dist",
 		"build": "tsc",
-		"retest": "npm run build && npm run test",
+		"pretest": "npm run build",
 		"test": "npm run test:compiled",
 		"test:compiled": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
-		"test:raw": "node --loader ts-node/esm --test --test-reporter=spec \"src/**/*.spec.ts\"",
-		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test",
-		"deploy": "npm run build && npm run test && npm run coverage",
+		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test:compiled",
 		"doc": "npx typedoc",
+		"deploy": "npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
 		"rerun": "npm run build && npm run start"
 	},

@@ -10,12 +10,13 @@
  *
  * @example
  * ```
- * help             (shows general help or command list)
- * help combat      (shows combat helpfile)
- * help com         (autocompletes to first matching topic)
- * help search att  (deep search for "att" across all fields)
+ * help            // shows general help or command list
+ * help combat     // shows combat helpfile
+ * help com        // autocompletes to first matching topic
+ * help search att // deep search for "att" across all fields
  * ```
  *
+ * **Aliases:** `?`
  * **Pattern:** `help~ <topic:word?>`
  * **Search Pattern:** `help~ search <query:text>`
  * @module commands/help

@@ -7,12 +7,11 @@
  * @example
  * ```
  * say Hello, traveler!
- * s How are you doing today? (autocomplete to "say")
- * ' This is a shortcut for say
+ * s How are you doing today? // (autocomplete to "say")
+ * 'This is a shortcut for say
  * ```
  *
  * **Aliases:** `'`
- *
  * **Pattern:** `say~ <message:text>`
  * @module commands/say
  */

@@ -7,13 +7,12 @@
  * @example
  * ```
  * ooc Hello everyone!
- * o Testing the OOC channel (autocomplete to "ooc")
- * oo Also works! (autocomplete to "ooc")
- * " Quick OOC message
+ * o Testing the OOC channel // (autocomplete to "ooc")
+ * oo Also works! // (autocomplete to "ooc")
+ * "Quick OOC message
  * ```
  *
  * **Aliases:** `"`
- *
  * **Pattern:** `ooc~ <message:text>`
  * @module commands/ooc
  */

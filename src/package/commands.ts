@@ -230,7 +230,7 @@ export default {
 
 				// Load JavaScript commands
 				for (const file of jsFiles) {
-					logger.debug(`Processing command file: ${file}`);
+					//logger.debug(`Processing command file: ${file}`);
 					try {
 						const filePath = join(commandDir, file);
 						const fileUrl = pathToFileURL(filePath).href;

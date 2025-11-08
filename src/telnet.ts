@@ -10,28 +10,25 @@ const ESC = "\x1B[";
  * Telnet foreground color codes
  */
 export const FG = {
-	/** Reset to default color */
-	RESET: `${ESC}0m`,
-
 	// Standard colors
 	BLACK: `${ESC}0;30m`,
-	RED: `${ESC}0;31m`,
-	GREEN: `${ESC}0;32m`,
-	YELLOW: `${ESC}0;33m`,
-	BLUE: `${ESC}0;34m`,
-	MAGENTA: `${ESC}0;35m`,
-	CYAN: `${ESC}0;36m`,
-	WHITE: `${ESC}0;37m`,
+	MAROON: `${ESC}0;31m`,
+	DARK_GREEN: `${ESC}0;32m`,
+	OLIVE: `${ESC}0;33m`,
+	DARK_BLUE: `${ESC}0;34m`,
+	PURPLE: `${ESC}0;35m`,
+	TEAL: `${ESC}0;36m`,
+	SILVER: `${ESC}0;37m`,
 
 	// Bright colors
-	BRIGHT_BLACK: `${ESC}1;30m`,
-	BRIGHT_RED: `${ESC}1;31m`,
-	BRIGHT_GREEN: `${ESC}1;32m`,
-	BRIGHT_YELLOW: `${ESC}1;33m`,
-	BRIGHT_BLUE: `${ESC}1;34m`,
-	BRIGHT_MAGENTA: `${ESC}1;35m`,
-	BRIGHT_CYAN: `${ESC}1;36m`,
-	BRIGHT_WHITE: `${ESC}1;37m`,
+	GREY: `${ESC}1;30m`,
+	CRIMSON: `${ESC}1;31m`,
+	LIME: `${ESC}1;32m`,
+	YELLOW: `${ESC}1;33m`,
+	LIGHT_BLUE: `${ESC}1;34m`,
+	PINK: `${ESC}1;35m`,
+	CYAN: `${ESC}1;36m`,
+	WHITE: `${ESC}1;37m`,
 } as const;
 
 /**
@@ -86,7 +83,7 @@ export function colorize(
 	bgColor?: string
 ): string {
 	const bg = bgColor || "";
-	return `${fgColor}${bg}${text}${FG.RESET}${bgColor ? BG.RESET : ""}`;
+	return `${fgColor}${bg}${text}${STYLE.RESET}${bgColor ? BG.RESET : ""}`;
 }
 
 /**

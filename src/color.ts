@@ -11,23 +11,23 @@ import { FG, BG, STYLE } from "./telnet.js";
 const COLOR_MAP: Record<string, string> = {
 	// Foreground - lowercase for dark colors
 	k: FG.BLACK,
-	r: FG.RED,
-	g: FG.GREEN,
-	y: FG.YELLOW,
-	b: FG.BLUE,
-	m: FG.MAGENTA,
-	c: FG.CYAN,
-	w: FG.WHITE,
+	r: FG.MAROON,
+	g: FG.DARK_GREEN,
+	y: FG.OLIVE,
+	b: FG.DARK_BLUE,
+	m: FG.PURPLE,
+	c: FG.TEAL,
+	w: FG.SILVER,
 
 	// Foreground - uppercase for bright colors
-	K: FG.BRIGHT_BLACK,
-	R: FG.BRIGHT_RED,
-	G: FG.BRIGHT_GREEN,
-	Y: FG.BRIGHT_YELLOW,
-	B: FG.BRIGHT_BLUE,
-	M: FG.BRIGHT_MAGENTA,
-	C: FG.BRIGHT_CYAN,
-	W: FG.BRIGHT_WHITE,
+	K: FG.GREY,
+	R: FG.CRIMSON,
+	G: FG.LIME,
+	Y: FG.YELLOW,
+	B: FG.LIGHT_BLUE,
+	M: FG.PINK,
+	C: FG.CYAN,
+	W: FG.WHITE,
 
 	// Background colors - using numbers
 	"0": BG.BLACK,
@@ -48,7 +48,7 @@ const COLOR_MAP: Record<string, string> = {
 	s: STYLE.STRIKETHROUGH,
 
 	// Reset
-	x: FG.RESET, // reset foreground
+	x: STYLE.RESET, // reset foreground
 	X: STYLE.RESET, // reset all
 };
 

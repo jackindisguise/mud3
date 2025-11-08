@@ -8,8 +8,8 @@
  * @example
  * ```
  * who
- * w (autocomplete to "who")
- * wh (autocomplete to "who")
+ * w   // autocomplete to "who"
+ * wh  // autocomplete to "who"
  * ```
  *
  * **Output:**

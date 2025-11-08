@@ -1,6 +1,6 @@
 keyword: say
-aliases: [speak, talk, "'"]
-related: [communication, ooc, commands]
+aliases: ["'"]
+related: [communication, ooc]
 topic: [communication, speaking, speech, roleplay, ic, in-character]
 content: |
   SAY - In-Character Speech

@@ -6,25 +6,25 @@ import { FG, BG, STYLE } from "./telnet.js";
 suite("color.ts", () => {
 	suite("colorize()", () => {
 		test("should convert lowercase color codes to dark colors", () => {
-			assert.strictEqual(colorize("{r"), FG.RED);
-			assert.strictEqual(colorize("{g"), FG.GREEN);
-			assert.strictEqual(colorize("{b"), FG.BLUE);
-			assert.strictEqual(colorize("{y"), FG.YELLOW);
-			assert.strictEqual(colorize("{c"), FG.CYAN);
-			assert.strictEqual(colorize("{m"), FG.MAGENTA);
+			assert.strictEqual(colorize("{r"), FG.MAROON);
+			assert.strictEqual(colorize("{g"), FG.DARK_GREEN);
+			assert.strictEqual(colorize("{b"), FG.DARK_BLUE);
+			assert.strictEqual(colorize("{y"), FG.OLIVE);
+			assert.strictEqual(colorize("{c"), FG.TEAL);
+			assert.strictEqual(colorize("{m"), FG.PURPLE);
 			assert.strictEqual(colorize("{k"), FG.BLACK);
-			assert.strictEqual(colorize("{w"), FG.WHITE);
+			assert.strictEqual(colorize("{w"), FG.SILVER);
 		});
 
 		test("should convert uppercase color codes to bright colors", () => {
-			assert.strictEqual(colorize("{R"), FG.BRIGHT_RED);
-			assert.strictEqual(colorize("{G"), FG.BRIGHT_GREEN);
-			assert.strictEqual(colorize("{B"), FG.BRIGHT_BLUE);
-			assert.strictEqual(colorize("{Y"), FG.BRIGHT_YELLOW);
-			assert.strictEqual(colorize("{C"), FG.BRIGHT_CYAN);
-			assert.strictEqual(colorize("{M"), FG.BRIGHT_MAGENTA);
-			assert.strictEqual(colorize("{K"), FG.BRIGHT_BLACK);
-			assert.strictEqual(colorize("{W"), FG.BRIGHT_WHITE);
+			assert.strictEqual(colorize("{R"), FG.CRIMSON);
+			assert.strictEqual(colorize("{G"), FG.LIME);
+			assert.strictEqual(colorize("{B"), FG.LIGHT_BLUE);
+			assert.strictEqual(colorize("{Y"), FG.YELLOW);
+			assert.strictEqual(colorize("{C"), FG.CYAN);
+			assert.strictEqual(colorize("{M"), FG.PINK);
+			assert.strictEqual(colorize("{K"), FG.GREY);
+			assert.strictEqual(colorize("{W"), FG.WHITE);
 		});
 
 		test("should convert number codes to background colors", () => {
@@ -48,7 +48,7 @@ suite("color.ts", () => {
 		});
 
 		test("should convert reset codes", () => {
-			assert.strictEqual(colorize("{x"), FG.RESET);
+			assert.strictEqual(colorize("{x"), STYLE.RESET);
 			assert.strictEqual(colorize("{X"), STYLE.RESET);
 		});
 
@@ -61,13 +61,13 @@ suite("color.ts", () => {
 
 		test("should handle mixed text and color codes", () => {
 			const input = "{rRed{x normal {Gbright green{X";
-			const expected = `${FG.RED}Red${FG.RESET} normal ${FG.BRIGHT_GREEN}bright green${STYLE.RESET}`;
+			const expected = `${FG.MAROON}Red${STYLE.RESET} normal ${FG.LIME}bright green${STYLE.RESET}`;
 			assert.strictEqual(colorize(input), expected);
 		});
 
 		test("should handle color codes with escaped braces", () => {
 			const input = "{rcolored {{not a code{x";
-			const expected = `${FG.RED}colored {not a code${FG.RESET}`;
+			const expected = `${FG.MAROON}colored {not a code${STYLE.RESET}`;
 			assert.strictEqual(colorize(input), expected);
 		});
 
@@ -92,7 +92,7 @@ suite("color.ts", () => {
 
 		test("should handle complex mixed content", () => {
 			const input = "{RBright{x {{escaped}} {1{WWhite on red{X normal";
-			const expected = `${FG.BRIGHT_RED}Bright${FG.RESET} {escaped}} ${BG.RED}${FG.BRIGHT_WHITE}White on red${STYLE.RESET} normal`;
+			const expected = `${FG.CRIMSON}Bright${STYLE.RESET} {escaped}} ${BG.RED}${FG.WHITE}White on red${STYLE.RESET} normal`;
 			assert.strictEqual(colorize(input), expected);
 		});
 	});
@@ -211,9 +211,9 @@ suite("color.ts", () => {
 
 			assert.strictEqual(plain, "You hit the orc for 10 damage!");
 			assert.strictEqual(visibleLength(message), plain.length);
-			assert.ok(colored.includes(FG.BRIGHT_RED));
-			assert.ok(colored.includes(FG.GREEN));
-			assert.ok(colored.includes(FG.BRIGHT_YELLOW));
+			assert.ok(colored.includes(FG.CRIMSON));
+			assert.ok(colored.includes(FG.DARK_GREEN));
+			assert.ok(colored.includes(FG.YELLOW));
 		});
 
 		test("should handle OOC-style messages", () => {

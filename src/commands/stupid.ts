@@ -6,15 +6,12 @@
  *
  * @example
  * ```
- * say Hello, traveler!
- * s How are you doing today? (autocomplete to "say")
- * ' This is a shortcut for say
+ * thisisastupidcommand Hello, traveler!
+ * tiascHow are you doing today? // autocomplete to "thisisastupidcommand"
  * ```
  *
- * **Aliases:** `'`
- *
- * **Pattern:** `say~ <message:text>`
- * @module commands/say
+ * **Pattern:** `this~is~a~stupid~command~<message:text>`
+ * @module commands/thisisastupidcommand
  */
 
 import { CommandContext, ParseResult } from "../command.js";
@@ -24,7 +21,6 @@ import { CommandObject } from "../package/commands.js";
 
 export default {
 	pattern: "this~is~a~stupid~command~<message:text>",
-
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor, room } = context;

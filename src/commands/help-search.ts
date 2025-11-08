@@ -7,11 +7,12 @@
  *
  * @example
  * ```
- * help search combat    (search for "combat" everywhere)
- * help search attack    (find all mentions of "attack")
- * help search comm      (partial search)
+ * help search combat // (search for "combat" everywhere)
+ * help search attack // (find all mentions of "attack")
+ * help search comm   // (partial search)
  * ```
  *
+ * **Aliases:** `? search <query:text>`
  * **Pattern:** `help~ search <query:text>`
  * @module commands/help-search
  */
@@ -120,6 +121,16 @@ function displaySearchResults(
 
 				// Clean up newlines in snippet
 				snippet = snippet.replace(/\n/g, " ").replace(/\s+/g, " ");
+
+				// Highlight the matched text in the snippet
+				const snippetLower = snippet.toLowerCase();
+				const matchPos = snippetLower.indexOf(queryLower);
+				if (matchPos !== -1) {
+					const before = snippet.substring(0, matchPos);
+					const match = snippet.substring(matchPos, matchPos + query.length);
+					const after = snippet.substring(matchPos + query.length);
+					snippet = `${before}{Y${match}{x${after}`;
+				}
 
 				// Build the line with keyword prefix
 				const prefix = `  {c${helpfile.keyword}{x: `;

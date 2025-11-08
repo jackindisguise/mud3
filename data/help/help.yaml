@@ -1,6 +1,6 @@
 keyword: help
 aliases: ["?"]
-related: [commands, searching]
+related: [searching]
 topic: [documentation, information, reference, search, tutorial]
 content: |
   HELP - Access Game Documentation

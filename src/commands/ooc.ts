@@ -26,6 +26,9 @@ import { Game } from "../game.js";
 export default {
 	pattern: "ooc~ <message:text>",
 	aliases: ['"<message:text>'],
+	/**
+	 * Execute the OOC command.
+	 */
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor } = context;

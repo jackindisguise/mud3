@@ -35,10 +35,25 @@ import { readdir, readFile } from "node:fs/promises";
 import { parse as parseYaml } from "yaml";
 import { join, extname, relative } from "node:path";
 import logger from "../logger.js";
-import { Helpfile } from "../help.js";
 
 const DATA_DIRECTORY = join(process.cwd(), "data");
 const HELP_DIRECTORY = join(DATA_DIRECTORY, "help");
+
+/**
+ * Represents a single helpfile entry.
+ */
+export interface Helpfile {
+	/** Primary keyword for this helpfile */
+	keyword: string;
+	/** Alternative keywords that reference this helpfile */
+	aliases?: string[];
+	/** Keywords of related helpfiles */
+	related?: string[];
+	/** Topic tags describing the type of information covered (e.g., "communication", "combat", "magic") */
+	topic?: string[];
+	/** The help content (supports multiline text) */
+	content: string;
+}
 
 /**
  * Raw helpfile structure from YAML (before validation)

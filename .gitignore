@@ -2,3 +2,4 @@ node_modules
 dist
 coverage
 logs/*.log
+STYLE_GUIDE.md

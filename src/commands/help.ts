@@ -24,50 +24,42 @@
 
 import { CommandContext, ParseResult } from "../command.js";
 import { CommandObject } from "../package/commands.js";
-import { getHelpfile, autocompleteHelpfile } from "../package/help.js";
+import {
+	getHelpfile,
+	autocompleteHelpfile,
+	Helpfile,
+} from "../package/help.js";
 import { MESSAGE_GROUP } from "../character.js";
+import { Mob } from "../dungeon.js";
 
 /**
  * Format a helpfile for display.
  */
-function formatHelpfile(
-	context: CommandContext,
-	keyword: string,
-	content: string,
-	aliases?: string[],
-	related?: string[]
-): void {
-	const { actor } = context;
+function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 	const lines: string[] = [];
 
-	lines.push(`{Y=== {W${keyword.toUpperCase()}{Y ==={x`);
+	lines.push(`{Y=== {W${helpfile.keyword.toUpperCase()}{Y ==={x`);
 	lines.push("");
-	lines.push(content);
+	lines.push(helpfile.content);
 
-	if (aliases && aliases.length > 0) {
+	if (helpfile.aliases && helpfile.aliases.length > 0) {
 		lines.push("");
-		lines.push(`{cAliases:{x ${aliases.join(", ")}`);
+		lines.push(`{cAliases:{x ${helpfile.aliases.join(", ")}`);
 	}
 
-	if (related && related.length > 0) {
+	if (helpfile.related && helpfile.related.length > 0) {
 		lines.push("");
-		lines.push(`{cRelated:{x ${related.join(", ")}`);
+		lines.push(`{cRelated:{x ${helpfile.related.join(", ")}`);
 	}
 
-	lines.push(`{Y${"=".repeat(keyword.length + 10)}{x`);
-
+	lines.push(`{Y${"=".repeat(helpfile.keyword.length + 10)}{x`);
 	actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
 /**
  * Display a list of matching topics.
  */
-function displayTopicList(
-	context: CommandContext,
-	title: string,
-	topics: string[]
-): void {
-	const { actor } = context;
+function displayTopicList(actor: Mob, title: string, topics: string[]): void {
 	const lines: string[] = [];
 
 	lines.push(`{Y${title}{x`);
@@ -95,13 +87,7 @@ export default {
 		if (!topic) {
 			const commandsHelp = getHelpfile("commands");
 			if (commandsHelp) {
-				formatHelpfile(
-					context,
-					commandsHelp.keyword,
-					commandsHelp.content,
-					commandsHelp.aliases,
-					commandsHelp.related
-				);
+				displayHelpfile(actor, commandsHelp);
 			} else {
 				const lines = [
 					"{YHelp System{x",
@@ -119,13 +105,7 @@ export default {
 		// Try exact match first
 		const exactMatch = getHelpfile(topic);
 		if (exactMatch) {
-			formatHelpfile(
-				context,
-				exactMatch.keyword,
-				exactMatch.content,
-				exactMatch.aliases,
-				exactMatch.related
-			);
+			displayHelpfile(actor, exactMatch);
 			return;
 		}
 
@@ -144,19 +124,13 @@ export default {
 
 		if (matches.length === 1) {
 			const helpfile = matches[0];
-			formatHelpfile(
-				context,
-				helpfile.keyword,
-				helpfile.content,
-				helpfile.aliases,
-				helpfile.related
-			);
+			displayHelpfile(actor, helpfile);
 			return;
 		}
 
 		// Multiple matches - show list
 		const topics = matches.map((h) => h.keyword);
-		displayTopicList(context, `Multiple topics match "${topic}":`, topics);
+		displayTopicList(actor, `Multiple topics match "${topic}":`, topics);
 		actor.sendLine("");
 		actor.sendLine(
 			`Type {chelp <topic>{x to view a specific topic, or {chelp search ${topic}{x for details.`
@@ -164,7 +138,6 @@ export default {
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {
-		// Handle any parsing errors
 		context.actor.sendLine(
 			"Usage: {chelp <topic>{x or {chelp search <query>{x"
 		);

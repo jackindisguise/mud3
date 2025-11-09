@@ -60,6 +60,7 @@ import type { MudClient } from "./io.js";
 import { CHANNEL, formatChannelMessage } from "./channel.js";
 import { isLocalhost } from "./io.js";
 import { LINEBREAK } from "./telnet.js";
+import { formatPlaytime } from "./time.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.
@@ -682,17 +683,7 @@ export class Character {
 		// Add current session time if active
 		if (this.session) totalMs += this.getSessionDuration();
 
-		const hours = Math.floor(totalMs / (1000 * 60 * 60));
-		const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
-		const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
-
-		if (hours > 0) {
-			return `${hours} hours, ${minutes} minutes, ${seconds} seconds`;
-		} else if (minutes > 0) {
-			return `${minutes} minutes, ${seconds} seconds`;
-		} else {
-			return `${seconds} seconds`;
-		}
+		return formatPlaytime(totalMs);
 	}
 
 	/**

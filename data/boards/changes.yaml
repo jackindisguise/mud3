@@ -2,6 +2,11 @@ name: changes
 displayName: Changes
 description: Updates about the game.
 permanent: true
-messages: []
-nextMessageId: 1
-
+writePermission: admin
+messages:
+  - id: 1
+    author: Judas
+    subject: sup
+    content: hehe
+    postedAt: '2025-11-09T16:28:33.643Z'
+nextMessageId: 2

@@ -22,12 +22,15 @@ export interface BoardMessage {
 	targets?: string[];
 }
 
+export type WritePermission = "all" | "admin";
+
 export interface SerializedBoard {
 	name: string;
 	displayName: string;
 	description: string;
 	permanent: boolean;
 	expirationMs?: number;
+	writePermission?: WritePermission;
 	messages: BoardMessage[];
 	nextMessageId: number;
 }
@@ -48,8 +51,10 @@ export class Board {
 	public readonly permanent: boolean;
 	/** Time in milliseconds before messages expire (only used if permanent=false) */
 	public readonly expirationMs?: number;
+	/** Who can write to this board: "all" (default) or "admin" */
+	public readonly writePermission: WritePermission;
 	/** Messages on this board */
-	public messages: BoardMessage[];
+	private messages: BoardMessage[];
 	/** Next message ID to use */
 	private nextMessageId: number;
 
@@ -61,19 +66,22 @@ export class Board {
 	 * @param description - Description of the board's purpose
 	 * @param permanent - Whether messages persist forever (default: true)
 	 * @param expirationMs - Time in milliseconds before messages expire (only used if permanent=false)
+	 * @param writePermission - Who can write to this board: "all" (default) or "admin"
 	 */
 	constructor(
 		name: string,
 		displayName: string,
 		description: string,
 		permanent: boolean = true,
-		expirationMs?: number
+		expirationMs?: number,
+		writePermission: WritePermission = "all"
 	) {
 		this.name = name;
 		this.displayName = displayName;
 		this.description = description;
 		this.permanent = permanent;
 		this.expirationMs = expirationMs;
+		this.writePermission = writePermission;
 		this.messages = [];
 		this.nextMessageId = 1;
 	}
@@ -180,6 +188,38 @@ export class Board {
 	}
 
 	/**
+	 * Checks if a user can write to this board.
+	 *
+	 * @param isAdmin - Whether the user is an administrator
+	 * @returns True if the user can write to this board
+	 */
+	public canWrite(isAdmin: boolean): boolean {
+		if (this.writePermission === "admin") {
+			return isAdmin;
+		}
+		return true; // "all" permission
+	}
+
+	/**
+	 * Gets the total number of messages on this board.
+	 *
+	 * @returns The message count
+	 */
+	public getMessageCount(): number {
+		return this.messages.length;
+	}
+
+	/**
+	 * Gets all messages on this board (for internal use and serialization).
+	 * Returns a copy to prevent external modification.
+	 *
+	 * @returns A copy of all messages
+	 */
+	public getAllMessages(): BoardMessage[] {
+		return [...this.messages];
+	}
+
+	/**
 	 * Serializes this board for persistence.
 	 *
 	 * @returns Serialized board data
@@ -191,7 +231,8 @@ export class Board {
 			description: this.description,
 			permanent: this.permanent,
 			expirationMs: this.expirationMs,
-			messages: this.messages,
+			writePermission: this.writePermission,
+			messages: this.getAllMessages(),
 			nextMessageId: this.nextMessageId,
 		};
 	}
@@ -208,14 +249,28 @@ export class Board {
 			data.displayName,
 			data.description,
 			data.permanent,
-			data.expirationMs
+			data.expirationMs,
+			data.writePermission || "all" // Default to "all" for backward compatibility
 		);
 		// Ensure all messages have a subject (for backward compatibility)
-		board.messages = data.messages.map((msg) => ({
-			...msg,
-			subject: msg.subject || "(No subject)",
-		}));
+		board.setMessages(
+			data.messages.map((msg) => ({
+				...msg,
+				subject: msg.subject || "(No subject)",
+			}))
+		);
 		board.nextMessageId = data.nextMessageId;
 		return board;
+	}
+
+	/**
+	 * Sets the messages array (for deserialization only).
+	 * This is a private method to maintain encapsulation.
+	 *
+	 * @param messages - The messages to set
+	 * @private
+	 */
+	private setMessages(messages: BoardMessage[]): void {
+		this.messages = messages;
 	}
 }

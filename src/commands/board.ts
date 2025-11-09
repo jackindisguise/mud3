@@ -6,12 +6,13 @@
  *
  * @example
  * ```
- * board general                    // List all visible messages (subject lines only)
- * board general read 5             // Read message #5 from general board
- * board general write              // Start interactive write sequence
+ * board                           // List all available boards
+ * board general                   // List all visible messages (subject lines only)
+ * board general read 5            // Read message #5 from general board
+ * board general write             // Start interactive write sequence
  * ```
  *
- * **Pattern:** `board <boardname:word> <action:word?> <id:number?>`
+ * **Pattern:** `board <boardname:word?> <action:word?> <id:number?>`
  * @module commands/board
  */
 
@@ -23,11 +24,12 @@ import { Board, BoardMessage } from "../board.js";
 import { color, COLOR } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { string } from "mud-ext";
+import { showBoardsList } from "./boards.js";
 
 export default {
-	pattern: "board <boardname:word> <action:word?> <id:number?>",
+	pattern: "board <boardname:word?> <action:word?> <id:number?>",
 	execute(context: CommandContext, args: Map<string, any>): void {
-		const boardName = args.get("boardname") as string;
+		const boardName = args.get("boardname") as string | undefined;
 		const action = args.get("action") as string | undefined;
 		const id = args.get("id") as number | undefined;
 		const message = args.get("message") as string | undefined;
@@ -39,6 +41,12 @@ export default {
 				"Only players can use message boards.",
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
+			return;
+		}
+
+		// If no board name provided, show the boards list
+		if (!boardName || boardName === "") {
+			showBoardsList(character);
 			return;
 		}
 
@@ -104,6 +112,17 @@ export default {
 					action.toLowerCase() === "write" ||
 					action.toLowerCase() === "post"
 				) {
+					// Check if user has permission to write to this board
+					if (!board.canWrite(character.isAdmin())) {
+						actor.sendMessage(
+							`Only administrators can post to the ${color(
+								board.displayName,
+								COLOR.YELLOW
+							)} board.`,
+							MESSAGE_GROUP.COMMAND_RESPONSE
+						);
+						return;
+					}
 					// Start interactive write sequence
 					startWriteSequence(character, board, boardName);
 				} else {
@@ -145,9 +164,9 @@ function displayBoard(actor: any, board: Board, username: string): void {
 		lines.push(color("No messages visible on this board.", COLOR.SILVER));
 	} else {
 		lines.push(
-			`${color("Messages:", COLOR.CYAN)} ${visibleMessages.length} (${
-				board.messages.length
-			} total)`
+			`${color("Messages:", COLOR.CYAN)} ${
+				visibleMessages.length
+			} (${board.getMessageCount()} total)`
 		);
 		lines.push("");
 

@@ -1,6 +1,90 @@
-A text-based MUD (Multi-User Dungeon) server built with TypeScript and Node.js.
+# MUD3 - A Modern TypeScript MUD Server
 
-# Quick Start
+A feature-rich, text-based Multi-User Dungeon (MUD) server built with TypeScript and Node.js. This server provides a complete foundation for building persistent online text-based games with player accounts, world modeling, communication systems, and extensible command framework.
+
+## ✨ Key Features
+
+### 📋 Persistent Message Board System
+- **Multiple Boards**: Create unlimited message boards with YAML configuration
+- **Flexible Expiration**: Permanent boards or time-limited boards (auto-expire after set duration)
+- **Interactive Editor**: Rich multi-line message editor with commands:
+  - `!done` - Finish and preview message
+  - `!show` - Display current body with line numbers
+  - `!delete <n>` - Delete specific line
+  - `!subject <text>` - Change subject inline
+  - `!to <@targets>` - Change message targets inline
+  - `!forget` / `!quit` - Cancel message creation
+  - `!help` - Show command reference
+- **Message Targeting**: Target messages to specific users with `@mentions` or make them public
+- **Write Permissions**: Configure boards to allow all users or restrict to admins only
+- **Auto-save**: Boards automatically saved on server shutdown
+- **Auto-cleanup**: Expired messages automatically removed from time-limited boards
+
+### 💬 Communication Channels
+- **Multiple Channels**: OOC, NEWBIE, TRADE, GOSSIP, SAY, WHISPER
+- **Color-coded Messages**: Each channel has distinct color schemes
+- **Channel Management**: Subscribe/unsubscribe to channels with `channels` command
+- **Whisper System**: Private messaging with `reply` command support
+- **User Blocking**: Block users to prevent whispers and unwanted messages
+
+### 🎨 Rich Terminal Experience
+- **Full Color Support**: 16-color palette with dark and bright variants
+- **Color Utilities**: `color()`, `colorize()`, `stripColors()`, `visibleLength()`
+- **Color Tags**: Inline color codes like `{R` for red, `{G` for green, etc.
+- **Formatted Output**: Colorized command outputs throughout the game
+
+### 👤 Character System
+- **Persistent Profiles**: YAML-based character storage
+- **Playtime Tracking**: Automatic session tracking with formatted display
+- **Statistics**: Track deaths, kills, and total playtime
+- **Settings**: Customizable player preferences (channels, colors, etc.)
+- **Admin System**: Built-in admin privileges and account management
+- **Authentication**: Secure password hashing with SHA-256
+
+### 🗺️ World Model
+- **3D Grid System**: Rooms organized in width × height × layers
+- **Movement**: Cardinal directions (N/S/E/W) and vertical (UP/DOWN)
+- **Room Links**: Custom connections between non-adjacent rooms
+- **Containment**: Objects can be in rooms, inventories, or nested containers
+- **Entity Types**: Rooms, Mobs (NPCs/players), Items, Props
+
+### ⚡ Command System
+- **Pattern Matching**: Declarative command patterns with typed arguments
+- **Autocomplete**: Partial command matching (e.g., `o` → `ooc`)
+- **Argument Types**: text, word, number, object, mob, item, direction, character
+- **Source Modifiers**: `@room`, `@inventory`, `@all` for object searches
+- **Aliases**: Multiple patterns per command
+- **Error Handling**: Custom error messages for parsing failures
+
+### 📚 Help System
+- **Topic-based Help**: YAML-based help files with keywords and aliases
+- **Search**: Full-text search across all help content
+- **Autocomplete**: Help topic autocomplete with prefix matching
+- **Related Topics**: Cross-referenced help topics
+
+### ⏰ Time Utilities
+- **Duration Formatting**: Human-readable duration strings (`formatDuration()`)
+- **Playtime Formatting**: Detailed playtime with hours, minutes, seconds (`formatPlaytime()`)
+- **Centralized**: All time formatting in `time.ts` module
+
+### 🧪 Testing & Quality
+- **Comprehensive Tests**: Full test coverage with Node.js test framework
+- **Type Safety**: Full TypeScript throughout
+- **Linting**: Code quality enforcement
+
+---
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+### Basic Usage
 
 ```ts
 import { loadPackage } from 'package-loader';
@@ -8,6 +92,7 @@ import lockfile from './src/package/lockfile.ts';
 import config from './src/package/config.ts';
 import commands from './src/package/commands.ts';
 import character from './src/package/character.ts';
+import board from './src/package/board.ts';
 import { startGame } from './src/game.ts';
 
 // Load packages in sequence
@@ -15,417 +100,225 @@ await loadPackage(lockfile);   // ensure single instance
 await loadPackage(config);     // load config.yaml (creates default if missing)
 await loadPackage(commands);   // load commands from data/commands/ and src/commands/
 await loadPackage(character);  // prepare character storage directory
+await loadPackage(board);      // load message boards
 
 // Start the game (sets Game.game singleton and begins accepting connections)
 const game = await startGame();
 ```
 
+### Connect
+
+```bash
+telnet localhost 23
+# or use your favorite MUD client
+```
+
 ---
 
-# Core Modules
+## 📖 Available Commands
 
-The core modules in `src/` provide the fundamental building blocks for the MUD server:
+### Communication
+- `say <message>` or `'<message>` - Speak to players in the same room
+- `ooc <message>` or `"<message>` - Send out-of-character message
+- `whisper <target> <message>` - Private message to a player
+- `reply <message>` - Reply to last whisper
+- `channels` - List and manage channel subscriptions
+- `channels on <channel>` - Subscribe to a channel
+- `channels off <channel>` - Unsubscribe from a channel
 
-- **game** - Server lifecycle, player sessions, and authentication
-- **io** - Network layer for TCP connections
-- **character** - Player data model and messaging
-- **dungeon** - World model (rooms, mobs, items, movement)
-- **command** - Command parsing and execution framework
-- **logger** - Structured logging with file/console output
+### Message Boards
+- `board` or `boards` - List all available message boards
+- `board <name>` - View messages on a board (subject lines only)
+- `board <name> read <id>` - Read a specific message
+- `board <name> write` - Start interactive message editor
 
-## game
+### Information
+- `who` - See who is currently online
+- `score` or `info` or `me` - View your character information
+- `help` - Show general help
+- `help <topic>` - Get help on a specific topic
+- `help search <query>` - Search all help topics
+- `commands` - List all available commands
 
+### Social
+- `block <username>` - Block a user from messaging you
+- `unblock <username>` - Unblock a user
+
+---
+
+## 🏗️ Core Modules
+
+The core modules in `src/` provide the fundamental building blocks:
+
+### game
 Orchestrates the MUD server lifecycle, player connections, authentication flow, and player sessions.
 
-### Key Exports
-
+**Key Exports:**
 - `Game` class - Main game orchestrator
 - `startGame()` - Bootstrap function with graceful shutdown
 - `LOGIN_STATE` enum - Authentication flow states
-- `LoginSession` interface - Per-connection state container
 
-### Game Class Methods
-
+**Methods:**
 ```ts
 class Game {
   async start(): Promise<void>
   async stop(): Promise<void>
-  
-  // Broadcasting
   broadcast(text: string, group?: MESSAGE_GROUP): void
-  announce(text: string): void
-  
-  // Iteration
-  forEachSession(callback: (session: LoginSession) => void): void
   forEachCharacter(callback: (character: Character) => void): void
-  
-  // Statistics
   getGameStats(): { activeConnections: number; playersOnline: number }
-  
-  // Singleton
-  static game?: Game
 }
 ```
 
-### Usage Example
+### io
+Networking primitives for TCP connections.
 
-```ts
-import { startGame, Game } from './src/game.ts';
-
-const game = await startGame();
-const stats = game.getGameStats();
-console.log(`${stats.playersOnline} players online`);
-
-game.broadcast("Server restart in 5 minutes!", MESSAGE_GROUP.SYSTEM);
-
-game.forEachCharacter((char) => {
-  console.log(char.credentials.username);
-});
-```
-
----
-
-## io
-
-Networking primitives for the MUD server. Provides `MudServer` (TCP server) and `MudClient` (per-connection wrapper).
-
-### Key Exports
-
+**Key Exports:**
 - `MudServer` class - TCP server wrapper
 - `MudClient` class - Connection wrapper with I/O helpers
 
-### MudServer
-
-```ts
-class MudServer {
-  async start(): Promise<void>
-  async stop(): Promise<void>
-}
-
-// Events
-server.on('listening', () => { })
-server.on('connection', (client: MudClient) => { })
-server.on('disconnection', (client: MudClient) => { })
-```
-
-### MudClient
-
+**MudClient Methods:**
 ```ts
 class MudClient {
   send(text: string): void
   sendLine(text: string): void
   ask(question: string, callback: (answer: string) => void): void
   yesno(question: string, callback: (answer: boolean | undefined) => void): void
-  close(): void
-  getAddress(): string
 }
-
-// Events
-client.on('input', (line: string) => { })
 ```
 
----
+### character
+Player data model combining persistent profile with runtime session.
 
-## character
-
-Player data model combining persistent profile (credentials, settings, stats) with runtime session (connection, messaging).
-
-### Key Exports
-
+**Key Exports:**
 - `Character` class - Player profile and session
 - `MESSAGE_GROUP` enum - Message categorization for prompts
-- `PlayerSettings`, `PlayerCredentials`, `PlayerStats` interfaces
-- `SerializedCharacter` interface - Persistence format
+- `CHANNEL` enum - Communication channels
 
-### MESSAGE_GROUP
-
-```ts
-enum MESSAGE_GROUP {
-  INFO = "INFO",
-  COMBAT = "COMBAT", 
-  COMMAND_RESPONSE = "COMMAND_RESPONSE",
-  SYSTEM = "SYSTEM",
-  CHANNELS = "CHANNELS"
-}
-```
-
-When a message arrives with a different group than the previous one, a blank line and prompt are emitted to visually separate contexts.
-
-### Character Class
-
+**Character Methods:**
 ```ts
 class Character {
   credentials: PlayerCredentials
   settings: PlayerSettings
   stats: PlayerStats
   mob: Mob
-  session?: PlayerSession
   
   setPassword(password: string): void
   verifyPassword(password: string): boolean
-  static hashPassword(password: string): string
-  
   startSession(connectionId: number, client: MudClient): void
   endSession(): void
-  
-  send(text: string): void
-  sendLine(text: string): void
   sendMessage(text: string, group: MESSAGE_GROUP): void
-  
-  serialize(): SerializedCharacter
-  static deserialize(data: SerializedCharacter): Character
+  getFormattedPlaytime(): string
+  joinChannel(channel: CHANNEL): void
+  leaveChannel(channel: CHANNEL): void
+  block(username: string): void
+  unblock(username: string): void
+  ask(question: string, callback: (line: string) => void): void
+  yesno(question: string, callback: (yesorno: boolean | undefined) => void): void
 }
 ```
 
----
+### dungeon
+World model providing rooms, mobs, items, props, and movement.
 
-## dungeon
-
-World model providing rooms, mobs, items, props, and movement. Implements a 3D grid-based world with exits, containment, and spatial relationships.
-
-### Key Exports
-
-**Base Classes:**
-- `DungeonObject` - Base for all world entities
-- `Movable` - Entities that can move between containers
-- `Container` - Entities that can hold other objects
-
-**Concrete Classes:**
+**Key Classes:**
+- `Dungeon` - 3D grid of rooms
 - `Room` - Spatial locations with exits
 - `Mob` - Living creatures (NPCs and player avatars)
 - `Item` - Portable objects
-- `Prop` - Fixed objects (furniture, scenery)
+- `Prop` - Fixed objects
+- `RoomLink` - Custom connections between rooms
 
-**World Management:**
-- `Dungeon` - 3D grid of rooms with dimensions
-- `RoomLink` - Custom connections between non-adjacent rooms
-
-**Enums:**
-- `Direction` - Cardinal directions (NORTH, SOUTH, EAST, WEST, UP, DOWN)
-
-### Class Hierarchy
-
-```
-DungeonObject (abstract)
-├── Movable (abstract)
-│   ├── Mob
-│   └── Item
-├── Container (abstract)
-│   ├── Room
-│   └── Prop
-└── RoomLink
-```
-
-### RoomLink
-
+**Movement:**
 ```ts
-class RoomLink {
-  static createTunnel(
-    fromRoom: Room,
-    direction: Direction,
-    toRoom: Room,
-    oneWay?: boolean
-  ): RoomLink
-  
-  getDestination(fromRoom: Room, direction: Direction): Room | undefined
-  remove(): void
+const mob = new Mob({ display: 'Player' });
+mob.moveTo(room);
+if (mob.canStep(Direction.NORTH)) {
+  mob.step(Direction.NORTH);
 }
 ```
 
-### Usage Example
+### command
+Pattern-based command parsing and execution framework.
 
+**Pattern Syntax:**
+- `<name:type>` - Required argument
+- `<name:type?>` - Optional argument
+- `<name:type@source>` - Object with source modifier
+- `word~` - Autocomplete literal
+
+**Example:**
 ```ts
-import { Dungeon, Room, Mob, Item, Direction, RoomLink } from './src/dungeon.ts';
-
-const dungeon = new Dungeon({ width: 10, height: 10, layers: 3 });
-dungeon.generateEmptyRooms();
-
-const startRoom = dungeon.getRoom(0, 0, 0)!;
-startRoom.display = 'Town Square';
-
-const player = new Mob({ display: 'Player', keywords: 'player' });
-player.moveTo(startRoom);
-
-if (player.canStep(Direction.NORTH)) {
-  player.step(Direction.NORTH);
-}
-
-// Create custom link (two-way by default)
-RoomLink.createTunnel(startRoom, Direction.UP, dungeon.getRoom(5, 5, 1)!);
-
-// Create one-way link
-RoomLink.createTunnel(startRoom, Direction.EAST, dungeon.getRoom(9, 0, 0)!, true);
-```
-
----
-
-## command
-
-Command parsing and execution framework with pattern matching, argument extraction, and registry management.
-
-### Key Exports
-
-- `Command` class - Pattern-based command parser
-- `CommandRegistry` class - Command collection manager
-- `CommandContext` interface - Execution context (actor, room, etc.)
-- `ParseResult` interface - Parse outcome
-
-### Pattern Syntax
-
-- `<name>` - Required argument
-- `<name:type>` - Typed argument (text, number, word, any)
-- `<...name>` - Consumes remaining input
-- Literal text - Must match exactly
-
-Examples:
-- `"say <message:text>"` - Matches "say hello world"
-- `"give <item> to <target>"` - Matches "give sword to alice"
-- `"look <...target>"` - Matches "look at the old sword"
-
-### CommandRegistry
-
-```ts
-class CommandRegistry {
-  static default: CommandRegistry
-  
-  register(commandObj: CommandObject): void
-  unregister(pattern: string): void
-  parse(input: string): ParseResult | undefined
-  execute(input: string, context: CommandContext): boolean
-}
-```
-
-### Usage Example
-
-```ts
-import { CommandRegistry } from './src/command.ts';
-
-const sayCommand = {
-  pattern: 'say <message:text>',
+export default {
+  pattern: "say <message:text>",
   aliases: ["'"],
-  
   execute(context, args) {
     const message = args.get('message');
     context.actor.sendMessage(`You say: "${message}"`, MESSAGE_GROUP.CHANNELS);
-    
-    if (context.room) {
-      for (const mob of context.room.contents) {
-        if (mob instanceof Mob && mob !== context.actor) {
-          mob.sendMessage(`${context.actor} says, "${message}"`, MESSAGE_GROUP.CHANNELS);
-        }
-      }
-    }
-  },
-  
-  onError(context, result) {
-    context.actor.sendLine(result.error ?? 'Invalid command');
   }
-};
-
-CommandRegistry.default.register(sayCommand);
+} satisfies CommandObject;
 ```
+
+### board
+Persistent message board system with class-based design.
+
+**Key Classes:**
+- `Board` - Message board with messages, permissions, expiration
+- `BoardMessage` - Individual message with author, subject, content, targets
+
+**Board Methods:**
+```ts
+class Board {
+  addMessage(author: string, subject: string, content: string, targets?: string[]): BoardMessage
+  getMessage(id: number): BoardMessage | undefined
+  getVisibleMessages(username: string): BoardMessage[]
+  canWrite(isAdmin: boolean): boolean
+  removeExpiredMessages(): number
+  getMessageCount(): number
+  getAllMessages(): BoardMessage[]
+}
+```
+
+### color
+Terminal color utilities and formatting.
+
+**Functions:**
+- `color(text: string, colorCode: COLOR): string` - Apply color to text
+- `colorize(text: string): string` - Parse and apply inline color tags
+- `stripColors(text: string): string` - Remove color codes
+- `visibleLength(text: string): number` - Get text length without color codes
+
+**Color Tags:**
+- `{r` - Dark red, `{R` - Bright red
+- `{g` - Dark green, `{G` - Bright green
+- `{b` - Dark blue, `{B` - Bright blue
+- `{y` - Yellow, `{c` - Cyan, `{m` - Magenta
+- `{x` - Reset colors
+
+### time
+Time formatting utilities for durations and timestamps.
+
+**Functions:**
+- `formatDuration(ms: number): string` - Format duration (days/hours/minutes)
+- `formatPlaytime(ms: number): string` - Format playtime (hours/minutes/seconds)
+
+### logger
+Structured logging with file and console output using Winston.
 
 ---
 
-## logger
+## 📦 Package System
 
-Structured logging with file output and console output. Uses Winston for formatting and transport.
+Built-in packages under `src/package/` provide configuration, persistence, and extensibility.
 
-### Key Export
+### commands
+Loads command modules from:
+- `data/commands/*.js` (runtime-extensible JavaScript commands)
+- `dist/src/commands/*.js` (compiled built-in TypeScript commands)
 
-- `logger` (default export) - Winston logger instance
+### config
+YAML configuration loader for `data/config.yaml`. Creates default config if missing.
 
-### Log Levels
-
-- `error` - Errors and exceptions
-- `warn` - Warning messages
-- `info` - General information
-- `debug` - Debug information
-
-### Usage
-
-```ts
-import logger from './src/logger.ts';
-
-logger.info('Server started', { port: 4000 });
-logger.debug('Processing command', { command: 'say', actor: 'Alice' });
-logger.warn('Connection timeout', { address: '127.0.0.1' });
-logger.error('Failed to save character', { error: err.message });
-```
-
-### Configuration
-
-- `LOG_LEVEL` environment variable controls console output (default: 'error')
-- File logs always written to `logs/` directory as JSON lines
-- Console logs disabled during tests
-
----
-
-# Package System
-
-The built-in packages under `src/package/` provide configuration, persistence, and extensibility.
-
-Package loader target: each module exports a default object `{ name, loader, dependencies }` for composition with a package loader.
-
-## commands
-
-Loads command modules from two locations at startup:
-
-- `data/commands` (runtime-extensible JS commands)
-- `dist/src/commands` (compiled built-in commands)
-
-Only `.js` files are loaded; files beginning with `_` are ignored.
-
-### Command shape
-
-```js
-// data/commands/say.js
-export default {
-  pattern: 'say <...text:any>',
-  aliases: ['"'],
-  execute(ctx, args) {
-    const text = args.get('text');
-    ctx.client.sendLine(text);
-  },
-  onError(ctx, result) {
-    ctx.client.sendLine(result.error ?? 'Could not parse command');
-  }
-};
-```
-
-Directory conventions:
-- Put custom runtime commands in `data/commands/*.js`
-- Built-in commands live in `src/commands/*.ts`
-
----
-
-## config
-
-YAML configuration loader that loads `data/config.yaml` and merges it into a typed in-memory `CONFIG` object.
-
-### Types
-
-```ts
-export type GameConfig = { name: string; creator: string };
-export type ServerConfig = { port: number; inactivity_timeout: number };
-export type SecurityConfig = { password_salt: string };
-export type Config = {
-  game: GameConfig;
-  server: ServerConfig;
-  security: SecurityConfig;
-};
-```
-
-### Usage
-
-```ts
-import configPkg, { CONFIG } from './src/package/config.ts';
-await loadPackage(configPkg);
-console.log(CONFIG.server.port);
-```
-
-Example `data/config.yaml`:
-
+**Config Structure:**
 ```yaml
 game:
   name: mud3
@@ -437,92 +330,169 @@ security:
   password_salt: changeme_default_salt_12345
 ```
 
----
+### character
+Persists `Character` entities to `data/characters/<username>.yaml`.
 
-## lockfile
+**Functions:**
+- `saveCharacter(character: Character): Promise<void>`
+- `loadCharacter(username: string): Promise<Character | undefined>`
+- `checkCharacterPassword(username: string, password: string): Promise<SerializedCharacter | undefined>`
 
-Ensures only one instance of the app runs by managing a `.lock` file in the project root.
+### board
+Persists `Board` entities to `data/boards/<name>.yaml`.
 
-### Usage
+**Functions:**
+- `saveBoard(board: Board): Promise<void>`
+- `loadBoard(name: string): Promise<Board | undefined>`
+- `getAllBoards(): Promise<Board[]>`
 
-```ts
-import { loadPackage } from 'package-loader';
-import lockfile from './src/package/lockfile.ts';
-await loadPackage(lockfile);
-// Exits the process if another instance is running
+**Board YAML Format:**
+```yaml
+name: general
+displayName: General
+description: General discussion board
+permanent: false
+expirationMs: 2592000000  # 30 days in milliseconds
+writePermission: all      # "all" or "admin"
+messages: []
+nextMessageId: 1
 ```
 
-#### Standalone utilities
+### help
+Loads help files from `data/help/*.yaml` with keyword-based lookup and search.
 
-```ts
-import { isProcessRunning, createLock, removeLock, checkLock } from './src/package/lockfile.ts';
-
-if (await checkLock()) process.exit(1);
-await createLock();
-// ... later
-await removeLock();
-```
+### lockfile
+Ensures only one instance runs by managing a `.lock` file.
 
 ---
 
-## character
+## 📁 Directory Structure
 
-Persists `Character` entities to `data/characters/<username>.yaml` and restores them back using `Character.serialize()`/`Character.deserialize()`.
-
-Active character registry: this package maintains a registry of usernames that are currently active. `loadCharacter()` refuses to load a character that's already active.
-
-### Authentication helpers
-
-- `checkCharacterPassword(username, password)` - Verifies password against the stored hash in the character file. Returns `SerializedCharacter` if the password matches, `undefined` otherwise.
-- `loadCharacterFromSerialized(data)` - Deserializes character data and registers it as active.
-
-This approach is more efficient for login flows because password verification happens before deserializing the full character object.
-
-### Usage
-
-```ts
-import { loadPackage } from 'package-loader';
-import characterPkg, { 
-  saveCharacter, 
-  loadCharacter, 
-  unregisterActiveCharacter,
-  checkCharacterPassword,
-  loadCharacterFromSerialized 
-} from './src/package/character.ts';
-
-await loadPackage(characterPkg);
-
-// Creating and saving a new character
-const player = new Character({ credentials: { username: 'Alice' } });
-player.setPassword('secret123');
-await saveCharacter(player);
-
-// Loading an existing character (automatically registers as active)
-const reloaded = await loadCharacter('Alice');
-
-// Authentication flow (password check + load)
-const serialized = await checkCharacterPassword('Alice', 'secret123');
-if (serialized) {
-  const character = loadCharacterFromSerialized(serialized);
-}
-
-// Later, on disconnect
-unregisterActiveCharacter('Alice');
+```
+mud-command2/
+├── data/
+│   ├── boards/          # Message board YAML files
+│   ├── characters/      # Character save files
+│   ├── commands/        # Runtime JavaScript commands
+│   ├── config.yaml      # Game configuration
+│   └── help/            # Help topic YAML files
+├── src/
+│   ├── commands/        # Built-in TypeScript commands
+│   ├── package/         # Package modules (persistence, etc.)
+│   ├── board.ts         # Board class and types
+│   ├── channel.ts       # Channel system
+│   ├── character.ts     # Character class
+│   ├── color.ts         # Color utilities
+│   ├── command.ts       # Command framework
+│   ├── dungeon.ts       # World model
+│   ├── game.ts          # Game orchestrator
+│   ├── io.ts            # Network layer
+│   ├── logger.ts        # Logging
+│   └── time.ts          # Time formatting utilities
+├── dist/                # Compiled JavaScript (generated)
+├── logs/                # Log files (generated)
+└── index.ts             # Entry point
 ```
 
 ---
 
-# Directory Structure
+## 🛠️ Development
 
-- `data/config.yaml` - game/server/security config (autocreated if missing)
-- `data/commands/*.js` - runtime command modules
-- `data/characters/*.yaml` - character saves
-- `.lock` - process lock file (created/removed by lockfile package)
-- `logs/` - JSON log files
+### Scripts
+
+```bash
+npm run build      # Compile TypeScript
+npm test           # Run all tests
+npm run coverage   # Generate test coverage report
+npm run doc        # Generate TypeScript documentation
+npm start          # Start the server
+npm run rerun      # Build and start
+```
+
+### Creating Commands
+
+**TypeScript Command (Built-in):**
+```ts
+// src/commands/mycommand.ts
+import { CommandContext } from "../command.js";
+import { MESSAGE_GROUP } from "../character.js";
+import { CommandObject } from "../package/commands.js";
+
+export default {
+  pattern: "mycommand <arg:word>",
+  execute(context: CommandContext, args: Map<string, any>): void {
+    const arg = args.get("arg");
+    context.actor.sendMessage(`You said: ${arg}`, MESSAGE_GROUP.COMMAND_RESPONSE);
+  }
+} satisfies CommandObject;
+```
+
+**JavaScript Command (Runtime):**
+```js
+// data/commands/mycommand.js
+export default {
+  pattern: "mycommand <arg:word>",
+  execute(context, args) {
+    const arg = args.get("arg");
+    context.actor.sendMessage(`You said: ${arg}`, "COMMAND_RESPONSE");
+  }
+};
+```
+
+### Creating Message Boards
+
+Create a YAML file in `data/boards/`:
+
+```yaml
+name: myboard
+displayName: My Board
+description: A custom message board
+permanent: true
+writePermission: all  # or "admin" for admin-only
+messages: []
+nextMessageId: 1
+```
+
+### Creating Help Topics
+
+Create a YAML file in `data/help/`:
+
+```yaml
+keyword: mytopic
+aliases: [topic, mt]
+related: [othertopic]
+content: |
+  This is the help content for my topic.
+  
+  It supports multi-line text and formatting.
+```
 
 ---
 
-# Module Dependencies
+## 🔧 Configuration
+
+### Server Configuration
+
+Edit `data/config.yaml`:
+
+```yaml
+game:
+  name: "My MUD"
+  creator: "Your Name"
+server:
+  port: 23
+  inactivity_timeout: 1800
+security:
+  password_salt: "your-secret-salt-here"
+```
+
+### Environment Variables
+
+- `LOG_LEVEL` - Console log level (default: `error`, options: `error`, `warn`, `info`, `debug`)
+
+---
+
+## 📝 Module Dependencies
 
 ```
 game
@@ -530,25 +500,109 @@ game
 ├── character (Character, MESSAGE_GROUP)
 ├── command (CommandRegistry, CommandContext)
 ├── dungeon (Mob, Room)
+├── board (Board)
 ├── package/config (CONFIG)
-├── package/character (persistence functions)
-└── logger
-
-io
+├── package/character (persistence)
+├── package/board (persistence)
 └── logger
 
 character
 ├── dungeon (Mob)
-├── package/config (CONFIG for password salt)
+├── channel (CHANNEL)
+├── time (formatPlaytime)
+├── package/config (CONFIG)
 └── io (MudClient)
 
-dungeon
-├── character (Character for Mob.character link)
-└── [no core dependencies]
+board
+└── [no dependencies]
 
 command
-└── [no core dependencies]
+└── dungeon (Mob, Room, etc.)
 
-logger
-└── [no core dependencies]
+dungeon
+└── character (Character for Mob.character link)
 ```
+
+---
+
+## 🧪 Testing
+
+The project includes comprehensive unit tests using Node.js's built-in test framework:
+
+```bash
+npm test              # Run all tests
+npm run coverage      # Generate coverage report
+```
+
+Test files follow the pattern `*.spec.ts` and are located alongside their source files.
+
+---
+
+## 📄 License
+
+ISC
+
+---
+
+## 🤝 Contributing
+
+This is a personal project, but suggestions and improvements are welcome!
+
+---
+
+## 🎮 Example Gameplay
+
+```
+> connect
+Connected to MUD3
+> create account alice
+Password: ****
+Account created! Logging in...
+Welcome to MUD3, alice!
+
+> who
+=== Players Online ===
+> alice
+
+Total Players: 1
+Total Connections: 1
+
+> board
+=== Available Message Boards ===
+
+Changes (changes)
+  Updates about the game.
+  Permanent
+  Messages: 1
+
+General (general)
+  General discussion board
+  Time-limited (expires after 30 days)
+  Messages: 0
+
+Trade (trade)
+  Trading board
+  Time-limited (expires after 7 days)
+  Messages: 0
+
+> board general write
+Target users (space-separated @mentions, or press Enter for public):
+Subject: Hello World
+Enter message body. Type !done when finished, or !help for commands.
+> This is my first message!
+> !done
+=== Message Preview ===
+Board: General
+Visibility: Public
+Subject: Hello World
+
+Body:
+This is my first message!
+
+Submit this message? (y/n): y
+Message #1 posted to General board.
+```
+
+---
+
+Built with ❤️ using TypeScript and Node.js

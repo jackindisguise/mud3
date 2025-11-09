@@ -6,93 +6,93 @@ import { FG, BG, STYLE } from "./telnet.js";
 suite("color.ts", () => {
 	suite("colorize()", () => {
 		test("should convert lowercase color codes to dark colors", () => {
-			assert.strictEqual(colorize("{r"), FG.MAROON);
-			assert.strictEqual(colorize("{g"), FG.DARK_GREEN);
-			assert.strictEqual(colorize("{b"), FG.DARK_BLUE);
-			assert.strictEqual(colorize("{y"), FG.OLIVE);
-			assert.strictEqual(colorize("{c"), FG.TEAL);
-			assert.strictEqual(colorize("{m"), FG.PURPLE);
-			assert.strictEqual(colorize("{k"), FG.BLACK);
-			assert.strictEqual(colorize("{w"), FG.SILVER);
+			assert.strictEqual(colorize("{r"), FG.MAROON + STYLE.RESET);
+			assert.strictEqual(colorize("{g"), FG.DARK_GREEN + STYLE.RESET);
+			assert.strictEqual(colorize("{b"), FG.DARK_BLUE + STYLE.RESET);
+			assert.strictEqual(colorize("{y"), FG.OLIVE + STYLE.RESET);
+			assert.strictEqual(colorize("{c"), FG.TEAL + STYLE.RESET);
+			assert.strictEqual(colorize("{m"), FG.PURPLE + STYLE.RESET);
+			assert.strictEqual(colorize("{k"), FG.BLACK + STYLE.RESET);
+			assert.strictEqual(colorize("{w"), FG.SILVER + STYLE.RESET);
 		});
 
 		test("should convert uppercase color codes to bright colors", () => {
-			assert.strictEqual(colorize("{R"), FG.CRIMSON);
-			assert.strictEqual(colorize("{G"), FG.LIME);
-			assert.strictEqual(colorize("{B"), FG.LIGHT_BLUE);
-			assert.strictEqual(colorize("{Y"), FG.YELLOW);
-			assert.strictEqual(colorize("{C"), FG.CYAN);
-			assert.strictEqual(colorize("{M"), FG.PINK);
-			assert.strictEqual(colorize("{K"), FG.GREY);
-			assert.strictEqual(colorize("{W"), FG.WHITE);
+			assert.strictEqual(colorize("{R"), FG.CRIMSON + STYLE.RESET);
+			assert.strictEqual(colorize("{G"), FG.LIME + STYLE.RESET);
+			assert.strictEqual(colorize("{B"), FG.LIGHT_BLUE + STYLE.RESET);
+			assert.strictEqual(colorize("{Y"), FG.YELLOW + STYLE.RESET);
+			assert.strictEqual(colorize("{C"), FG.CYAN + STYLE.RESET);
+			assert.strictEqual(colorize("{M"), FG.PINK + STYLE.RESET);
+			assert.strictEqual(colorize("{K"), FG.GREY + STYLE.RESET);
+			assert.strictEqual(colorize("{W"), FG.WHITE + STYLE.RESET);
 		});
 
 		test("should convert number codes to background colors", () => {
-			assert.strictEqual(colorize("{0"), BG.BLACK);
-			assert.strictEqual(colorize("{1"), BG.MAROON);
-			assert.strictEqual(colorize("{2"), BG.DARK_GREEN);
-			assert.strictEqual(colorize("{3"), BG.OLIVE);
-			assert.strictEqual(colorize("{4"), BG.DARK_BLUE);
-			assert.strictEqual(colorize("{5"), BG.PURPLE);
-			assert.strictEqual(colorize("{6"), BG.TEAL);
-			assert.strictEqual(colorize("{7"), BG.SILVER);
+			assert.strictEqual(colorize("{0"), BG.BLACK + STYLE.RESET);
+			assert.strictEqual(colorize("{1"), BG.MAROON + STYLE.RESET);
+			assert.strictEqual(colorize("{2"), BG.DARK_GREEN + STYLE.RESET);
+			assert.strictEqual(colorize("{3"), BG.OLIVE + STYLE.RESET);
+			assert.strictEqual(colorize("{4"), BG.DARK_BLUE + STYLE.RESET);
+			assert.strictEqual(colorize("{5"), BG.PURPLE + STYLE.RESET);
+			assert.strictEqual(colorize("{6"), BG.TEAL + STYLE.RESET);
+			assert.strictEqual(colorize("{7"), BG.SILVER + STYLE.RESET);
 		});
 
 		test("should convert style codes", () => {
-			assert.strictEqual(colorize("{d"), STYLE.BOLD);
-			assert.strictEqual(colorize("{i"), STYLE.ITALIC);
-			assert.strictEqual(colorize("{u"), STYLE.UNDERLINE);
-			assert.strictEqual(colorize("{f"), STYLE.BLINK);
-			assert.strictEqual(colorize("{v"), STYLE.REVERSE);
-			assert.strictEqual(colorize("{s"), STYLE.STRIKETHROUGH);
+			assert.strictEqual(colorize("{d"), STYLE.BOLD + STYLE.RESET);
+			assert.strictEqual(colorize("{i"), STYLE.ITALIC + STYLE.RESET);
+			assert.strictEqual(colorize("{u"), STYLE.UNDERLINE + STYLE.RESET);
+			assert.strictEqual(colorize("{f"), STYLE.BLINK + STYLE.RESET);
+			assert.strictEqual(colorize("{v"), STYLE.REVERSE + STYLE.RESET);
+			assert.strictEqual(colorize("{s"), STYLE.STRIKETHROUGH + STYLE.RESET);
 		});
 
 		test("should convert reset codes", () => {
-			assert.strictEqual(colorize("{x"), STYLE.RESET);
-			assert.strictEqual(colorize("{X"), STYLE.RESET);
+			assert.strictEqual(colorize("{x"), STYLE.RESET + STYLE.RESET);
+			assert.strictEqual(colorize("{X"), STYLE.RESET + STYLE.RESET);
 		});
 
 		test("should escape {{ to literal {", () => {
-			assert.strictEqual(colorize("{{"), "{");
-			assert.strictEqual(colorize("{{hello"), "{hello");
-			assert.strictEqual(colorize("test{{code"), "test{code");
-			assert.strictEqual(colorize("{{{{"), "{{");
+			assert.strictEqual(colorize("{{"), "{" + STYLE.RESET);
+			assert.strictEqual(colorize("{{hello"), "{hello" + STYLE.RESET);
+			assert.strictEqual(colorize("test{{code"), "test{code" + STYLE.RESET);
+			assert.strictEqual(colorize("{{{{"), "{{" + STYLE.RESET);
 		});
 
 		test("should handle mixed text and color codes", () => {
 			const input = "{rRed{x normal {Gbright green{X";
-			const expected = `${FG.MAROON}Red${STYLE.RESET} normal ${FG.LIME}bright green${STYLE.RESET}`;
+			const expected = `${FG.MAROON}Red${STYLE.RESET} normal ${FG.LIME}bright green${STYLE.RESET}${STYLE.RESET}`;
 			assert.strictEqual(colorize(input), expected);
 		});
 
 		test("should handle color codes with escaped braces", () => {
 			const input = "{rcolored {{not a code{x";
-			const expected = `${FG.MAROON}colored {not a code${STYLE.RESET}`;
+			const expected = `${FG.MAROON}colored {not a code${STYLE.RESET}${STYLE.RESET}`;
 			assert.strictEqual(colorize(input), expected);
 		});
 
 		test("should consume unknown codes", () => {
-			assert.strictEqual(colorize("{z"), "");
-			assert.strictEqual(colorize("{9"), "");
-			assert.strictEqual(colorize("{*"), "");
-			assert.strictEqual(colorize("text{?more"), "textmore");
+			assert.strictEqual(colorize("{z"), STYLE.RESET);
+			assert.strictEqual(colorize("{9"), STYLE.RESET);
+			assert.strictEqual(colorize("{*"), STYLE.RESET);
+			assert.strictEqual(colorize("text{?more"), "textmore" + STYLE.RESET);
 		});
 
 		test("should handle empty string", () => {
-			assert.strictEqual(colorize(""), "");
+			assert.strictEqual(colorize(""), STYLE.RESET);
 		});
 
 		test("should handle string with no codes", () => {
-			assert.strictEqual(colorize("plain text"), "plain text");
+			assert.strictEqual(colorize("plain text"), "plain text" + STYLE.RESET);
 		});
 
 		test("should handle trailing { (no character to consume, left as-is)", () => {
-			assert.strictEqual(colorize("test{"), "test{");
+			assert.strictEqual(colorize("test{"), "test{" + STYLE.RESET);
 		});
 
 		test("should handle complex mixed content", () => {
 			const input = "{RBright{x {{escaped}} {1{WWhite on maroon{X normal";
-			const expected = `${FG.CRIMSON}Bright${STYLE.RESET} {escaped}} ${BG.MAROON}${FG.WHITE}White on maroon${STYLE.RESET} normal`;
+			const expected = `${FG.CRIMSON}Bright${STYLE.RESET} {escaped}} ${BG.MAROON}${FG.WHITE}White on maroon${STYLE.RESET} normal${STYLE.RESET}`;
 			assert.strictEqual(colorize(input), expected);
 		});
 	});

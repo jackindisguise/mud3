@@ -16,13 +16,13 @@
  * ```ts
  * import { MudServer } from './io.js';
  *
- * const server = new MudServer(4000);
+ * const server = new MudServer();
  * server.on('connection', (client) => {
  *   client.on('input', (line) => {
  *     client.sendLine(`You said: ${line}`);
  *   });
  * });
- * await server.start();
+ * await server.start(4000);
  * ```
  *
  * Notes
@@ -41,6 +41,7 @@ import { createServer, Server, Socket } from "net";
 import logger from "./logger.js";
 import { string } from "mud-ext";
 import { colorize as _colorize, stripColors } from "./color.js";
+import { LINEBREAK } from "./telnet.js";
 
 /**
  * Represents a connected MUD client.
@@ -162,7 +163,7 @@ export class MudClient extends EventEmitter {
 	 * @param text The text to send
 	 */
 	public sendLine(text: string, colorize: boolean = false): void {
-		this.send(text + "\r\n", colorize);
+		this.send(text + LINEBREAK, colorize);
 	}
 
 	/**
@@ -224,6 +225,53 @@ export class MudClient extends EventEmitter {
 	public isConnected(): boolean {
 		return !this.socket.destroyed;
 	}
+
+	/**
+	 * Check if this client is connecting from localhost.
+	 * Convenience wrapper around the isLocalhost utility function.
+	 *
+	 * @returns true if the client is from localhost
+	 *
+	 * @example
+	 * ```typescript
+	 * if (client.isLocalhost()) {
+	 *   console.log("Local connection detected");
+	 * }
+	 * ```
+	 */
+	public isLocalhost(): boolean {
+		return isLocalhost(this.getAddress());
+	}
+}
+
+/**
+ * Checks if an address string represents a localhost connection.
+ * Handles both IPv4 (127.0.0.1) and IPv6 (::1, ::ffff:127.0.0.1) localhost addresses.
+ *
+ * @param address The client address string (format: "ip:port")
+ * @returns true if the address is from localhost
+ *
+ * @example
+ * ```typescript
+ * isLocalhost("127.0.0.1:12345"); // true
+ * isLocalhost("::1:12345"); // true
+ * isLocalhost("192.168.1.100:12345"); // false
+ * ```
+ */
+export function isLocalhost(address: string): boolean {
+	// Extract IP portion (remove port)
+	const ip = address.split(":").slice(0, -1).join(":");
+
+	// Check for IPv4 localhost
+	if (ip === "127.0.0.1") return true;
+
+	// Check for IPv6 localhost
+	if (ip === "::1") return true;
+
+	// Check for IPv6-mapped IPv4 localhost
+	if (ip === "::ffff:127.0.0.1") return true;
+
+	return false;
 }
 
 /**
@@ -237,22 +285,21 @@ export class MudClient extends EventEmitter {
  *
  * Example
  * ```ts
- * const server = new MudServer(4000);
+ * const server = new MudServer();
  * server.on('connection', (client) => {
  *   client.on('input', (line) => client.sendLine(`Echo: ${line}`));
  * });
- * await server.start();
+ * await server.start(4000);
  * ```
  */
 export class MudServer extends EventEmitter {
 	private server: Server;
 	private clients: Set<MudClient> = new Set();
-	private port: number;
+	private port?: number;
 	private isListening: boolean = false;
 
-	constructor(port: number = 4000) {
+	constructor() {
 		super();
-		this.port = port;
 		this.server = createServer((socket: Socket) => {
 			this.handleConnection(socket);
 		});
@@ -349,17 +396,19 @@ export class MudServer extends EventEmitter {
 	}
 
 	/**
-	 * Start the server
+	 * Start the server on the specified port
+	 * @param port The port number to listen on
 	 */
-	public start(): Promise<void> {
+	public start(port: number): Promise<void> {
 		return new Promise((resolve, reject) => {
 			if (this.isListening) {
 				reject(new Error("Server is already listening"));
 				return;
 			}
 
+			this.port = port;
 			this.server.once("error", reject);
-			this.server.listen(this.port, () => {
+			this.server.listen(port, () => {
 				this.server.removeListener("error", reject);
 				resolve();
 			});
@@ -414,8 +463,9 @@ export class MudServer extends EventEmitter {
 
 	/**
 	 * Get the port the server is listening on
+	 * @returns The port number, or undefined if the server hasn't been started yet
 	 */
-	public getPort(): number {
+	public getPort(): number | undefined {
 		return this.port;
 	}
 

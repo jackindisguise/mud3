@@ -6,6 +6,9 @@
 /** ANSI escape sequence prefix */
 const ESC = "\x1B[";
 
+/** Telnet line break (CR+LF) */
+export const LINEBREAK = "\r\n";
+
 /**
  * Telnet foreground color codes
  */
@@ -63,18 +66,6 @@ export const STYLE = {
 	HIDDEN: `${ESC}8m`,
 	STRIKETHROUGH: `${ESC}9m`,
 } as const;
-
-/**
- * Helper function to wrap text with foreground color
- */
-export function colorize(
-	text: string,
-	fgColor: string,
-	bgColor?: string
-): string {
-	const bg = bgColor || "";
-	return `${fgColor}${bg}${text}${STYLE.RESET}${bgColor ? BG.RESET : ""}`;
-}
 
 /**
  * Helper function to create a 256-color foreground code

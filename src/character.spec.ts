@@ -12,6 +12,7 @@ import {
 	DEFAULT_PLAYER_CREDENTIALS,
 	RequiredPlayerCredentials,
 } from "./character.js";
+import { CHANNEL } from "./channel.js";
 import { Mob, Dungeon } from "./dungeon.js";
 import type { MudClient } from "./io.js";
 
@@ -47,15 +48,21 @@ suite("character.ts", () => {
 	}
 
 	// Helper to create a lightweight mock MudClient for session tests
-	function createMockClient(): MudClient {
+	function createMockClient(): MudClient & { sendHistory: string[] } {
+		const sendHistory: string[] = [];
 		const mock = {
-			send: (_text: string) => {},
-			sendLine: (_text: string) => {},
+			sendHistory,
+			send: (text: string) => {
+				sendHistory.push(text);
+			},
+			sendLine: (text: string) => {
+				sendHistory.push(text + "\r\n");
+			},
 			close: () => {},
 			getAddress: () => "test:0",
 			isConnected: () => true,
 		};
-		return mock as unknown as MudClient;
+		return mock as unknown as MudClient & { sendHistory: string[] };
 	}
 
 	suite("Constructor", () => {
@@ -78,7 +85,37 @@ suite("character.ts", () => {
 		test("should apply default settings when none provided", () => {
 			const character = createTestCharacter();
 
-			assert.deepStrictEqual(character.settings, DEFAULT_PLAYER_SETTINGS);
+			// Check default settings (channels is initialized separately in constructor)
+			assert.strictEqual(
+				character.settings.receiveOOC,
+				DEFAULT_PLAYER_SETTINGS.receiveOOC
+			);
+			assert.strictEqual(
+				character.settings.verboseMode,
+				DEFAULT_PLAYER_SETTINGS.verboseMode
+			);
+			assert.strictEqual(
+				character.settings.prompt,
+				DEFAULT_PLAYER_SETTINGS.prompt
+			);
+			assert.strictEqual(
+				character.settings.colorEnabled,
+				DEFAULT_PLAYER_SETTINGS.colorEnabled
+			);
+			assert.strictEqual(
+				character.settings.autoLook,
+				DEFAULT_PLAYER_SETTINGS.autoLook
+			);
+			assert.strictEqual(
+				character.settings.briefMode,
+				DEFAULT_PLAYER_SETTINGS.briefMode
+			);
+			// Channels should be initialized with defaults (OOC, NEWBIE, GOSSIP)
+			assert.ok(character.settings.channels instanceof Set);
+			assert.strictEqual(character.settings.channels.size, 3);
+			assert.ok(character.isInChannel(CHANNEL.OOC));
+			assert.ok(character.isInChannel(CHANNEL.NEWBIE));
+			assert.ok(character.isInChannel(CHANNEL.GOSSIP));
 		});
 
 		test("should merge custom settings with defaults", () => {
@@ -544,6 +581,194 @@ suite("character.ts", () => {
 				character.settings.receiveOOC,
 				DEFAULT_PLAYER_SETTINGS.receiveOOC
 			);
+		});
+	});
+
+	suite("Channels", () => {
+		test("should start with default channels", () => {
+			const character = createTestCharacter();
+			assert.ok(character.settings.channels);
+			assert.strictEqual(character.settings.channels.size, 3);
+			assert.ok(character.isInChannel(CHANNEL.OOC));
+			assert.ok(character.isInChannel(CHANNEL.NEWBIE));
+			assert.ok(character.isInChannel(CHANNEL.GOSSIP));
+			assert.strictEqual(character.isInChannel(CHANNEL.TRADE), false);
+		});
+
+		test("should join a channel", () => {
+			const character = createTestCharacter();
+			character.joinChannel(CHANNEL.TRADE); // Join a channel not in defaults
+
+			assert.ok(character.isInChannel(CHANNEL.TRADE));
+			assert.strictEqual(character.settings.channels?.size, 4); // 3 defaults + TRADE
+		});
+
+		test("should leave a channel", () => {
+			const character = createTestCharacter();
+			// Character starts with OOC, NEWBIE, GOSSIP
+
+			assert.ok(character.isInChannel(CHANNEL.OOC));
+			assert.ok(character.isInChannel(CHANNEL.NEWBIE));
+
+			character.leaveChannel(CHANNEL.OOC);
+
+			assert.strictEqual(character.isInChannel(CHANNEL.OOC), false);
+			assert.ok(character.isInChannel(CHANNEL.NEWBIE));
+			assert.strictEqual(character.settings.channels?.size, 2); // NEWBIE and GOSSIP remain
+		});
+
+		test("should handle joining the same channel multiple times", () => {
+			const character = createTestCharacter();
+			character.joinChannel(CHANNEL.OOC); // Already in OOC by default
+			character.joinChannel(CHANNEL.OOC);
+			character.joinChannel(CHANNEL.OOC);
+
+			assert.strictEqual(character.settings.channels?.size, 3); // Still 3 defaults
+			assert.ok(character.isInChannel(CHANNEL.OOC));
+		});
+
+		test("should handle leaving a channel not subscribed to", () => {
+			const character = createTestCharacter();
+			// Character has OOC, NEWBIE, GOSSIP by default but not TRADE
+
+			character.leaveChannel(CHANNEL.TRADE); // not in this channel
+
+			assert.ok(character.isInChannel(CHANNEL.OOC));
+			assert.strictEqual(character.settings.channels?.size, 3); // Still 3 defaults
+		});
+
+		test("should handle leaving when channels is undefined", () => {
+			const character = createTestCharacter();
+			character.settings.channels = undefined;
+
+			// Should not throw
+			character.leaveChannel(CHANNEL.OOC);
+
+			assert.strictEqual(character.settings.channels, undefined);
+		});
+
+		test("isInChannel should return false when channels is undefined", () => {
+			const character = createTestCharacter();
+			character.settings.channels = undefined;
+
+			assert.strictEqual(character.isInChannel(CHANNEL.OOC), false);
+		});
+
+		test("should send chat to subscribed character", () => {
+			const speaker = createTestCharacter({
+				credentials: { username: "speaker" },
+			});
+			const listener = createTestCharacter({
+				credentials: { username: "listener" },
+			});
+
+			// listener is in OOC by default
+
+			const mockClient = createMockClient();
+			listener.startSession(1, mockClient);
+
+			speaker.credentials.username = "speaker";
+			listener.sendChat(speaker, "Hello world!", CHANNEL.OOC);
+
+			// Check that message was sent (message + blank line + prompt = 3 sends)
+			assert.ok(mockClient.sendHistory.length > 0);
+			const fullMessage = mockClient.sendHistory.join("");
+			assert.ok(fullMessage.includes("[OOC]"));
+			assert.ok(fullMessage.includes("speaker"));
+			assert.ok(fullMessage.includes("Hello world!"));
+		});
+
+		test("should not send chat to unsubscribed character", () => {
+			const speaker = createTestCharacter({
+				credentials: { username: "speaker" },
+			});
+			const listener = createTestCharacter({
+				credentials: { username: "listener" },
+			});
+
+			// Remove listener from all default channels and ensure not in TRADE
+			listener.settings.channels?.clear();
+
+			const mockClient = createMockClient();
+			listener.startSession(1, mockClient);
+
+			listener.sendChat(speaker, "Hello world!", CHANNEL.OOC);
+
+			// No message should be sent
+			assert.strictEqual(mockClient.sendHistory.length, 0);
+		});
+
+		test("should not send chat when no session active", () => {
+			const speaker = createTestCharacter({
+				credentials: { username: "speaker" },
+			});
+			const listener = createTestCharacter({
+				credentials: { username: "listener" },
+			});
+
+			// listener is in OOC by default
+			// No session started
+
+			// Should not throw
+			listener.sendChat(speaker, "Hello world!", CHANNEL.OOC);
+		});
+
+		test("should serialize and deserialize channels correctly", () => {
+			const character = createTestCharacter();
+			// Character starts with OOC, NEWBIE, GOSSIP (3 defaults)
+			character.joinChannel(CHANNEL.TRADE); // Add TRADE
+
+			const serialized = character.serialize();
+
+			// Check that channels are serialized as array
+			assert.ok(Array.isArray(serialized.settings.channels));
+			assert.strictEqual(serialized.settings.channels?.length, 4); // 3 defaults + TRADE
+			assert.ok(serialized.settings.channels?.includes(CHANNEL.OOC));
+			assert.ok(serialized.settings.channels?.includes(CHANNEL.NEWBIE));
+			assert.ok(serialized.settings.channels?.includes(CHANNEL.GOSSIP));
+			assert.ok(serialized.settings.channels?.includes(CHANNEL.TRADE));
+
+			// Deserialize and check
+			const deserialized = Character.deserialize(serialized);
+
+			assert.ok(deserialized.settings.channels instanceof Set);
+			assert.strictEqual(deserialized.settings.channels.size, 4);
+			assert.ok(deserialized.isInChannel(CHANNEL.OOC));
+			assert.ok(deserialized.isInChannel(CHANNEL.NEWBIE));
+			assert.ok(deserialized.isInChannel(CHANNEL.GOSSIP));
+			assert.ok(deserialized.isInChannel(CHANNEL.TRADE));
+		});
+		test("should handle serialization when channels is undefined", () => {
+			const character = createTestCharacter();
+			character.settings.channels = undefined;
+
+			const serialized = character.serialize();
+
+			// Undefined channels serialize to empty array
+			assert.ok(Array.isArray(serialized.settings.channels));
+			assert.strictEqual(serialized.settings.channels.length, 0);
+
+			const deserialized = Character.deserialize(serialized);
+
+			// Deserialized channels should be an empty Set (constructor doesn't re-apply defaults if explicitly provided)
+			assert.ok(deserialized.settings.channels instanceof Set);
+			assert.strictEqual(deserialized.settings.channels.size, 0);
+		});
+
+		test("should handle serialization with empty channels", () => {
+			const character = createTestCharacter();
+			// Clear default channels
+			character.settings.channels?.clear();
+
+			const serialized = character.serialize();
+
+			assert.ok(Array.isArray(serialized.settings.channels));
+			assert.strictEqual(serialized.settings.channels?.length, 0);
+
+			const deserialized = Character.deserialize(serialized);
+
+			assert.ok(deserialized.settings.channels instanceof Set);
+			assert.strictEqual(deserialized.settings.channels.size, 0);
 		});
 	});
 });

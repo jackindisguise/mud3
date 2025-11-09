@@ -1,0 +1,52 @@
+keyword: channels
+aliases: [channel]
+related: [communication, ooc, say]
+topic: [communication, chat, channels, settings, preferences]
+content: |
+  CHANNELS - Manage Channel Subscriptions
+  
+  Usage:
+    channels                        - List all channels and their status
+    channels on <channel>           - Subscribe to a channel
+    channels off <channel>          - Unsubscribe from a channel
+    channels enable <channel>       - Subscribe to a channel
+    channels disable <channel>      - Unsubscribe from a channel
+  
+  The channels command allows you to control which communication channels you
+  are subscribed to. When you unsubscribe from a channel, you will no longer
+  receive messages sent on that channel.
+  
+  Available Channels:
+    OOC     - Out of Character      (Default: ON)
+    GOSSIP  - General gossip chat   (Default: ON)
+    SAY     - In-character speech   (Default: ON)
+    NEWBIE  - Help for new players  (Default: OFF)
+    TRADE   - Trading and commerce  (Default: OFF)
+  
+  Examples:
+    channels
+      Shows your current channel subscriptions with [ON]/[OFF] status
+    
+    channels on newbie
+      Subscribe to the NEWBIE channel to help new players
+    
+    channels off gossip
+      Stop receiving gossip messages
+    
+    channels enable trade
+      Subscribe to trading channel
+    
+    channels disable ooc
+      Unsubscribe from out-of-character chat
+  
+  Features:
+    - Color-coded display ([ON] in green, [OFF] in red)
+    - Case-insensitive channel names
+    - Flexible syntax (on/enable and off/disable work the same)
+    - Shows full channel names and descriptions
+  
+  Notes:
+    - You can't send messages to channels you're not subscribed to
+    - SAY channel only affects messages in your current room
+    - Most channels are MUD-wide (OOC, GOSSIP, NEWBIE, TRADE)
+    - Default channels are automatically enabled for new characters

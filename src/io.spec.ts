@@ -9,7 +9,7 @@ describe("io.ts", () => {
 		const TEST_PORT = 14000; // Use a high port to avoid conflicts
 
 		beforeEach(async () => {
-			server = new MudServer(TEST_PORT);
+			server = new MudServer();
 		});
 
 		afterEach(async () => {
@@ -21,7 +21,7 @@ describe("io.ts", () => {
 		});
 
 		it("should start and listen on the specified port", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 			assert.strictEqual(server.isRunning(), true);
 			assert.strictEqual(server.getPort(), TEST_PORT);
 		});
@@ -32,12 +32,12 @@ describe("io.ts", () => {
 				listeningEmitted = true;
 			});
 
-			await server.start();
+			await server.start(TEST_PORT);
 			assert.strictEqual(listeningEmitted, true);
 		});
 
 		it("should stop the server", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 			assert.strictEqual(server.isRunning(), true);
 
 			await server.stop();
@@ -45,7 +45,7 @@ describe("io.ts", () => {
 		});
 
 		it("should emit close event when stopped", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			let closeEmitted = false;
 			server.on("close", () => {
@@ -57,18 +57,18 @@ describe("io.ts", () => {
 		});
 
 		it("should reject starting when already listening", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			await assert.rejects(
 				async () => {
-					await server.start();
+					await server.start(TEST_PORT);
 				},
 				{ message: "Server is already listening" }
 			);
 		});
 
 		it("should accept client connections", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			let connectionEmitted = false;
 			let clientInstance: MudClient | null = null;
@@ -97,7 +97,7 @@ describe("io.ts", () => {
 		});
 
 		it("should track connected clients", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			const client1 = new Socket();
 			const client2 = new Socket();
@@ -121,7 +121,7 @@ describe("io.ts", () => {
 		});
 
 		it("should emit disconnection event when client disconnects", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			let disconnectionEmitted = false;
 			server.on("disconnection", () => {
@@ -144,7 +144,7 @@ describe("io.ts", () => {
 		});
 
 		it("should broadcast messages to all clients", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			const client1 = new Socket();
 			const client2 = new Socket();
@@ -177,7 +177,7 @@ describe("io.ts", () => {
 		});
 
 		it("should broadcast lines to all clients", async () => {
-			await server.start();
+			await server.start(TEST_PORT);
 
 			const client1 = new Socket();
 			await new Promise<void>((resolve) => {
@@ -205,8 +205,8 @@ describe("io.ts", () => {
 		const TEST_PORT = 14001;
 
 		beforeEach(async () => {
-			server = new MudServer(TEST_PORT);
-			await server.start();
+			server = new MudServer();
+			await server.start(TEST_PORT);
 
 			// Set up connection handler
 			server.on("connection", (client: MudClient) => {

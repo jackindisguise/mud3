@@ -22,6 +22,7 @@ import { MESSAGE_GROUP } from "../character.js";
 import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
+import { CHANNEL, formatChannelMessage } from "../channel.js";
 
 export default {
 	pattern: "ooc~ <message:text>",
@@ -32,14 +33,28 @@ export default {
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor } = context;
+		const character = actor.character;
 
-		actor.sendMessage(`You OOC: "${message}"`, MESSAGE_GROUP.CHANNELS);
-		Game.game!.forEachCharacter((character) => {
-			if (actor === character.mob) return;
-			character.sendMessage(
-				`${actor} OOC: "${message}"`,
-				MESSAGE_GROUP.CHANNELS
+		if (!character) {
+			actor.sendMessage(
+				"Only players can use channels.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
+			return;
+		}
+
+		// Check if the character is in the OOC channel
+		if (!character.isInChannel(CHANNEL.OOC)) {
+			actor.sendMessage(
+				"You are not subscribed to the OOC channel.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+
+		// Send to all characters in the OOC channel
+		Game.game!.forEachCharacter((recipient) => {
+			recipient.sendChat(character, message, CHANNEL.OOC);
 		});
 	},
 

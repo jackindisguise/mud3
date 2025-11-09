@@ -1,0 +1,40 @@
+keyword: exec
+aliases: [execute, eval]
+related: [commands]
+topic: [admin, developer, debugging, code, javascript]
+content: |
+  EXEC - Execute JavaScript Code (Admin Only)
+  
+  Usage:
+    exec <code>
+  
+  The exec command allows administrators to execute arbitrary JavaScript code
+  on the server. This is a powerful debugging and administration tool that
+  provides direct access to the game's runtime environment.
+  
+  Examples:
+    exec console.log("Hello World")
+    exec context.actor.sendMessage("Test", MESSAGE_GROUP.SYSTEM)
+    exec return context.room.contents.length
+    exec context.game.broadcast("Server announcement!")
+  
+  Available Variables:
+    context - The command context containing:
+      - context.actor    - The mob executing the command
+      - context.room     - The current room
+      - context.game     - The game instance
+      - context.registry - The command registry
+  
+  Return Values:
+    - If the code returns a value, it will be displayed as JSON
+    - If no value is returned, you'll see "Code executed successfully"
+    - Errors are caught and displayed
+  
+  Security:
+    This command is RESTRICTED to admin users only. Regular players cannot
+    access this command. Admins are automatically granted to localhost
+    connections.
+  
+  Warning:
+    This command can modify game state, create/delete objects, and execute
+    any JavaScript code. Use with caution!

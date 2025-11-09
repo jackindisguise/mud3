@@ -7,6 +7,8 @@
  * What you get
  * - `Character`: persistent credentials, settings, and stats + runtime session handling
  * - `MESSAGE_GROUP`: controls how messages are grouped to show prompts cleanly
+ * - `CHANNEL`: enum of predefined communication channels
+ * - `CHANNELS`: array of all channel values for runtime reference
  * - Defaults: `DEFAULT_PLAYER_SETTINGS`, `DEFAULT_PLAYER_CREDENTIALS`, `DEFAULT_PLAYER_STATS`
  * - Types: `PlayerSettings`, `PlayerCredentials`, `PlayerStats`, `PlayerSession`,
  *   `CharacterOptions`, `SerializedCharacter`, and related helpers
@@ -55,6 +57,9 @@ import { Mob, SerializedMob } from "./dungeon.js";
 import { createHash } from "crypto";
 import { CONFIG } from "./package/config.js";
 import type { MudClient } from "./io.js";
+import { CHANNEL, formatChannelMessage } from "./channel.js";
+import { isLocalhost } from "./io.js";
+import { LINEBREAK } from "./telnet.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.
@@ -85,7 +90,20 @@ export interface PlayerSettings {
 	autoLook?: boolean;
 	/** Brief mode for room descriptions */
 	briefMode?: boolean;
+	/** Channels the player is subscribed to */
+	channels?: Set<CHANNEL>;
 }
+
+/**
+ * Default channels that new characters are subscribed to.
+ * Players start subscribed to OOC, GOSSIP, and SAY channels by default.
+ * They must opt-in to NEWBIE and TRADE channels.
+ */
+export const DEFAULT_CHANNELS: readonly CHANNEL[] = [
+	CHANNEL.OOC,
+	CHANNEL.GOSSIP,
+	CHANNEL.SAY,
+] as const;
 
 /**
  * Default player settings applied to new characters.
@@ -100,6 +118,7 @@ export interface PlayerSettings {
  *   colorEnabled: true,
  *   autoLook: true,
  *   briefMode: false,
+ *   channels: new Set<string>(),
  * };
  * ```
  */
@@ -258,11 +277,31 @@ export interface SerializedPlayerCredentials {
 	isAdmin: boolean;
 }
 
+/**
+ * Serialized player settings with channels as an array instead of Set.
+ */
+export interface SerializedPlayerSettings {
+	/** Whether to receive out-of-character (OOC) messages */
+	receiveOOC?: boolean;
+	/** Whether to show verbose room descriptions */
+	verboseMode?: boolean;
+	/** Preferred command prompt format */
+	prompt?: string;
+	/** Color preferences */
+	colorEnabled?: boolean;
+	/** Auto-look after movement */
+	autoLook?: boolean;
+	/** Brief mode for room descriptions */
+	briefMode?: boolean;
+	/** Channels the player is subscribed to (serialized as array of enum values) */
+	channels?: CHANNEL[];
+}
+
 export interface SerializedCharacter {
 	/** Player's account credentials and authentication info (serialized) */
 	credentials: SerializedPlayerCredentials;
-	/** Player's game settings and preferences */
-	settings: PlayerSettings;
+	/** Player's game settings and preferences (serialized) */
+	settings: SerializedPlayerSettings;
 	/** Player's gameplay statistics and progression */
 	stats: PlayerStats;
 	/** Serialized mob data for reconstructing the character's mob representation */
@@ -388,6 +427,11 @@ export class Character {
 			...options.settings,
 		};
 
+		// Initialize channels with defaults if not provided
+		if (!this.settings.channels) {
+			this.settings.channels = new Set<CHANNEL>(DEFAULT_CHANNELS);
+		}
+
 		// Apply default stats
 		this.stats = {
 			...DEFAULT_PLAYER_STATS,
@@ -439,6 +483,11 @@ export class Character {
 			client,
 		};
 		this.updateLastLogin(this.session.startTime);
+
+		// Grant admin privileges to localhost connections
+		if (client.isLocalhost()) {
+			this.credentials.isAdmin = true;
+		}
 	}
 
 	/**
@@ -553,7 +602,7 @@ export class Character {
 	 * If no client is connected, this is a no-op.
 	 */
 	public sendLine(text: string) {
-		this.send(`${text}\r\n`);
+		this.send(`${text}${LINEBREAK}`);
 	}
 
 	/** Core routine for group-aware sending */
@@ -647,6 +696,78 @@ export class Character {
 	}
 
 	/**
+	 * Subscribes the character to a channel.
+	 *
+	 * @param channel The channel to join
+	 *
+	 * @example
+	 * ```typescript
+	 * character.joinChannel(CHANNEL.OOC);
+	 * character.joinChannel(CHANNEL.NEWBIE);
+	 * ```
+	 */
+	public joinChannel(channel: CHANNEL): void {
+		if (!this.settings.channels) {
+			this.settings.channels = new Set<CHANNEL>();
+		}
+		this.settings.channels.add(channel);
+	}
+
+	/**
+	 * Unsubscribes the character from a channel.
+	 *
+	 * @param channel The channel to leave
+	 *
+	 * @example
+	 * ```typescript
+	 * character.leaveChannel(CHANNEL.OOC);
+	 * ```
+	 */
+	public leaveChannel(channel: CHANNEL): void {
+		if (!this.settings.channels) return;
+		this.settings.channels.delete(channel);
+	}
+
+	/**
+	 * Checks if the character is subscribed to a channel.
+	 *
+	 * @param channel The channel to check
+	 * @returns true if subscribed to the channel
+	 *
+	 * @example
+	 * ```typescript
+	 * if (character.isInChannel(CHANNEL.OOC)) {
+	 *   // Character will receive OOC messages
+	 * }
+	 * ```
+	 */
+	public isInChannel(channel: CHANNEL): boolean {
+		if (!this.settings.channels) return false;
+		return this.settings.channels.has(channel);
+	}
+
+	/**
+	 * Sends a chat message to this character if they are subscribed to the channel.
+	 *
+	 * @param speaker The character sending the message
+	 * @param message The message text
+	 * @param channel The channel the message is being sent on
+	 *
+	 * @example
+	 * ```typescript
+	 * // Send OOC message to all characters in the OOC channel
+	 * for (const character of allCharacters) {
+	 *   character.sendChat(speaker, "Hello everyone!", CHANNEL.OOC);
+	 * }
+	 * ```
+	 */
+	public sendChat(speaker: Character, message: string, channel: CHANNEL): void {
+		if (!this.isInChannel(channel)) return;
+		const formatted = formatChannelMessage(channel, `${speaker}`, message);
+		this.sendMessage(formatted, MESSAGE_GROUP.CHANNELS);
+	}
+
+	/**
 	 * Verifies if the provided password matches the stored password.
 	 * Hashes the input password and compares it to the stored hash.
 	 *
@@ -708,9 +829,17 @@ export class Character {
 			isAdmin: c.isAdmin,
 		};
 
+		// Convert channels Set to array for serialization
+		const serializedSettings: SerializedPlayerSettings = {
+			...this.settings,
+			channels: this.settings.channels
+				? Array.from(this.settings.channels)
+				: [],
+		};
+
 		return {
 			credentials: serializedCreds,
-			settings: this.settings,
+			settings: serializedSettings,
 			stats: this.stats,
 			mob: this.mob.serialize() as SerializedMob,
 		};
@@ -743,9 +872,18 @@ export class Character {
 			isAdmin: data.credentials.isAdmin,
 		};
 
+		// Convert channels array back to Set
+		const settings: PlayerSettings = {
+			...data.settings,
+			channels:
+				data.settings.channels !== undefined
+					? new Set(data.settings.channels)
+					: new Set<CHANNEL>(),
+		};
+
 		const character = new Character({
 			credentials: creds,
-			settings: data.settings,
+			settings: settings,
 			stats: data.stats,
 			mob: mob,
 		});

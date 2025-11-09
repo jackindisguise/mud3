@@ -20,6 +20,7 @@ import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
+import { CHANNEL } from "../channel.js";
 
 export default {
 	pattern: "say~ <message:text>",
@@ -27,18 +28,30 @@ export default {
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor, room } = context;
+		const character = actor.character;
 
-		actor.sendMessage(`You say: "${message}"`, MESSAGE_GROUP.CHANNELS);
+		if (!character) {
+			actor.sendMessage(
+				"Only players can use the say channel.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
 
-		if (room) {
-			for (const mob of room.contents) {
-				if (mob instanceof Mob && mob !== actor) {
-					mob.sendMessage(
-						`${actor} says, "${message}"`,
-						MESSAGE_GROUP.CHANNELS
-					);
-				}
-			}
+		// Check if the character is in the SAY channel
+		if (!character.isInChannel(CHANNEL.SAY)) {
+			actor.sendMessage(
+				"You are not subscribed to the SAY channel.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+
+		// Send to all mobs in the same room that are subscribed to SAY
+		for (const mob of [actor, ...(room?.contents || [])]) {
+			if (!(mob instanceof Mob)) continue;
+			if (!mob.character) continue;
+			mob.character.sendChat(character, message, CHANNEL.SAY);
 		}
 	},
 

@@ -110,7 +110,7 @@ export class Game {
 
 	constructor() {
 		// Use package config
-		this.server = new MudServer(this.config.server.port);
+		this.server = new MudServer();
 	}
 
 	/**
@@ -172,7 +172,7 @@ export class Game {
 		});
 
 		// Start the server
-		await this.server.start();
+		await this.server.start(this.config.server.port);
 
 		// Set up auto-save timer
 		this.saveTimer = setInterval(() => {

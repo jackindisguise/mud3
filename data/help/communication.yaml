@@ -1,6 +1,6 @@
 keyword: communication
 aliases: [chat, talking, speak]
-related: [say, ooc]
+related: [say, ooc, tell, reply]
 topic: [communication, speaking, speech, chat, roleplay, talking]
 content: |
   COMMUNICATION - Talking in the Game
@@ -23,12 +23,11 @@ content: |
       ooc Hello everyone!
       "How do I find the market?
   
-  Key Differences:
-    - SAY is in-character, only heard by those in your room
-    - OOC is out-of-character, heard by all players online
-    - Use SAY for roleplay, OOC for game questions/chat
-  
-  Related Topics:
-    help say          - In-character speech command
-    help ooc          - Out-of-character communication
-    help commands     - Full list of available commands
+  Private Messages (Tell):
+    Use the 'tell' command to send private messages to specific players.
+    Use 'reply' or 'r' to respond to the last player who sent you a tell.
+    
+    Examples:
+      tell Alice Hey, want to go hunting?
+      reply Sure, meet you at the gates
+      r On my way!

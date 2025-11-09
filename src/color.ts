@@ -332,7 +332,7 @@ export function colorize(text: string): string {
 
 		// {letter} becomes the color code if it exists
 		const colorCode = COLOR_MAP[code];
-		return colorCode !== undefined ? colorCode : match;
+		return colorCode !== undefined ? colorCode : "";
 	});
 }
 
@@ -356,8 +356,8 @@ export function stripColors(text: string): string {
 		// {{ becomes a literal {
 		if (code === "{") return "{";
 
-		// {letter} is removed if it's a valid color code
-		return COLOR_MAP[code] !== undefined ? "" : match;
+		// {letter} is always consumed (both valid color codes and unknown codes)
+		return "";
 	});
 }
 

@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { MudServer, MudClient } from "./io.js";
 import { Socket } from "net";
+import { LINEBREAK } from "./telnet.js";
 
 describe("io.ts", () => {
 	describe("MudServer", () => {
@@ -192,7 +193,7 @@ describe("io.ts", () => {
 			server.broadcastLine("Test message");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			assert.strictEqual(messages.join(""), "Test message\r\n");
+			assert.strictEqual(messages.join(""), `Test message${LINEBREAK}`);
 
 			client1.destroy();
 		});
@@ -241,7 +242,7 @@ describe("io.ts", () => {
 				inputReceived = line;
 			});
 
-			testSocket.write("test command\n");
+			testSocket.write(`test command${LINEBREAK}`);
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			assert.strictEqual(inputReceived, "test command");
@@ -255,7 +256,7 @@ describe("io.ts", () => {
 				inputs.push(line);
 			});
 
-			testSocket.write("line1\nline2\nline3\n");
+			testSocket.write(`line1${LINEBREAK}line2${LINEBREAK}line3${LINEBREAK}`);
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			assert.deepStrictEqual(inputs, ["line1", "line2", "line3"]);
@@ -273,7 +274,7 @@ describe("io.ts", () => {
 			await new Promise((resolve) => setTimeout(resolve, 50));
 			assert.strictEqual(inputs.length, 0);
 
-			testSocket.write(" line\n");
+			testSocket.write(` line${LINEBREAK}`);
 			await new Promise((resolve) => setTimeout(resolve, 50));
 			assert.deepStrictEqual(inputs, ["partial line"]);
 		});
@@ -303,7 +304,7 @@ describe("io.ts", () => {
 			mudClient!.sendLine("Welcome!");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			assert.strictEqual(messages.join(""), "Welcome!\r\n");
+			assert.strictEqual(messages.join(""), `Welcome!${LINEBREAK}`);
 		});
 
 		it("should emit close event when connection is closed", async () => {
@@ -353,7 +354,7 @@ describe("io.ts", () => {
 				inputs.push(line);
 			});
 
-			testSocket.write("\n\n  \n");
+			testSocket.write(`${LINEBREAK}${LINEBREAK}  ${LINEBREAK}`);
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			assert.strictEqual(inputs.length, 3);
@@ -367,7 +368,7 @@ describe("io.ts", () => {
 				inputs.push(line);
 			});
 
-			testSocket.write("  command with spaces  \n");
+			testSocket.write(`  command with spaces  ${LINEBREAK}`);
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			assert.deepStrictEqual(inputs, ["command with spaces"]);

@@ -7,7 +7,7 @@
  * What you get
  * - `Command`: abstract base class with pattern parsing and `execute()` hook
  * - `CommandRegistry`: register commands and execute user input centrally
- * - `ARGUMENT_TYPE`: built-in argument types (text, word, number, object, mob, item, direction)
+ * - `ARGUMENT_TYPE`: built-in argument types (text, word, number, object, mob, item, direction, character)
  * - Types: `CommandContext`, `ParseResult`, `ArgumentConfig`, `CommandOptions`
  *
  * Pattern basics
@@ -52,6 +52,8 @@ import {
 	DIRECTION,
 	text2dir,
 } from "./dungeon.js";
+import { Character } from "./character.js";
+import { Game } from "./game.js";
 import logger from "./logger.js";
 
 /**
@@ -139,6 +141,7 @@ export interface ParseResult {
  * ARGUMENT_TYPE.MOB        // "bob" -> Mob (if found in room)
  * ARGUMENT_TYPE.ITEM       // "potion" -> Item (if found)
  * ARGUMENT_TYPE.DIRECTION  // "north" or "n" -> DIRECTION.NORTH
+ * ARGUMENT_TYPE.CHARACTER  // "alice" -> Character (online player)
  * ```
  */
 export enum ARGUMENT_TYPE {
@@ -149,6 +152,7 @@ export enum ARGUMENT_TYPE {
 	MOB = "mob",
 	ITEM = "item",
 	DIRECTION = "direction",
+	CHARACTER = "character",
 }
 
 /**
@@ -220,6 +224,7 @@ export interface CommandOptions {
  * - `mob` - Finds a Mob entity by keyword matching in current room
  * - `item` - Finds an Item entity by keyword matching
  * - `direction` - Parses direction names/abbreviations into DIRECTION enum values
+ * - `character` - Finds an online Character (player) by username or mob keywords
  *
  * ### Source Modifiers (for object and item types)
  * - `@room` - Search only in the current room's contents
@@ -914,6 +919,9 @@ export abstract class Command {
 			case ARGUMENT_TYPE.DIRECTION:
 				return this.parseDirection(value);
 
+			case ARGUMENT_TYPE.CHARACTER:
+				return this.findCharacter(value, context);
+
 			default:
 				return value;
 		}
@@ -1007,6 +1015,63 @@ export abstract class Command {
 		return context.room.contents.find(
 			(obj) => obj instanceof Mob && obj.match(keywords)
 		) as Mob | undefined;
+	}
+
+	/**
+	 * Find a character (player) by username or mob keywords.
+	 *
+	 * This method searches for an online Character (player) by matching against
+	 * their username or their mob's keywords. It searches all currently connected
+	 * players using the Game instance.
+	 *
+	 * The search is case-insensitive for usernames and uses the mob's keyword
+	 * matching system which supports partial matches. The first matching character
+	 * is returned.
+	 *
+	 * Returns undefined if:
+	 * - No Game instance is available (Game.game is undefined)
+	 * - No online character matches the provided username/keywords
+	 *
+	 * @private
+	 * @param keywords - The username or keywords to search for
+	 * @param context - The execution context (unused but kept for consistency)
+	 * @returns {Character | undefined} First matching Character, or undefined if none found
+	 *
+	 * @example
+	 * // Search for character by username
+	 * findCharacter("alice", context)
+	 * // Returns: <Character with username "alice"> or undefined
+	 *
+	 * @example
+	 * // Search for character by mob keywords
+	 * findCharacter("ali", context)
+	 * // Returns: <Character whose mob matches "ali"> or undefined
+	 */
+	private findCharacter(
+		keywords: string,
+		context: CommandContext
+	): Character | undefined {
+		if (!Game.game) return undefined;
+
+		let foundCharacter: Character | undefined;
+		Game.game.forEachCharacter((char: Character) => {
+			// Check username match (case-insensitive)
+			if (
+				char.credentials.username.toLowerCase() ===
+				keywords.toLowerCase()
+			) {
+				foundCharacter = char;
+				return;
+			}
+
+			// Check mob keyword match
+			if (char.mob && char.mob.match(keywords)) {
+				foundCharacter = char;
+				return;
+			}
+		});
+
+		return foundCharacter;
 	}
 
 	/**

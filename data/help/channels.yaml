@@ -1,6 +1,6 @@
 keyword: channels
 aliases: [channel]
-related: [communication, ooc, say]
+related: [communication, ooc, say, whisper, reply]
 topic: [communication, chat, channels, settings, preferences]
 content: |
   CHANNELS - Manage Channel Subscriptions
@@ -20,12 +20,13 @@ content: |
     OOC     - Out of Character      (Default: ON)
     GOSSIP  - General gossip chat   (Default: ON)
     SAY     - In-character speech   (Default: ON)
+    WHISPER - Private messages      (Default: ON)
     NEWBIE  - Help for new players  (Default: OFF)
     TRADE   - Trading and commerce  (Default: OFF)
   
   Examples:
     channels
-      Shows your current channel subscriptions with [ON]/[OFF] status
+      Shows your current channel subscriptions with [*] (on) or [ ] (off).
     
     channels on newbie
       Subscribe to the NEWBIE channel to help new players
@@ -38,15 +39,3 @@ content: |
     
     channels disable ooc
       Unsubscribe from out-of-character chat
-  
-  Features:
-    - Color-coded display ([ON] in green, [OFF] in red)
-    - Case-insensitive channel names
-    - Flexible syntax (on/enable and off/disable work the same)
-    - Shows full channel names and descriptions
-  
-  Notes:
-    - You can't send messages to channels you're not subscribed to
-    - SAY channel only affects messages in your current room
-    - Most channels are MUD-wide (OOC, GOSSIP, NEWBIE, TRADE)
-    - Default channels are automatically enabled for new characters

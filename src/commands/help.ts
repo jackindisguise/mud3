@@ -31,49 +31,46 @@ import {
 } from "../package/help.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Mob } from "../dungeon.js";
+import { LINEBREAK } from "../telnet.js";
+import { string } from "mud-ext";
 
 /**
  * Format a helpfile for display.
  */
 function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 	const lines: string[] = [];
+	lines.push(...helpfile.content.split("\n"));
 
-	lines.push(`{Y=== {W${helpfile.keyword.toUpperCase()}{Y ==={x`);
-	lines.push("");
-	lines.push(helpfile.content);
+	const meta = [];
+	if (helpfile.aliases && helpfile.aliases.length > 0)
+		meta.push(`{cAliases:{x ${helpfile.aliases.join(", ")}`);
 
-	if (helpfile.aliases && helpfile.aliases.length > 0) {
-		lines.push("");
-		lines.push(`{cAliases:{x ${helpfile.aliases.join(", ")}`);
-	}
+	if (helpfile.related && helpfile.related.length > 0)
+		meta.push(`{cRelated:{x ${helpfile.related.join(", ")}`);
 
-	if (helpfile.related && helpfile.related.length > 0) {
-		lines.push("");
-		lines.push(`{cRelated:{x ${helpfile.related.join(", ")}`);
-	}
+	if (meta.length) lines.push("", ...meta);
 
-	lines.push(`{Y${"=".repeat(helpfile.keyword.length + 10)}{x`);
-	actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
-}
-
-/**
- * Display a list of matching topics.
- */
-function displayTopicList(actor: Mob, title: string, topics: string[]): void {
-	const lines: string[] = [];
-
-	lines.push(`{Y${title}{x`);
-	lines.push("");
-
-	// Display in columns (3 per line)
-	const columns = 3;
-	for (let i = 0; i < topics.length; i += columns) {
-		const row = topics.slice(i, i + columns);
-		const formatted = row.map((topic) => topic.padEnd(20)).join("  ");
-		lines.push(`  {c${formatted}{x`);
-	}
-
-	actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
+	const box = string.box({
+		input: lines,
+		width: 80,
+		style: {
+			...string.BOX_STYLES.PLAIN,
+			titleHAlign: string.PAD_SIDE.CENTER,
+			titleBorder: {
+				left: ">",
+				right: "<",
+			},
+		},
+		title: `${helpfile.keyword.toUpperCase()}`,
+		sizer: {
+			size: (str: string) => {
+				return str.replace(/\{(\{|.)/g, (sub, match) =>
+					match == "{" ? "{" : ""
+				).length;
+			},
+		},
+	});
+	actor.sendMessage(box.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
 export default {
@@ -92,12 +89,15 @@ export default {
 				const lines = [
 					"{YHelp System{x",
 					"",
-					"Usage: {chelp <topic>{x",
+					"Usage: {chelp <keyword>{x",
 					"       {chelp search <query>{x",
 					"",
 					"Type {chelp commands{x for a list of available commands.",
 				];
-				actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
+				actor.sendMessage(
+					lines.join(LINEBREAK),
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
 			}
 			return;
 		}
@@ -118,7 +118,7 @@ export default {
 				"",
 				`Try {chelp search ${topic}{x for a broader search.`,
 			];
-			actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
+			actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 			return;
 		}
 
@@ -129,17 +129,32 @@ export default {
 		}
 
 		// Multiple matches - show list
-		const topics = matches.map((h) => h.keyword);
-		displayTopicList(actor, `Multiple topics match "${topic}":`, topics);
-		actor.sendLine("");
-		actor.sendLine(
-			`Type {chelp <topic>{x to view a specific topic, or {chelp search ${topic}{x for details.`
+		const keywords = matches.map((h) => h.keyword);
+		const lines: string[] = [];
+
+		lines.push(`{YMultiple helpfiles match "${topic}":{x`);
+		lines.push("");
+
+		// Display in columns (3 per line)
+		const columns = 3;
+		for (let i = 0; i < keywords.length; i += columns) {
+			const row = keywords.slice(i, i + columns);
+			const formatted = row.map((keyword) => keyword.padEnd(20)).join("  ");
+			lines.push(`  {c${formatted}{x`);
+		}
+
+		lines.push("");
+		lines.push(
+			`Type {chelp <keyword>{x to view a specific file, or {chelp search ${topic}{x for details.`
 		);
+
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {
-		context.actor.sendLine(
-			"Usage: {chelp <topic>{x or {chelp search <query>{x"
+		context.actor.sendMessage(
+			"Usage: {chelp <keyword>{x or {chelp search <query>{x",
+			MESSAGE_GROUP.COMMAND_RESPONSE
 		);
 	},
 } satisfies CommandObject;

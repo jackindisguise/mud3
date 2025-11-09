@@ -125,7 +125,7 @@ export class MudClient extends EventEmitter {
 
 		// Process complete lines
 		let newlineIndex: number;
-		while ((newlineIndex = this.buffer.indexOf("\n")) !== -1) {
+		while ((newlineIndex = this.buffer.indexOf(LINEBREAK)) !== -1) {
 			const line = this.buffer.substring(0, newlineIndex).trim();
 			this.buffer = this.buffer.substring(newlineIndex + 1);
 

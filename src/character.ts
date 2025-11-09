@@ -92,17 +92,20 @@ export interface PlayerSettings {
 	briefMode?: boolean;
 	/** Channels the player is subscribed to */
 	channels?: Set<CHANNEL>;
+	/** Set of blocked usernames (players who cannot send messages to this character) */
+	blockedUsers?: Set<string>;
 }
 
 /**
  * Default channels that new characters are subscribed to.
- * Players start subscribed to OOC, GOSSIP, and SAY channels by default.
+ * Players start subscribed to OOC, GOSSIP, SAY, and WHISPER channels by default.
  * They must opt-in to NEWBIE and TRADE channels.
  */
 export const DEFAULT_CHANNELS: readonly CHANNEL[] = [
 	CHANNEL.OOC,
 	CHANNEL.GOSSIP,
 	CHANNEL.SAY,
+	CHANNEL.WHISPER,
 ] as const;
 
 /**
@@ -295,6 +298,8 @@ export interface SerializedPlayerSettings {
 	briefMode?: boolean;
 	/** Channels the player is subscribed to (serialized as array of enum values) */
 	channels?: CHANNEL[];
+	/** Blocked usernames (serialized as array) */
+	blockedUsers?: string[];
 }
 
 export interface SerializedCharacter {
@@ -381,6 +386,9 @@ export class Character {
 	/** Current session information (runtime data, not persisted) */
 	public session?: PlayerSession;
 
+	/** Username of the last person who whispered to this character (for reply command) */
+	public lastWhisperFrom?: string;
+
 	/**
 	 * Creates a new Character instance.
 	 *
@@ -430,6 +438,11 @@ export class Character {
 		// Initialize channels with defaults if not provided
 		if (!this.settings.channels) {
 			this.settings.channels = new Set<CHANNEL>(DEFAULT_CHANNELS);
+		}
+
+		// Initialize blockedUsers if not provided
+		if (!this.settings.blockedUsers) {
+			this.settings.blockedUsers = new Set<string>();
 		}
 
 		// Apply default stats
@@ -763,8 +776,72 @@ export class Character {
 	 */
 	public sendChat(speaker: Character, message: string, channel: CHANNEL): void {
 		if (!this.isInChannel(channel)) return;
-		const formatted = formatChannelMessage(channel, `${speaker}`, message);
+
+		// Check if the speaker is blocked by this character
+		if (
+			this.settings.blockedUsers?.has(
+				speaker.credentials.username.toLowerCase()
+			)
+		) {
+			return;
+		}
+
+		// For whisper channel, update lastWhisperFrom for reply functionality
+		if (channel === CHANNEL.WHISPER && speaker !== this) {
+			this.lastWhisperFrom = speaker.credentials.username;
+		}
+
+		const formatted = formatChannelMessage(
+			channel,
+			speaker.credentials.username,
+			message
+		);
 		this.sendMessage(formatted, MESSAGE_GROUP.CHANNELS);
+	}
+
+	/**
+	 * Checks if this character is blocking the specified username.
+	 *
+	 * @param username The username to check
+	 * @returns true if the username is blocked
+	 */
+	public isBlocking(username: string): boolean {
+		return this.settings.blockedUsers?.has(username.toLowerCase()) ?? false;
+	}
+
+	/**
+	 * Blocks a user by username. Automatically converts to lowercase.
+	 * Blocked users cannot send whispers or other direct messages to this character.
+	 *
+	 * @param username The username to block
+	 *
+	 * @example
+	 * ```typescript
+	 * character.block("SpammerUser");
+	 * // Now SpammerUser (case-insensitive) cannot whisper this character
+	 * ```
+	 */
+	public block(username: string): void {
+		if (!this.settings.blockedUsers) {
+			this.settings.blockedUsers = new Set<string>();
+		}
+		this.settings.blockedUsers.add(username.toLowerCase());
+	}
+
+	/**
+	 * Unblocks a user by username. Automatically converts to lowercase.
+	 *
+	 * @param username The username to unblock
+	 *
+	 * @example
+	 * ```typescript
+	 * character.unblock("FormerlyBlockedUser");
+	 * // Now FormerlyBlockedUser can whisper this character again
+	 * ```
+	 */
+	public unblock(username: string): void {
+		if (!this.settings.blockedUsers) return;
+		this.settings.blockedUsers.delete(username.toLowerCase());
 	}
 
 	/**
@@ -829,11 +906,14 @@ export class Character {
 			isAdmin: c.isAdmin,
 		};
 
-		// Convert channels Set to array for serialization
+		// Convert channels and blockedUsers Sets to arrays for serialization
 		const serializedSettings: SerializedPlayerSettings = {
 			...this.settings,
 			channels: this.settings.channels
 				? Array.from(this.settings.channels)
+				: [],
+			blockedUsers: this.settings.blockedUsers
+				? Array.from(this.settings.blockedUsers)
 				: [],
 		};
 
@@ -872,13 +952,17 @@ export class Character {
 			isAdmin: data.credentials.isAdmin,
 		};
 
-		// Convert channels array back to Set
+		// Convert channels and blockedUsers arrays back to Sets
 		const settings: PlayerSettings = {
 			...data.settings,
 			channels:
 				data.settings.channels !== undefined
 					? new Set(data.settings.channels)
 					: new Set<CHANNEL>(),
+			blockedUsers:
+				data.settings.blockedUsers !== undefined
+					? new Set(data.settings.blockedUsers)
+					: new Set<string>(),
 		};
 
 		const character = new Character({

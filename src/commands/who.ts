@@ -30,6 +30,7 @@ import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
+import { LINEBREAK } from "../telnet.js";
 
 export default {
 	pattern: "who~",
@@ -62,6 +63,6 @@ export default {
 		lines.push(`Total Connections: ${stats.activeConnections}`);
 
 		// Send the formatted output
-		actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;

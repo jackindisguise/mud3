@@ -49,9 +49,9 @@ export default {
 				const status = isSubscribed
 					? color("[*]", COLOR.LIME)
 					: color("[ ]", COLOR.CRIMSON);
-				lines.push(
-					`  ${status} ${info.channelTag.padEnd(10)} - ${info.channelName}`
-				);
+				const tag = color(info.channelTag.padEnd(10), info.primaryColor);
+				const name = color(info.channelName, info.highlightColor);
+				lines.push(`  ${status} ${tag} - ${name}`);
 			}
 			lines.push("", "Usage: channels <on|off|enable|disable> <channel>");
 			actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);

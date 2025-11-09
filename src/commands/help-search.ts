@@ -21,6 +21,7 @@ import { CommandContext, ParseResult } from "../command.js";
 import { CommandObject } from "../package/commands.js";
 import { searchHelpfiles } from "../package/help.js";
 import { MESSAGE_GROUP } from "../character.js";
+import { LINEBREAK } from "../telnet.js";
 
 /**
  * Display search results categorized by match type.
@@ -46,7 +47,7 @@ function displaySearchResults(
 		lines.push(
 			"Try a different search term or {chelp commands{x for a full list."
 		);
-		actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 		return;
 	}
 
@@ -173,7 +174,7 @@ function displaySearchResults(
 	lines.push("");
 	lines.push("Type {chelp <topic>{x to view a specific topic.");
 
-	actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
+	actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
 export default {
@@ -192,7 +193,7 @@ export default {
 				"Example: {chelp search combat{x",
 			];
 			context.actor.sendMessage(
-				lines.join("\n"),
+				lines.join(LINEBREAK),
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

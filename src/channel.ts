@@ -10,6 +10,7 @@ export enum CHANNEL {
 	TRADE = "TRADE",
 	GOSSIP = "GOSSIP",
 	SAY = "SAY",
+	WHISPER = "WHISPER",
 }
 
 /**
@@ -24,6 +25,20 @@ export interface ChannelInfo {
 	primaryColor: COLOR;
 	/** Highlight color for usernames or important text */
 	highlightColor: COLOR;
+	/**
+	 * Message format pattern with placeholders:
+	 * - $tag: Channel tag (e.g., "OOC")
+	 * - $speaker: Speaker's username
+	 * - $message: The message text
+	 * - $primary: Primary color tag
+	 * - $highlight: Highlight color tag
+	 * - $recipient: Recipient username (for whispers)
+	 */
+	messagePattern: string;
+	/**
+	 * Optional: pattern for recipient's view (used for WHISPER only)
+	 */
+	recipientMessagePattern?: string;
 }
 
 /**
@@ -35,30 +50,48 @@ export const CHANNEL_INFO: Record<CHANNEL, ChannelInfo> = {
 		channelTag: "OOC",
 		primaryColor: COLOR.CYAN,
 		highlightColor: COLOR.WHITE,
+		messagePattern:
+			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
 	},
 	[CHANNEL.NEWBIE]: {
 		channelName: "Newbie Help",
 		channelTag: "NEWBIE",
 		primaryColor: COLOR.LIME,
 		highlightColor: COLOR.YELLOW,
+		messagePattern:
+			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
 	},
 	[CHANNEL.TRADE]: {
 		channelName: "Trading",
 		channelTag: "TRADE",
-		primaryColor: COLOR.YELLOW,
-		highlightColor: COLOR.WHITE,
+		primaryColor: COLOR.OLIVE,
+		highlightColor: COLOR.YELLOW,
+		messagePattern:
+			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
 	},
 	[CHANNEL.GOSSIP]: {
 		channelName: "Gossip",
 		channelTag: "GOSSIP",
-		primaryColor: COLOR.PINK,
+		primaryColor: COLOR.LIME,
 		highlightColor: COLOR.WHITE,
+		messagePattern:
+			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
 	},
 	[CHANNEL.SAY]: {
 		channelName: "Say",
 		channelTag: "SAY",
-		primaryColor: COLOR.WHITE,
-		highlightColor: COLOR.YELLOW,
+		primaryColor: COLOR.MAROON,
+		highlightColor: COLOR.CRIMSON,
+		messagePattern:
+			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
+	},
+	[CHANNEL.WHISPER]: {
+		channelName: "Whisper",
+		channelTag: "WHISPER",
+		primaryColor: COLOR.PINK,
+		highlightColor: COLOR.WHITE,
+		messagePattern:
+			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
 	},
 };
 
@@ -68,15 +101,19 @@ export const CHANNEL_INFO: Record<CHANNEL, ChannelInfo> = {
 export const CHANNELS: readonly CHANNEL[] = Object.values(CHANNEL);
 
 /**
- * Formats a channel message with appropriate colors.
+ * Formats a channel message with appropriate colors using the channel's pattern.
  * @param channel The channel enum value
  * @param username The username of the speaker
  * @param message The message text
+ * @param recipient The username of the recipient
  * @returns A formatted string with color tags
  *
  * @example
  * formatChannelMessage(CHANNEL.OOC, "Alice", "Hello everyone!")
- * // returns "{C[OOC] {WAlice{x: Hello everyone!{x"
+ * // returns "{C[OOC] {WAlice{x: {WHello everyone!{x"
+ *
+ * formatChannelMessage(CHANNEL.SAY, "Bob", "Nice day!")
+ * // returns "{rBob says, '{RNice day!{r'{x"
  */
 export function formatChannelMessage(
 	channel: CHANNEL,
@@ -84,7 +121,15 @@ export function formatChannelMessage(
 	message: string
 ): string {
 	const info = CHANNEL_INFO[channel];
+	const primary = colorToTag(info.primaryColor);
 	const highlight = colorToTag(info.highlightColor);
-	const formattedMessage = `[${info.channelTag}] ${highlight}${username}{x: ${highlight}${message}{x`;
-	return stickyColor(formattedMessage, info.primaryColor);
+
+	let formatted = info.messagePattern
+		.replace(/\$tag/g, info.channelTag)
+		.replace(/\$speaker/g, username)
+		.replace(/\$message/g, message)
+		.replace(/\$primary/g, primary)
+		.replace(/\$highlight/g, highlight);
+
+	return formatted;
 }

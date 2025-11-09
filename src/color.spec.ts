@@ -71,11 +71,11 @@ suite("color.ts", () => {
 			assert.strictEqual(colorize(input), expected);
 		});
 
-		test("should leave unknown codes unchanged", () => {
-			assert.strictEqual(colorize("{z"), "{z");
-			assert.strictEqual(colorize("{9"), "{9");
-			assert.strictEqual(colorize("{*"), "{*");
-			assert.strictEqual(colorize("text{?more"), "text{?more");
+		test("should consume unknown codes", () => {
+			assert.strictEqual(colorize("{z"), "");
+			assert.strictEqual(colorize("{9"), "");
+			assert.strictEqual(colorize("{*"), "");
+			assert.strictEqual(colorize("text{?more"), "textmore");
 		});
 
 		test("should handle empty string", () => {
@@ -86,7 +86,7 @@ suite("color.ts", () => {
 			assert.strictEqual(colorize("plain text"), "plain text");
 		});
 
-		test("should handle trailing {", () => {
+		test("should handle trailing { (no character to consume, left as-is)", () => {
 			assert.strictEqual(colorize("test{"), "test{");
 		});
 
@@ -123,9 +123,9 @@ suite("color.ts", () => {
 			assert.strictEqual(stripColors(input), expected);
 		});
 
-		test("should leave unknown codes unchanged", () => {
-			assert.strictEqual(stripColors("{z"), "{z");
-			assert.strictEqual(stripColors("text{?more"), "text{?more");
+		test("should consume unknown codes", () => {
+			assert.strictEqual(stripColors("{z"), "");
+			assert.strictEqual(stripColors("text{?more"), "textmore");
 		});
 
 		test("should handle empty string", () => {
@@ -136,7 +136,7 @@ suite("color.ts", () => {
 			assert.strictEqual(stripColors("plain text"), "plain text");
 		});
 
-		test("should handle trailing {", () => {
+		test("should handle trailing { (no character to consume, left as-is)", () => {
 			assert.strictEqual(stripColors("test{"), "test{");
 		});
 
@@ -177,8 +177,8 @@ suite("color.ts", () => {
 			assert.strictEqual(visibleLength("plain text"), 10);
 		});
 
-		test("should handle unknown codes (counted as text)", () => {
-			assert.strictEqual(visibleLength("{zunknown"), 9);
+		test("should handle unknown codes (consumed)", () => {
+			assert.strictEqual(visibleLength("{zunknown"), 7); // {z is consumed, "unknown" remains
 		});
 	});
 

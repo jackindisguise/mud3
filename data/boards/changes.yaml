@@ -1,0 +1,7 @@
+name: changes
+displayName: Changes
+description: Updates about the game.
+permanent: true
+messages: []
+nextMessageId: 1
+

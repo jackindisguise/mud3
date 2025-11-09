@@ -144,10 +144,7 @@ suite("channel.ts", () => {
 				"Alice",
 				"Hello everyone!"
 			);
-			assert.strictEqual(
-				result,
-				"{C[OOC] {WAlice{C (Bob): {WHello everyone!{C{x"
-			);
+			assert.strictEqual(result, "{C[OOC] {WAlice{C: {WHello everyone!{x");
 		});
 
 		test("should format NEWBIE message with correct colors", () => {
@@ -156,10 +153,7 @@ suite("channel.ts", () => {
 				"Bob",
 				"How do I start?"
 			);
-			assert.strictEqual(
-				result,
-				"{G[NEWBIE] {YBob{G (Alice): {YHow do I start?{G{x"
-			);
+			assert.strictEqual(result, "{G[NEWBIE] {YBob{G: {YHow do I start?{x");
 		});
 
 		test("should format TRADE message with correct colors", () => {
@@ -168,10 +162,7 @@ suite("channel.ts", () => {
 				"Charlie",
 				"Selling sword!"
 			);
-			assert.strictEqual(
-				result,
-				"{y[TRADE] {YCharlie{y (Alice): {YSelling sword!{y{x"
-			);
+			assert.strictEqual(result, "{y[TRADE] {YCharlie{y: {YSelling sword!{x");
 		});
 
 		test("should format GOSSIP message with correct colors", () => {
@@ -180,15 +171,12 @@ suite("channel.ts", () => {
 				"Diana",
 				"Did you hear?"
 			);
-			assert.strictEqual(
-				result,
-				"{G[GOSSIP] {WDiana{G (Alice): {WDid you hear?{G{x"
-			);
+			assert.strictEqual(result, "{G[GOSSIP] {WDiana{G: {WDid you hear?{x");
 		});
 
 		test("should handle empty messages", () => {
 			const result = formatChannelMessage(CHANNEL.OOC, "User", "");
-			assert.strictEqual(result, "{C[OOC] {WUser{C (Alice): {W{C{x");
+			assert.strictEqual(result, "{C[OOC] {WUser{C: {W{x");
 		});
 
 		test("should handle messages with color codes", () => {
@@ -197,10 +185,7 @@ suite("channel.ts", () => {
 				"User",
 				"{RRed text{x here"
 			);
-			assert.strictEqual(
-				result,
-				"{C[OOC] {WUser{C (Alice): {W{RRed text{C here{C{x"
-			);
+			assert.strictEqual(result, "{C[OOC] {WUser{C: {W{RRed text{x here{x");
 		});
 	});
 });

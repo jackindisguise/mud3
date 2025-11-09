@@ -1,0 +1,19 @@
+name: general
+displayName: General
+description: General messages.
+permanent: false
+expirationMs: 2592000000
+messages:
+  - id: 1
+    author: Judas
+    content: What up foos.
+    postedAt: '2025-11-09T15:31:34.464Z'
+    subject: (No subject)
+  - id: 2
+    author: Judas
+    subject: What up yo?
+    content: "hello cutie\r\nyou a cutie\r\nyoyoyo"
+    postedAt: '2025-11-09T15:58:49.687Z'
+    targets:
+      - judas
+nextMessageId: 3

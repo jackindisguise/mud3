@@ -4,6 +4,7 @@
  */
 
 import { FG, BG, STYLE } from "./telnet.js";
+import { string } from "mud-ext";
 
 /**
  * Available foreground colors for text styling.
@@ -360,6 +361,21 @@ export function stripColors(text: string): string {
 		return "";
 	});
 }
+
+export const SIZER: string.Sizer = {
+	open: "{",
+	unrenderedSequenceLength: (str: string, i: number) => {
+		if (str[i] === "{")
+			if (str[i + 1] === "{") return 1;
+			else return 2;
+		return 0;
+	},
+	size: (str: string) => {
+		if (!str) return 0;
+		return str.replace(/\{(\{|.)/g, (sub, match) => (match == "{" ? "{" : ""))
+			.length;
+	},
+};
 
 /**
  * Get the visible length of a string (excluding color codes).

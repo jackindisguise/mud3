@@ -31,6 +31,7 @@ import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
 import { LINEBREAK } from "../telnet.js";
+import { color, COLOR } from "../color.js";
 
 export default {
 	pattern: "who~",
@@ -48,19 +49,29 @@ export default {
 
 		// Build the output
 		const lines: string[] = [];
-		lines.push("=== Players Online ===");
+		lines.push(color("=== Players Online ===", COLOR.YELLOW));
 
 		if (players.length === 0) {
-			lines.push("No players currently online.");
+			lines.push(color("No players currently online.", COLOR.SILVER));
 		} else {
 			players.forEach((name) => {
-				lines.push(`> ${name}`);
+				lines.push(`${color(">", COLOR.CYAN)} ${color(name, COLOR.LIME)}`);
 			});
 		}
 
 		lines.push("");
-		lines.push(`Total Players: ${stats.playersOnline}`);
-		lines.push(`Total Connections: ${stats.activeConnections}`);
+		lines.push(
+			`${color("Total Players:", COLOR.CYAN)} ${color(
+				stats.playersOnline.toString(),
+				COLOR.WHITE
+			)}`
+		);
+		lines.push(
+			`${color("Total Connections:", COLOR.CYAN)} ${color(
+				stats.activeConnections.toString(),
+				COLOR.WHITE
+			)}`
+		);
 
 		// Send the formatted output
 		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);

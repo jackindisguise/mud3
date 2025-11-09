@@ -24,7 +24,6 @@ import { Game } from "../game.js";
 
 export default {
 	pattern: "reply~ <message:text>",
-	aliases: ["r~ <message:text>"],
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;
 		const { actor } = context;

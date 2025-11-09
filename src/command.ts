@@ -1056,10 +1056,7 @@ export abstract class Command {
 		let foundCharacter: Character | undefined;
 		Game.game.forEachCharacter((char: Character) => {
 			// Check username match (case-insensitive)
-			if (
-				char.credentials.username.toLowerCase() ===
-				keywords.toLowerCase()
-			) {
+			if (char.credentials.username.toLowerCase() === keywords.toLowerCase()) {
 				foundCharacter = char;
 				return;
 			}
@@ -1285,7 +1282,6 @@ export class CommandRegistry {
 	 * separate instances.
 	 *
 	 * @param command - The Command instance to register
-	 * @returns {void}
 	 *
 	 * @example
 	 * ```typescript
@@ -1295,7 +1291,7 @@ export class CommandRegistry {
 	 * // GetFromContainerCommand will be tried first automatically
 	 * ```
 	 */
-	register(command: Command): void {
+	register(command: Command) {
 		this.commands.push(command);
 		// Sort by pattern length (longest first) to prioritize more specific commands
 		this.commands.sort((a, b) => b.pattern.length - a.pattern.length);
@@ -1321,7 +1317,6 @@ export class CommandRegistry {
 	 * - Plugin systems that add/remove commands
 	 *
 	 * @param command - The Command instance to unregister (must be same instance)
-	 * @returns {void}
 	 *
 	 * @example
 	 * ```typescript

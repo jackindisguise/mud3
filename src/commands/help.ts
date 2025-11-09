@@ -32,6 +32,7 @@ import {
 import { MESSAGE_GROUP } from "../character.js";
 import { Mob } from "../dungeon.js";
 import { LINEBREAK } from "../telnet.js";
+import { SIZER, color, COLOR } from "../color.js";
 import { string } from "mud-ext";
 
 /**
@@ -43,18 +44,46 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 
 	const meta = [];
 	if (helpfile.aliases && helpfile.aliases.length > 0)
-		meta.push(`{cAliases:{x ${helpfile.aliases.join(", ")}`);
+		meta.push(
+			`${color("Aliases", COLOR.TEAL)}: ${color(
+				helpfile.aliases.join(", "),
+				COLOR.CYAN
+			)}`
+		);
 
 	if (helpfile.related && helpfile.related.length > 0)
-		meta.push(`{cRelated:{x ${helpfile.related.join(", ")}`);
+		meta.push(
+			`${color("Related", COLOR.TEAL)}: ${color(
+				helpfile.related.join(", "),
+				COLOR.CYAN
+			)}`
+		);
 
-	if (meta.length) lines.push("", ...meta);
+	if (meta.length) {
+		const metaBox = string.box({
+			input: meta,
+			width: 76,
+			color: (str) => color(str, COLOR.YELLOW),
+			style: {
+				top: {
+					middle: "-",
+					left: ">",
+					right: "<",
+				},
+			},
+			title: `See...`,
+			sizer: SIZER,
+		});
+		lines.push("", ...metaBox);
+	}
 
+	console.log(lines);
 	const box = string.box({
 		input: lines,
 		width: 80,
+		color: (str) => color(str, COLOR.YELLOW),
 		style: {
-			...string.BOX_STYLES.PLAIN,
+			...string.BOX_STYLES.ROUNDED,
 			titleHAlign: string.PAD_SIDE.CENTER,
 			titleBorder: {
 				left: ">",
@@ -62,14 +91,9 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 			},
 		},
 		title: `${helpfile.keyword.toUpperCase()}`,
-		sizer: {
-			size: (str: string) => {
-				return str.replace(/\{(\{|.)/g, (sub, match) =>
-					match == "{" ? "{" : ""
-				).length;
-			},
-		},
+		sizer: SIZER,
 	});
+	console.log(box);
 	actor.sendMessage(box.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 

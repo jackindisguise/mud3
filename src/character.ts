@@ -310,7 +310,7 @@ export interface SerializedCharacter {
 	/** Player's gameplay statistics and progression */
 	stats: PlayerStats;
 	/** Serialized mob data for reconstructing the character's mob representation */
-	mob: SerializedMob;
+	mob: Omit<SerializedMob, "type">;
 }
 
 /**
@@ -618,6 +618,38 @@ export class Character {
 		this.send(`${text}${LINEBREAK}`);
 	}
 
+	/**
+	 * Ask for a single line of input and route the next received line
+	 * to the provided callback. This supersedes the standard "input"
+	 * event for one line only.
+	 *
+	 * @param question The question to ask
+	 * @param callback The callback to receive the input
+	 */
+	public ask(question: string, callback: (line: string) => void): void {
+		const client = this.session?.client;
+		if (!client) return;
+		client.ask(question, callback, this.settings.colorEnabled ?? true);
+	}
+
+	/**
+	 * Ask a yes/no question and route the response to the provided callback.
+	 * Supports autocomplete for "yes" and "no" responses.
+	 *
+	 * @param question The yes/no question to ask
+	 * @param callback The callback to receive the boolean response (or undefined if default used)
+	 * @param _default Optional default value if user just presses Enter
+	 */
+	public yesno(
+		question: string,
+		callback: (yesorno: boolean | undefined) => void,
+		_default?: boolean | undefined
+	): void {
+		const client = this.session?.client;
+		if (!client) return;
+		client.yesno(question, callback, _default);
+	}
+
 	/** Core routine for group-aware sending */
 	public sendMessage(text: string, group: MESSAGE_GROUP): void {
 		const session = this.session;
@@ -652,11 +684,14 @@ export class Character {
 
 		const hours = Math.floor(totalMs / (1000 * 60 * 60));
 		const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60));
+		const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
 
 		if (hours > 0) {
-			return `${hours} hours, ${minutes} minutes`;
+			return `${hours} hours, ${minutes} minutes, ${seconds} seconds`;
+		} else if (minutes > 0) {
+			return `${minutes} minutes, ${seconds} seconds`;
 		} else {
-			return `${minutes} minutes`;
+			return `${seconds} seconds`;
 		}
 	}
 
@@ -917,11 +952,19 @@ export class Character {
 				: [],
 		};
 
+		// Serialize mob and remove 'type' field
+		const mobData: SerializedMob = {
+			...(this.mob.serialize() as SerializedMob),
+		};
+
+		const { type, ...mobDataWithoutType } =
+			this.mob.serialize() as SerializedMob;
+
 		return {
 			credentials: serializedCreds,
 			settings: serializedSettings,
 			stats: this.stats,
-			mob: this.mob.serialize() as SerializedMob,
+			mob: mobDataWithoutType,
 		};
 	}
 
@@ -938,8 +981,9 @@ export class Character {
 	 * ```
 	 */
 	public static deserialize(data: SerializedCharacter): Character {
+		const mobDataWithType: SerializedMob = { ...data.mob, type: "Mob" };
 		// Deserialize the mob using the dungeon system's deserializer
-		const mob = Mob.deserialize(data.mob);
+		const mob = Mob.deserialize(mobDataWithType);
 
 		const creds: PlayerCredentials = {
 			username: data.credentials.username,

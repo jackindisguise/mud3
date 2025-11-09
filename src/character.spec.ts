@@ -329,7 +329,7 @@ suite("character.ts", () => {
 			character.stats.playtime = 30 * 60 * 1000; // 30 minutes
 
 			const formatted = character.getFormattedPlaytime();
-			assert.strictEqual(formatted, "30 minutes");
+			assert.strictEqual(formatted, "30 minutes, 0 seconds");
 		});
 
 		test("should format playtime correctly for hours and minutes", () => {
@@ -337,7 +337,7 @@ suite("character.ts", () => {
 			character.stats.playtime = (2 * 60 * 60 + 45 * 60) * 1000; // 2 hours 45 minutes
 
 			const formatted = character.getFormattedPlaytime();
-			assert.strictEqual(formatted, "2 hours, 45 minutes");
+			assert.strictEqual(formatted, "2 hours, 45 minutes, 0 seconds");
 		});
 
 		test("should include current session time in formatted playtime", () => {
@@ -349,7 +349,7 @@ suite("character.ts", () => {
 			character.session!.startTime = new Date(Date.now() - 15 * 60 * 1000); // 15 minutes ago
 
 			const formatted = character.getFormattedPlaytime();
-			assert.strictEqual(formatted, "45 minutes");
+			assert.strictEqual(formatted, "45 minutes, 0 seconds");
 		});
 	});
 
@@ -410,7 +410,6 @@ suite("character.ts", () => {
 			assert.strictEqual(serialized.stats.playtime, 5000);
 			assert.strictEqual(serialized.stats.deaths, 2);
 			assert.strictEqual(serialized.stats.kills, 10);
-			assert.strictEqual(serialized.mob.type, "Mob");
 		});
 
 		test("should exclude runtime data from serialization", () => {
@@ -556,7 +555,7 @@ suite("character.ts", () => {
 			character.stats.playtime = 0;
 
 			const formatted = character.getFormattedPlaytime();
-			assert.strictEqual(formatted, "0 minutes");
+			assert.strictEqual(formatted, "0 seconds");
 		});
 
 		test("should handle exactly one hour playtime formatting", () => {
@@ -564,7 +563,7 @@ suite("character.ts", () => {
 			character.stats.playtime = 60 * 60 * 1000; // exactly 1 hour
 
 			const formatted = character.getFormattedPlaytime();
-			assert.strictEqual(formatted, "1 hours, 0 minutes");
+			assert.strictEqual(formatted, "1 hours, 0 minutes, 0 seconds");
 		});
 
 		test("should handle multiple settings updates", () => {

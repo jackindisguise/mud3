@@ -43,6 +43,7 @@ import {
 	checkCharacterPassword,
 	loadCharacterFromSerialized,
 } from "./package/character.js";
+import { getAllBoards, saveBoard } from "./package/board.js";
 import logger from "./logger.js";
 
 // Default intervals/timeouts (milliseconds)
@@ -103,6 +104,7 @@ export class Game {
 	private activeCharacters = new Set<Character>();
 
 	private saveTimer?: NodeJS.Timeout;
+	private boardCleanupTimer?: NodeJS.Timeout;
 	private nextConnectionId = 1;
 
 	/** Static singleton instance of the Game */
@@ -178,6 +180,11 @@ export class Game {
 		this.saveTimer = setInterval(() => {
 			this.saveAllCharacters();
 		}, DEFAULT_SAVE_INTERVAL_MS);
+
+		// Set up board cleanup timer (runs every hour)
+		this.boardCleanupTimer = setInterval(() => {
+			this.cleanupExpiredBoardMessages();
+		}, 60 * 60 * 1000); // 1 hour
 	}
 
 	/**
@@ -191,6 +198,13 @@ export class Game {
 			clearInterval(this.saveTimer);
 			this.saveTimer = undefined;
 			logger.debug("Auto-save timer cleared");
+		}
+
+		// Clear board cleanup timer
+		if (this.boardCleanupTimer) {
+			clearInterval(this.boardCleanupTimer);
+			this.boardCleanupTimer = undefined;
+			logger.debug("Board cleanup timer cleared");
 		}
 
 		// End all sessions and remove them from the set BEFORE closing the server
@@ -213,7 +227,11 @@ export class Game {
 			);
 		}
 
-		logger.debug("All sessions ended, stopping server");
+		logger.debug("All sessions ended, saving boards");
+		// Save all boards before shutting down
+		await this.saveAllBoards();
+
+		logger.debug("All boards saved, stopping server");
 		// Stop the server (this will trigger disconnection events, but sessions are already cleared)
 		await this.server.stop();
 		logger.debug("Server stopped successfully");
@@ -508,6 +526,54 @@ export class Game {
 		);
 
 		await Promise.all(savePromises);
+	}
+
+	/**
+	 * Clean up expired messages from all boards.
+	 */
+	private async cleanupExpiredBoardMessages() {
+		try {
+			const boards = await getAllBoards();
+			let totalRemoved = 0;
+
+			for (const board of boards) {
+				const removed = board.removeExpiredMessages();
+				if (removed > 0) {
+					await saveBoard(board);
+					totalRemoved += removed;
+					logger.debug(
+						`Removed ${removed} expired message(s) from board "${board.name}"`
+					);
+				}
+			}
+
+			if (totalRemoved > 0) {
+				logger.info(
+					`Board cleanup: removed ${totalRemoved} expired message(s) total`
+				);
+			}
+		} catch (error) {
+			logger.error(`Error during board cleanup: ${error}`);
+		}
+	}
+
+	/**
+	 * Save all boards to disk.
+	 */
+	private async saveAllBoards() {
+		try {
+			const boards = await getAllBoards();
+			if (boards.length === 0) return;
+
+			logger.info(`Saving ${boards.length} board(s)...`);
+
+			const savePromises = boards.map((board) => saveBoard(board));
+			await Promise.all(savePromises);
+
+			logger.info(`All boards saved successfully`);
+		} catch (error) {
+			logger.error(`Error saving boards: ${error}`);
+		}
 	}
 
 	/**

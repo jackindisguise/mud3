@@ -21,7 +21,7 @@ import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { loadBoard, saveBoard } from "../package/board.js";
 import { Board, BoardMessage } from "../board.js";
-import { color, COLOR } from "../color.js";
+import { color, COLOR, textStyleToTag, TEXT_STYLE } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { string } from "mud-ext";
 import { showBoardsList } from "./boards.js";
@@ -332,6 +332,33 @@ function startWriteSequence(
 		);
 	};
 
+	// Helper function to insert a line
+	const insertLine = (lineNum: number, text: string) => {
+		const index = lineNum - 1; // Convert to 0-based index
+		if (index < 0 || index > bodyLines.length) {
+			sendLine(
+				color(
+					`Invalid line number. Must be between 1 and ${bodyLines.length + 1}.`,
+					COLOR.CRIMSON
+				)
+			);
+			return;
+		}
+		// Wrap the text at 80 characters
+		const wrapped = string.wrap(text, 80);
+		// Add color reset code to each line
+		const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
+		const linesWithReset = wrapped.map((line) => line + resetTag);
+		// Insert at the specified position (pushes existing line down)
+		bodyLines.splice(index, 0, ...linesWithReset);
+		sendLine(
+			color(
+				`Inserted ${wrapped.length} line(s) at position ${lineNum}.`,
+				COLOR.LIME
+			)
+		);
+	};
+
 	// Helper function to show help
 	const showHelp = () => {
 		sendLine("");
@@ -350,6 +377,12 @@ function startWriteSequence(
 				"!delete <n>",
 				COLOR.CYAN
 			)} - Delete line number <n> from the body`
+		);
+		sendLine(
+			`${color(
+				"!insert <n> <text>",
+				COLOR.CYAN
+			)} - Insert a line at position <n>, pushing existing lines down`
 		);
 		sendLine(
 			`${color("!subject <text>", COLOR.CYAN)} - Change the message subject`
@@ -407,6 +440,54 @@ function startWriteSequence(
 			}
 			deleteLine(lineNum);
 			askBody();
+		} else if (lower.startsWith("!insert ")) {
+			const rest = trimmed.substring(8).trim();
+			// Find the first space to separate line number from text
+			const spaceIndex = rest.indexOf(" ");
+			if (spaceIndex === -1) {
+				sendLine(
+					color(
+						`Invalid format. Use: ${color(
+							"!insert <number> <text>",
+							COLOR.CYAN
+						)}`,
+						COLOR.CRIMSON
+					)
+				);
+				askBody();
+				return;
+			}
+			const lineNumStr = rest.substring(0, spaceIndex);
+			const text = rest.substring(spaceIndex + 1).trim();
+			if (!text) {
+				sendLine(
+					color(
+						`Text cannot be empty. Use: ${color(
+							"!insert <number> <text>",
+							COLOR.CYAN
+						)}`,
+						COLOR.CRIMSON
+					)
+				);
+				askBody();
+				return;
+			}
+			const lineNum = parseInt(lineNumStr, 10);
+			if (isNaN(lineNum)) {
+				sendLine(
+					color(
+						`Invalid line number. Use: ${color(
+							"!insert <number> <text>",
+							COLOR.CYAN
+						)}`,
+						COLOR.CRIMSON
+					)
+				);
+				askBody();
+				return;
+			}
+			insertLine(lineNum, text);
+			askBody();
 		} else if (lower.startsWith("!subject ")) {
 			const newSubject = trimmed.substring(9).trim();
 			if (!newSubject || newSubject.length === 0) {
@@ -458,7 +539,10 @@ function startWriteSequence(
 		} else {
 			// Wrap the input at 80 characters and add to body
 			const wrapped = string.wrap(trimmed, 80);
-			bodyLines.push(...wrapped);
+			// Add color reset code to each line
+			const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
+			const linesWithReset = wrapped.map((line) => line + resetTag);
+			bodyLines.push(...linesWithReset);
 			ask("> ", bodyInput);
 		}
 	};

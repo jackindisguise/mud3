@@ -7,6 +7,12 @@ import { FG, BG, STYLE } from "./telnet.js";
 import { string } from "mud-ext";
 
 /**
+ * The escape character used for color codes.
+ * Color codes use the format {letter}, where {{ escapes to a literal {.
+ */
+export const COLOR_ESCAPE = "{";
+
+/**
  * Available foreground colors for text styling.
  */
 export enum COLOR {
@@ -96,8 +102,8 @@ export enum TEXT_STYLE {
 	BLINK,
 	REVERSE,
 	STRIKETHROUGH,
-	RESET_FG,
 	RESET_ALL,
+	RESET_ALL_UPPERCASE,
 }
 
 /**
@@ -149,8 +155,8 @@ export const TEXT_STYLE_TAG = {
 	[TEXT_STYLE.BLINK]: "f",
 	[TEXT_STYLE.REVERSE]: "v",
 	[TEXT_STYLE.STRIKETHROUGH]: "s",
-	[TEXT_STYLE.RESET_FG]: "x",
-	[TEXT_STYLE.RESET_ALL]: "X",
+	[TEXT_STYLE.RESET_ALL]: "x",
+	[TEXT_STYLE.RESET_ALL_UPPERCASE]: "X",
 } as const;
 
 /**
@@ -195,9 +201,9 @@ const COLOR_MAP: Record<string, string> = {
 	[TEXT_STYLE_TAG[TEXT_STYLE.REVERSE]]: STYLE.REVERSE,
 	[TEXT_STYLE_TAG[TEXT_STYLE.STRIKETHROUGH]]: STYLE.STRIKETHROUGH,
 
-	// Reset
-	[TEXT_STYLE_TAG[TEXT_STYLE.RESET_FG]]: STYLE.RESET,
-	[TEXT_STYLE_TAG[TEXT_STYLE.RESET_ALL]]: STYLE.RESET,
+	// Reset - both {x and {X map to RESET_ALL
+	[TEXT_STYLE_TAG[TEXT_STYLE.RESET_ALL]]: STYLE.RESET, // "x"
+	[TEXT_STYLE_TAG[TEXT_STYLE.RESET_ALL_UPPERCASE]]: STYLE.RESET, // "X"
 } as const;
 
 /**
@@ -235,7 +241,7 @@ export function nameToColor(name: string): COLOR | undefined {
  * colorToTag(COLOR.CYAN) // returns "{C"
  */
 export function colorToTag(color: COLOR): string {
-	return `{${COLOR_TAG[color]}`;
+	return `${COLOR_ESCAPE}${COLOR_TAG[color]}`;
 }
 
 /**
@@ -248,7 +254,7 @@ export function colorToTag(color: COLOR): string {
  * bgColorToTag(BG_COLOR.DARK_BLUE) // returns "{4"
  */
 export function bgColorToTag(color: BG_COLOR): string {
-	return `{${BG_COLOR_TAG[color]}`;
+	return `${COLOR_ESCAPE}${BG_COLOR_TAG[color]}`;
 }
 
 /**
@@ -261,7 +267,7 @@ export function bgColorToTag(color: BG_COLOR): string {
  * textStyleToTag(TEXT_STYLE.ITALIC) // returns "{i"
  */
 export function textStyleToTag(style: TEXT_STYLE): string {
-	return `{${TEXT_STYLE_TAG[style]}`;
+	return `${COLOR_ESCAPE}${TEXT_STYLE_TAG[style]}`;
 }
 
 /**
@@ -305,15 +311,20 @@ export function color(text: string, color: COLOR): string {
  */
 export function stickyColor(text: string, color: COLOR): string {
 	const colorTag = colorToTag(color);
+	const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
 	// Replace reset tags ({x or {X) with the base color tag
-	const replaced = text.replace(/\{[xX]/g, colorTag);
+	// Escape the escape character for use in regex
+	const escapedEscape = COLOR_ESCAPE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const escapeRegex = new RegExp(`${escapedEscape}[xX]`, "g");
+	const replaced = text.replace(escapeRegex, colorTag);
 	// Add color at start and reset at end
-	return `${colorTag}${replaced}{x`;
+	return `${colorTag}${replaced}${resetTag}`;
 }
 
 /**
  * Colorize a string by replacing {letter} codes with ANSI escape sequences.
  * {{ is escaped to a literal {.
+ * Automatically appends a color reset at the end if not already present.
  *
  * @param text - The text containing color codes
  * @returns The text with ANSI color codes applied
@@ -327,14 +338,23 @@ export function stickyColor(text: string, color: COLOR): string {
  * // Returns "{not a color code}}"
  */
 export function colorize(text: string): string {
-	return text.replace(/\{(\{|.)/g, (match, code) => {
+	// Build regex pattern using the escape character
+	// Escape the escape character for use in regex
+	const escapedEscape = COLOR_ESCAPE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const colorizeRegex = new RegExp(`${escapedEscape}(${escapedEscape}|.)`, "g");
+
+	// Colorize the text
+	const colorized = text.replace(colorizeRegex, (match, code) => {
 		// {{ becomes a literal {
-		if (code === "{") return "{";
+		if (code === COLOR_ESCAPE) return COLOR_ESCAPE;
 
 		// {letter} becomes the color code if it exists
 		const colorCode = COLOR_MAP[code];
 		return colorCode !== undefined ? colorCode : "";
 	});
+
+	// Automatically append color reset ANSI code at the end
+	return colorized + STYLE.RESET;
 }
 
 /**
@@ -353,9 +373,14 @@ export function colorize(text: string): string {
  * // Returns "{not a color code}"
  */
 export function stripColors(text: string): string {
-	return text.replace(/\{(\{|.)/g, (match, code) => {
+	// Build regex pattern using the escape character
+	// Escape the escape character for use in regex
+	const escapedEscape = COLOR_ESCAPE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const stripRegex = new RegExp(`${escapedEscape}(${escapedEscape}|.)`, "g");
+
+	return text.replace(stripRegex, (match, code) => {
 		// {{ becomes a literal {
-		if (code === "{") return "{";
+		if (code === COLOR_ESCAPE) return COLOR_ESCAPE;
 
 		// {letter} is always consumed (both valid color codes and unknown codes)
 		return "";
@@ -363,17 +388,22 @@ export function stripColors(text: string): string {
 }
 
 export const SIZER: string.Sizer = {
-	open: "{",
+	open: COLOR_ESCAPE,
 	unrenderedSequenceLength: (str: string, i: number) => {
-		if (str[i] === "{")
-			if (str[i + 1] === "{") return 1;
+		if (str[i] === COLOR_ESCAPE)
+			if (str[i + 1] === COLOR_ESCAPE) return 1;
 			else return 2;
 		return 0;
 	},
 	size: (str: string) => {
 		if (!str) return 0;
-		return str.replace(/\{(\{|.)/g, (sub, match) => (match == "{" ? "{" : ""))
-			.length;
+		// Build regex pattern using the escape character
+		// Escape the escape character for use in regex
+		const escapedEscape = COLOR_ESCAPE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const sizeRegex = new RegExp(`${escapedEscape}(${escapedEscape}|.)`, "g");
+		return str.replace(sizeRegex, (sub, match) =>
+			match == COLOR_ESCAPE ? COLOR_ESCAPE : ""
+		).length;
 	},
 };
 

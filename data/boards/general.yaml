@@ -3,6 +3,7 @@ displayName: General
 description: General messages.
 permanent: false
 expirationMs: 2592000000
+writePermission: all
 messages:
   - id: 1
     author: Judas
@@ -16,4 +17,9 @@ messages:
     postedAt: '2025-11-09T15:58:49.687Z'
     targets:
       - judas
-nextMessageId: 3
+  - id: 3
+    author: Judas
+    subject: dis a test yo
+    content: "{RHello, citizens.\r\nWhat is up?\r\n{YYah yah.\r\n{YWe in dis shit for sho.\r\nhehe."
+    postedAt: '2025-11-09T16:40:36.336Z'
+nextMessageId: 4

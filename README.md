@@ -29,14 +29,11 @@ import { Command, CommandContext } from "./command.js";
 
 class SayCommand extends Command {
   pattern = "say <message:text>";
-  
   execute(context: CommandContext, args: Map<string, any>) {
     const message = args.get("message");
     context.actor.sendLine(`You say: ${message}`);
   }
 }
-
-CommandRegistry.default.register(new SayCommand());
 ```
 
 **YAML Command:**
@@ -100,31 +97,109 @@ reply Thanks!               # Reply to last whisper
 
 ## 3. Easy-to-use message board system
 
-The message board system provides persistent note boards with an interactive multi-line editor, message targeting, and flexible expiration policies. Boards can be configured as permanent (messages never expire) or time-limited (messages automatically expire after a set duration).
+The message board system provides persistent note boards with an interactive multi-line editor, message targeting, read tracking, and flexible expiration policies. Boards can be configured as permanent (messages never expire) or time-limited (messages automatically expire after a set duration).
 
 ### Key Features
 
 - **Interactive editor**: Rich multi-line message editor with commands for editing, previewing, and managing messages
 - **Message targeting**: Target messages to specific users with `@mentions` or make them public
+- **Read tracking**: Track which characters have read each message using unique character IDs
+- **Read status display**: See `[read]` or `[unread]` status for each message in the board list
+- **Quick read next**: Use `board <name> read next` to read the oldest unread message
+- **Login notifications**: Automatically notified of unread messages when you log in
+- **Targeted message alerts**: Instant notifications when someone sends you a targeted message
 - **Expiration policies**: Boards can be permanent or time-limited with automatic cleanup
 - **Write permissions**: Configure boards to allow all users or restrict to admins only
 - **Auto-save**: Boards automatically saved on server shutdown
 - **Auto-cleanup**: Expired messages automatically removed from time-limited boards
 
-### Editor Commands
+### Targetable Messages
 
-- `!done` - Finish and preview message
-- `!show` - Display current body with line numbers
-- `!delete <n>` - Delete specific line
-- `!insert <n> <text>` - Insert a line at position <n>, pushing existing lines down
-- `!subject <text>` - Change subject inline
-- `!to <@targets>` - Change message targets inline
+Messages can be targeted to specific users using `@mentions` when writing. Targeted messages are only visible to the author and the mentioned users. When a targeted message is posted, all mentioned users who are currently online and have access to the board will receive an instant notification telling them they have mail and exactly what command to type to read it.
+
+**Example:**
+```
+board write general
+> @bob @alice
+> Subject: Meeting reminder
+> Don't forget about the meeting tomorrow!
+> !done
+```
+
+This creates a message that only bob, alice, and the author can see. Both bob and alice will receive a notification: "You have new mail on the General board from username. Type: board general read 5"
+
+### Writing Interface
+
+The board system includes a powerful interactive editor for writing multi-line messages. The editor supports various commands for managing your message as you write it.
+
+**Editor Commands:**
+- `!done` - Finish editing and preview the message
+- `!show` - Display the current message body with line numbers
+- `!delete <n>` - Delete line number `<n>` from the body
+- `!insert <n> <text>` - Insert a line at position `<n>`, pushing existing lines down
+- `!subject <text>` - Change the message subject inline
+- `!to <@targets>` - Change message targets inline (use `@all` for public)
 - `!forget` / `!quit` - Cancel message creation
 - `!help` - Show command reference
 
-### Usage Examples
+**Example Writing Session:**
+```
+board write general
+> @bob
+> Important update
+> This is line one.
+> This is line two.
+> !show
+>   1: This is line one.
+>   2: This is line two.
+> !insert 2 This is a new line two.
+> !show
+>   1: This is line one.
+>   2: This is a new line two.
+>   3: This is line two.
+> !delete 3
+> !done
+```
 
-**Board YAML Format:**
+### Read Tracking Using Character IDs
+
+Each character in the game has a unique character ID assigned when they are created. The board system uses these IDs to track which characters have read each message. When you read a message, your character ID is automatically added to that message's `readBy` list, and the board is saved to persist this information.
+
+This system ensures accurate read tracking even if a player changes their username, and allows the system to efficiently determine read status without storing per-character read lists.
+
+### Reading the Oldest Unread Message
+
+The `board <name> read` command finds and displays the oldest unread message on the specified board that is visible to you. This makes it easy to catch up on messages you haven't read yet without having to manually check each message ID.
+
+**Example:**
+```
+board general read
+```
+
+This will find the oldest message on the general board that you haven't read yet and display it, automatically marking it as read.
+
+### Login Unread Message Notifications
+
+When you log into the game, the system automatically checks all boards you have access to and shows you a summary of unread activity. The notification system shows two types of alerts:
+
+1. **General board activity**: Shows boards that have new messages since your last login (without specific details).
+   - Example: "• General has 5 new messages."
+
+2. **Direct messages**: Shows specific messages that were targeted directly at you
+   - Example: "• New message from username on the General board. Type: board general read 3"
+
+These notifications only show messages posted after your last login date, ensuring you only see relevant new activity. The notifications are displayed in a message when you first connect.
+
+### Targeted Message Notifications
+
+When someone posts a message targeting you (using `@yourname`), you receive an instant notification if you're currently online. The notification tells you:
+- Who sent the message
+- Which board it's on
+- The exact command to read it: `board <boardname> read <id>`
+
+If the message is on a board with admin-only access and you don't have admin privileges, you won't receive the notification (since you can't access that board anyway).
+
+### Board YAML Format
 
 Boards are saved to two separate files in `data/boards/`:
 - `<name>.yaml` - Board configuration
@@ -154,6 +229,9 @@ messages:
     targets:              # Optional: list of usernames, or omit for public messages
       - username1
       - username2
+    readBy:               # Optional: list of character IDs who have read this message
+      - 1
+      - 5
   - id: 2
     author: anotheruser
     subject: Another message
@@ -161,17 +239,7 @@ messages:
     postedAt: "2024-01-15T11:00:00.000Z"
 ```
 
-The system automatically loads both files when a board is accessed.
-
-**Posting a Message:**
-```
-board read general
-board write general
-> This is my message subject
-> This is line one of my message.
-> This is line two.
-> !done
-```
+The system automatically loads both files when a board is accessed. If the messages file is missing, the board will load with an empty message list.
 
 ## 4. Dungeon and DungeonObject and Room systems
 
@@ -444,7 +512,7 @@ const length = visibleLength(text);    // Returns 11 (ignores color codes)
 
 The mud3 framework uses a package-based architecture for modularity and extensibility. Packages handle persistence, configuration, and system initialization. All packages follow a consistent pattern with a `loader` function that is called during application startup.
 
-## 1. Simple lockfile system that ensures you can't run multiple instances
+## lockfile
 
 The lockfile package prevents multiple server instances from running simultaneously by maintaining a process lock file with PID tracking. It automatically detects and removes stale locks from processes that are no longer running.
 
@@ -465,7 +533,7 @@ import lockfile from "./src/package/lockfile.js";
 await loadPackage(lockfile); // Always load first
 ```
 
-## 2. Saving and loading basic config systems
+## config
 
 The config package manages YAML-based configuration with default values, type-safe config structures, and automatic default file creation. Configuration is merged from the file into in-memory defaults, ensuring all required settings are present.
 
@@ -499,7 +567,7 @@ await loadPackage(config);
 console.log(CONFIG.server.port); // 23
 ```
 
-## 3. Saving and loading helpfiles
+## help
 
 The help package loads topic-based help files from YAML files in the `data/help` directory. Each help file includes keywords, aliases, related topics, and content with full-text search capabilities.
 
@@ -535,16 +603,59 @@ if (helpTopic) {
 }
 ```
 
-## 4. Saving and loading message boards
+## board
 
-The board package provides persistence for message boards with YAML serialization, automatic directory creation, and board management utilities. Boards are saved to `data/boards/<name>.yaml` with atomic writes.
+The board package provides persistence for message boards with YAML serialization, automatic directory creation, and board management utilities. Boards are saved to two separate files: `data/boards/<name>.yaml` (configuration) and `data/boards/<name>.messages.yaml` (messages) with atomic writes.
 
 ### Key Features
 
-- **YAML persistence**: Boards serialized to YAML files
+- **YAML persistence**: Boards serialized to separate config and messages files
 - **Automatic directory creation**: Creates `data/boards` directory if needed
 - **Atomic writes**: Uses temporary files and atomic rename to prevent corruption
 - **Board management**: Functions to save, load, list, and delete boards
+- **Graceful degradation**: Loads boards even if messages file is missing
+
+### Board YAML Format
+
+Boards are saved to two separate files in `data/boards/`:
+- `<name>.yaml` - Board configuration
+- `<name>.messages.yaml` - Board messages
+
+**Board Configuration (`<name>.yaml`):**
+
+```yaml
+name: general
+displayName: General
+description: General discussion
+permanent: false          # these messages expire
+expirationMs: 2592000000  # Optional: milliseconds before messages expire (only used if permanent=false)
+writePermission: all      # "all" or "admin"
+nextMessageId: 3          # Next ID to use for new messages
+```
+
+**Board Messages (`<name>.messages.yaml`):**
+
+```yaml
+messages:
+  - id: 1
+    author: username
+    subject: Message subject
+    content: "Message content with\r\nmultiple lines"
+    postedAt: "2024-01-15T10:30:00.000Z"
+    targets:              # Optional: list of usernames, or omit for public messages
+      - username1
+      - username2
+    readBy:               # Optional: list of character IDs who have read this message
+      - 1
+      - 5
+  - id: 2
+    author: anotheruser
+    subject: Another message
+    content: "Single line message"
+    postedAt: "2024-01-15T11:00:00.000Z"
+```
+
+The system automatically loads both files when a board is accessed. If the messages file is missing, the board will load with an empty message list.
 
 ### Usage
 
@@ -553,14 +664,12 @@ import board, { saveBoard, loadBoard, getAllBoards } from "./src/package/board.j
 
 await loadPackage(board);
 
-const board = new Board("general", "General", "General discussion", true);
-await saveBoard(board);
-
 const loaded = await loadBoard("general");
 const allBoards = await getAllBoards();
+await saveBoard(loadedBoard);
 ```
 
-## 5. Saving and loading characters
+## 5. character
 
 The character package provides character persistence with YAML storage, password authentication, active character registry, and serialization support. Characters are saved to `data/characters/<username>.yaml`.
 
@@ -569,6 +678,8 @@ The character package provides character persistence with YAML storage, password
 - **YAML persistence**: Characters serialized to YAML files
 - **Password authentication**: Secure password hashing with SHA-256
 - **Active character registry**: Prevents duplicate logins
+- **Character ID system**: Unique IDs assigned to each character for tracking
+- **ID-based lookup**: Fast O(1) lookup of active characters by ID
 - **Atomic writes**: Uses temporary files and atomic rename to prevent corruption
 - **Serialization**: Full serialization/deserialization support
 
@@ -578,7 +689,8 @@ The character package provides character persistence with YAML storage, password
 import character, { 
   saveCharacter, 
   loadCharacter, 
-  checkCharacterPassword 
+  checkCharacterPassword,
+  getCharacterById
 } from "./src/package/character.js";
 
 await loadPackage(character);
@@ -589,9 +701,12 @@ const serialized = await checkCharacterPassword("username", "password");
 if (serialized) {
   const char = loadCharacterFromSerialized(serialized);
 }
+
+// Look up active character by ID
+const activeChar = getCharacterById(characterId);
 ```
 
-## 6. Saving and loading commands
+## 6. commands
 
 The commands package provides a flexible command loading system that supports multiple formats: YAML files, JavaScript modules, and compiled TypeScript commands. Commands can be loaded from `data/commands` (runtime-extensible) or `dist/src/commands` (compiled built-in commands).
 
@@ -658,14 +773,15 @@ await loadPackage(commands);
 // All commands from data/commands and src/commands are now registered
 ```
 
-## 7. Saving and loading gamestate
+## gamestate
 
-The gamestate package provides runtime state persistence for tracking elapsed game time across server restarts. It automatically calculates downtime and adds it to elapsed time, ensuring continuity even after server restarts.
+The gamestate package provides runtime state persistence for tracking elapsed game time and character ID generation across server restarts. It automatically calculates downtime and adds it to elapsed time, ensuring continuity even after server restarts.
 
 ### Key Features
 
 - **Elapsed time tracking**: Tracks total game time in milliseconds
 - **Downtime calculation**: Automatically calculates and adds server downtime to elapsed time
+- **Character ID generation**: Manages next character ID counter for unique character identification
 - **Atomic writes**: Uses temporary files and atomic rename to prevent corruption
 - **Default state**: Creates default gamestate file if missing
 - **Session tracking**: Tracks time in current session separately from persisted time
@@ -673,12 +789,15 @@ The gamestate package provides runtime state persistence for tracking elapsed ga
 ### Usage
 
 ```typescript
-import gamestate, { getElapsedTime, saveGameState } from "./src/package/gamestate.js";
+import gamestate, { getElapsedTime, saveGameState, getNextCharacterId } from "./src/package/gamestate.js";
 
 await loadPackage(gamestate);
 
 // Get total elapsed time (includes previous sessions + downtime)
 const elapsed = getElapsedTime(); // milliseconds
+
+// Get next character ID (increments counter and saves)
+const nextId = await getNextCharacterId();
 
 // Save state (called automatically every 5 minutes)
 await saveGameState();
@@ -689,4 +808,5 @@ await saveGameState();
 ```yaml
 elapsedTime: 1234567890
 lastSaved: "2024-01-15T10:30:00.000Z"
+nextCharacterId: 42
 ```

@@ -11,6 +11,7 @@ A feature-rich, text-based Multi-User Dungeon (MUD) server built with TypeScript
   - `!done` - Finish and preview message
   - `!show` - Display current body with line numbers
   - `!delete <n>` - Delete specific line
+  - `!insert <n> <text>` - Insert a line at position <n>, pushing existing lines down
   - `!subject <text>` - Change subject inline
   - `!to <@targets>` - Change message targets inline
   - `!forget` / `!quit` - Cancel message creation

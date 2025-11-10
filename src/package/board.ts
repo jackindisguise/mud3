@@ -23,7 +23,15 @@
  * @module package/board
  */
 import { join, relative } from "path";
-import { mkdir, readFile, writeFile, access, readdir } from "fs/promises";
+import {
+	mkdir,
+	readFile,
+	writeFile,
+	access,
+	readdir,
+	rename,
+	unlink,
+} from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
 import { Board, SerializedBoard } from "../board.js";
@@ -59,17 +67,35 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 /**
- * Save a board to disk.
+ * Save a board to disk using atomic write (temp file + rename).
+ * This prevents corruption if the process is killed during the write.
  */
 export async function saveBoard(board: Board): Promise<void> {
 	await ensureDir();
 	const data: SerializedBoard = board.serialize();
 	const filePath = getBoardFilePath(board.name);
+	const tempPath = `${filePath}.tmp`;
 	const yaml = YAML.dump(data as any, { noRefs: true, lineWidth: 120 });
-	await writeFile(filePath, yaml, "utf-8");
-	logger.debug(
-		`Saved board file: ${relative(process.cwd(), filePath)} for ${board.name}`
-	);
+
+	try {
+		// Write to temporary file first
+		await writeFile(tempPath, yaml, "utf-8");
+
+		// Atomically rename temp file to final location
+		await rename(tempPath, filePath);
+
+		logger.debug(
+			`Saved board file: ${relative(process.cwd(), filePath)} for ${board.name}`
+		);
+	} catch (error) {
+		// Clean up temp file if it exists
+		try {
+			await unlink(tempPath);
+		} catch {
+			// Ignore cleanup errors
+		}
+		throw error;
+	}
 }
 
 /**

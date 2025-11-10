@@ -5,6 +5,7 @@ import character from "./src/package/character.js";
 import lockfile from "./src/package/lockfile.js";
 import help from "./src/package/help.js";
 import board from "./src/package/board.js";
+import gamestate from "./src/package/gamestate.js";
 import logger from "./src/logger.js";
 import { startGame } from "./src/game.js";
 
@@ -14,6 +15,7 @@ await loadPackage(config);
 await loadPackage(character);
 await loadPackage(help);
 await loadPackage(board);
+await loadPackage(gamestate);
 
 // Start the game using startGame() to properly set Game.game singleton
 const game = await startGame();

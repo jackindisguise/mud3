@@ -20,7 +20,7 @@
  */
 import { Package } from "package-loader";
 import { join, relative } from "path";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
 
@@ -136,8 +136,22 @@ export default {
 				noRefs: true,
 				lineWidth: 120,
 			});
-			await writeFile(CONFIG_PATH, defaultContent, "utf-8");
-			logger.info("Default config file created");
+			const tempPath = `${CONFIG_PATH}.tmp`;
+			try {
+				// Write to temporary file first
+				await writeFile(tempPath, defaultContent, "utf-8");
+				// Atomically rename temp file to final location
+				await rename(tempPath, CONFIG_PATH);
+				logger.info("Default config file created");
+			} catch (writeError) {
+				// Clean up temp file if it exists
+				try {
+					await unlink(tempPath);
+				} catch {
+					// Ignore cleanup errors
+				}
+				throw writeError;
+			}
 		}
 	},
 } as Package;

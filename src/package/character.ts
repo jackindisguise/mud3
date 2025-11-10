@@ -39,7 +39,14 @@
  * @module package/character
  */
 import { join, relative } from "path";
-import { mkdir, readFile, writeFile, access } from "fs/promises";
+import {
+	mkdir,
+	readFile,
+	writeFile,
+	access,
+	rename,
+	unlink,
+} from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
 import { Character, SerializedCharacter } from "../character.js";
@@ -122,13 +129,30 @@ export async function saveCharacter(character: Character) {
 	await ensureDir();
 	const data: SerializedCharacter = character.serialize();
 	const filePath = getCharacterFilePath(character.credentials.username);
+	const tempPath = `${filePath}.tmp`;
 	const yaml = YAML.dump(data as any, { noRefs: true, lineWidth: 120 });
-	await writeFile(filePath, yaml, "utf-8");
-	logger.debug(
-		`Saved character file: ${relative(process.cwd(), filePath)} for ${
-			character.credentials.username
-		}`
-	);
+
+	try {
+		// Write to temporary file first
+		await writeFile(tempPath, yaml, "utf-8");
+
+		// Atomically rename temp file to final location
+		await rename(tempPath, filePath);
+
+		logger.debug(
+			`Saved character file: ${relative(process.cwd(), filePath)} for ${
+				character.credentials.username
+			}`
+		);
+	} catch (error) {
+		// Clean up temp file if it exists
+		try {
+			await unlink(tempPath);
+		} catch {
+			// Ignore cleanup errors
+		}
+		throw error;
+	}
 }
 
 export async function characterExists(username: string): Promise<boolean> {

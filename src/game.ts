@@ -44,6 +44,7 @@ import {
 	loadCharacterFromSerialized,
 } from "./package/character.js";
 import { getAllBoards, saveBoard } from "./package/board.js";
+import { saveGameState } from "./package/gamestate.js";
 import logger from "./logger.js";
 
 // Default intervals/timeouts (milliseconds)
@@ -105,6 +106,7 @@ export class Game {
 
 	private saveTimer?: NodeJS.Timeout;
 	private boardCleanupTimer?: NodeJS.Timeout;
+	private gameStateSaveTimer?: NodeJS.Timeout;
 	private nextConnectionId = 1;
 
 	/** Static singleton instance of the Game */
@@ -185,6 +187,11 @@ export class Game {
 		this.boardCleanupTimer = setInterval(() => {
 			this.cleanupExpiredBoardMessages();
 		}, 60 * 60 * 1000); // 1 hour
+
+		// Set up periodic game state save (every 5 minutes)
+		this.gameStateSaveTimer = setInterval(() => {
+			this.saveGameState();
+		}, DEFAULT_SAVE_INTERVAL_MS);
 	}
 
 	/**
@@ -206,6 +213,16 @@ export class Game {
 			this.boardCleanupTimer = undefined;
 			logger.debug("Board cleanup timer cleared");
 		}
+
+		// Clear game state save timer
+		if (this.gameStateSaveTimer) {
+			clearInterval(this.gameStateSaveTimer);
+			this.gameStateSaveTimer = undefined;
+			logger.debug("Game state save timer cleared");
+		}
+
+		// Save game state before shutdown
+		await this.saveGameState();
 
 		// End all sessions and remove them from the set BEFORE closing the server
 		// This prevents handleDisconnection from trying to process them again
@@ -667,6 +684,17 @@ export class Game {
 	 */
 	public forEachCharacter(callback: (character: Character) => void): void {
 		for (const character of this.activeCharacters) callback(character);
+	}
+
+	/**
+	 * Save game state to disk.
+	 */
+	private async saveGameState(): Promise<void> {
+		try {
+			await saveGameState();
+		} catch (error) {
+			logger.error(`Failed to save game state: ${error}`);
+		}
 	}
 }
 

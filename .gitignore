@@ -3,3 +3,6 @@ dist
 coverage
 logs/*.log
 STYLE_GUIDE.md
+CURSOR_GUIDE.md
+COMMIT_GUIDE.md
+**/*.tmp

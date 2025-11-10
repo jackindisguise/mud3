@@ -10,7 +10,6 @@ export default {
 			const extractWord = (pattern: string) => {
 				let word = pattern.trim().split(/[ <]/)[0];
 				if (word !== "?") word = word.replace(/[?~]/g, "");
-				console.log(pattern, word);
 				return word;
 			};
 			commandLabelsSet.add(extractWord(cmd.pattern));

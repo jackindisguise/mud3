@@ -77,7 +77,6 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 		lines.push("", ...metaBox);
 	}
 
-	console.log(lines);
 	const box = string.box({
 		input: lines,
 		width: 80,
@@ -93,7 +92,6 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 		title: `${helpfile.keyword.toUpperCase()}`,
 		sizer: SIZER,
 	});
-	console.log(box);
 	actor.sendMessage(box.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 

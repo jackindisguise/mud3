@@ -30,7 +30,11 @@ suite("board.ts", () => {
 	suite("addMessage()", () => {
 		test("should add a public message without targets", () => {
 			const board = new Board("test", "Test", "Test");
-			const message = board.addMessage("alice", "Test Subject", "Test content");
+			const message = board.createMessage(
+				"alice",
+				"Test Subject",
+				"Test content"
+			);
 
 			assert.strictEqual(message.id, 1);
 			assert.strictEqual(message.author, "alice");
@@ -43,7 +47,7 @@ suite("board.ts", () => {
 
 		test("should add a targeted message", () => {
 			const board = new Board("test", "Test", "Test");
-			const message = board.addMessage(
+			const message = board.createMessage(
 				"alice",
 				"Private Note",
 				"Secret content",
@@ -57,9 +61,9 @@ suite("board.ts", () => {
 
 		test("should assign sequential message IDs", () => {
 			const board = new Board("test", "Test", "Test");
-			const msg1 = board.addMessage("alice", "First", "Content 1");
-			const msg2 = board.addMessage("bob", "Second", "Content 2");
-			const msg3 = board.addMessage("charlie", "Third", "Content 3");
+			const msg1 = board.createMessage("alice", "First", "Content 1");
+			const msg2 = board.createMessage("bob", "Second", "Content 2");
+			const msg3 = board.createMessage("charlie", "Third", "Content 3");
 
 			assert.strictEqual(msg1.id, 1);
 			assert.strictEqual(msg2.id, 2);
@@ -68,7 +72,7 @@ suite("board.ts", () => {
 
 		test("should ignore empty targets array", () => {
 			const board = new Board("test", "Test", "Test");
-			const message = board.addMessage("alice", "Test", "Content", []);
+			const message = board.createMessage("alice", "Test", "Content", []);
 
 			assert.strictEqual(message.targets, undefined);
 		});
@@ -76,7 +80,7 @@ suite("board.ts", () => {
 		test("should set postedAt timestamp", () => {
 			const board = new Board("test", "Test", "Test");
 			const before = new Date().toISOString();
-			const message = board.addMessage("alice", "Test", "Content");
+			const message = board.createMessage("alice", "Test", "Content");
 			const after = new Date().toISOString();
 
 			assert.ok(message.postedAt >= before);
@@ -87,8 +91,8 @@ suite("board.ts", () => {
 	suite("removeExpiredMessages()", () => {
 		test("should not remove messages from permanent boards", () => {
 			const board = new Board("test", "Test", "Test", true);
-			board.addMessage("alice", "Test", "Content");
-			board.addMessage("bob", "Test 2", "Content 2");
+			board.createMessage("alice", "Test", "Content");
+			board.createMessage("bob", "Test 2", "Content 2");
 
 			const removed = board.removeExpiredMessages();
 			assert.strictEqual(removed, 0);
@@ -97,7 +101,7 @@ suite("board.ts", () => {
 
 		test("should not remove recent messages from time-limited boards", () => {
 			const board = new Board("test", "Test", "Test", false, 86400000); // 1 day
-			board.addMessage("alice", "Recent", "Content");
+			board.createMessage("alice", "Recent", "Content");
 
 			const removed = board.removeExpiredMessages();
 			assert.strictEqual(removed, 0);
@@ -118,7 +122,7 @@ suite("board.ts", () => {
 			serialized.messages.push(oldMessage);
 			serialized.nextMessageId = 2;
 			const boardWithOldMessage = Board.deserialize(serialized);
-			boardWithOldMessage.addMessage("bob", "Recent", "Recent content");
+			boardWithOldMessage.createMessage("bob", "Recent", "Recent content");
 
 			const removed = boardWithOldMessage.removeExpiredMessages();
 			assert.strictEqual(removed, 1);
@@ -149,7 +153,7 @@ suite("board.ts", () => {
 			});
 			serialized.nextMessageId = 3;
 			const boardWithOldMessages = Board.deserialize(serialized);
-			boardWithOldMessages.addMessage("charlie", "Recent", "Content");
+			boardWithOldMessages.createMessage("charlie", "Recent", "Content");
 
 			const removed = boardWithOldMessages.removeExpiredMessages();
 			assert.strictEqual(removed, 2);
@@ -159,8 +163,8 @@ suite("board.ts", () => {
 	suite("getMessage()", () => {
 		test("should find message by ID", () => {
 			const board = new Board("test", "Test", "Test");
-			const msg1 = board.addMessage("alice", "First", "Content 1");
-			const msg2 = board.addMessage("bob", "Second", "Content 2");
+			const msg1 = board.createMessage("alice", "First", "Content 1");
+			const msg2 = board.createMessage("bob", "Second", "Content 2");
 
 			const found = board.getMessage(msg2.id);
 			assert.strictEqual(found?.id, msg2.id);
@@ -169,7 +173,7 @@ suite("board.ts", () => {
 
 		test("should return undefined for non-existent message ID", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "Test", "Content");
+			board.createMessage("alice", "Test", "Content");
 
 			const found = board.getMessage(999);
 			assert.strictEqual(found, undefined);
@@ -272,8 +276,8 @@ suite("board.ts", () => {
 	suite("getVisibleMessages()", () => {
 		test("should return all public messages", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "Public 1", "Content 1");
-			board.addMessage("bob", "Public 2", "Content 2");
+			board.createMessage("alice", "Public 1", "Content 1");
+			board.createMessage("bob", "Public 2", "Content 2");
 
 			const visible = board.getVisibleMessages("charlie");
 			assert.strictEqual(visible.length, 2);
@@ -281,9 +285,9 @@ suite("board.ts", () => {
 
 		test("should return only messages visible to user", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "Public", "Content 1");
-			board.addMessage("bob", "Private", "Content 2", ["charlie"]);
-			board.addMessage("diana", "Private 2", "Content 3", ["alice"]);
+			board.createMessage("alice", "Public", "Content 1");
+			board.createMessage("bob", "Private", "Content 2", ["charlie"]);
+			board.createMessage("diana", "Private 2", "Content 3", ["alice"]);
 
 			const visible = board.getVisibleMessages("charlie");
 			assert.strictEqual(visible.length, 2);
@@ -293,7 +297,7 @@ suite("board.ts", () => {
 
 		test("should include user's own messages even if targeted", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "To Bob", "Content", ["bob"]);
+			board.createMessage("alice", "To Bob", "Content", ["bob"]);
 
 			const visible = board.getVisibleMessages("alice");
 			assert.strictEqual(visible.length, 1);
@@ -302,7 +306,7 @@ suite("board.ts", () => {
 
 		test("should return empty array for user with no visible messages", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "Private", "Content", ["bob"]);
+			board.createMessage("alice", "Private", "Content", ["bob"]);
 
 			const visible = board.getVisibleMessages("charlie");
 			assert.strictEqual(visible.length, 0);
@@ -312,7 +316,7 @@ suite("board.ts", () => {
 	suite("serialize()", () => {
 		test("should serialize permanent board correctly", () => {
 			const board = new Board("test", "Test Board", "Description", true);
-			board.addMessage("alice", "Subject", "Content");
+			board.createMessage("alice", "Subject", "Content");
 
 			const serialized = board.serialize();
 			assert.strictEqual(serialized.name, "test");
@@ -326,7 +330,7 @@ suite("board.ts", () => {
 
 		test("should serialize time-limited board correctly", () => {
 			const board = new Board("trade", "Trade", "Trading", false, 604800000);
-			board.addMessage("alice", "Subject", "Content");
+			board.createMessage("alice", "Subject", "Content");
 
 			const serialized = board.serialize();
 			assert.strictEqual(serialized.permanent, false);
@@ -335,8 +339,8 @@ suite("board.ts", () => {
 
 		test("should preserve all messages in serialization", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "First", "Content 1");
-			board.addMessage("bob", "Second", "Content 2", ["charlie"]);
+			board.createMessage("alice", "First", "Content 1");
+			board.createMessage("bob", "Second", "Content 2", ["charlie"]);
 
 			const serialized = board.serialize();
 			assert.strictEqual(serialized.messages.length, 2);
@@ -347,8 +351,8 @@ suite("board.ts", () => {
 
 		test("should preserve nextMessageId", () => {
 			const board = new Board("test", "Test", "Test");
-			board.addMessage("alice", "First", "Content");
-			board.addMessage("bob", "Second", "Content");
+			board.createMessage("alice", "First", "Content");
+			board.createMessage("bob", "Second", "Content");
 
 			const serialized = board.serialize();
 			assert.strictEqual(serialized.nextMessageId, 3);
@@ -400,37 +404,6 @@ suite("board.ts", () => {
 			assert.strictEqual(board.expirationMs, 604800000);
 		});
 
-		test("should add default subject for messages without subject (backward compatibility)", () => {
-			const data: SerializedBoard = {
-				name: "test",
-				displayName: "Test",
-				description: "Test",
-				permanent: true,
-				messages: [
-					{
-						id: 1,
-						author: "alice",
-						subject: "", // Old message without subject
-						content: "Content",
-						postedAt: new Date().toISOString(),
-					},
-					{
-						id: 2,
-						author: "bob",
-						// Missing subject field entirely
-						content: "Content 2",
-						postedAt: new Date().toISOString(),
-					} as BoardMessage,
-				],
-				nextMessageId: 3,
-			};
-
-			const board = Board.deserialize(data);
-			const messages = board.getAllMessages();
-			assert.strictEqual(messages[0].subject, "(No subject)");
-			assert.strictEqual(messages[1].subject, "(No subject)");
-		});
-
 		test("should preserve nextMessageId on deserialize", () => {
 			const data: SerializedBoard = {
 				name: "test",
@@ -443,7 +416,7 @@ suite("board.ts", () => {
 
 			const board = Board.deserialize(data);
 			// After deserialization, next message should use the preserved ID
-			const newMessage = board.addMessage("alice", "New", "Content");
+			const newMessage = board.createMessage("alice", "New", "Content");
 			assert.strictEqual(newMessage.id, 42);
 		});
 
@@ -455,8 +428,8 @@ suite("board.ts", () => {
 				false,
 				86400000
 			);
-			original.addMessage("alice", "Public", "Content 1");
-			original.addMessage("bob", "Private", "Content 2", ["charlie"]);
+			original.createMessage("alice", "Public", "Content 1");
+			original.createMessage("bob", "Private", "Content 2", ["charlie"]);
 
 			const serialized = original.serialize();
 			const restored = Board.deserialize(serialized);

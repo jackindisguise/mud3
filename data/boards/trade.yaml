@@ -3,6 +3,4 @@ displayName: Trade
 description: Trade!
 permanent: false
 expirationMs: 604800000
-messages: []
 nextMessageId: 1
-

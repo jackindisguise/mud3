@@ -1,15 +1,16 @@
 /**
  * Package: board - YAML persistence for Message Boards
  *
- * Persists `Board` class instances to `data/boards/<name>.yaml` and
- * restores them back, using the `Board.serialize()`/`Board.deserialize()`
- * methods from the core model.
+ * Persists `Board` class instances to two separate files:
+ * - `data/boards/<name>.yaml` - Board configuration
+ * - `data/boards/<name>.messages.yaml` - Board messages
  *
  * Behavior
  * - Filenames are derived from a sanitized, lowercased board name
  * - On save, directories are created as needed; YAML is written without
  *   references and with a wide line width for readability
- * - On load, returns `undefined` if the board file doesn't exist
+ * - On load, returns `undefined` if either board file doesn't exist
+ * - Uses atomic writes (temp file + rename) to prevent corruption
  *
  * @example
  * import boardPkg, { saveBoard, loadBoard, getAllBoards } from './package/board.js';
@@ -34,7 +35,11 @@ import {
 } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
-import { Board, SerializedBoard } from "../board.js";
+import {
+	Board,
+	SerializedBoardConfig,
+	SerializedBoardMessages,
+} from "../board.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 
@@ -48,9 +53,14 @@ function sanitizeBoardName(name: string): string {
 		.replace(/[^a-z0-9_-]/gi, "_");
 }
 
-function getBoardFilePath(name: string): string {
+function getBoardConfigFilePath(name: string): string {
 	const safe = sanitizeBoardName(name);
 	return join(BOARD_DIR, `${safe}.yaml`);
+}
+
+function getBoardMessagesFilePath(name: string): string {
+	const safe = sanitizeBoardName(name);
+	return join(BOARD_DIR, `${safe}.messages.yaml`);
 }
 
 async function ensureDir() {
@@ -69,28 +79,54 @@ async function fileExists(path: string): Promise<boolean> {
 /**
  * Save a board to disk using atomic write (temp file + rename).
  * This prevents corruption if the process is killed during the write.
+ * Saves board configuration and messages to separate files.
  */
 export async function saveBoard(board: Board): Promise<void> {
 	await ensureDir();
-	const data: SerializedBoard = board.serialize();
-	const filePath = getBoardFilePath(board.name);
-	const tempPath = `${filePath}.tmp`;
-	const yaml = YAML.dump(data as any, { noRefs: true, lineWidth: 120 });
+
+	const configPath = getBoardConfigFilePath(board.name);
+	const messagesPath = getBoardMessagesFilePath(board.name);
+	const configTempPath = `${configPath}.tmp`;
+	const messagesTempPath = `${messagesPath}.tmp`;
+
+	const configData = board.serializeConfig();
+	const messagesData = board.serializeMessages();
+
+	const configYaml = YAML.dump(configData as any, {
+		noRefs: true,
+		lineWidth: 120,
+	});
+	const messagesYaml = YAML.dump(messagesData as any, {
+		noRefs: true,
+		lineWidth: 120,
+	});
 
 	try {
-		// Write to temporary file first
-		await writeFile(tempPath, yaml, "utf-8");
-
+		// Write config to temporary file first
+		await writeFile(configTempPath, configYaml, "utf-8");
 		// Atomically rename temp file to final location
-		await rename(tempPath, filePath);
+		await rename(configTempPath, configPath);
+
+		// Write messages to temporary file first
+		await writeFile(messagesTempPath, messagesYaml, "utf-8");
+		// Atomically rename temp file to final location
+		await rename(messagesTempPath, messagesPath);
 
 		logger.debug(
-			`Saved board file: ${relative(process.cwd(), filePath)} for ${board.name}`
+			`Saved board files: ${relative(process.cwd(), configPath)} and ${relative(
+				process.cwd(),
+				messagesPath
+			)} for ${board.name}`
 		);
 	} catch (error) {
-		// Clean up temp file if it exists
+		// Clean up temp files if they exist
 		try {
-			await unlink(tempPath);
+			await unlink(configTempPath);
+		} catch {
+			// Ignore cleanup errors
+		}
+		try {
+			await unlink(messagesTempPath);
 		} catch {
 			// Ignore cleanup errors
 		}
@@ -100,17 +136,33 @@ export async function saveBoard(board: Board): Promise<void> {
 
 /**
  * Load a board from disk.
+ * If the messages file is missing, the board will be loaded with no messages.
  */
 export async function loadBoard(name: string): Promise<Board | undefined> {
-	const filePath = getBoardFilePath(name);
-	if (!(await fileExists(filePath))) {
+	const configPath = getBoardConfigFilePath(name);
+	const messagesPath = getBoardMessagesFilePath(name);
+
+	const hasConfigFile = await fileExists(configPath);
+
+	if (!hasConfigFile) {
 		return undefined;
 	}
 
 	try {
-		const content = await readFile(filePath, "utf-8");
-		const data = YAML.load(content) as SerializedBoard;
-		return Board.deserialize(data);
+		const configContent = await readFile(configPath, "utf-8");
+		const config = YAML.load(configContent) as SerializedBoardConfig;
+
+		let messages: SerializedBoardMessages;
+		const hasMessagesFile = await fileExists(messagesPath);
+		if (hasMessagesFile) {
+			const messagesContent = await readFile(messagesPath, "utf-8");
+			messages = YAML.load(messagesContent) as SerializedBoardMessages;
+		} else {
+			// Messages file is missing - use empty messages
+			messages = { messages: [] };
+		}
+
+		return Board.deserializeFromSeparate(config, messages);
 	} catch (error) {
 		logger.error(`Failed to load board ${name}: ${error}`);
 		return undefined;
@@ -119,22 +171,39 @@ export async function loadBoard(name: string): Promise<Board | undefined> {
 
 /**
  * Check if a board exists.
+ * Only checks for the config file since messages file is optional.
  */
 export async function boardExists(name: string): Promise<boolean> {
-	const filePath = getBoardFilePath(name);
-	return await fileExists(filePath);
+	const configPath = getBoardConfigFilePath(name);
+	return await fileExists(configPath);
 }
 
 /**
  * Get all board names from disk.
+ * Looks for config files (board.yaml) and ignores message files (board.messages.yaml).
  */
 export async function getAllBoardNames(): Promise<string[]> {
 	await ensureDir();
 	try {
 		const files = await readdir(BOARD_DIR);
-		return files
-			.filter((file) => file.endsWith(".yaml"))
-			.map((file) => file.replace(/\.yaml$/, ""));
+		const boardNames = new Set<string>();
+
+		for (const file of files) {
+			if (file.endsWith(".messages.yaml")) {
+				// Extract board name from messages file
+				const name = file.replace(/\.messages\.yaml$/, "");
+				boardNames.add(name);
+			} else if (file.endsWith(".yaml") && !file.endsWith(".messages.yaml")) {
+				// Check if it's a config file (not a messages file)
+				const name = file.replace(/\.yaml$/, "");
+				// Only add if it's not already in the set (to avoid duplicates)
+				if (!boardNames.has(name)) {
+					boardNames.add(name);
+				}
+			}
+		}
+
+		return Array.from(boardNames);
 	} catch (error) {
 		logger.error(`Failed to read boards directory: ${error}`);
 		return [];
@@ -150,28 +219,39 @@ export async function getAllBoards(): Promise<Board[]> {
 
 	for (const name of names) {
 		const board = await loadBoard(name);
-		if (board) {
-			boards.push(board);
-		}
+		if (board) boards.push(board);
 	}
 
 	return boards;
 }
 
 /**
- * Delete a board file.
+ * Delete a board (both config and messages files).
  */
 export async function deleteBoard(name: string): Promise<boolean> {
-	const filePath = getBoardFilePath(name);
-	if (!(await fileExists(filePath))) {
-		return false;
-	}
+	const configPath = getBoardConfigFilePath(name);
+	const messagesPath = getBoardMessagesFilePath(name);
+
+	let deleted = false;
 
 	try {
-		const { unlink } = await import("fs/promises");
-		await unlink(filePath);
-		logger.debug(`Deleted board file: ${relative(process.cwd(), filePath)}`);
-		return true;
+		if (await fileExists(configPath)) {
+			await unlink(configPath);
+			logger.debug(
+				`Deleted board config file: ${relative(process.cwd(), configPath)}`
+			);
+			deleted = true;
+		}
+
+		if (await fileExists(messagesPath)) {
+			await unlink(messagesPath);
+			logger.debug(
+				`Deleted board messages file: ${relative(process.cwd(), messagesPath)}`
+			);
+			deleted = true;
+		}
+
+		return deleted;
 	} catch (error) {
 		logger.error(`Failed to delete board ${name}: ${error}`);
 		return false;
@@ -182,6 +262,7 @@ export default {
 	name: "board",
 	loader: async () => {
 		await ensureDir();
+		await getAllBoards();
 		logger.info("Board package loaded");
 	},
 } as Package;

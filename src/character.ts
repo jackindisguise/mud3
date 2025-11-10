@@ -142,6 +142,8 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
  * these become ISO strings via `SerializedPlayerCredentials`.
  */
 export interface PlayerCredentials {
+	/** Unique character ID (assigned on creation) */
+	characterId: number;
 	/** Player's username/login name */
 	username: string;
 	/** Hashed password (never store plain text) */
@@ -263,6 +265,8 @@ export interface CharacterOptions {
  * Dates are represented as ISO strings; runtime-only fields (like session) are excluded.
  */
 export interface SerializedPlayerCredentials {
+	/** Unique character ID (assigned on creation) */
+	characterId: number;
 	/** Player's username/login name */
 	username: string;
 	/** Hashed password (never store plain text) */
@@ -387,8 +391,8 @@ export class Character {
 	/** Current session information (runtime data, not persisted) */
 	public session?: PlayerSession;
 
-	/** Username of the last person who whispered to this character (for reply command) */
-	public lastWhisperFrom?: string;
+	/** Character ID of the last person who whispered to this character (for reply command) */
+	public lastWhisperFromId?: number;
 
 	/**
 	 * Creates a new Character instance.
@@ -423,7 +427,14 @@ export class Character {
 	 */
 	constructor(options: CharacterOptions) {
 		const now = new Date();
+		// characterId is required - if not provided, it should be assigned during creation
+		if (!options.credentials.characterId) {
+			throw new Error(
+				"characterId is required. Characters must be assigned an ID during creation."
+			);
+		}
 		this.credentials = {
+			characterId: options.credentials.characterId, // Explicitly set required field
 			...{ passwordHash: "" },
 			...{ createdAt: now, lastLogin: now },
 			...DEFAULT_PLAYER_CREDENTIALS, // defaults
@@ -812,9 +823,9 @@ export class Character {
 			return;
 		}
 
-		// For whisper channel, update lastWhisperFrom for reply functionality
+		// For whisper channel, update lastWhisperFromId for reply functionality
 		if (channel === CHANNEL.WHISPER && speaker !== this) {
-			this.lastWhisperFrom = speaker.credentials.username;
+			this.lastWhisperFromId = speaker.credentials.characterId;
 		}
 
 		const formatted = formatChannelMessage(
@@ -922,6 +933,7 @@ export class Character {
 	public serialize(): SerializedCharacter {
 		const c = this.credentials;
 		const serializedCreds: SerializedPlayerCredentials = {
+			characterId: c.characterId,
 			username: c.username,
 			passwordHash: c.passwordHash,
 			email: c.email,
@@ -976,7 +988,13 @@ export class Character {
 		// Deserialize the mob using the dungeon system's deserializer
 		const mob = Mob.deserialize(mobDataWithType);
 
+		// Handle backward compatibility: if characterId is missing, assign a temporary one
+		// This should only happen for old characters that were created before character IDs
+		// In production, you'd want to migrate these properly
+		const characterId = data.credentials.characterId ?? Number.MAX_SAFE_INTEGER;
+
 		const creds: PlayerCredentials = {
+			characterId,
 			username: data.credentials.username,
 			passwordHash: data.credentials.passwordHash,
 			email: data.credentials.email,

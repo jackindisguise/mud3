@@ -7,6 +7,10 @@
  * @module board
  */
 
+import { Game } from "./game.js";
+import { Character, MESSAGE_GROUP } from "./character.js";
+import { saveBoard } from "./package/board.js";
+
 export interface BoardMessage {
 	/** Unique message ID */
 	id: number;
@@ -20,6 +24,8 @@ export interface BoardMessage {
 	postedAt: string; // ISO string
 	/** Optional list of usernames this message is targeted to. If undefined/empty, message is public. */
 	targets?: string[];
+	/** Optional list of character IDs who have read this message */
+	readBy?: number[];
 }
 
 export type WritePermission = "all" | "admin";
@@ -33,6 +39,20 @@ export interface SerializedBoard {
 	writePermission?: WritePermission;
 	messages: BoardMessage[];
 	nextMessageId: number;
+}
+
+export interface SerializedBoardConfig {
+	name: string;
+	displayName: string;
+	description: string;
+	permanent: boolean;
+	expirationMs?: number;
+	writePermission?: WritePermission;
+	nextMessageId: number;
+}
+
+export interface SerializedBoardMessages {
+	messages: BoardMessage[];
 }
 
 /**
@@ -95,7 +115,7 @@ export class Board {
 	 * @param targets - Optional list of usernames to target. If undefined/empty, message is public.
 	 * @returns The created message
 	 */
-	public addMessage(
+	public createMessage(
 		author: string,
 		subject: string,
 		content: string,
@@ -110,6 +130,31 @@ export class Board {
 			targets: targets && targets.length > 0 ? targets : undefined,
 		};
 		this.messages.push(message);
+
+		// Notify targeted characters that they have mail
+		if (message.targets && message.targets.length > 0 && Game.game) {
+			Game.game.forEachCharacter((character: Character) => {
+				const targetUsername = character.credentials.username.toLowerCase();
+				const isTarget = message.targets!.some(
+					(t) => t.toLowerCase() === targetUsername
+				);
+
+				if (isTarget) {
+					// Check if board has access restriction and target doesn't have access
+					if (this.writePermission === "admin" && !character.isAdmin()) {
+						// Skip notifying this target - they don't have access
+						return;
+					}
+
+					// Send notification
+					character.sendMessage(
+						`You have new mail on the ${this.displayName} board from ${author}. Type: board ${this.name} read ${message.id}`,
+						MESSAGE_GROUP.SYSTEM
+					);
+				}
+			});
+		}
+
 		return message;
 	}
 
@@ -144,6 +189,57 @@ export class Board {
 	 */
 	public getMessage(messageId: number): BoardMessage | undefined {
 		return this.messages.find((m) => m.id === messageId);
+	}
+
+	/**
+	 * Marks a message as read by a character ID.
+	 * Adds the character ID to the message's readBy array if not already present.
+	 * Automatically saves the board to persist the read status.
+	 *
+	 * @param messageId - The message ID to mark as read
+	 * @param characterId - The character ID that read the message
+	 * @returns True if the message was found and marked, false otherwise
+	 */
+	public async markMessageAsRead(
+		messageId: number,
+		characterId: number
+	): Promise<boolean> {
+		const message = this.getMessage(messageId);
+		if (!message) {
+			return false;
+		}
+
+		// Initialize readBy array if it doesn't exist
+		if (!message.readBy) {
+			message.readBy = [];
+		}
+
+		// Add character ID if not already present
+		if (!message.readBy.includes(characterId)) {
+			message.readBy.push(characterId);
+			// Save the board to persist the read status
+			await saveBoard(this).catch((err) => {
+				// Error saving is logged by saveBoard, continue anyway
+			});
+		}
+
+		return true;
+	}
+
+	/**
+	 * Checks if a message has been read by a character ID.
+	 *
+	 * @param messageId - The message ID to check
+	 * @param characterId - The character ID to check
+	 * @returns True if the message has been read by the character, false otherwise
+	 */
+	public isMessageReadBy(messageId: number, characterId: number): boolean {
+		const message = this.getMessage(messageId);
+		if (!message || !message.readBy) {
+			return false;
+		}
+
+		return message.readBy.includes(characterId);
 	}
 
 	/**
@@ -238,6 +334,34 @@ export class Board {
 	}
 
 	/**
+	 * Serializes board configuration (without messages).
+	 *
+	 * @returns Serialized board configuration
+	 */
+	public serializeConfig(): SerializedBoardConfig {
+		return {
+			name: this.name,
+			displayName: this.displayName,
+			description: this.description,
+			permanent: this.permanent,
+			expirationMs: this.expirationMs,
+			writePermission: this.writePermission,
+			nextMessageId: this.nextMessageId,
+		};
+	}
+
+	/**
+	 * Serializes board messages.
+	 *
+	 * @returns Serialized board messages
+	 */
+	public serializeMessages(): SerializedBoardMessages {
+		return {
+			messages: this.getAllMessages(),
+		};
+	}
+
+	/**
 	 * Creates a Board instance from serialized data.
 	 *
 	 * @param data - Serialized board data
@@ -250,16 +374,35 @@ export class Board {
 			data.description,
 			data.permanent,
 			data.expirationMs,
-			data.writePermission || "all" // Default to "all" for backward compatibility
+			data.writePermission || "all"
+		);
+		board.setMessages(data.messages);
+		board.nextMessageId = data.nextMessageId;
+		return board;
+	}
+
+	/**
+	 * Creates a Board instance from separate config and messages data.
+	 *
+	 * @param config - Serialized board configuration
+	 * @param messages - Serialized board messages
+	 * @returns New Board instance
+	 */
+	public static deserializeFromSeparate(
+		config: SerializedBoardConfig,
+		messages: SerializedBoardMessages
+	): Board {
+		const board = new Board(
+			config.name,
+			config.displayName,
+			config.description,
+			config.permanent,
+			config.expirationMs,
+			config.writePermission || "all"
 		);
 		// Ensure all messages have a subject (for backward compatibility)
-		board.setMessages(
-			data.messages.map((msg) => ({
-				...msg,
-				subject: msg.subject || "(No subject)",
-			}))
-		);
-		board.nextMessageId = data.nextMessageId;
+		board.setMessages(messages.messages);
+		board.nextMessageId = config.nextMessageId;
 		return board;
 	}
 

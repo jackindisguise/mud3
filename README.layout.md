@@ -15,12 +15,13 @@ Explain the features in the game.
 
 # Packages
 Explain the package system.
-1. Saving and loading basic config systems.
-2. Saving and loading helpfiles.
-3. Simple lockfile system that ensures you can't run multiple instances.
+1. Simple lockfile system that ensures you can't run multiple instances.
+2. Saving and loading basic config systems.
+3. Saving and loading helpfiles.
 4. Saving and loading message boards.
 5. Saving and loading characters.
 6. Saving and loading commands.
     1. Allows for pure-text YAML command loading (data/commands/*.yaml).
     2. Allows for plain JavaScript command loading (data/commands/*.js).
     3. Allows for compiled TypeScript command loading (src/commands/*.ts).
+7. Saving and loading gamestate.

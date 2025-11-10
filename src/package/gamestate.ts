@@ -1,20 +1,22 @@
 /**
  * Package: gamestate - YAML persistence for Game Runtime State
  *
- * Persists game runtime state (elapsed time) to `data/gamestate.yaml` and
- * restores it on startup, allowing the game to maintain continuity across
- * server restarts.
+ * Persists game runtime state (elapsed time and character ID counter) to
+ * `data/gamestate.yaml` and restores it on startup, allowing the game to
+ * maintain continuity across server restarts.
  *
  * Behavior
  * - Stores total elapsed game time in milliseconds
+ * - Stores next character ID to assign (for unique character identification)
  * - On save, writes YAML without references and with a wide line width for readability
  * - On load, calculates downtime and adds it to elapsed time
- * - If the file is absent/unreadable, starts from zero
+ * - If the file is absent/unreadable, starts from zero elapsed time and ID 1
  *
  * @example
- * import gamestatePkg, { getElapsedTime, saveGameState } from './package/gamestate.js';
+ * import gamestatePkg, { getElapsedTime, getNextCharacterId, saveGameState } from './package/gamestate.js';
  * await gamestatePkg.loader();
  * const elapsed = getElapsedTime(); // milliseconds since game started
+ * const characterId = await getNextCharacterId(); // get next unique character ID
  * await saveGameState();
  *
  * @module package/gamestate
@@ -36,11 +38,14 @@ export interface SerializedGameState {
 	elapsedTime: number;
 	/** Timestamp when this state was last saved (ISO string) */
 	lastSaved: string;
+	/** Next character ID to assign */
+	nextCharacterId: number;
 }
 
 export const GAME_STATE_DEFAULT: SerializedGameState = {
 	elapsedTime: 0,
 	lastSaved: new Date().toISOString(),
+	nextCharacterId: 1,
 } as const;
 
 // make a copy of the default, don't reference it directly plz
@@ -67,6 +72,20 @@ export function getElapsedTime(): number {
  */
 export function getSessionElapsedTime(): number {
 	return Date.now() - sessionStartTime;
+}
+
+/**
+ * Get the next available character ID and increment the counter.
+ * This function is thread-safe in the sense that it atomically
+ * reads, increments, and saves the ID.
+ *
+ * @returns The next character ID to assign
+ */
+export async function getNextCharacterId(): Promise<number> {
+	const id = GAME_STATE.nextCharacterId;
+	GAME_STATE.nextCharacterId++;
+	await saveGameState();
+	return id;
 }
 
 /**
@@ -115,6 +134,14 @@ export async function loadGameState(): Promise<void> {
 				GAME_STATE.lastSaved = data.lastSaved;
 				logger.debug(`Set lastSaved = ${data.lastSaved}`);
 			}
+		}
+
+		// Merge nextCharacterId
+		if (data.nextCharacterId !== undefined) {
+			GAME_STATE.nextCharacterId = data.nextCharacterId;
+			logger.debug(`Loaded nextCharacterId = ${GAME_STATE.nextCharacterId}`);
+		} else {
+			logger.debug(`DEFAULT nextCharacterId = ${GAME_STATE.nextCharacterId}`);
 		}
 
 		sessionStartTime = Date.now();

@@ -44,7 +44,9 @@ import {
 	loadCharacterFromSerialized,
 } from "./package/character.js";
 import { getAllBoards, saveBoard } from "./package/board.js";
-import { saveGameState } from "./package/gamestate.js";
+import { Board } from "./board.js";
+import { saveGameState, getNextCharacterId } from "./package/gamestate.js";
+import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 
 // Default intervals/timeouts (milliseconds)
@@ -409,9 +411,9 @@ export class Game {
 			});
 		};
 
-		const MOTD = (existingCharacter?: Character) => {
+		const MOTD = async (existingCharacter?: Character) => {
 			sendLine("This is the MOTD.");
-			ask("Press any key to continue...", () => {
+			ask("Press any key to continue...", async () => {
 				let character: Character;
 
 				if (existingCharacter) {
@@ -419,12 +421,13 @@ export class Game {
 					character = existingCharacter;
 				} else {
 					// Create a new character
+					const characterId = await getNextCharacterId();
 					const mob = new Mob({
 						display: username,
 						keywords: username,
 					});
 					character = new Character({
-						credentials: { username },
+						credentials: { username, characterId },
 						mob,
 					});
 					character.setPassword(password);
@@ -479,6 +482,9 @@ export class Game {
 	private startPlayerSession(session: LoginSession, character: Character) {
 		const connectionId = this.nextConnectionId++;
 
+		// Save last login date before updating it
+		const lastLoginDate = character.credentials.lastLogin;
+
 		// Start character session (attach client for convenience send helpers)
 		character.startSession(connectionId, session.client);
 
@@ -498,10 +504,141 @@ export class Game {
 
 		logger.info(`${character.credentials.username} has entered the game`);
 
+		// Check for unread messages
+		this.checkUnreadMessages(character, lastLoginDate);
+
 		// Wire gameplay input handler now that the player is in the world
 		session.client.on("input", (line: string) => {
 			this.handleClientInput(session, line);
 		});
+	}
+
+	/**
+	 * Check for unread messages on boards and notify the character.
+	 * Shows two types of alerts:
+	 * 1. General board activity: boards with new messages since last login
+	 * 2. Direct messages: messages specifically targeted at the character
+	 *
+	 * @param character - The character to check for unread messages
+	 * @param lastLoginDate - The character's last login date (before current session)
+	 */
+	private async checkUnreadMessages(
+		character: Character,
+		lastLoginDate: Date
+	): Promise<void> {
+		try {
+			const boards = await getAllBoards();
+			const username = character.credentials.username.toLowerCase();
+			const boardActivity: Array<{
+				board: Board;
+				count: number;
+			}> = [];
+			const directMessages: Array<{
+				board: Board;
+				messageId: number;
+				author: string;
+			}> = [];
+
+			for (const board of boards) {
+				// Check if user has access to this board
+				// If board is admin-only and user is not admin, skip it
+				if (board.writePermission === "admin" && !character.isAdmin()) {
+					continue;
+				}
+
+				// Get all messages posted after last login
+				const messages = board.getAllMessages();
+				let newMessageCount = 0;
+
+				for (const message of messages) {
+					const messageDate = new Date(message.postedAt);
+
+					// Check if message was posted after last login
+					if (messageDate <= lastLoginDate) {
+						continue;
+					}
+
+					newMessageCount++;
+
+					// Check if message is targeted at this user
+					if (message.targets && message.targets.length > 0) {
+						const isTarget = message.targets.some(
+							(target) => target.toLowerCase() === username
+						);
+						if (isTarget) {
+							directMessages.push({
+								board,
+								messageId: message.id,
+								author: message.author,
+							});
+						}
+					}
+				}
+
+				// Track board activity if there are new messages
+				if (newMessageCount > 0) {
+					boardActivity.push({
+						board,
+						count: newMessageCount,
+					});
+				}
+			}
+
+			// Buffer all message lines
+			const messageLines: string[] = [];
+
+			// Add general board activity
+			if (boardActivity.length > 0) {
+				messageLines.push("");
+				messageLines.push(
+					color("=== New Messages on Boards ===", COLOR.YELLOW)
+				);
+				for (const activity of boardActivity) {
+					const messageText = activity.count === 1 ? "message" : "messages";
+					messageLines.push(
+						`  ${color("•", COLOR.CYAN)} ${color(
+							activity.board.displayName,
+							COLOR.LIME
+						)} has ${color(
+							activity.count.toString(),
+							COLOR.YELLOW
+						)} new ${messageText}.`
+					);
+				}
+				messageLines.push("");
+			}
+
+			// Add direct messages
+			if (directMessages.length > 0) {
+				messageLines.push(
+					color("=== Unread Direct Messages ===", COLOR.PURPLE)
+				);
+				for (const msg of directMessages) {
+					messageLines.push(
+						`  ${color("•", COLOR.CYAN)} New message from ${color(
+							msg.author,
+							COLOR.LIME
+						)} on the ${color(msg.board.displayName, COLOR.YELLOW)} board.`
+					);
+					messageLines.push(
+						`    ${color("Type:", COLOR.SILVER)} ${color(
+							`board ${msg.board.name} read ${msg.messageId}`,
+							COLOR.CYAN
+						)}`
+					);
+				}
+				messageLines.push("");
+			}
+
+			// Send all buffered lines in a single message
+			if (messageLines.length > 0) {
+				character.sendMessage(messageLines.join("\n"), MESSAGE_GROUP.SYSTEM);
+			}
+		} catch (error) {
+			logger.error(
+				`Failed to check unread messages for ${character.credentials.username}: ${error}`
+			);
+		}
 	}
 
 	/**

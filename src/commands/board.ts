@@ -12,7 +12,7 @@
  * board general write             // Start interactive write sequence
  * ```
  *
- * **Pattern:** `board <boardname:word?> <action:word?> <id:number?>`
+ * **Pattern:** `board <boardname:word?> <action:word?> <id:word?>`
  * @module commands/board
  */
 
@@ -21,17 +21,17 @@ import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { loadBoard, saveBoard } from "../package/board.js";
 import { Board, BoardMessage } from "../board.js";
-import { color, COLOR, textStyleToTag, TEXT_STYLE } from "../color.js";
+import { color, COLOR, textStyleToTag, TEXT_STYLE, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { string } from "mud-ext";
 import { showBoardsList } from "./boards.js";
 
 export default {
-	pattern: "board <boardname:word?> <action:word?> <id:number?>",
-	execute(context: CommandContext, args: Map<string, any>): void {
+	pattern: "board <boardname:word?> <action:word?> <id:word?>",
+	async execute(context: CommandContext, args: Map<string, any>) {
 		const boardName = args.get("boardname") as string | undefined;
 		const action = args.get("action") as string | undefined;
-		const id = args.get("id") as number | undefined;
+		const idArg = args.get("id") as string | undefined;
 		const message = args.get("message") as string | undefined;
 		const { actor } = context;
 		const character = actor.character;
@@ -51,96 +51,141 @@ export default {
 		}
 
 		// Load the board
-		loadBoard(boardName)
-			.then((board) => {
-				if (!board) {
+		try {
+			const board = await loadBoard(boardName);
+			if (!board) {
+				actor.sendMessage(
+					`Board "${color(
+						boardName,
+						COLOR.YELLOW
+					)}" does not exist. Use ${color(
+						"boards",
+						COLOR.CYAN
+					)} to see available boards.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			// Remove expired messages before processing
+			const removed = board.removeExpiredMessages();
+			if (removed > 0) {
+				saveBoard(board).catch((err) => {
+					// Error saving is logged by saveBoard, continue anyway
+				});
+			}
+
+			// Handle different actions
+			if (!action || action === "") {
+				// List all messages (subject lines only)
+				displayBoard(
+					actor,
+					board,
+					character.credentials.username,
+					character.credentials.characterId
+				);
+			} else if (action.toLowerCase() === "read") {
+				// Check for "read next" command
+				if (!idArg || idArg.toLowerCase() === "next") {
+					// Find oldest unread message
+					const visibleMessages = board.getVisibleMessages(
+						character.credentials.username
+					);
+					const unreadMessages = visibleMessages.filter(
+						(msg) =>
+							!board.isMessageReadBy(msg.id, character.credentials.characterId)
+					);
+
+					if (unreadMessages.length === 0) {
+						actor.sendMessage(
+							"No unread messages on this board.",
+							MESSAGE_GROUP.COMMAND_RESPONSE
+						);
+						return;
+					}
+
+					// Sort by ID (oldest first) and get the first one
+					const oldestUnread = unreadMessages.sort((a, b) => a.id - b.id)[0];
+
+					// Display and mark as read
+					await displayAndMarkMessageAsRead(
+						actor,
+						board,
+						oldestUnread,
+						character.credentials.characterId
+					);
+					return;
+				}
+
+				// Parse idArg as a number
+				const idValue = parseInt(idArg, 10);
+				if (isNaN(idValue)) {
 					actor.sendMessage(
-						`Board "${color(
-							boardName,
-							COLOR.YELLOW
-						)}" does not exist. Use ${color(
-							"boards",
+						`Invalid message ID. Use: ${color(
+							`board ${boardName} read <id>`,
 							COLOR.CYAN
-						)} to see available boards.`,
+						)} or ${color(`board ${boardName} read next`, COLOR.CYAN)}`,
 						MESSAGE_GROUP.COMMAND_RESPONSE
 					);
 					return;
 				}
 
-				// Remove expired messages before processing
-				const removed = board.removeExpiredMessages();
-				if (removed > 0) {
-					saveBoard(board).catch((err) => {
-						// Error saving is logged by saveBoard, continue anyway
-					});
-				}
-
-				// Handle different actions
-				if (!action || action === "") {
-					// List all messages (subject lines only)
-					displayBoard(actor, board, character.credentials.username);
-				} else if (action.toLowerCase() === "read") {
-					// Read specific message by ID
-					if (id === undefined) {
-						actor.sendMessage(
-							`Which message? Use: ${color(
-								`board ${boardName} read <id>`,
-								COLOR.CYAN
-							)}`,
-							MESSAGE_GROUP.COMMAND_RESPONSE
-						);
-						return;
-					}
-					const msg = board.getMessage(id);
-					if (!msg) {
-						actor.sendMessage(
-							`Message #${id} not found on this board.`,
-							MESSAGE_GROUP.COMMAND_RESPONSE
-						);
-						return;
-					}
-					// Check if user can see this message
-					if (!Board.isMessageVisible(msg, character.credentials.username)) {
-						actor.sendMessage(
-							`Message #${id} is not visible to you.`,
-							MESSAGE_GROUP.COMMAND_RESPONSE
-						);
-						return;
-					}
-					displayMessage(actor, board, msg);
-				} else if (
-					action.toLowerCase() === "write" ||
-					action.toLowerCase() === "post"
-				) {
-					// Check if user has permission to write to this board
-					if (!board.canWrite(character.isAdmin())) {
-						actor.sendMessage(
-							`Only administrators can post to the ${color(
-								board.displayName,
-								COLOR.YELLOW
-							)} board.`,
-							MESSAGE_GROUP.COMMAND_RESPONSE
-						);
-						return;
-					}
-					// Start interactive write sequence
-					startWriteSequence(character, board, boardName);
-				} else {
+				// Read specific message by ID
+				const msg = board.getMessage(idValue);
+				if (!msg) {
 					actor.sendMessage(
-						`Unknown action "${action}". Use ${color(
-							"read",
-							COLOR.CYAN
-						)} to view messages or ${color("write", COLOR.CYAN)} to post.`,
+						`Message #${idValue} not found on this board.`,
 						MESSAGE_GROUP.COMMAND_RESPONSE
 					);
+					return;
 				}
-			})
-			.catch((err) => {
+				// Check if user can see this message
+				if (!Board.isMessageVisible(msg, character.credentials.username)) {
+					actor.sendMessage(
+						`Message #${idValue} is not visible to you.`,
+						MESSAGE_GROUP.COMMAND_RESPONSE
+					);
+					return;
+				}
+				// Display and mark as read
+				await displayAndMarkMessageAsRead(
+					actor,
+					board,
+					msg,
+					character.credentials.characterId
+				);
+			} else if (
+				action.toLowerCase() === "write" ||
+				action.toLowerCase() === "post"
+			) {
+				// Check if user has permission to write to this board
+				if (!board.canWrite(character.isAdmin())) {
+					actor.sendMessage(
+						`Only administrators can post to the ${color(
+							board.displayName,
+							COLOR.YELLOW
+						)} board.`,
+						MESSAGE_GROUP.COMMAND_RESPONSE
+					);
+					return;
+				}
+				// Start interactive write sequence
+				startWriteSequence(character, board, boardName);
+			} else {
 				actor.sendMessage(
-					"Error loading board. Please try again.",
+					`Unknown action "${action}". Use ${color(
+						"read",
+						COLOR.CYAN
+					)} to view messages or ${color("write", COLOR.CYAN)} to post.`,
 					MESSAGE_GROUP.COMMAND_RESPONSE
 				);
-			});
+			}
+		} catch (err) {
+			actor.sendMessage(
+				"Error loading board. Please try again.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+		}
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {
@@ -151,25 +196,37 @@ export default {
 	},
 } satisfies CommandObject;
 
-function displayBoard(actor: any, board: Board, username: string): void {
-	const lines: string[] = [];
-	lines.push(color(`=== ${board.displayName} Board ===`, COLOR.YELLOW));
-	lines.push(color(board.description, COLOR.SILVER));
-	lines.push("");
-
+function displayBoard(
+	actor: any,
+	board: Board,
+	username: string,
+	characterId: number
+): void {
 	// Get visible messages for this user
 	const visibleMessages = board.getVisibleMessages(username);
 
+	const headerLines = [color(board.description, COLOR.SILVER)];
+
 	if (visibleMessages.length === 0) {
-		lines.push(color("No messages visible on this board.", COLOR.SILVER));
+		headerLines.push(color("No messages visible on this board.", COLOR.SILVER));
 	} else {
-		lines.push(
+		headerLines.push(
 			`${color("Messages:", COLOR.CYAN)} ${
 				visibleMessages.length
 			} (${board.getMessageCount()} total)`
 		);
-		lines.push("");
+	}
 
+	// Header box with board description
+	const header = string.box({
+		input: [...headerLines],
+		width: 76,
+		sizer: SIZER,
+	});
+
+	// Message list box
+	let messageListLines: string[] = [];
+	if (visibleMessages.length > 0) {
 		// Show last 10 messages (most recent first)
 		const recentMessages = visibleMessages.slice().reverse().slice(0, 10);
 
@@ -180,33 +237,97 @@ function displayBoard(actor: any, board: Board, username: string): void {
 				msg.targets && msg.targets.length > 0
 					? ` ${color("(targeted)", COLOR.PURPLE)}`
 					: "";
-			lines.push(
+			// Check if message has been read by this character
+			const isRead = board.isMessageReadBy(msg.id, characterId);
+			const readStatus = isRead
+				? ` ${color("[read]", COLOR.LIME)}`
+				: ` ${color("[unread]", COLOR.YELLOW)}`;
+			messageListLines.push(
 				`${color(`[${msg.id}]`, COLOR.CYAN)} ${color(
 					msg.subject,
 					COLOR.WHITE
 				)} - ${color(msg.author, COLOR.LIME)} ${color(
 					timeAgo,
 					COLOR.SILVER
-				)}${targetInfo}`
-			);
-		}
-
-		if (visibleMessages.length > 10) {
-			lines.push(
-				color(
-					`... and ${
-						visibleMessages.length - 10
-					} more visible message(s). Use ${color(
-						`board ${board.name} read <id>`,
-						COLOR.CYAN
-					)} to read specific messages.`,
-					COLOR.SILVER
-				)
+				)}${targetInfo}${readStatus}`
 			);
 		}
 	}
 
-	actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+	const messageList = string.box({
+		input: messageListLines,
+		width: 76,
+		sizer: SIZER,
+		style: {
+			hPadding: 2,
+			vPadding: 1,
+		},
+	});
+
+	// Footer box with help text (if there are more messages)
+	let footerLines: string[] = [];
+	if (visibleMessages.length > 10) {
+		footerLines.push(
+			color(
+				`... and ${
+					visibleMessages.length - 10
+				} more visible message(s). Use ${color(
+					`board ${board.name} read <id>`,
+					COLOR.CYAN
+				)} to read specific messages, or ${color(
+					`board ${board.name} read next`,
+					COLOR.CYAN
+				)} to read the oldest unread message.`,
+				COLOR.SILVER
+			)
+		);
+	}
+
+	let megaBoxInput: string[] = [...header, ...messageList];
+	if (footerLines.length > 0) {
+		const footer = string.box({
+			input: footerLines,
+			width: 76,
+			sizer: SIZER,
+			style: {
+				hAlign: string.PAD_SIDE.LEFT,
+			},
+		});
+		megaBoxInput = [...megaBoxInput, ...footer];
+	}
+
+	const megaBox = string.box({
+		input: megaBoxInput,
+		width: 80,
+		sizer: SIZER,
+		title: color(`${board.displayName} Board`, COLOR.YELLOW),
+		style: {
+			...string.BOX_STYLES.ROUNDED,
+			titleHAlign: string.PAD_SIDE.CENTER,
+		},
+	});
+
+	actor.sendMessage(megaBox.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+}
+
+/**
+ * Displays a message and marks it as read by the character.
+ * This is a convenience function that combines displayMessage and markMessageAsRead.
+ *
+ * @param actor - The actor viewing the message
+ * @param board - The board containing the message
+ * @param msg - The message to display and mark as read
+ * @param characterId - The character ID marking the message as read
+ */
+async function displayAndMarkMessageAsRead(
+	actor: any,
+	board: Board,
+	msg: BoardMessage,
+	characterId: number
+): Promise<void> {
+	// Mark message as read (automatically saves the board)
+	await board.markMessageAsRead(msg.id, characterId);
+	displayMessage(actor, board, msg);
 }
 
 function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
@@ -214,28 +335,43 @@ function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
 	const postedDate = new Date(msg.postedAt);
 	const formattedDate = postedDate.toLocaleString();
 
-	lines.push(color(`=== Message #${msg.id} ===`, COLOR.YELLOW));
-	lines.push(`${color("Board:", COLOR.CYAN)} ${board.displayName}`);
-	lines.push(
-		`${color("Author:", COLOR.CYAN)} ${color(msg.author, COLOR.LIME)}`
-	);
-	lines.push(`${color("Posted:", COLOR.CYAN)} ${formattedDate}`);
-	if (msg.targets && msg.targets.length > 0) {
-		lines.push(
-			`${color("Targeted to:", COLOR.CYAN)} ${color(
-				msg.targets.join(", "),
-				COLOR.PURPLE
-			)}`
-		);
-	}
-	lines.push("");
-	lines.push(
-		`${color("Subject:", COLOR.CYAN)} ${color(msg.subject, COLOR.WHITE)}`
-	);
-	lines.push("");
-	lines.push(msg.content);
+	const header = string.box({
+		input: [
+			`${color("Author:", COLOR.CYAN)} ${color(msg.author, COLOR.LIME)}`,
+			`${color("Subject:", COLOR.CYAN)} ${color(msg.subject, COLOR.WHITE)}`,
+		],
+		width: 76,
+		sizer: SIZER,
+	});
+	const content = string.box({
+		input: [...msg.content.split(LINEBREAK)],
+		width: 76,
+		sizer: SIZER,
+		style: {
+			vPadding: 1,
+			hPadding: 2,
+		},
+	});
+	const footer = string.box({
+		input: [`${color("Posted:", COLOR.CYAN)} ${formattedDate}`],
+		width: 76,
+		sizer: SIZER,
+		style: {
+			hAlign: string.PAD_SIDE.LEFT,
+		},
+	});
+	const megaBox = string.box({
+		input: [...header, ...content, ...footer],
+		width: 80,
+		sizer: SIZER,
+		title: color(`${board.displayName} Message #${msg.id}`, COLOR.CYAN),
+		style: {
+			...string.BOX_STYLES.ROUNDED,
+			titleHAlign: string.PAD_SIDE.CENTER,
+		},
+	});
 
-	actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+	actor.sendMessage(megaBox.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
 /**
@@ -305,7 +441,7 @@ function startWriteSequence(
 		sendLine(color("=== Current Message Body ===", COLOR.YELLOW));
 		bodyLines.forEach((line, index) => {
 			sendLine(
-				`${color(`${(index + 1).toString().padStart(3)}:`, COLOR.CYAN)} ${line}`
+				`${color(`${(index + 1).toString().padStart(2)}:`, COLOR.CYAN)} ${line}`
 			);
 		});
 		sendLine("");
@@ -345,7 +481,7 @@ function startWriteSequence(
 			return;
 		}
 		// Wrap the text at 80 characters
-		const wrapped = string.wrap(text, 80);
+		const wrapped = string.wrap(text, 72);
 		// Add color reset code to each line
 		const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
 		const linesWithReset = wrapped.map((line) => line + resetTag);
@@ -538,7 +674,7 @@ function startWriteSequence(
 			);
 		} else {
 			// Wrap the input at 80 characters and add to body
-			const wrapped = string.wrap(trimmed, 80);
+			const wrapped = string.wrap(trimmed, 72);
 			// Add color reset code to each line
 			const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
 			const linesWithReset = wrapped.map((line) => line + resetTag);
@@ -586,35 +722,31 @@ function startWriteSequence(
 			sendLine(line);
 		}
 
-		yesno("Submit this message?", (confirmed) => {
+		yesno("Submit this message?", async (confirmed) => {
 			if (confirmed === true) {
 				// Save the message
-				const newMessage = board.addMessage(
+				const newMessage = board.createMessage(
 					character.credentials.username,
 					subject,
 					content,
 					targets.length > 0 ? targets : undefined
 				);
-				saveBoard(board)
-					.then(() => {
-						const targetInfo =
-							newMessage.targets && newMessage.targets.length > 0
-								? ` (targeted to ${newMessage.targets.join(", ")})`
-								: "";
-						character.sendMessage(
-							`Message #${newMessage.id} posted to ${color(
-								board.displayName,
-								COLOR.YELLOW
-							)} board${targetInfo}.`,
-							MESSAGE_GROUP.COMMAND_RESPONSE
-						);
-					})
-					.catch((err) => {
-						character.sendMessage(
-							"Error saving message. Please try again.",
-							MESSAGE_GROUP.COMMAND_RESPONSE
-						);
-					});
+				// Mark message as read by the author (automatically saves the board)
+				await board.markMessageAsRead(
+					newMessage.id,
+					character.credentials.characterId
+				);
+				const targetInfo =
+					newMessage.targets && newMessage.targets.length > 0
+						? ` (targeted to ${newMessage.targets.join(", ")})`
+						: "";
+				character.sendMessage(
+					`Message #${newMessage.id} posted to ${color(
+						board.displayName,
+						COLOR.YELLOW
+					)} board${targetInfo}.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
 			} else if (confirmed === false) {
 				// User declined - ask if they want to continue editing
 				yesno("Continue editing?", (continueEditing) => {

@@ -22,6 +22,7 @@ suite("character.ts", () => {
 		overrides: Partial<PlayerCredentials> = {}
 	): PlayerCredentials {
 		return {
+			characterId: 1,
 			username: "testuser",
 			passwordHash: "hashed_password_123",
 			email: "test@example.com",
@@ -48,7 +49,14 @@ suite("character.ts", () => {
 			mob: mob,
 		};
 
-		return new Character({ ...defaultOptions, ...overrides });
+		// Ensure characterId is always present, even if credentials are overridden
+		const mergedOptions = { ...defaultOptions, ...overrides };
+		if (mergedOptions.credentials && !mergedOptions.credentials.characterId) {
+			mergedOptions.credentials.characterId =
+				defaultOptions.credentials.characterId;
+		}
+
+		return new Character(mergedOptions);
 	}
 
 	// Helper to create a lightweight mock MudClient for session tests
@@ -540,7 +548,10 @@ suite("character.ts", () => {
 
 	suite("Edge Cases", () => {
 		test("should handle creating character with minimal credentials", () => {
-			const credentials: RequiredPlayerCredentials = { username: "minimal" };
+			const credentials = createTestCredentials({
+				username: "minimal",
+				email: undefined,
+			});
 
 			const mob = new Mob();
 			const character = new Character({ credentials, mob });

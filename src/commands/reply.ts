@@ -20,7 +20,7 @@ import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP, Character } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { CHANNEL } from "../channel.js";
-import { Game } from "../game.js";
+import { getCharacterById } from "../package/character.js";
 
 export default {
 	pattern: "reply~ <message:text>",
@@ -47,7 +47,7 @@ export default {
 		}
 
 		// Check if there's someone to reply to
-		if (!character.lastWhisperFrom) {
+		if (!character.lastWhisperFromId) {
 			actor.sendMessage(
 				"No one has whispered to you yet.",
 				MESSAGE_GROUP.COMMAND_RESPONSE
@@ -55,20 +55,12 @@ export default {
 			return;
 		}
 
-		// Find the target character (case-insensitive)
-		const targetName = character.lastWhisperFrom;
-		let target: Character | undefined;
-		Game.game!.forEachCharacter((char) => {
-			if (
-				char.credentials.username.toLowerCase() === targetName.toLowerCase()
-			) {
-				target = char;
-			}
-		});
+		// Find the target character by ID
+		const target = getCharacterById(character.lastWhisperFromId);
 
 		if (!target) {
 			actor.sendMessage(
-				`${targetName} is no longer online.`,
+				"That player is no longer online.",
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

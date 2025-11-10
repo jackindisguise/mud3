@@ -58,6 +58,7 @@ const CHAR_DIR = join(process.cwd(), "data", "characters");
 // --- Active character registry (local lock) ---
 type ActiveEntry = { character: Character; since: Date };
 const ACTIVE_REGISTRY: Map<string, ActiveEntry> = new Map();
+const ACTIVE_ID_REGISTRY: Map<number, Character> = new Map();
 
 function normalizeUsernameKey(username: string): string {
 	return username.trim().toLowerCase();
@@ -70,8 +71,9 @@ export function registerActiveCharacter(character: Character): boolean {
 	const key = normalizeUsernameKey(character.credentials.username);
 	if (ACTIVE_REGISTRY.has(key)) return false;
 	ACTIVE_REGISTRY.set(key, { character, since: new Date() });
+	ACTIVE_ID_REGISTRY.set(character.credentials.characterId, character);
 	logger.debug(
-		`Registered active character: ${character.credentials.username}`
+		`Registered active character: ${character.credentials.username} (ID: ${character.credentials.characterId})`
 	);
 	return true;
 }
@@ -84,8 +86,12 @@ export function unregisterActiveCharacter(character: Character): boolean;
 export function unregisterActiveCharacter(arg: string | Character): boolean {
 	const username = typeof arg === "string" ? arg : arg.credentials.username;
 	const key = normalizeUsernameKey(username);
+	const entry = ACTIVE_REGISTRY.get(key);
 	const removed = ACTIVE_REGISTRY.delete(key);
-	if (removed) logger.debug(`Unregistered active character: ${username}`);
+	if (removed && entry) {
+		ACTIVE_ID_REGISTRY.delete(entry.character.credentials.characterId);
+		logger.debug(`Unregistered active character: ${username}`);
+	}
 	return removed;
 }
 
@@ -97,6 +103,16 @@ export function isCharacterActive(username: string): boolean {
 /** Get currently active Character instances. */
 export function getActiveCharacters(): Character[] {
 	return Array.from(ACTIVE_REGISTRY.values()).map((e) => e.character);
+}
+
+/**
+ * Get a logged-in character by their character ID.
+ *
+ * @param characterId - The character ID to look up
+ * @returns The Character instance if found and active, undefined otherwise
+ */
+export function getCharacterById(characterId: number): Character | undefined {
+	return ACTIVE_ID_REGISTRY.get(characterId);
 }
 
 function sanitizeUsername(username: string): string {

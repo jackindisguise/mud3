@@ -22,9 +22,11 @@ describe("package/character.ts", () => {
 
 		const character = new Character({
 			credentials: {
+				characterId: 1,
 				username,
 				passwordHash: Character.hashPassword(password),
 				createdAt: new Date(),
+				lastLogin: new Date(),
 				isActive: true,
 				isBanned: false,
 				isAdmin: false,

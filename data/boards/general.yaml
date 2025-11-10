@@ -4,22 +4,4 @@ description: General messages.
 permanent: false
 expirationMs: 2592000000
 writePermission: all
-messages:
-  - id: 1
-    author: Judas
-    content: What up foos.
-    postedAt: '2025-11-09T15:31:34.464Z'
-    subject: (No subject)
-  - id: 2
-    author: Judas
-    subject: What up yo?
-    content: "hello cutie\r\nyou a cutie\r\nyoyoyo"
-    postedAt: '2025-11-09T15:58:49.687Z'
-    targets:
-      - judas
-  - id: 3
-    author: Judas
-    subject: dis a test yo
-    content: "{RHello, citizens.\r\nWhat is up?\r\n{YYah yah.\r\n{YWe in dis shit for sho.\r\nhehe."
-    postedAt: '2025-11-09T16:40:36.336Z'
-nextMessageId: 4
+nextMessageId: 6

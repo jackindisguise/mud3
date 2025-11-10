@@ -1,0 +1,8 @@
+messages:
+  - id: 1
+    author: SYSTEM
+    subject: Version 1.0.0
+    content: "### Features\r\n\r\n* Add customizable channel message patterns and recipient formatting (f184a8b)\r\n* Add persistent message board system with interactive editor and colorized who command (bc2742c)\r\n* added autocomplete literals to command patterns (c73c090)\r\n* added logger (6a3d6e5)\r\n* doin a lot out here (8d44100)\r\n* implement channel system with SAY support and admin tools (6403972)\r\n* we be doin this (aa71119)\r\n\r\n\r\n### Bug Fixes\r\n\r\n* fixed development flow a little bit (139f47b)\r\n* fixed mob/character relationship (e342f44)"
+    postedAt: '2025-11-10T05:14:15.103Z'
+    readBy:
+      - 2

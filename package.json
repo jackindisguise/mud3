@@ -16,7 +16,8 @@
 		"doc": "npx typedoc",
 		"deploy": "npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
-		"rerun": "npm run build && npm run start"
+		"rerun": "npm run build && npm run start",
+		"post-changelog": "npm run build && node dist/src/scripts/post-changelog-to-board.js"
 	},
 	"devDependencies": {
 		"@types/ini": "^4.1.1",

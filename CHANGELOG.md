@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/jackindisguise/mud3/compare/v1.0.0...v1.1.0) (2025-11-10)
+
+
+### Features
+
+* add character ID system, board read tracking, and improved board UI ([20dd3ce](https://github.com/jackindisguise/mud3/commit/20dd3ce99902276679b4995e9671be5921c8f448))
+* add gamestate package and implement atomic file writes ([4dd7842](https://github.com/jackindisguise/mud3/commit/4dd78427bc058d8f9f39bb8edfa825792135a552))
+
 ## 1.0.0 (2025-11-09)
 
 

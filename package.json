@@ -34,7 +34,7 @@
 		"winston": "^3.18.3"
 	},
 	"dependencies": {
-		"mud-ext": "github:jackindisguise/mud-ext#v2.8.1",
+		"mud-ext": "github:jackindisguise/mud-ext#v2.8.2",
 		"package-loader": "github:jackindisguise/package-loader"
 	}
 }

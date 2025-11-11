@@ -80,16 +80,16 @@ import logger from "./logger.js";
  * ```
  */
 export const enum DIRECTION {
-	NORTH,
-	SOUTH,
-	EAST,
-	WEST,
-	NORTHEAST,
-	NORTHWEST,
-	SOUTHEAST,
-	SOUTHWEST,
-	UP,
-	DOWN,
+	NORTH = 1 << 0,
+	SOUTH = 1 << 1,
+	EAST = 1 << 2,
+	WEST = 1 << 3,
+	NORTHEAST = NORTH | EAST,
+	NORTHWEST = NORTH | WEST,
+	SOUTHEAST = SOUTH | EAST,
+	SOUTHWEST = SOUTH | WEST,
+	UP = 1 << 8,
+	DOWN = 1 << 9,
 }
 
 /**
@@ -953,6 +953,27 @@ export class Dungeon {
 	}
 
 	/**
+	 * Gets the dimensions of this dungeon.
+	 * Returns a copy of the dungeon's width, height, and layers.
+	 *
+	 * @returns The dungeon dimensions
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 10, height: 10, layers: 3 } });
+	 * const dims = dungeon.dimensions;
+	 * console.log(dims.width, dims.height, dims.layers); // 10, 10, 3
+	 * ```
+	 */
+	get dimensions(): MapDimensions {
+		return {
+			width: this._dimensions.width,
+			height: this._dimensions.height,
+			layers: this._dimensions.layers,
+		};
+	}
+
+	/**
 	 * Gets a safe, shallow copy of the dungeon's contents.
 	 * Returns all objects that exist in the dungeon, regardless of their location
 	 * within the dungeon's containment hierarchy.
@@ -1388,6 +1409,7 @@ export interface DungeonObjectOptions {
 	display?: string;
 	description?: string;
 	dungeon?: Dungeon;
+	baseWeight?: number;
 }
 
 /**
@@ -1409,6 +1431,7 @@ export interface DungeonObjectOptions {
  */
 export interface RoomOptions extends DungeonObjectOptions {
 	coordinates: Coordinates;
+	allowedExits?: DIRECTION; // Bitmask of allowed exit directions
 }
 
 /**
@@ -1420,7 +1443,8 @@ export interface RoomOptions extends DungeonObjectOptions {
  * @property display - Human-readable display name
  * @property description - Detailed object description
  * @property contents - Array of serialized contained objects
- * @property dungeonId - ID of the dungeon this object belongs to (if any)
+ * @property baseWeight - The intrinsic weight of the object (optional)
+ * Note: currentWeight is not serialized as it is calculated at runtime from baseWeight and contents.
  */
 export interface SerializedDungeonObject {
 	type: SerializedDungeonObjectType;
@@ -1429,6 +1453,7 @@ export interface SerializedDungeonObject {
 	description?: string;
 	contents?: SerializedDungeonObject[];
 	location?: string; // RoomRef value
+	baseWeight?: number;
 }
 
 /**
@@ -1440,6 +1465,7 @@ export interface SerializedDungeonObject {
 export interface SerializedRoom extends SerializedDungeonObject {
 	type: "Room";
 	coordinates: Coordinates;
+	allowedExits?: DIRECTION;
 }
 
 /**
@@ -1460,7 +1486,7 @@ export interface SerializedMob extends SerializedDungeonObject {
 
 /**
  * Serialized form for Item objects.
- * Currently identical to Movable form but defined for type safety and future extensions.
+ * Currently identical to base form but defined for type safety and future extensions.
  */
 export interface SerializedItem extends SerializedDungeonObject {
 	type: "Item";
@@ -1495,6 +1521,52 @@ export type AnySerializedDungeonObject =
 	| SerializedMob
 	| SerializedItem
 	| SerializedProp;
+
+/**
+ * Template definition for dungeon objects.
+ * Templates store only fields that differ from the base object's default values.
+ * This allows efficient storage and on-demand loading of object definitions.
+ * Note: Contents are runtime state and are not stored in templates.
+ *
+ * @property id - Unique identifier for this template
+ * @property type - The type of dungeon object this template creates
+ * @property keywords - Optional keywords override (only included if different from default)
+ * @property display - Optional display name override (only included if different from default)
+ * @property description - Optional description override (only included if different from default)
+ * @property baseWeight - Optional base weight override (only included if different from default 0)
+ *
+ * @example
+ * ```typescript
+ * // Template that only overrides display, description, and weight
+ * const template: DungeonObjectTemplate = {
+ *   id: "sword-basic",
+ *   type: "Item",
+ *   display: "Iron Sword",
+ *   description: "A well-crafted iron sword.",
+ *   baseWeight: 3.5
+ *   // keywords not included - uses default "dungeon object"
+ * };
+ * ```
+ */
+export interface DungeonObjectTemplate {
+	id: string;
+	type: SerializedDungeonObjectType;
+	keywords?: string;
+	display?: string;
+	description?: string;
+	baseWeight?: number;
+}
+
+/**
+ * Template definition specifically for Room objects.
+ * Extends DungeonObjectTemplate with room-specific properties.
+ *
+ * @property allowedExits - Bitmask of allowed exit directions (only for Room templates)
+ */
+export interface RoomTemplate extends DungeonObjectTemplate {
+	type: "Room";
+	allowedExits?: DIRECTION;
+}
 
 /**
  * Base class for all objects that can exist in the dungeon.
@@ -1542,6 +1614,19 @@ export class DungeonObject {
 	description?: string;
 
 	/**
+	 * The intrinsic weight of this object, not including contents.
+	 * The currentWeight property tracks the total weight including contents.
+	 */
+	baseWeight: number = 0;
+
+	/**
+	 * Current total weight of this object including all contained objects.
+	 * This is automatically managed through add() and remove() operations
+	 * and propagates up the containment chain.
+	 */
+	currentWeight: number = 0;
+
+	/**
 	 * Array of objects directly contained by this object. Acts as a container
 	 * registry for inventory, room contents, or nested object hierarchies.
 	 * @private
@@ -1570,10 +1655,11 @@ export class DungeonObject {
 	 * @param options.display Human-readable display string
 	 * @param options.description Longer descriptive text
 	 * @param options.dungeon If provided, the object will be added to that dungeon
+	 * @param options.baseWeight The intrinsic weight of the object (default: 0)
 	 *
 	 * @example
 	 * ```typescript
-	 * const sword = new DungeonObject({ keywords: "steel sword", display: "A Sword" });
+	 * const sword = new DungeonObject({ keywords: "steel sword", display: "A Sword", baseWeight: 2.5 });
 	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 	 * sword.dungeon = dungeon; // adds sword to dungeon.contents
 	 * ```
@@ -1584,6 +1670,10 @@ export class DungeonObject {
 		if (options.keywords) this.keywords = options.keywords;
 		if (options.display) this.display = options.display;
 		if (options.description) this.description = options.description;
+		if (options.baseWeight !== undefined) {
+			this.baseWeight = options.baseWeight;
+			this.currentWeight = options.baseWeight;
+		}
 	}
 
 	toString() {
@@ -1754,14 +1844,15 @@ export class DungeonObject {
 	 * Also sets each object's location to this container. Objects already in this
 	 * container are ignored. This method maintains containment consistency by
 	 * ensuring both the contents array and location references are updated.
+	 * Weight changes are automatically propagated up the containment chain.
 	 *
 	 * @param dobjs The objects to add to this container
 	 *
 	 * @example
 	 * ```typescript
 	 * const chest = new DungeonObject({ keywords: "chest" });
-	 * const coin = new DungeonObject({ keywords: "coin" });
-	 * const gem = new DungeonObject({ keywords: "gem" });
+	 * const coin = new Item({ keywords: "coin", baseWeight: 0.1 });
+	 * const gem = new Item({ keywords: "gem", baseWeight: 0.2 });
 	 *
 	 * // Add multiple items at once
 	 * chest.add(coin, gem);
@@ -1769,6 +1860,8 @@ export class DungeonObject {
 	 * // Items are now in the chest
 	 * console.log(chest.contains(coin)); // true
 	 * console.log(coin.location === chest); // true
+	 * // Weight is automatically updated
+	 * console.log(chest.currentWeight); // 0.3 (coin + gem weights)
 	 *
 	 * // Adding an item that's already contained is ignored
 	 * chest.add(coin); // no effect
@@ -1779,6 +1872,9 @@ export class DungeonObject {
 			if (this.contains(obj)) continue;
 			this._contents.push(obj);
 			if (obj.location !== this) obj.move(this);
+
+			// Add the object's current weight to this container's weight
+			this._addWeight(obj.currentWeight);
 		}
 	}
 
@@ -1788,21 +1884,24 @@ export class DungeonObject {
 	 * Objects not found in the contents are ignored. This method maintains
 	 * containment consistency by ensuring both the contents array and location
 	 * references are updated.
+	 * Weight changes are automatically propagated up the containment chain.
 	 *
 	 * @param dobjs The objects to remove from this container
 	 *
 	 * @example
 	 * ```typescript
 	 * const chest = new DungeonObject({ keywords: "chest" });
-	 * const coin = new DungeonObject({ keywords: "coin" });
+	 * const coin = new Item({ keywords: "coin", baseWeight: 0.1 });
 	 *
 	 * // Add and then remove an item
 	 * chest.add(coin);
 	 * console.log(chest.contains(coin)); // true
+	 * console.log(chest.currentWeight); // 0.1
 	 *
 	 * chest.remove(coin);
 	 * console.log(chest.contains(coin)); // false
 	 * console.log(coin.location === undefined); // true
+	 * console.log(chest.currentWeight); // 0 (weight removed)
 	 *
 	 * // Removing an item that's not contained is ignored
 	 * chest.remove(coin); // no effect
@@ -1812,8 +1911,36 @@ export class DungeonObject {
 		for (let obj of dobjs) {
 			const index = this._contents.indexOf(obj);
 			if (index === -1) continue;
+
+			// Remove the object's current weight from this container's weight
+			this._removeWeight(obj.currentWeight);
+
 			this._contents.splice(index, 1);
 			if (obj.location === this) obj.move(undefined);
+		}
+	}
+
+	/**
+	 * Internal method to add weight and propagate up the containment chain.
+	 * @private
+	 */
+	private _addWeight(weight: number): void {
+		this.currentWeight += weight;
+		// Propagate weight change up to parent container
+		if (this.location) {
+			this.location._addWeight(weight);
+		}
+	}
+
+	/**
+	 * Internal method to remove weight and propagate up the containment chain.
+	 * @private
+	 */
+	private _removeWeight(weight: number): void {
+		this.currentWeight -= weight;
+		// Propagate weight change up to parent container
+		if (this.location) {
+			this.location._removeWeight(weight);
 		}
 	}
 
@@ -1905,6 +2032,7 @@ export class DungeonObject {
 			description: this.description,
 			...(serializedContents.length > 0 && { contents: serializedContents }),
 			...(locationRef && { location: locationRef }),
+			...(this.baseWeight !== 0 && { baseWeight: this.baseWeight }),
 		};
 	}
 
@@ -1979,6 +2107,160 @@ export class DungeonObject {
 
 		return obj;
 	}
+
+	/**
+	 * Gets the serialized form of a base/default object of this type.
+	 * Used as a reference for determining which fields differ from defaults.
+	 *
+	 * @returns Serialized form of a default object of this type
+	 */
+	private static getBaseSerialized(
+		type: SerializedDungeonObjectType
+	): SerializedDungeonObject {
+		return baseSerializedTypes[type];
+	}
+
+	/**
+	 * Creates a template from this object, storing only fields that differ from defaults.
+	 * This is useful for saving object definitions efficiently.
+	 *
+	 * @param id - Unique identifier for the template
+	 * @returns A template containing only differential fields
+	 *
+	 * @example
+	 * ```typescript
+	 * const sword = new Item({
+	 *   keywords: "iron sword",
+	 *   display: "Iron Sword",
+	 *   description: "A well-crafted iron sword."
+	 * });
+	 * const template = sword.toTemplate("sword-basic");
+	 * // template only includes fields that differ from defaults
+	 * ```
+	 */
+	toTemplate(id: string): DungeonObjectTemplate {
+		// Serialize this object
+		const serialized = this.serialize();
+
+		// Get the base serialized object for comparison
+		const baseSerialized = DungeonObject.getBaseSerialized(
+			this.constructor.name as SerializedDungeonObjectType
+		);
+
+		// Start with id and type
+		const template: DungeonObjectTemplate = {
+			id,
+			type: serialized.type,
+		};
+
+		// Only include fields that differ from the base
+		// Exclude contents and location as they are runtime state
+		for (const field in serialized) {
+			// Skip contents and location - they are runtime state, not template data
+			if (field === "contents" || field === "location") {
+				continue;
+			}
+
+			const serializedValue =
+				serialized[field as keyof SerializedDungeonObject];
+			const baseValue = baseSerialized[field as keyof SerializedDungeonObject];
+			if (serializedValue !== baseValue) {
+				template[field as keyof DungeonObjectTemplate] =
+					serializedValue as unknown as never;
+			}
+		}
+
+		return template;
+	}
+
+	/**
+	 * Applies a template to this object, setting only the fields specified in the template.
+	 * Fields not in the template remain unchanged.
+	 *
+	 * @param template - The template to apply
+	 *
+	 * @example
+	 * ```typescript
+	 * const obj = new Item();
+	 * const template: DungeonObjectTemplate = {
+	 *   id: "sword",
+	 *   type: "Item",
+	 *   display: "Iron Sword",
+	 *   description: "A sword.",
+	 *   baseWeight: 3.5
+	 * };
+	 * obj.applyTemplate(template);
+	 * // obj now has display="Iron Sword", description="A sword.", and baseWeight=3.5
+	 * // but keywords remains "dungeon object" (default)
+	 * ```
+	 */
+	applyTemplate(template: DungeonObjectTemplate): void {
+		if (template.keywords !== undefined) {
+			this.keywords = template.keywords;
+		}
+		if (template.display !== undefined) {
+			this.display = template.display;
+		}
+		if (template.description !== undefined) {
+			this.description = template.description;
+		}
+		if (template.baseWeight !== undefined) {
+			this.baseWeight = template.baseWeight;
+			this.currentWeight = template.baseWeight;
+		}
+	}
+}
+
+/**
+ * Creates a new DungeonObject instance from a template.
+ *
+ * @param template - The template to create an object from
+ * @returns A new DungeonObject instance with template properties applied
+ *
+ * @example
+ * ```typescript
+ * const template: DungeonObjectTemplate = {
+ *   id: "sword-basic",
+ *   type: "Item",
+ *   display: "Iron Sword",
+ *   description: "A sword."
+ * };
+ * const obj = createFromTemplate(template);
+ * ```
+ */
+export function createFromTemplate(
+	template: DungeonObjectTemplate
+): DungeonObject {
+	let obj: DungeonObject;
+
+	// Create the appropriate object type
+	switch (template.type) {
+		case "Room":
+			throw new Error(
+				"Room templates require coordinates - use Room.createFromTemplate() instead"
+			);
+		case "Movable":
+			obj = new Movable();
+			break;
+		case "Mob":
+			obj = new Mob();
+			break;
+		case "Item":
+			obj = new Item();
+			break;
+		case "Prop":
+			obj = new Prop();
+			break;
+		case "DungeonObject":
+		default:
+			obj = new DungeonObject();
+			break;
+	}
+
+	// Apply template properties
+	obj.applyTemplate(template);
+
+	return obj;
 }
 
 /**
@@ -2066,6 +2348,13 @@ export class Room extends DungeonObject {
 	private _links?: RoomLink[];
 
 	/**
+	 * Bitmask of allowed exit directions from this room.
+	 * By default, only horizontal directions are allowed (NORTH, SOUTH, EAST, WEST,
+	 * NORTHEAST, NORTHWEST, SOUTHEAST, SOUTHWEST). UP and DOWN must be explicitly enabled.
+	 */
+	allowedExits: DIRECTION;
+
+	/**
 	 * Returns a shallow copy of the room's coordinates.
 	 * @returns The room coordinates as an object { x, y, z }
 	 *
@@ -2122,19 +2411,90 @@ export class Room extends DungeonObject {
 	constructor(options: RoomOptions) {
 		super(options);
 		this._coordinates = options.coordinates;
+		// Default allowedExits: all horizontal directions (not UP/DOWN)
+		this.allowedExits =
+			options.allowedExits ??
+			DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
 	}
 
 	/**
 	 * Deserialize a SerializedRoom into a Room instance.
 	 */
 	public static deserialize(data: SerializedRoom): Room {
-		const room = new Room(data);
+		const room = new Room({
+			...data,
+			allowedExits: data.allowedExits,
+		});
 		if (data.contents && Array.isArray(data.contents)) {
 			for (const contentData of data.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
 				room.add(contentObj);
 			}
 		}
+		return room;
+	}
+
+	/**
+	 * Applies a room template to this room, setting only the fields specified in the template.
+	 * Fields not in the template remain unchanged.
+	 *
+	 * @param template - The room template to apply
+	 *
+	 * @example
+	 * ```typescript
+	 * const room = new Room({ coordinates: { x: 0, y: 0, z: 0 } });
+	 * const template: RoomTemplate = {
+	 *   id: "room",
+	 *   type: "Room",
+	 *   display: "Chamber",
+	 *   allowedExits: DIRECTION.NORTH | DIRECTION.UP
+	 * };
+	 * room.applyTemplate(template);
+	 * ```
+	 */
+	applyTemplate(template: RoomTemplate): void {
+		super.applyTemplate(template);
+		if (template.allowedExits !== undefined) {
+			this.allowedExits = template.allowedExits;
+		}
+	}
+
+	/**
+	 * Creates a new Room instance from a template with the specified coordinates.
+	 * Rooms require coordinates for positioning in the dungeon grid, so this method
+	 * is used instead of the generic `createFromTemplate()` function.
+	 *
+	 * @param template - The room template to create a room from
+	 * @param coordinates - The position of the room in the dungeon
+	 * @returns A new Room instance with template properties applied
+	 *
+	 * @example
+	 * ```typescript
+	 * const template: RoomTemplate = {
+	 *   id: "start-room",
+	 *   type: "Room",
+	 *   display: "Starting Room",
+	 *   description: "You are in the starting room.",
+	 *   allowedExits: DIRECTION.NORTH | DIRECTION.UP
+	 * };
+	 * const room = Room.createFromTemplate(template, { x: 0, y: 0, z: 0 });
+	 * ```
+	 */
+	public static createFromTemplate(
+		template: RoomTemplate,
+		coordinates: Coordinates
+	): Room {
+		const room = new Room({
+			coordinates,
+		});
+		room.applyTemplate(template);
 		return room;
 	}
 
@@ -2191,6 +2551,7 @@ export class Room extends DungeonObject {
 	 */
 	getStep(dir: DIRECTION) {
 		// First check for a linked room in this direction
+		// Links override allowedExits
 		if (this._links) {
 			for (const link of this._links) {
 				const destination = link.getDestination(this, dir);
@@ -2199,7 +2560,12 @@ export class Room extends DungeonObject {
 				}
 			}
 		}
-		// If no link handles this direction, use normal spatial navigation
+		// If no link handles this direction, check allowedExits
+		// Only return a room if the direction is allowed
+		if ((this.allowedExits & dir) === 0) {
+			return undefined;
+		}
+		// Direction is allowed, use normal spatial navigation
 		return this.dungeon?.getStep(this, dir);
 	}
 
@@ -2243,7 +2609,20 @@ export class Room extends DungeonObject {
 	 * ```
 	 */
 	canExit(movable: Movable, direction?: DIRECTION) {
-		return true;
+		if (direction === undefined) return true;
+
+		// Links override allowedExits - if there's a link in this direction, allow exit
+		if (this._links) {
+			for (const link of this._links) {
+				const destination = link.getDestination(this, direction);
+				if (destination) {
+					return true; // Link exists, allow exit regardless of allowedExits
+				}
+			}
+		}
+
+		// No link found, check if the direction is in the allowedExits bitmask
+		return (this.allowedExits & direction) !== 0;
 	}
 
 	/**
@@ -2340,11 +2719,25 @@ export class Room extends DungeonObject {
 	 */
 	serialize(): SerializedRoom {
 		const baseData = super.serialize();
-		return {
+		const result: SerializedRoom = {
 			...baseData,
 			type: "Room" as const,
 			coordinates: this.coordinates,
 		};
+		// Only include allowedExits if it differs from default (all horizontal)
+		const defaultExits =
+			DIRECTION.NORTH |
+			DIRECTION.SOUTH |
+			DIRECTION.EAST |
+			DIRECTION.WEST |
+			DIRECTION.NORTHEAST |
+			DIRECTION.NORTHWEST |
+			DIRECTION.SOUTHEAST |
+			DIRECTION.SOUTHWEST;
+		if (this.allowedExits !== defaultExits) {
+			result.allowedExits = this.allowedExits;
+		}
+		return result;
 	}
 }
 
@@ -2995,3 +3388,15 @@ export class RoomLink {
 		if (index !== -1) SAFE_ROOM_LINKS.splice(index, 1);
 	}
 }
+
+const baseSerializedTypes: Record<
+	SerializedDungeonObjectType,
+	SerializedDungeonObject
+> = {
+	Movable: new Movable().serialize(),
+	Mob: new Mob().serialize(),
+	Item: new Item().serialize(),
+	Prop: new Prop().serialize(),
+	Room: new DungeonObject().serialize(),
+	DungeonObject: new DungeonObject().serialize(),
+};

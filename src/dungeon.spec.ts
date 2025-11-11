@@ -18,12 +18,15 @@ import {
 	Prop,
 	RoomLink,
 	DIRECTIONS,
+	createFromTemplate,
 	type SerializedDungeonObject,
 	type SerializedRoom,
 	type SerializedMovable,
 	type SerializedMob,
 	type SerializedItem,
 	type SerializedProp,
+	type DungeonObjectTemplate,
+	type RoomTemplate,
 } from "./dungeon.js";
 
 suite("dungeon.ts", () => {
@@ -349,6 +352,464 @@ suite("dungeon.ts", () => {
 			assert.strictEqual(obj.dungeon, undefined);
 			assert.strictEqual(obj.location, undefined); // Still in room
 			assert(!dungeon.contains(obj));
+		});
+
+		suite("Weight System", () => {
+			test("should initialize baseWeight and currentWeight correctly", () => {
+				const obj = new DungeonObject();
+				assert.strictEqual(obj.baseWeight, 0);
+				assert.strictEqual(obj.currentWeight, 0);
+
+				const heavyObj = new DungeonObject({ baseWeight: 5.5 });
+				assert.strictEqual(heavyObj.baseWeight, 5.5);
+				assert.strictEqual(heavyObj.currentWeight, 5.5);
+			});
+
+			test("should add weight when adding objects", () => {
+				const container = new DungeonObject({ baseWeight: 1.0 });
+				const item1 = new DungeonObject({ baseWeight: 2.5 });
+				const item2 = new DungeonObject({ baseWeight: 1.5 });
+
+				// Container starts with its base weight
+				assert.strictEqual(container.currentWeight, 1.0);
+
+				// Add first item
+				container.add(item1);
+				assert.strictEqual(container.currentWeight, 1.0 + 2.5);
+				assert.strictEqual(item1.currentWeight, 2.5);
+
+				// Add second item
+				container.add(item2);
+				assert.strictEqual(container.currentWeight, 1.0 + 2.5 + 1.5);
+				assert.strictEqual(item2.currentWeight, 1.5);
+			});
+
+			test("should remove weight when removing objects", () => {
+				const container = new DungeonObject({ baseWeight: 1.0 });
+				const item1 = new DungeonObject({ baseWeight: 2.5 });
+				const item2 = new DungeonObject({ baseWeight: 1.5 });
+
+				container.add(item1, item2);
+				assert.strictEqual(container.currentWeight, 1.0 + 2.5 + 1.5);
+
+				// Remove first item
+				container.remove(item1);
+				assert.strictEqual(container.currentWeight, 1.0 + 1.5);
+				assert.strictEqual(item1.currentWeight, 2.5); // Item's weight unchanged
+
+				// Remove second item
+				container.remove(item2);
+				assert.strictEqual(container.currentWeight, 1.0); // Back to base weight
+			});
+
+			test("should propagate weight up the containment chain", () => {
+				const outer = new DungeonObject({ baseWeight: 2.0 });
+				const middle = new DungeonObject({ baseWeight: 1.0 });
+				const inner = new DungeonObject({ baseWeight: 0.5 });
+
+				// Build nested structure: outer -> middle -> inner
+				outer.add(middle);
+				assert.strictEqual(outer.currentWeight, 2.0 + 1.0);
+				assert.strictEqual(middle.currentWeight, 1.0);
+
+				middle.add(inner);
+				// middle's weight should increase
+				assert.strictEqual(middle.currentWeight, 1.0 + 0.5);
+				// outer's weight should also increase (propagated up)
+				assert.strictEqual(outer.currentWeight, 2.0 + 1.0 + 0.5);
+			});
+
+			test("should propagate weight removal up the containment chain", () => {
+				const outer = new DungeonObject({ baseWeight: 2.0 });
+				const middle = new DungeonObject({ baseWeight: 1.0 });
+				const inner = new DungeonObject({ baseWeight: 0.5 });
+
+				outer.add(middle);
+				middle.add(inner);
+				assert.strictEqual(outer.currentWeight, 2.0 + 1.0 + 0.5);
+
+				// Remove inner from middle
+				middle.remove(inner);
+				// middle's weight should decrease
+				assert.strictEqual(middle.currentWeight, 1.0);
+				// outer's weight should also decrease (propagated up)
+				assert.strictEqual(outer.currentWeight, 2.0 + 1.0);
+			});
+
+			test("should handle weight when moving objects between containers", () => {
+				const container1 = new DungeonObject({ baseWeight: 1.0 });
+				const container2 = new DungeonObject({ baseWeight: 2.0 });
+				const item = new DungeonObject({ baseWeight: 3.0 });
+
+				container1.add(item);
+				assert.strictEqual(container1.currentWeight, 1.0 + 3.0);
+				assert.strictEqual(container2.currentWeight, 2.0);
+
+				// Move item to container2
+				container2.add(item);
+				// item should be removed from container1
+				assert.strictEqual(container1.currentWeight, 1.0);
+				// item should be added to container2
+				assert.strictEqual(container2.currentWeight, 2.0 + 3.0);
+			});
+
+			test("should handle weight with zero baseWeight objects", () => {
+				const container = new DungeonObject({ baseWeight: 1.0 });
+				const item1 = new DungeonObject({ baseWeight: 0 });
+				const item2 = new DungeonObject(); // default baseWeight is 0
+
+				container.add(item1, item2);
+				// Container weight should only include its own base weight
+				assert.strictEqual(container.currentWeight, 1.0);
+			});
+
+			test("should handle weight with deeply nested structures", () => {
+				const level1 = new DungeonObject({ baseWeight: 10.0 });
+				const level2 = new DungeonObject({ baseWeight: 5.0 });
+				const level3 = new DungeonObject({ baseWeight: 2.0 });
+				const level4 = new DungeonObject({ baseWeight: 1.0 });
+
+				level1.add(level2);
+				level2.add(level3);
+				level3.add(level4);
+
+				// level4: 1.0
+				assert.strictEqual(level4.currentWeight, 1.0);
+				// level3: 2.0 + 1.0 = 3.0
+				assert.strictEqual(level3.currentWeight, 2.0 + 1.0);
+				// level2: 5.0 + 3.0 = 8.0
+				assert.strictEqual(level2.currentWeight, 5.0 + 2.0 + 1.0);
+				// level1: 10.0 + 8.0 = 18.0
+				assert.strictEqual(level1.currentWeight, 10.0 + 5.0 + 2.0 + 1.0);
+			});
+		});
+
+		suite("Template System", () => {
+			test("toTemplate() should create template with only differential fields", () => {
+				const obj = new DungeonObject({
+					keywords: "test object",
+					display: "Test Object",
+					description: "A test object.",
+					baseWeight: 5.0,
+				});
+
+				const template = obj.toTemplate("test-id");
+
+				assert.strictEqual(template.id, "test-id");
+				assert.strictEqual(template.type, "DungeonObject");
+				assert.strictEqual(template.keywords, "test object");
+				assert.strictEqual(template.display, "Test Object");
+				assert.strictEqual(template.description, "A test object.");
+				assert.strictEqual(template.baseWeight, 5.0);
+			});
+
+			test("toTemplate() should exclude fields that match defaults", () => {
+				const obj = new DungeonObject({
+					keywords: "dungeon object", // default
+					display: "Dungeon Object", // default
+					// description is undefined (default)
+					baseWeight: 0, // default
+				});
+
+				const template = obj.toTemplate("default-id");
+
+				assert.strictEqual(template.id, "default-id");
+				assert.strictEqual(template.type, "DungeonObject");
+				assert.strictEqual(template.keywords, undefined);
+				assert.strictEqual(template.display, undefined);
+				assert.strictEqual(template.description, undefined);
+				assert.strictEqual(template.baseWeight, undefined);
+				assert.deepEqual(template, { id: "default-id", type: "DungeonObject" });
+			});
+
+			test("toTemplate() should handle partial overrides", () => {
+				const obj = new DungeonObject({
+					display: "Custom Display",
+					baseWeight: 2.5,
+					// keywords and description use defaults
+				});
+
+				const template = obj.toTemplate("partial-id");
+
+				assert.strictEqual(template.id, "partial-id");
+				assert.strictEqual(template.type, "DungeonObject");
+				assert.strictEqual(template.keywords, undefined); // default
+				assert.strictEqual(template.display, "Custom Display");
+				assert.strictEqual(template.description, undefined); // default
+				assert.strictEqual(template.baseWeight, 2.5);
+				assert.deepEqual(template, {
+					id: "partial-id",
+					type: "DungeonObject",
+					display: "Custom Display",
+					baseWeight: 2.5,
+				});
+			});
+
+			test("toTemplate() should work with Items", () => {
+				const item = new Item({
+					keywords: "iron sword",
+					display: "Iron Sword",
+					baseWeight: 3.0,
+				});
+
+				const template = item.toTemplate("sword-id");
+
+				assert.strictEqual(template.id, "sword-id");
+				assert.strictEqual(template.type, "Item");
+				assert.strictEqual(template.keywords, "iron sword");
+				assert.strictEqual(template.display, "Iron Sword");
+				assert.strictEqual(template.baseWeight, 3.0);
+				assert.deepEqual(template, {
+					id: "sword-id",
+					type: "Item",
+					keywords: "iron sword",
+					display: "Iron Sword",
+					baseWeight: 3.0,
+				});
+			});
+
+			test("toTemplate() should not include contents", () => {
+				const container = new DungeonObject({
+					keywords: "chest",
+					display: "Chest",
+				});
+				const item = new DungeonObject({
+					keywords: "coin",
+					display: "Coin",
+				});
+				container.add(item);
+
+				const template = container.toTemplate("chest-id");
+
+				// Template should not have contents field
+				assert.strictEqual(template.id, "chest-id");
+				assert.strictEqual(template.keywords, "chest");
+				assert.strictEqual(template.display, "Chest");
+				assert.deepEqual(template, {
+					id: "chest-id",
+					type: "DungeonObject",
+					keywords: "chest",
+					display: "Chest",
+				});
+				// No contents in template
+			});
+
+			test("applyTemplate() should apply template fields to object", () => {
+				const obj = new DungeonObject();
+				const template: DungeonObjectTemplate = {
+					id: "test",
+					type: "DungeonObject",
+					keywords: "applied keywords",
+					display: "Applied Display",
+					description: "Applied description",
+					baseWeight: 10.0,
+				};
+
+				obj.applyTemplate(template);
+
+				assert.strictEqual(obj.keywords, "applied keywords");
+				assert.strictEqual(obj.display, "Applied Display");
+				assert.strictEqual(obj.description, "Applied description");
+				assert.strictEqual(obj.baseWeight, 10.0);
+				assert.strictEqual(obj.currentWeight, 10.0);
+			});
+
+			test("applyTemplate() should only apply defined fields", () => {
+				const obj = new DungeonObject({
+					keywords: "original keywords",
+					display: "Original Display",
+					description: "Original description",
+					baseWeight: 5.0,
+				});
+
+				const template: DungeonObjectTemplate = {
+					id: "test",
+					type: "DungeonObject",
+					display: "New Display",
+					// keywords, description, and baseWeight are undefined
+				};
+
+				obj.applyTemplate(template);
+
+				// Only display should change
+				assert.strictEqual(obj.keywords, "original keywords");
+				assert.strictEqual(obj.display, "New Display");
+				assert.strictEqual(obj.description, "Original description");
+				assert.strictEqual(obj.baseWeight, 5.0);
+			});
+
+			test("applyTemplate() should update currentWeight when baseWeight is applied", () => {
+				const obj = new DungeonObject({
+					baseWeight: 2.0,
+				});
+				assert.strictEqual(obj.currentWeight, 2.0);
+
+				const template: DungeonObjectTemplate = {
+					id: "test",
+					type: "DungeonObject",
+					baseWeight: 7.5,
+				};
+
+				obj.applyTemplate(template);
+
+				assert.strictEqual(obj.baseWeight, 7.5);
+				assert.strictEqual(obj.currentWeight, 7.5);
+			});
+
+			test("createFromTemplate() should create DungeonObject from template", () => {
+				const template: DungeonObjectTemplate = {
+					id: "test",
+					type: "DungeonObject",
+					keywords: "test keywords",
+					display: "Test Object",
+					description: "Test description",
+					baseWeight: 3.0,
+				};
+
+				const obj = createFromTemplate(template);
+
+				assert(obj instanceof DungeonObject);
+				assert.strictEqual(obj.keywords, "test keywords");
+				assert.strictEqual(obj.display, "Test Object");
+				assert.strictEqual(obj.description, "Test description");
+				assert.strictEqual(obj.baseWeight, 3.0);
+				assert.strictEqual(obj.currentWeight, 3.0);
+			});
+
+			test("createFromTemplate() should create Item from template", () => {
+				const template: DungeonObjectTemplate = {
+					id: "sword",
+					type: "Item",
+					keywords: "iron sword",
+					display: "Iron Sword",
+					baseWeight: 4.0,
+				};
+
+				const obj = createFromTemplate(template);
+
+				assert(obj instanceof Item);
+				assert.strictEqual(obj.keywords, "iron sword");
+				assert.strictEqual(obj.display, "Iron Sword");
+				assert.strictEqual(obj.baseWeight, 4.0);
+			});
+
+			test("createFromTemplate() should create Mob from template", () => {
+				const template: DungeonObjectTemplate = {
+					id: "goblin",
+					type: "Mob",
+					keywords: "goblin creature",
+					display: "Goblin",
+					baseWeight: 50.0,
+				};
+
+				const obj = createFromTemplate(template);
+
+				assert(obj instanceof Mob);
+				assert.strictEqual(obj.keywords, "goblin creature");
+				assert.strictEqual(obj.display, "Goblin");
+				assert.strictEqual(obj.baseWeight, 50.0);
+			});
+
+			test("createFromTemplate() should create Prop from template", () => {
+				const template: DungeonObjectTemplate = {
+					id: "sign",
+					type: "Prop",
+					keywords: "wooden sign",
+					display: "Wooden Sign",
+					description: "A weathered wooden sign.",
+					baseWeight: 1.5,
+				};
+
+				const obj = createFromTemplate(template);
+
+				assert(obj instanceof Prop);
+				assert.strictEqual(obj.keywords, "wooden sign");
+				assert.strictEqual(obj.display, "Wooden Sign");
+				assert.strictEqual(obj.description, "A weathered wooden sign.");
+				assert.strictEqual(obj.baseWeight, 1.5);
+			});
+
+			test("createFromTemplate() should throw error for Room templates", () => {
+				const template: RoomTemplate = {
+					id: "room",
+					type: "Room",
+					display: "Test Room",
+				};
+
+				assert.throws(() => {
+					createFromTemplate(template);
+				}, /Room templates require coordinates/);
+			});
+
+			test("Room.createFromTemplate() should create Room from template with coordinates", () => {
+				const template: RoomTemplate = {
+					id: "start-room",
+					type: "Room",
+					keywords: "start room entrance",
+					display: "Starting Room",
+					description: "You are in the starting room.",
+					baseWeight: 0,
+				};
+
+				const room = Room.createFromTemplate(template, { x: 0, y: 0, z: 0 });
+
+				assert(room instanceof Room);
+				assert.strictEqual(room.keywords, "start room entrance");
+				assert.strictEqual(room.display, "Starting Room");
+				assert.strictEqual(room.description, "You are in the starting room.");
+				assert.strictEqual(room.baseWeight, 0);
+				assert.deepStrictEqual(room.coordinates, { x: 0, y: 0, z: 0 });
+			});
+
+			test("createFromTemplate() should handle templates with only type and id", () => {
+				const template: DungeonObjectTemplate = {
+					id: "minimal",
+					type: "DungeonObject",
+				};
+
+				const obj = createFromTemplate(template);
+
+				assert(obj instanceof DungeonObject);
+				assert.strictEqual(obj.keywords, "dungeon object"); // default
+				assert.strictEqual(obj.display, "Dungeon Object"); // default
+				assert.strictEqual(obj.description, undefined); // default
+				assert.strictEqual(obj.baseWeight, 0); // default
+			});
+
+			test("toTemplate() and createFromTemplate() should round-trip correctly", () => {
+				const original = new Item({
+					keywords: "magic sword",
+					display: "Magic Sword",
+					description: "A sword imbued with magic.",
+					baseWeight: 2.5,
+				});
+
+				const template = original.toTemplate("sword-template");
+				const recreated = createFromTemplate(template);
+
+				assert(recreated instanceof Item);
+				assert.strictEqual(recreated.keywords, original.keywords);
+				assert.strictEqual(recreated.display, original.display);
+				assert.strictEqual(recreated.description, original.description);
+				assert.strictEqual(recreated.baseWeight, original.baseWeight);
+				assert.strictEqual(recreated.currentWeight, original.baseWeight);
+			});
+
+			test("toTemplate() should handle objects with zero weight correctly", () => {
+				const obj = new DungeonObject({
+					keywords: "light object",
+					display: "Light Object",
+					baseWeight: 0,
+				});
+
+				const template = obj.toTemplate("light-id");
+
+				// baseWeight should not be included if it's 0 (default)
+				assert.strictEqual(template.keywords, "light object");
+				assert.strictEqual(template.display, "Light Object");
+				// baseWeight should be undefined since it matches default
+				assert.strictEqual(template.baseWeight, undefined);
+			});
 		});
 
 		test("should handle moving between dungeons with contents", () => {
@@ -697,6 +1158,42 @@ suite("dungeon.ts", () => {
 			assert(room.canExit(movable));
 		});
 
+		test("should block UP/DOWN by default", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 3, height: 3, layers: 3 },
+			});
+			const room = dungeon.getRoom({ x: 1, y: 1, z: 1 });
+			assert(room);
+			const movable = new Movable();
+			room.add(movable);
+
+			// UP/DOWN should be blocked by default
+			assert.strictEqual(movable.canStep(DIRECTION.UP), false);
+			assert.strictEqual(movable.canStep(DIRECTION.DOWN), false);
+
+			// Horizontal directions should work
+			assert.strictEqual(movable.canStep(DIRECTION.NORTH), true);
+			assert.strictEqual(movable.canStep(DIRECTION.SOUTH), true);
+			assert.strictEqual(movable.canStep(DIRECTION.EAST), true);
+			assert.strictEqual(movable.canStep(DIRECTION.WEST), true);
+		});
+
+		test("should allow UP/DOWN when explicitly enabled", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 3, height: 3, layers: 3 },
+			});
+			const room = dungeon.getRoom({ x: 1, y: 1, z: 1 });
+			assert(room);
+			// Enable UP/DOWN
+			room.allowedExits |= DIRECTION.UP | DIRECTION.DOWN;
+			const movable = new Movable();
+			room.add(movable);
+
+			// UP/DOWN should now be allowed
+			assert.strictEqual(movable.canStep(DIRECTION.UP), true);
+			assert.strictEqual(movable.canStep(DIRECTION.DOWN), true);
+		});
+
 		test("getRoomRef() should generate a room reference string", () => {
 			const id = "test-room-ref";
 			const dungeon = Dungeon.generateEmptyDungeon({
@@ -786,42 +1283,51 @@ suite("dungeon.ts", () => {
 
 		test("should allow removal of links", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
-				dimensions: { width: 3, height: 3, layers: 1 },
+				dimensions: { width: 3, height: 3, layers: 2 },
 			});
 			const roomA = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const roomB = dungeon.getRoom({ x: 2, y: 2, z: 0 });
+			const roomB = dungeon.getRoom({ x: 0, y: 0, z: 1 });
 			assert(roomA && roomB);
+			// Links override allowedExits, so we don't need to enable UP/DOWN
 
 			const link = RoomLink.createTunnel(roomA, DIRECTION.UP, roomB);
 
-			// Verify link works
+			// Verify link works (links override allowedExits)
 			assert.strictEqual(roomA.getStep(DIRECTION.UP), roomB);
 			assert.strictEqual(roomB.getStep(DIRECTION.DOWN), roomA);
+
+			const movable = new Movable();
+			roomA.add(movable);
+			// canStep should work because link overrides allowedExits
+			assert.strictEqual(movable.canStep(DIRECTION.UP), true);
 
 			// Remove link
 			link.remove();
 
-			// Verify normal spatial relationships are restored
+			// After link removal, UP/DOWN is blocked by default allowedExits
+			// getStep should return undefined because UP is not in allowedExits
 			assert.strictEqual(roomA.getStep(DIRECTION.UP), undefined);
-			assert.strictEqual(roomB.getStep(DIRECTION.DOWN), undefined);
+			// canStep should also fail
+			assert.strictEqual(movable.canStep(DIRECTION.UP), false);
 		});
 
 		test("should handle multiple links per room", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
-				dimensions: { width: 3, height: 3, layers: 1 },
+				dimensions: { width: 3, height: 3, layers: 2 },
 			});
 			const center = dungeon.getRoom({ x: 1, y: 1, z: 0 });
 			const north = dungeon.getRoom({ x: 1, y: 0, z: 0 });
 			const south = dungeon.getRoom({ x: 1, y: 2, z: 0 });
 			const east = dungeon.getRoom({ x: 2, y: 1, z: 0 });
 			assert(center && north && south && east);
+			// Links override allowedExits, so we don't need to enable UP/DOWN
 
 			// Create portal from center to each other room
 			const link1 = RoomLink.createTunnel(center, DIRECTION.UP, north);
 			const link2 = RoomLink.createTunnel(center, DIRECTION.DOWN, south);
 			const link3 = RoomLink.createTunnel(center, DIRECTION.WEST, east);
 
-			// Test all portals work
+			// Test all portals work (links override allowedExits)
 			assert.strictEqual(center.getStep(DIRECTION.UP), north);
 			assert.strictEqual(center.getStep(DIRECTION.DOWN), south);
 			assert.strictEqual(center.getStep(DIRECTION.WEST), east);
@@ -840,9 +1346,17 @@ suite("dungeon.ts", () => {
 			assert.strictEqual(north.getStep(DIRECTION.DOWN), center);
 			assert.strictEqual(east.getStep(DIRECTION.EAST), center);
 
-			// But removed link doesn't
+			// But removed link doesn't work - getStep should return undefined because DOWN is blocked by allowedExits
+			const movable = new Movable();
+			center.add(movable);
+			// getStep should return undefined because DOWN is not in allowedExits by default
 			assert.strictEqual(center.getStep(DIRECTION.DOWN), undefined);
+			assert.strictEqual(movable.canStep(DIRECTION.DOWN), false);
+
+			// Test from south's perspective
+			south.add(movable);
 			assert.strictEqual(south.getStep(DIRECTION.UP), undefined);
+			assert.strictEqual(movable.canStep(DIRECTION.UP), false);
 		});
 
 		test("should support one-way links", () => {
@@ -1055,6 +1569,8 @@ suite("dungeon.ts", () => {
 			const movable = new Movable();
 			const centerRoom = dungeon.getRoom({ x: 1, y: 1, z: 1 });
 			assert(centerRoom);
+			// Enable UP/DOWN for vertical movement
+			centerRoom.allowedExits |= DIRECTION.UP | DIRECTION.DOWN;
 			centerRoom.add(movable);
 
 			// Test NORTH movement
@@ -1094,6 +1610,9 @@ suite("dungeon.ts", () => {
 			assert.deepStrictEqual(movable.coordinates, { x: 1, y: 1, z: 1 });
 
 			// Test UP movement
+			const upRoom = dungeon.getRoom({ x: 1, y: 1, z: 2 });
+			assert(upRoom);
+			upRoom.allowedExits |= DIRECTION.DOWN; // Enable DOWN for return trip
 			assert(movable.canStep(DIRECTION.UP));
 			movable.step(DIRECTION.UP);
 			assert.deepStrictEqual(movable.coordinates, { x: 1, y: 1, z: 2 });
@@ -1103,6 +1622,9 @@ suite("dungeon.ts", () => {
 			assert.deepStrictEqual(movable.coordinates, { x: 1, y: 1, z: 1 });
 
 			// Test DOWN movement
+			const downRoom = dungeon.getRoom({ x: 1, y: 1, z: 0 });
+			assert(downRoom);
+			downRoom.allowedExits |= DIRECTION.UP; // Enable UP for return trip
 			assert(movable.canStep(DIRECTION.DOWN));
 			movable.step(DIRECTION.DOWN);
 			assert.deepStrictEqual(movable.coordinates, { x: 1, y: 1, z: 0 });

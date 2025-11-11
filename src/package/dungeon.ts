@@ -47,11 +47,26 @@ import {
 	DungeonObjectTemplate,
 	RoomTemplate,
 	DIRECTION,
+	Reset,
+	ResetOptions,
+	DUNGEON_REGISTRY,
 } from "../dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
+import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 
 const DUNGEON_DIR = join(process.cwd(), "data", "dungeons");
+
+/**
+ * Serialized reset format (for YAML persistence).
+ * Only includes fields that differ from defaults (minCount=1, maxCount=1).
+ */
+export interface SerializedReset {
+	templateId: string;
+	roomRef: string;
+	minCount?: number;
+	maxCount?: number;
+}
 
 /**
  * Serialized dungeon format structure.
@@ -62,6 +77,8 @@ export interface SerializedDungeonFormat {
 		dimensions: MapDimensions;
 		grid: number[][][]; // [z][y][x] - layers, rows, columns
 		rooms: Array<Omit<RoomTemplate, "id" | "type">>; // Room templates without id/type
+		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets)
+		resets?: SerializedReset[]; // Optional array of resets
 	};
 }
 
@@ -101,6 +118,8 @@ async function fileExists(path: string): Promise<boolean> {
 /**
  * Save a dungeon to disk using atomic write (temp file + rename).
  * This prevents corruption if the process is killed during the write.
+ *
+ * @param dungeon - The dungeon to save
  */
 export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 	if (!dungeon.id) {
@@ -191,12 +210,48 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 		grid.push(layer);
 	}
 
+	// Serialize resets (only include if there are any)
+	const resets: SerializedReset[] = [];
+	for (const reset of dungeon.resets) {
+		const serialized: SerializedReset = {
+			templateId: reset.templateId,
+			roomRef: reset.roomRef,
+		};
+		// Only include minCount/maxCount if they differ from defaults (1)
+		if (reset.minCount !== 1) {
+			serialized.minCount = reset.minCount;
+		}
+		if (reset.maxCount !== 1) {
+			serialized.maxCount = reset.maxCount;
+		}
+		resets.push(serialized);
+	}
+
+	// Serialize templates referenced by resets
+	const templates: DungeonObjectTemplate[] = [];
+	const templateIds = new Set<string>();
+	for (const reset of dungeon.resets) {
+		templateIds.add(reset.templateId);
+	}
+	for (const templateId of templateIds) {
+		const template = dungeon.templates.get(templateId);
+		if (template) {
+			templates.push(template);
+		} else {
+			logger.warn(
+				`Template "${templateId}" referenced by reset not found in dungeon's template registry`
+			);
+		}
+	}
+
 	const data: SerializedDungeonFormat = {
 		dungeon: {
 			id: dungeon.id,
 			dimensions: dungeon.dimensions,
 			grid,
 			rooms: roomTemplates,
+			...(templates.length > 0 && { templates }),
+			...(resets.length > 0 && { resets }),
 		},
 	};
 
@@ -247,7 +302,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			throw new Error("Invalid dungeon format: missing 'dungeon' key");
 		}
 
-		const { dimensions, grid, rooms } = data.dungeon;
+		const { dimensions, grid, rooms, templates, resets } = data.dungeon;
 
 		// Validate dimensions
 		if (
@@ -350,11 +405,50 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			}
 		}
 
+		// Load templates if present
+		if (templates && Array.isArray(templates)) {
+			for (const template of templates) {
+				if (!template.id) {
+					logger.warn(
+						`Skipping invalid template in dungeon "${id}": missing id`
+					);
+					continue;
+				}
+				dungeon.addTemplate(template);
+			}
+		}
+
+		// Load resets if present
+		if (resets && Array.isArray(resets)) {
+			for (const resetData of resets) {
+				if (!resetData.templateId || !resetData.roomRef) {
+					logger.warn(
+						`Skipping invalid reset in dungeon "${id}": missing templateId or roomRef`
+					);
+					continue;
+				}
+
+				const reset = new Reset({
+					templateId: resetData.templateId,
+					roomRef: resetData.roomRef,
+					minCount: resetData.minCount ?? 1,
+					maxCount: resetData.maxCount ?? 1,
+				});
+				dungeon.addReset(reset);
+			}
+		}
+
 		logger.debug(
 			`Successfully loaded dungeon "${id}" from ${relative(
 				process.cwd(),
 				filePath
-			)}`
+			)}${
+				resets && resets.length > 0 ? ` with ${resets.length} reset(s)` : ""
+			}${
+				templates && templates.length > 0
+					? ` and ${templates.length} template(s)`
+					: ""
+			}`
 		);
 		return dungeon;
 	} catch (error) {
@@ -416,6 +510,32 @@ export async function getAllDungeons(): Promise<Dungeon[]> {
 	return dungeons;
 }
 
+/**
+ * Timer that resets all dungeons every 60 seconds.
+ * Stores the interval ID so it can be cleared if needed.
+ */
+let resetTimer: number | undefined;
+
+/**
+ * Execute resets on all registered dungeons.
+ */
+function executeAllDungeonResets(): void {
+	let totalSpawned = 0;
+	let dungeonCount = 0;
+
+	for (const dungeon of DUNGEON_REGISTRY.values()) {
+		const spawned = dungeon.executeResets();
+		totalSpawned += spawned;
+		dungeonCount++;
+	}
+
+	if (dungeonCount > 0) {
+		logger.debug(
+			`Dungeon reset cycle: ${dungeonCount} dungeon(s), ${totalSpawned} object(s) spawned`
+		);
+	}
+}
+
 export default {
 	name: "dungeon",
 	loader: async () => {
@@ -424,5 +544,12 @@ export default {
 		logger.info(
 			`Dungeon persistence package loaded: ${dungeons.length} dungeon(s)`
 		);
+
+		// Start the reset timer (every 60 seconds)
+		resetTimer = setAbsoluteInterval(() => {
+			executeAllDungeonResets();
+		}, 60000);
+
+		logger.info("Dungeon reset timer started: resets every 60 seconds");
 	},
 } as Package;

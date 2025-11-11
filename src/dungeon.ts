@@ -855,6 +855,19 @@ export class Dungeon {
 	private _contents: DungeonObject[] = [];
 
 	/**
+	 * Array of resets that define objects to spawn in this dungeon.
+	 * @private
+	 */
+	private _resets: Reset[] = [];
+
+	/**
+	 * Registry of object templates used by resets in this dungeon.
+	 * Maps template IDs to their template definitions.
+	 * @private
+	 */
+	private _templates: Map<string, DungeonObjectTemplate> = new Map();
+
+	/**
 	 * The size of the dungeon in all three dimensions. Used for bounds checking
 	 * and room generation. These dimensions are immutable after creation.
 	 */
@@ -1377,6 +1390,136 @@ export class Dungeon {
 		if (direction === DIRECTION.DOWN) coordinates.z--;
 		return this.getRoom(coordinates);
 	}
+
+	/**
+	 * Gets a copy of the resets array.
+	 *
+	 * @returns Array of resets for this dungeon
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({
+	 *   dimensions: { width: 10, height: 10, layers: 1 }
+	 * });
+	 *
+	 * const resets = dungeon.resets;
+	 * console.log(`Dungeon has ${resets.length} resets`);
+	 * ```
+	 */
+	get resets(): readonly Reset[] {
+		return [...this._resets];
+	}
+
+	/**
+	 * Adds a reset to this dungeon.
+	 *
+	 * @param reset The reset to add
+	 *
+	 * @example
+	 * ```typescript
+	 * const reset = new Reset({
+	 *   templateId: "coin-gold",
+	 *   roomRef: "@tower{0,0,0}",
+	 *   minCount: 2,
+	 *   maxCount: 5
+	 * });
+	 * dungeon.addReset(reset);
+	 * ```
+	 */
+	addReset(reset: Reset): void {
+		if (this._resets.includes(reset)) return;
+		this._resets.push(reset);
+	}
+
+	/**
+	 * Removes a reset from this dungeon.
+	 *
+	 * @param reset The reset to remove
+	 *
+	 * @example
+	 * ```typescript
+	 * dungeon.removeReset(reset);
+	 * ```
+	 */
+	removeReset(reset: Reset): void {
+		const index = this._resets.indexOf(reset);
+		if (index !== -1) {
+			this._resets.splice(index, 1);
+		}
+	}
+
+	/**
+	 * Gets the template registry for this dungeon.
+	 *
+	 * @returns Map of template IDs to templates
+	 *
+	 * @example
+	 * ```typescript
+	 * const templates = dungeon.templates;
+	 * const goblinTemplate = templates.get("goblin");
+	 * ```
+	 */
+	get templates(): Map<string, DungeonObjectTemplate> {
+		return this._templates;
+	}
+
+	/**
+	 * Adds a template to this dungeon's template registry.
+	 *
+	 * @param template The template to add
+	 *
+	 * @example
+	 * ```typescript
+	 * dungeon.addTemplate({
+	 *   id: "coin-gold",
+	 *   type: "Item",
+	 *   display: "Gold Coin"
+	 * });
+	 * ```
+	 */
+	addTemplate(template: DungeonObjectTemplate): void {
+		this._templates.set(template.id, template);
+	}
+
+	/**
+	 * Removes a template from this dungeon's template registry.
+	 *
+	 * @param templateId The ID of the template to remove
+	 *
+	 * @example
+	 * ```typescript
+	 * dungeon.removeTemplate("coin-gold");
+	 * ```
+	 */
+	removeTemplate(templateId: string): void {
+		this._templates.delete(templateId);
+	}
+
+	/**
+	 * Executes all resets in this dungeon using the dungeon's template registry.
+	 * Each reset will spawn objects if the current count is below the minimum.
+	 *
+	 * @returns Total number of objects spawned across all resets
+	 *
+	 * @example
+	 * ```typescript
+	 * dungeon.addTemplate({
+	 *   id: "coin-gold",
+	 *   type: "Item",
+	 *   display: "Gold Coin"
+	 * });
+	 * const spawned = dungeon.executeResets();
+	 * console.log(`Spawned ${spawned} objects`);
+	 * ```
+	 */
+	executeResets(): number {
+		let totalSpawned = 0;
+		for (const reset of this._resets) {
+			const spawned = reset.execute(this._templates);
+			totalSpawned += spawned.length;
+		}
+		return totalSpawned;
+	}
 }
 
 /**
@@ -1572,6 +1715,204 @@ export interface RoomTemplate extends DungeonObjectTemplate {
 }
 
 /**
+ * Options for creating a Reset.
+ *
+ * @property templateId - The ID of the template to spawn
+ * @property roomRef - Room reference string in format "@dungeon-id{x,y,z}"
+ * @property minCount - Minimum number of objects that should exist (default: 1)
+ * @property maxCount - Maximum number of objects that can exist (default: 1)
+ */
+export interface ResetOptions {
+	templateId: string;
+	roomRef: string;
+	minCount?: number;
+	maxCount?: number;
+}
+
+/**
+ * A Reset defines an object that should spawn in a dungeon room.
+ * Resets track minimum and maximum counts, and automatically spawn
+ * objects when the count falls below the minimum.
+ *
+ * @example
+ * ```typescript
+ * // Create a reset that spawns 2-5 coins in a room
+ * const reset = new Reset({
+ *   templateId: "coin-gold",
+ *   roomRef: "@tower{0,0,0}",
+ *   minCount: 2,
+ *   maxCount: 5
+ * });
+ *
+ * // Execute the reset (spawns objects if needed)
+ * reset.execute(templateRegistry);
+ * ```
+ */
+export class Reset {
+	/**
+	 * The ID of the template to spawn.
+	 */
+	readonly templateId: string;
+
+	/**
+	 * Room reference string in format "@dungeon-id{x,y,z}".
+	 */
+	readonly roomRef: string;
+
+	/**
+	 * Minimum number of objects that should exist.
+	 * When resetting, if the count is below this, objects will be spawned.
+	 * Default: 1
+	 */
+	readonly minCount: number;
+
+	/**
+	 * Maximum number of objects that can exist.
+	 * When resetting, if the count is at or above this, no objects will be spawned.
+	 * Default: 1
+	 */
+	readonly maxCount: number;
+
+	/**
+	 * Array of objects that this reset has spawned.
+	 * Objects notify the reset when they're destroyed so they can be removed from this array.
+	 * @private
+	 */
+	private _spawned: DungeonObject[] = [];
+
+	/**
+	 * Create a new Reset.
+	 *
+	 * @param options Reset configuration options
+	 */
+	constructor(options: ResetOptions) {
+		this.templateId = options.templateId;
+		this.roomRef = options.roomRef;
+		this.minCount = options.minCount ?? 1;
+		this.maxCount = options.maxCount ?? 1;
+	}
+
+	/**
+	 * Gets a copy of the spawned objects array.
+	 */
+	get spawned(): readonly DungeonObject[] {
+		return [...this._spawned];
+	}
+
+	/**
+	 * Counts how many spawned objects still exist anywhere in the game world.
+	 * Cleans up dead references (objects that are no longer in any dungeon).
+	 *
+	 * @returns The number of valid spawned objects that still exist
+	 */
+	countExisting(): number {
+		return this._spawned.length;
+	}
+
+	/**
+	 * Executes the reset, spawning objects if needed.
+	 *
+	 * @param templateRegistry Map of template IDs to templates
+	 * @returns Array of newly spawned objects (empty if none were spawned)
+	 */
+	execute(
+		templateRegistry: Map<string, DungeonObjectTemplate>
+	): DungeonObject[] {
+		// Get the target room
+		const targetRoom = getRoomByRef(this.roomRef);
+		if (!targetRoom) {
+			logger.warn(
+				`Reset for template "${this.templateId}" failed: room reference "${this.roomRef}" not found`
+			);
+			return [];
+		}
+
+		// Get the template
+		const template = templateRegistry.get(this.templateId);
+		if (!template) {
+			logger.warn(
+				`Reset for template "${this.templateId}" failed: template not found`
+			);
+			return [];
+		}
+
+		// Count existing spawned objects (anywhere in the game world)
+		const existingCount = this.countExisting();
+
+		// If we're at or above max, don't spawn
+		if (existingCount >= this.maxCount) {
+			return [];
+		}
+
+		// Calculate how many to spawn
+		// We need at least minCount, but can spawn up to maxCount
+		const needed = Math.max(
+			this.minCount - existingCount, // Need to reach minimum
+			0
+		);
+		const canSpawn = this.maxCount - existingCount; // Can spawn up to max
+
+		// Spawn the needed objects (up to maxCount)
+		const spawned: DungeonObject[] = [];
+		const toSpawn = Math.min(needed, canSpawn);
+		for (let i = 0; i < toSpawn; i++) {
+			const obj = createFromTemplate(template);
+			// Track which reset spawned this object BEFORE adding to room
+			// This ensures spawnedByReset is set before location changes
+			targetRoom.add(obj);
+			spawned.push(obj);
+			this.addSpawned(obj);
+		}
+
+		return spawned;
+	}
+
+	/**
+	 * Adds a spawned object to tracking.
+	 * Also sets the object's spawnedByReset property to this reset.
+	 *
+	 * @param obj The object to add to tracking
+	 *
+	 * @example
+	 * ```typescript
+	 * const reset = new Reset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
+	 * const obj = new DungeonObject();
+	 * reset.addSpawned(obj);
+	 * console.log(reset.spawned.includes(obj)); // true
+	 * console.log(obj.spawnedByReset === reset); // true
+	 * ```
+	 */
+	addSpawned(obj: DungeonObject): void {
+		if (this._spawned.includes(obj)) return;
+		this._spawned.push(obj);
+		if (obj.spawnedByReset !== this) obj.spawnedByReset = this;
+	}
+
+	/**
+	 * Removes a spawned object from tracking.
+	 * Also unsets the object's spawnedByReset property if it points to this reset.
+	 *
+	 * @param obj The object to remove from tracking
+	 *
+	 * @example
+	 * ```typescript
+	 * const reset = new Reset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
+	 * const obj = new DungeonObject();
+	 * reset.addSpawned(obj);
+	 * reset.removeSpawned(obj);
+	 * console.log(reset.spawned.includes(obj)); // false
+	 * console.log(obj.spawnedByReset === reset); // false
+	 * ```
+	 */
+	removeSpawned(obj: DungeonObject): void {
+		const index = this._spawned.indexOf(obj);
+		if (index === -1) return;
+		this._spawned.splice(index, 1);
+		if (obj.spawnedByReset === this) obj.spawnedByReset = undefined;
+	}
+}
+
+/**
  * Base class for all objects that can exist in the dungeon.
  * Provides core functionality for object identification, containment, and location management.
  *
@@ -1656,6 +1997,50 @@ export class DungeonObject {
 	 * @private
 	 */
 	private _location?: DungeonObject;
+
+	/**
+	 * Reference to the Reset that spawned this object, if any.
+	 * Used to notify the reset when this object is destroyed or moves to a different dungeon.
+	 * Setting this property automatically adds/removes the object from the reset's tracking list.
+	 * @private
+	 */
+	private _spawnedByReset?: Reset;
+
+	/**
+	 * Gets the Reset that spawned this object, if any.
+	 */
+	get spawnedByReset(): Reset | undefined {
+		return this._spawnedByReset;
+	}
+
+	/**
+	 * Sets the Reset that spawned this object.
+	 * When set, the object will be added to the reset's tracking list.
+	 * When unset, the object will be removed from the reset's tracking list.
+	 *
+	 * @param reset The reset to assign, or `undefined` to remove
+	 *
+	 * @example
+	 * ```typescript
+	 * const reset = new Reset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
+	 * const obj = new DungeonObject();
+	 * obj.spawnedByReset = reset; // obj is now tracked in reset.spawned
+	 * ```
+	 */
+	set spawnedByReset(reset: Reset | undefined) {
+		if (this.spawnedByReset === reset) return;
+
+		// unassign reset
+		if (this._spawnedByReset) {
+			const oldReset: Reset = this._spawnedByReset;
+			this._spawnedByReset = undefined;
+			oldReset.removeSpawned(this);
+		}
+
+		// update new reset
+		this._spawnedByReset = reset;
+		if (reset) reset.addSpawned(this);
+	}
 
 	/**
 	 * Create a new DungeonObject.
@@ -1744,6 +2129,7 @@ export class DungeonObject {
 	 */
 	set location(dobj: DungeonObject | undefined) {
 		if (this._location === dobj) return;
+
 		if (this._location) {
 			const oldLocation: DungeonObject = this._location;
 			this._location = undefined;
@@ -1806,6 +2192,15 @@ export class DungeonObject {
 		// update new dungeon
 		this._dungeon = dungeon;
 		if (dungeon) dungeon.add(this);
+
+		// If we were spawned by a reset and are moving to a different dungeon (or being removed),
+		// notify the reset to stop tracking us
+		if (this.spawnedByReset) {
+			const resetTargetRoom = getRoomByRef(this.spawnedByReset.roomRef);
+			const resetDungeon = resetTargetRoom?.dungeon;
+			if (!dungeon || !resetDungeon || dungeon !== resetDungeon)
+				this.spawnedByReset = undefined;
+		}
 
 		// inform our contents that we're in a new dungeon
 		for (let obj of this._contents) obj.dungeon = dungeon;
@@ -2040,7 +2435,7 @@ export class DungeonObject {
 			type: this.constructor.name as SerializedDungeonObjectType,
 			keywords: this.keywords,
 			display: this.display,
-			description: this.description,
+			...(this.description !== undefined && { description: this.description }),
 			...(this.roomDescription !== undefined && {
 				roomDescription: this.roomDescription,
 			}),
@@ -3149,6 +3544,34 @@ export class Item extends Movable {
 			}
 		}
 		return item;
+	}
+
+	/**
+	 * Set the location (container) of this item.
+	 * When an item's location changes, it clears reset tracking.
+	 * This allows items to be picked up and moved without the reset system tracking them.
+	 *
+	 * @param dobj The container to move into, or undefined to remove from any container
+	 */
+	override set location(dobj: DungeonObject | undefined) {
+		// Get the current location before it changes (access private field directly)
+		const oldLocation = (this as any)._location;
+
+		// Clear reset tracking when location changes (only if we had a previous location)
+		if (oldLocation && this.spawnedByReset) {
+			this.spawnedByReset = undefined;
+		}
+
+		// Call parent setter to handle the actual location change
+		super.location = dobj;
+	}
+
+	/**
+	 * Get the current location of this item.
+	 * @returns The DungeonObject containing this item, or undefined
+	 */
+	override get location() {
+		return super.location;
 	}
 }
 

@@ -49,6 +49,7 @@ import { Board } from "./board.js";
 import { saveGameState, getNextCharacterId } from "./package/gamestate.js";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
+import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -107,9 +108,9 @@ export class Game {
 	/** Active player characters (authenticated and playing) */
 	private activeCharacters = new Set<Character>();
 
-	private saveTimer?: NodeJS.Timeout;
-	private boardCleanupTimer?: NodeJS.Timeout;
-	private gameStateSaveTimer?: NodeJS.Timeout;
+	private saveTimer?: number;
+	private boardCleanupTimer?: number;
+	private gameStateSaveTimer?: number;
 	private nextConnectionId = 1;
 
 	/** Static singleton instance of the Game */
@@ -182,17 +183,17 @@ export class Game {
 		await this.server.start(this.config.server.port);
 
 		// Set up auto-save timer
-		this.saveTimer = setInterval(() => {
+		this.saveTimer = setAbsoluteInterval(() => {
 			this.saveAllCharacters();
 		}, DEFAULT_SAVE_INTERVAL_MS);
 
 		// Set up board cleanup timer (runs every hour)
-		this.boardCleanupTimer = setInterval(() => {
+		this.boardCleanupTimer = setAbsoluteInterval(() => {
 			this.cleanupExpiredBoardMessages();
 		}, 60 * 60 * 1000); // 1 hour
 
 		// Set up periodic game state save (every 5 minutes)
-		this.gameStateSaveTimer = setInterval(() => {
+		this.gameStateSaveTimer = setAbsoluteInterval(() => {
 			this.saveGameState();
 		}, DEFAULT_SAVE_INTERVAL_MS);
 	}
@@ -204,22 +205,22 @@ export class Game {
 	 */
 	async stop() {
 		// Clear auto-save timer
-		if (this.saveTimer) {
-			clearInterval(this.saveTimer);
+		if (this.saveTimer !== undefined) {
+			clearCustomInterval(this.saveTimer);
 			this.saveTimer = undefined;
 			logger.debug("Auto-save timer cleared");
 		}
 
 		// Clear board cleanup timer
-		if (this.boardCleanupTimer) {
-			clearInterval(this.boardCleanupTimer);
+		if (this.boardCleanupTimer !== undefined) {
+			clearCustomInterval(this.boardCleanupTimer);
 			this.boardCleanupTimer = undefined;
 			logger.debug("Board cleanup timer cleared");
 		}
 
 		// Clear game state save timer
-		if (this.gameStateSaveTimer) {
-			clearInterval(this.gameStateSaveTimer);
+		if (this.gameStateSaveTimer !== undefined) {
+			clearCustomInterval(this.gameStateSaveTimer);
 			this.gameStateSaveTimer = undefined;
 			logger.debug("Game state save timer cleared");
 		}

@@ -19,6 +19,7 @@ import {
 	RoomLink,
 	DIRECTIONS,
 	createFromTemplate,
+	Reset,
 	type SerializedDungeonObject,
 	type SerializedRoom,
 	type SerializedMovable,
@@ -2562,6 +2563,390 @@ suite("dungeon.ts", () => {
 			assert(restored instanceof Item);
 			assert.strictEqual(restored.keywords, "small key");
 			assert.strictEqual(restored.location, undefined);
+		});
+	});
+
+	suite("Reset", () => {
+		test("should create reset with default minCount of 1 and maxCount of 1", () => {
+			const reset = new Reset({
+				templateId: "test-item",
+				roomRef: "@test{0,0,0}",
+			});
+
+			assert.strictEqual(reset.templateId, "test-item");
+			assert.strictEqual(reset.roomRef, "@test{0,0,0}");
+			assert.strictEqual(reset.minCount, 1);
+			assert.strictEqual(reset.maxCount, 1);
+			assert.strictEqual(reset.countExisting(), 0);
+		});
+
+		test("should create reset with custom minCount and maxCount", () => {
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: "@tower{0,0,0}",
+				minCount: 2,
+				maxCount: 5,
+			});
+
+			assert.strictEqual(reset.minCount, 2);
+			assert.strictEqual(reset.maxCount, 5);
+		});
+
+		test("should spawn objects when count is below minimum", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-spawn",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const template: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+				keywords: "coin gold",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: room.getRoomRef()!,
+				minCount: 3,
+				maxCount: 5,
+			});
+
+			// Execute reset - should spawn 3 objects
+			const spawned = reset.execute(templateRegistry);
+
+			assert.strictEqual(spawned.length, 3);
+			assert.strictEqual(reset.countExisting(), 3);
+			assert.strictEqual(room.contents.length, 3);
+
+			// Verify all spawned objects are in the room
+			for (const obj of spawned) {
+				assert.strictEqual(obj.location, room);
+				assert.strictEqual(obj.dungeon, dungeon);
+			}
+		});
+
+		test("should not spawn objects when count is at minimum", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-min",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const template: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: room.getRoomRef()!,
+				minCount: 2,
+				maxCount: 5,
+			});
+
+			// First execution - spawns 2 objects
+			const firstSpawn = reset.execute(templateRegistry);
+			assert.strictEqual(firstSpawn.length, 2);
+
+			// Second execution - should not spawn (at minimum)
+			const secondSpawn = reset.execute(templateRegistry);
+			assert.strictEqual(secondSpawn.length, 0);
+		});
+
+		test("should clean up dead references when counting", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-cleanup",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const template: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: room.getRoomRef()!,
+				minCount: 2,
+				maxCount: 5,
+			});
+
+			// Spawn objects
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 2);
+			assert.strictEqual(reset.countExisting(), 2);
+
+			// Remove one object from dungeon
+			spawned[0].remove();
+			dungeon.remove(spawned[0]);
+
+			// Count should reflect that object is no longer in any dungeon
+			// (WeakSet automatically handles GC, so the object is no longer tracked)
+			const count = reset.countExisting();
+			assert.strictEqual(count, 1);
+		});
+
+		test("should return empty array when room reference is invalid", () => {
+			const template: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: "@nonexistent{0,0,0}",
+				minCount: 2,
+				maxCount: 5,
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 0);
+		});
+
+		test("should return empty array when template is not found", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-notfound",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>();
+
+			const reset = new Reset({
+				templateId: "nonexistent",
+				roomRef: room.getRoomRef()!,
+				minCount: 2,
+				maxCount: 5,
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 0);
+		});
+
+		test("should respect maxCount when spawning multiple objects", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-maxcount",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const template: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: room.getRoomRef()!,
+				minCount: 5,
+				maxCount: 3, // Max is less than min
+			});
+
+			// Should only spawn up to maxCount
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 3);
+			assert.strictEqual(reset.countExisting(), 3);
+		});
+	});
+
+	suite("Dungeon reset management", () => {
+		test("should add and remove resets", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+
+			const reset1 = new Reset({
+				templateId: "item1",
+				roomRef: "@test{0,0,0}",
+			});
+
+			const reset2 = new Reset({
+				templateId: "item2",
+				roomRef: "@test{0,0,0}",
+			});
+
+			assert.strictEqual(dungeon.resets.length, 0);
+
+			dungeon.addReset(reset1);
+			assert.strictEqual(dungeon.resets.length, 1);
+			assert(dungeon.resets.includes(reset1));
+
+			dungeon.addReset(reset2);
+			assert.strictEqual(dungeon.resets.length, 2);
+
+			dungeon.removeReset(reset1);
+			assert.strictEqual(dungeon.resets.length, 1);
+			assert(!dungeon.resets.includes(reset1));
+			assert(dungeon.resets.includes(reset2));
+		});
+
+		test("should not add duplicate resets", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+
+			const reset = new Reset({
+				templateId: "item1",
+				roomRef: "@test{0,0,0}",
+			});
+
+			dungeon.addReset(reset);
+			dungeon.addReset(reset); // Try to add again
+
+			assert.strictEqual(dungeon.resets.length, 1);
+		});
+
+		test("should execute all resets", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-execute",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room1 = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+			const room2 = dungeon.getRoom({ x: 1, y: 0, z: 0 })!;
+
+			const template1: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+			};
+
+			const template2: DungeonObjectTemplate = {
+				id: "sword-iron",
+				type: "Item",
+				display: "Iron Sword",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template1],
+				["sword-iron", template2],
+			]);
+
+			const reset1 = new Reset({
+				templateId: "coin-gold",
+				roomRef: room1.getRoomRef()!,
+				minCount: 2,
+				maxCount: 5,
+			});
+
+			const reset2 = new Reset({
+				templateId: "sword-iron",
+				roomRef: room2.getRoomRef()!,
+				minCount: 1,
+				maxCount: 3,
+			});
+
+			dungeon.addReset(reset1);
+			dungeon.addReset(reset2);
+
+			// Add templates to dungeon
+			for (const [id, template] of templateRegistry) {
+				dungeon.addTemplate(template);
+			}
+			const totalSpawned = dungeon.executeResets();
+			assert.strictEqual(totalSpawned, 3); // 2 coins + 1 sword
+			assert.strictEqual(room1.contents.length, 2);
+			assert.strictEqual(room2.contents.length, 1);
+		});
+	});
+
+	suite("Reset tracking and location changes", () => {
+		test("should clear tracking for items when location changes", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-item-location",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room1 = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+			const room2 = dungeon.getRoom({ x: 1, y: 0, z: 0 })!;
+
+			const template: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: room1.getRoomRef()!,
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+			const item = spawned[0];
+			assert(item instanceof Item);
+			assert.strictEqual(item.spawnedByReset, reset);
+			assert.strictEqual(reset.countExisting(), 1);
+
+			// Move item to different room - should lose tracking
+			item.location = room2;
+			assert.strictEqual(item.spawnedByReset, undefined);
+			assert.strictEqual(reset.countExisting(), 0);
+		});
+
+		test("should NOT clear tracking for mobs when location changes", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-mob-location",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room1 = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+			const room2 = dungeon.getRoom({ x: 1, y: 0, z: 0 })!;
+
+			const template: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", template],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room1.getRoomRef()!,
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+			assert.strictEqual(mob.spawnedByReset, reset);
+			assert.strictEqual(reset.countExisting(), 1);
+
+			// Move mob to different room - should KEEP tracking
+			mob.location = room2;
+			assert.strictEqual(mob.spawnedByReset, reset);
+			assert.strictEqual(reset.countExisting(), 1);
 		});
 	});
 });

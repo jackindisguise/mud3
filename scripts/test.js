@@ -8,6 +8,16 @@
 import { fileURLToPath } from "url";
 import { dirname, join, relative, resolve } from "path";
 import { existsSync } from "fs";
+import { inspect } from "node:util";
+
+// Configure inspect defaults for cleaner test output
+if (typeof inspect.defaultOptions !== "undefined") {
+	inspect.defaultOptions.depth = 2;
+	inspect.defaultOptions.maxArrayLength = 5;
+	inspect.defaultOptions.maxStringLength = 80;
+	inspect.defaultOptions.compact = true;
+	inspect.defaultOptions.showHidden = false;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -47,7 +57,7 @@ import { spawn } from "child_process";
 
 const testProcess = spawn(
 	"node",
-	["--test", "--test-reporter=spec", ...testArgs],
+	["--test", "--test-reporter=dot", ...testArgs],
 	{
 		stdio: "inherit",
 		shell: true,

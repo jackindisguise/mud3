@@ -34,6 +34,7 @@
 		"winston": "^3.18.3"
 	},
 	"dependencies": {
+		"accurate-intervals": "github:jackindisguise/accurate-intervals",
 		"mud-ext": "github:jackindisguise/mud-ext#v2.8.2",
 		"package-loader": "github:jackindisguise/package-loader"
 	}

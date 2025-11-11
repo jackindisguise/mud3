@@ -6,6 +6,7 @@ import {
 	CommandRegistry,
 	ARGUMENT_TYPE,
 	ParseResult,
+	PRIORITY,
 } from "./command.js";
 import { JavaScriptCommandAdapter } from "./package/commands.js";
 import { Dungeon, DungeonObject, Mob, DIRECTION } from "./dungeon.js";
@@ -525,6 +526,171 @@ suite("command.ts", () => {
 
 			CommandRegistry.default.unregister(command);
 			assert.strictEqual(CommandRegistry.default.getCommands().length, 0);
+		});
+
+		test("should prioritize commands correctly: HIGH > NORMAL > LOW", () => {
+			// Clear registry first
+			const existingCommands = CommandRegistry.default.getCommands();
+			existingCommands.forEach((cmd) =>
+				CommandRegistry.default.unregister(cmd)
+			);
+
+			let highExecuted = false;
+			let normalExecuted = false;
+			let lowExecuted = false;
+
+			// Commands with different priorities, all can match "test"
+			const highCommand = new JavaScriptCommandAdapter({
+				pattern: "test~",
+				priority: PRIORITY.HIGH,
+				execute() {
+					highExecuted = true;
+				},
+			});
+
+			const normalCommand = new JavaScriptCommandAdapter({
+				pattern: "test~ <arg:text>",
+				priority: PRIORITY.NORMAL,
+				execute() {
+					normalExecuted = true;
+				},
+			});
+
+			const lowCommand = new JavaScriptCommandAdapter({
+				pattern: "test~ <arg:text>",
+				priority: PRIORITY.LOW,
+				execute() {
+					lowExecuted = true;
+				},
+			});
+
+			// Register in reverse priority order to ensure sorting works
+			CommandRegistry.default.register(lowCommand);
+			CommandRegistry.default.register(normalCommand);
+			CommandRegistry.default.register(highCommand);
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// "test" should match HIGH priority first (even though it was registered last)
+			const result1 = CommandRegistry.default.execute("test", context);
+			assert.strictEqual(result1, true);
+			assert.strictEqual(highExecuted, true);
+			assert.strictEqual(normalExecuted, false);
+			assert.strictEqual(lowExecuted, false);
+
+			// Reset and test NORMAL > LOW (remove HIGH command)
+			highExecuted = false;
+			normalExecuted = false;
+			lowExecuted = false;
+			CommandRegistry.default.unregister(highCommand);
+
+			// "test hello" should match NORMAL priority over LOW
+			const result2 = CommandRegistry.default.execute("test hello", context);
+			assert.strictEqual(result2, true);
+			assert.strictEqual(normalExecuted, true);
+			assert.strictEqual(lowExecuted, false);
+
+			// Clean up
+			CommandRegistry.default.unregister(normalCommand);
+			CommandRegistry.default.unregister(lowCommand);
+		});
+
+		test("should sort by pattern length when priorities are equal", () => {
+			// Clear registry first
+			const existingCommands = CommandRegistry.default.getCommands();
+			existingCommands.forEach((cmd) =>
+				CommandRegistry.default.unregister(cmd)
+			);
+
+			let longExecuted = false;
+			let shortExecuted = false;
+
+			// Both commands have NORMAL priority (default)
+			// Use patterns where both can match the same input
+			// Use word arguments since text arguments are greedy and should be last
+			const longCommand = new JavaScriptCommandAdapter({
+				pattern: "test~ <arg1:word> <arg2:word> <arg3:text>",
+				execute() {
+					longExecuted = true;
+				},
+			});
+
+			const shortCommand = new JavaScriptCommandAdapter({
+				pattern: "test~ <arg:text>",
+				execute() {
+					shortExecuted = true;
+				},
+			});
+
+			// Register short first, then long
+			CommandRegistry.default.register(shortCommand);
+			CommandRegistry.default.register(longCommand);
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// "test hello world more" should match "test~ <arg1:word> <arg2:word> <arg3:text>" (longer pattern) first
+			// Even though short was registered first, long has longer pattern so it's sorted first
+			const result = CommandRegistry.default.execute(
+				"test hello world more text",
+				context
+			);
+			assert.strictEqual(result, true);
+			assert.strictEqual(longExecuted, true);
+			assert.strictEqual(shortExecuted, false);
+
+			// Clean up
+			CommandRegistry.default.unregister(longCommand);
+			CommandRegistry.default.unregister(shortCommand);
+		});
+
+		test("should handle commands with same priority and same pattern length", () => {
+			// Clear registry first
+			const existingCommands = CommandRegistry.default.getCommands();
+			existingCommands.forEach((cmd) =>
+				CommandRegistry.default.unregister(cmd)
+			);
+
+			let cmd1Executed = false;
+			let cmd2Executed = false;
+
+			// Both commands have same priority and same pattern length
+			const cmd1 = new JavaScriptCommandAdapter({
+				pattern: "test <arg1:text>",
+				priority: PRIORITY.NORMAL,
+				execute() {
+					cmd1Executed = true;
+				},
+			});
+
+			const cmd2 = new JavaScriptCommandAdapter({
+				pattern: "test <arg2:text>",
+				priority: PRIORITY.NORMAL,
+				execute() {
+					cmd2Executed = true;
+				},
+			});
+
+			// Register cmd1 first, then cmd2
+			// When priority and length are equal, sort is stable (preserves order)
+			// So cmd1 (registered first) should be tried first
+			CommandRegistry.default.register(cmd1);
+			CommandRegistry.default.register(cmd2);
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			// Both have same priority and length, so order is preserved
+			// cmd1 (registered first) should be tried first
+			const result = CommandRegistry.default.execute("test hello", context);
+			assert.strictEqual(result, true);
+			assert.strictEqual(cmd1Executed, true);
+			assert.strictEqual(cmd2Executed, false);
+
+			// Clean up
+			CommandRegistry.default.unregister(cmd1);
+			CommandRegistry.default.unregister(cmd2);
 		});
 	});
 

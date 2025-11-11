@@ -29,6 +29,7 @@ import {
 	Command,
 	CommandContext,
 	ParseResult,
+	PRIORITY,
 } from "../command.js";
 import { Package } from "package-loader";
 import { readdir, readFile } from "fs/promises";
@@ -48,6 +49,8 @@ export interface CommandObject {
 	pattern: string;
 	/** Optional aliases for the command */
 	aliases?: string[];
+	/** Priority level for command execution order */
+	priority?: PRIORITY;
 	/** Execute handler invoked after successful parse */
 	execute: (context: CommandContext, args: Map<string, any>) => void;
 	/** Optional parse error handler */
@@ -82,7 +85,11 @@ export class JavaScriptCommandAdapter extends Command {
 	) => void;
 
 	constructor(commandObj: CommandObject) {
-		super({ pattern: commandObj.pattern, aliases: commandObj.aliases });
+		super({
+			pattern: commandObj.pattern,
+			aliases: commandObj.aliases,
+			priority: commandObj.priority,
+		});
 		this.executeFunction = commandObj.execute;
 		this.errorFunction = commandObj.onError;
 	}
@@ -234,9 +241,9 @@ export default {
 					try {
 						const filePath = join(commandDir, file);
 						const fileUrl = pathToFileURL(filePath).href;
-						logger.debug(
+						/*logger.debug(
 							`Importing command from ${relative(process.cwd(), filePath)}`
-						);
+						);*/
 						const commandModule = await import(fileUrl);
 						const commandObj = commandModule.default;
 

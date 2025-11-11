@@ -17,7 +17,7 @@
  * @module commands/whisper
  */
 
-import { CommandContext, ParseResult } from "../command.js";
+import { CommandContext, ParseResult, PRIORITY } from "../command.js";
 import { MESSAGE_GROUP, Character } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { CHANNEL } from "../channel.js";
@@ -26,6 +26,7 @@ import { Game } from "../game.js";
 export default {
 	pattern: "whisper~ <target:character> <message:text>",
 	aliases: ["tell~ <target:character> <message:text>"],
+	priority: PRIORITY.LOW,
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const target = args.get("target") as Character | undefined;
 		const message = args.get("message") as string;

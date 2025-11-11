@@ -10,7 +10,7 @@
 		"prebuild": "rimraf dist",
 		"build": "tsc",
 		"pretest": "npm run build",
-		"test": "npm run test:compiled",
+		"test": "node scripts/test.js",
 		"test:compiled": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
 		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test:compiled",
 		"doc": "npx typedoc",

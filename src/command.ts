@@ -196,9 +196,21 @@ export interface ArgumentConfig {
 	source?: "room" | "inventory" | "all";
 }
 
+/**
+ * Priority levels for command execution order.
+ * Commands with higher priority are tried before commands with lower priority.
+ * Within the same priority level, commands are sorted by pattern length (longest first).
+ */
+export enum PRIORITY {
+	LOW = 0,
+	NORMAL = 1,
+	HIGH = 2,
+}
+
 export interface CommandOptions {
 	pattern: string;
 	aliases?: string[];
+	priority?: PRIORITY;
 }
 
 /**
@@ -430,6 +442,13 @@ export abstract class Command {
 	readonly aliases?: string[];
 
 	/**
+	 * Priority level for this command.
+	 * Commands with higher priority are tried before commands with lower priority.
+	 * Defaults to PRIORITY.NORMAL.
+	 */
+	readonly priority: PRIORITY = PRIORITY.NORMAL;
+
+	/**
 	 * Cached pattern information for efficient parsing.
 	 * Built once during construction to avoid rebuilding regex patterns on every parse.
 	 * @private
@@ -475,6 +494,7 @@ export abstract class Command {
 		if (options) {
 			if (options.pattern) this.pattern = options.pattern;
 			if (options.aliases) this.aliases = options.aliases;
+			if (options.priority !== undefined) this.priority = options.priority;
 		}
 		this.buildPatternCache();
 	}
@@ -847,7 +867,7 @@ export abstract class Command {
 			.replace(/___OPTIONAL_GENERIC___/g, "(?:(.+?))?");
 
 		const regex = new RegExp(`^${regexStr}$`, "i");
-		logger.debug(`> ${this.pattern}: '${regex}'`);
+		//logger.debug(`> ${this.pattern}: '${regex}'`);
 		return regex;
 	}
 
@@ -1293,8 +1313,13 @@ export class CommandRegistry {
 	 */
 	register(command: Command) {
 		this.commands.push(command);
-		// Sort by pattern length (longest first) to prioritize more specific commands
-		this.commands.sort((a, b) => b.pattern.length - a.pattern.length);
+		// Sort by priority first (higher priority first), then by pattern length (longest first)
+		this.commands.sort((a, b) => {
+			if (a.priority !== b.priority) {
+				return b.priority - a.priority; // Higher priority first
+			}
+			return b.pattern.length - a.pattern.length; // Longer pattern first
+		});
 	}
 
 	/**
@@ -1389,10 +1414,12 @@ export class CommandRegistry {
 	 * // ...
 	 * ```
 	 */
+
 	execute(input: string, context: CommandContext): boolean {
-		input = input.trim();
+		input = input.trim().toLowerCase();
 		if (!input) return false;
 
+		// Commands are already sorted by priority and pattern length
 		for (const command of this.commands) {
 			const result = command.parse(input, context);
 			if (result.success) {

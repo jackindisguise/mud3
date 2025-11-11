@@ -1408,6 +1408,7 @@ export interface DungeonObjectOptions {
 	keywords?: string;
 	display?: string;
 	description?: string;
+	roomDescription?: string;
 	dungeon?: Dungeon;
 	baseWeight?: number;
 }
@@ -1451,6 +1452,7 @@ export interface SerializedDungeonObject {
 	keywords: string;
 	display: string;
 	description?: string;
+	roomDescription?: string;
 	contents?: SerializedDungeonObject[];
 	location?: string; // RoomRef value
 	baseWeight?: number;
@@ -1554,6 +1556,7 @@ export interface DungeonObjectTemplate {
 	keywords?: string;
 	display?: string;
 	description?: string;
+	roomDescription?: string;
 	baseWeight?: number;
 }
 
@@ -1614,6 +1617,13 @@ export class DungeonObject {
 	description?: string;
 
 	/**
+	 * One-line description shown when this object appears in a room.
+	 * If undefined, the room will display the object's display string instead.
+	 * Used for contextual descriptions like "A shining, long piece of metal is here."
+	 */
+	roomDescription?: string;
+
+	/**
 	 * The intrinsic weight of this object, not including contents.
 	 * The currentWeight property tracks the total weight including contents.
 	 */
@@ -1670,6 +1680,7 @@ export class DungeonObject {
 		if (options.keywords) this.keywords = options.keywords;
 		if (options.display) this.display = options.display;
 		if (options.description) this.description = options.description;
+		if (options.roomDescription) this.roomDescription = options.roomDescription;
 		if (options.baseWeight !== undefined) {
 			this.baseWeight = options.baseWeight;
 			this.currentWeight = options.baseWeight;
@@ -2030,6 +2041,9 @@ export class DungeonObject {
 			keywords: this.keywords,
 			display: this.display,
 			description: this.description,
+			...(this.roomDescription !== undefined && {
+				roomDescription: this.roomDescription,
+			}),
 			...(serializedContents.length > 0 && { contents: serializedContents }),
 			...(locationRef && { location: locationRef }),
 			...(this.baseWeight !== 0 && { baseWeight: this.baseWeight }),
@@ -2203,6 +2217,9 @@ export class DungeonObject {
 		}
 		if (template.description !== undefined) {
 			this.description = template.description;
+		}
+		if (template.roomDescription !== undefined) {
+			this.roomDescription = template.roomDescription;
 		}
 		if (template.baseWeight !== undefined) {
 			this.baseWeight = template.baseWeight;

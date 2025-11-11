@@ -31,7 +31,8 @@
 import { MudServer, MudClient } from "./io.js";
 import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
-import { Mob, Room } from "./dungeon.js";
+import { Mob, Room, getRoomByRef } from "./dungeon.js";
+import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./package/config.js";
 import {
 	saveCharacter as saveCharacterFile,
@@ -373,8 +374,13 @@ export class Game {
 				const loadedCharacter =
 					loadCharacterFromSerialized(serializedCharacter);
 
+				// Get the saved location reference from the serialized data
+				const savedLocationRef = serializedCharacter.mob.location as
+					| string
+					| undefined;
+
 				// Password is correct, show MOTD and start session
-				MOTD(loadedCharacter);
+				MOTD(loadedCharacter, savedLocationRef);
 			});
 		};
 
@@ -411,16 +417,23 @@ export class Game {
 			});
 		};
 
-		const MOTD = async (existingCharacter?: Character) => {
+		const MOTD = async (
+			existingCharacter?: Character,
+			savedLocationRef?: string
+		) => {
 			sendLine("This is the MOTD.");
 			ask("Press any key to continue...", async () => {
 				let character: Character;
+				let isNewCharacter = false;
+				let locationRef: string | undefined;
 
 				if (existingCharacter) {
 					// Use the loaded existing character
 					character = existingCharacter;
+					locationRef = savedLocationRef;
 				} else {
 					// Create a new character
+					isNewCharacter = true;
 					const characterId = await getNextCharacterId();
 					const mob = new Mob({
 						display: username,
@@ -434,7 +447,12 @@ export class Game {
 					saveCharacterFile(character);
 				}
 
-				self.startPlayerSession(session, character);
+				self.startPlayerSession(
+					session,
+					character,
+					isNewCharacter,
+					locationRef
+				);
 			});
 		};
 
@@ -478,8 +496,19 @@ export class Game {
 	/**
 	 * Start a gameplay session for an authenticated character.
 	 * Associates the connection, transitions to PLAYING, and welcomes the player.
+	 * Moves the character to their saved location (or starting location for new characters).
+	 *
+	 * @param session The login session
+	 * @param character The character to start a session for
+	 * @param isNewCharacter Whether this is a newly created character
+	 * @param savedLocationRef Optional room reference string from saved character data
 	 */
-	private startPlayerSession(session: LoginSession, character: Character) {
+	private startPlayerSession(
+		session: LoginSession,
+		character: Character,
+		isNewCharacter: boolean = false,
+		savedLocationRef?: string
+	) {
 		const connectionId = this.nextConnectionId++;
 
 		// Save last login date before updating it
@@ -499,10 +528,69 @@ export class Game {
 		registerActiveCharacter(character);
 
 		// Welcome the player
-		character.sendLine(`Welcome back, ${character.credentials.username}!`);
+		if (isNewCharacter) {
+			character.sendLine(`Welcome, ${character.credentials.username}!`);
+		} else {
+			character.sendLine(`Welcome back, ${character.credentials.username}!`);
+		}
 		character.sendLine("You are now playing.");
 
 		logger.info(`${character.credentials.username} has entered the game`);
+
+		// Move character to their location
+		let targetRoom: Room | undefined;
+		if (isNewCharacter) {
+			// New characters start at @tower{0,0,0}
+			targetRoom = getRoomByRef("@tower{0,0,0}");
+			if (!targetRoom) {
+				logger.warn(
+					`Failed to find starting room @tower{0,0,0} for new character ${character.credentials.username}`
+				);
+				character.sendMessage(
+					"Warning: Could not find starting location. Please contact an administrator.",
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+			}
+		} else {
+			// Existing characters: restore from saved location
+			if (savedLocationRef) {
+				targetRoom = getRoomByRef(savedLocationRef);
+				if (!targetRoom) {
+					logger.warn(
+						`Failed to restore location ${savedLocationRef} for character ${character.credentials.username}, falling back to starting location`
+					);
+					// Fall back to starting location
+					targetRoom = getRoomByRef("@tower{0,0,0}");
+					if (!targetRoom) {
+						logger.error(
+							`Failed to find fallback starting room @tower{0,0,0} for character ${character.credentials.username}`
+						);
+						character.sendMessage(
+							"Warning: Could not restore your location. Please contact an administrator.",
+							MESSAGE_GROUP.COMMAND_RESPONSE
+						);
+					}
+				}
+			} else {
+				// No saved location, use starting location
+				targetRoom = getRoomByRef("@tower{0,0,0}");
+				if (!targetRoom) {
+					logger.warn(
+						`No saved location and failed to find starting room @tower{0,0,0} for character ${character.credentials.username}`
+					);
+					character.sendMessage(
+						"Warning: Could not find starting location. Please contact an administrator.",
+						MESSAGE_GROUP.COMMAND_RESPONSE
+					);
+				}
+			}
+		}
+
+		// Move the character to the target room and show it
+		if (targetRoom) {
+			targetRoom.add(character.mob);
+			showRoom(character.mob, targetRoom);
+		}
 
 		// Check for unread messages
 		this.checkUnreadMessages(character, lastLoginDate);

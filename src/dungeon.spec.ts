@@ -272,9 +272,24 @@ suite("dungeon.ts", () => {
 			assert.strictEqual(obj.keywords, "dungeon object");
 			assert.strictEqual(obj.display, "Dungeon Object");
 			assert.strictEqual(obj.description, undefined);
+			assert.strictEqual(obj.roomDescription, undefined);
 			assert.deepStrictEqual(obj.contents, []);
 			assert.strictEqual(obj.dungeon, undefined);
 			assert.strictEqual(obj.location, undefined);
+		});
+
+		test("should initialize with roomDescription when provided", () => {
+			const obj = new DungeonObject({
+				keywords: "sword",
+				display: "Sword",
+				roomDescription: "A shining, long piece of metal is here.",
+			});
+			assert.strictEqual(obj.keywords, "sword");
+			assert.strictEqual(obj.display, "Sword");
+			assert.strictEqual(
+				obj.roomDescription,
+				"A shining, long piece of metal is here."
+			);
 		});
 
 		test("should manage contents correctly", () => {
@@ -490,6 +505,7 @@ suite("dungeon.ts", () => {
 					keywords: "test object",
 					display: "Test Object",
 					description: "A test object.",
+					roomDescription: "A test object is here.",
 					baseWeight: 5.0,
 				});
 
@@ -500,6 +516,7 @@ suite("dungeon.ts", () => {
 				assert.strictEqual(template.keywords, "test object");
 				assert.strictEqual(template.display, "Test Object");
 				assert.strictEqual(template.description, "A test object.");
+				assert.strictEqual(template.roomDescription, "A test object is here.");
 				assert.strictEqual(template.baseWeight, 5.0);
 			});
 
@@ -602,6 +619,7 @@ suite("dungeon.ts", () => {
 					keywords: "applied keywords",
 					display: "Applied Display",
 					description: "Applied description",
+					roomDescription: "A test object is here.",
 					baseWeight: 10.0,
 				};
 
@@ -610,6 +628,7 @@ suite("dungeon.ts", () => {
 				assert.strictEqual(obj.keywords, "applied keywords");
 				assert.strictEqual(obj.display, "Applied Display");
 				assert.strictEqual(obj.description, "Applied description");
+				assert.strictEqual(obj.roomDescription, "A test object is here.");
 				assert.strictEqual(obj.baseWeight, 10.0);
 				assert.strictEqual(obj.currentWeight, 10.0);
 			});
@@ -1693,6 +1712,34 @@ suite("dungeon.ts", () => {
 				assert.strictEqual(serialized.location, undefined);
 			});
 
+			test("should serialize roomDescription when present", () => {
+				const obj = new DungeonObject({
+					keywords: "sword",
+					display: "Sword",
+					roomDescription: "A shining, long piece of metal is here.",
+				});
+
+				const serialized = obj.serialize();
+
+				assert.strictEqual(serialized.type, "DungeonObject");
+				assert.strictEqual(
+					serialized.roomDescription,
+					"A shining, long piece of metal is here."
+				);
+			});
+
+			test("should not serialize roomDescription when undefined", () => {
+				const obj = new DungeonObject({
+					keywords: "sword",
+					display: "Sword",
+				});
+
+				const serialized = obj.serialize();
+
+				assert.strictEqual(serialized.type, "DungeonObject");
+				assert.strictEqual(serialized.roomDescription, undefined);
+			});
+
 			test("should serialize nested contents recursively", () => {
 				const chest = new DungeonObject({
 					keywords: "wooden chest",
@@ -1912,6 +1959,38 @@ suite("dungeon.ts", () => {
 					"A sturdy wooden chest bound with iron bands."
 				);
 				assert.strictEqual(obj.contents.length, 0);
+			});
+
+			test("should deserialize roomDescription when present", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "sword",
+					display: "Sword",
+					roomDescription: "A shining, long piece of metal is here.",
+					contents: [],
+				};
+
+				const obj = DungeonObject.deserialize(data);
+
+				assert(obj instanceof DungeonObject);
+				assert.strictEqual(
+					obj.roomDescription,
+					"A shining, long piece of metal is here."
+				);
+			});
+
+			test("should handle missing roomDescription in deserialization", () => {
+				const data: SerializedDungeonObject = {
+					type: "DungeonObject",
+					keywords: "sword",
+					display: "Sword",
+					contents: [],
+				};
+
+				const obj = DungeonObject.deserialize(data);
+
+				assert(obj instanceof DungeonObject);
+				assert.strictEqual(obj.roomDescription, undefined);
 			});
 
 			test("should deserialize nested contents recursively", () => {

@@ -18,7 +18,7 @@
  * ```ts
  * import { Character, MESSAGE_GROUP } from "./character.js";
  * import { MudClient } from "./io.js";
- * import { Mob } from "./dungeon.js";
+ * import { Mob } from "./mob.js";
  *
  * // 1) Create a character (only username is required)
  * const hero = new Character({
@@ -53,7 +53,7 @@
  * @module character
  */
 
-import { Mob, SerializedMob } from "./dungeon.js";
+import { Mob, SerializedMob } from "./mob.js";
 import { createHash } from "crypto";
 import { CONFIG } from "./package/config.js";
 import type { MudClient } from "./io.js";
@@ -331,7 +331,7 @@ export interface SerializedCharacter {
  * Example
  * ```ts
  * import { Character, MESSAGE_GROUP } from "./character.js";
- * import { Mob } from "./dungeon.js";
+ * import { Mob } from "./mob.js";
  *
  * const c = new Character({
  *   credentials: { username: "playerOne" },
@@ -401,8 +401,8 @@ export class Character {
 	 *
 	 * @example
 	 * ```ts
-	 * import { Character } from "./character.js";
-	 * import { Mob } from "./dungeon.js";
+ * import { Character } from "./character.js";
+ * import { Mob } from "./mob.js";
 	 *
 	 * // Minimal setup: only username is required; other fields get sensible defaults
 	 * const character = new Character({

@@ -5,7 +5,8 @@ import { join } from "path";
 import { existsSync } from "fs";
 import commandsPackage, { JavaScriptCommandAdapter } from "./commands.js";
 import { CommandRegistry, CommandContext } from "../command.js";
-import { Dungeon, Mob } from "../dungeon.js";
+import { Dungeon } from "../dungeon.js";
+import { Mob } from "../mob.js";
 
 const COMMANDS_DIR = join(process.cwd(), "data", "commands");
 

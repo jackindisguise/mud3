@@ -57,7 +57,7 @@ import { spawn } from "child_process";
 
 const testProcess = spawn(
 	"node",
-	["--test", "--test-reporter=dot", ...testArgs],
+	["--test", "--test-reporter=spec", ...testArgs],
 	{
 		stdio: "inherit",
 		shell: true,

@@ -20,7 +20,8 @@
 
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Mob, Room, DIRECTION, dir2text, DIRECTIONS } from "../dungeon.js";
+import { Room, DIRECTION, dir2text, DIRECTIONS } from "../dungeon.js";
+import { Mob } from "../mob.js";
 import { CommandObject } from "../package/commands.js";
 import { COLOR, color, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";

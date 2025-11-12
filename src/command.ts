@@ -19,7 +19,7 @@
  * Quick start
  * ```ts
  * import { Command, CommandRegistry } from "./command.js";
- * import { Mob } from "./dungeon.js";
+ * import { Mob } from "./mob.js";
  *
  * // Define a simple command: say <message:text>
  * class Say extends Command {
@@ -44,14 +44,8 @@
  * @module command
  */
 
-import {
-	DungeonObject,
-	Mob,
-	Item,
-	Room,
-	DIRECTION,
-	text2dir,
-} from "./dungeon.js";
+import { DungeonObject, Item, Room, DIRECTION, text2dir } from "./dungeon.js";
+import { Mob } from "./mob.js";
 import { Character } from "./character.js";
 import { Game } from "./game.js";
 import logger from "./logger.js";

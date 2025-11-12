@@ -13,7 +13,6 @@ import {
 	getDungeonById,
 	getRoomByRef,
 	Movable,
-	Mob,
 	Item,
 	Prop,
 	RoomLink,
@@ -23,12 +22,12 @@ import {
 	type SerializedDungeonObject,
 	type SerializedRoom,
 	type SerializedMovable,
-	type SerializedMob,
 	type SerializedItem,
 	type SerializedProp,
 	type DungeonObjectTemplate,
 	type RoomTemplate,
 } from "./dungeon.js";
+import { Mob, type SerializedMob } from "./mob.js";
 
 suite("dungeon.ts", () => {
 	suite("DIRECTION", () => {

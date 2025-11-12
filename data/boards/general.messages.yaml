@@ -9,6 +9,7 @@ messages:
     readBy:
       - 3
       - 2
+      - 5
   - id: 3
     author: Judas
     subject: wassup
@@ -16,6 +17,7 @@ messages:
     postedAt: '2025-11-10T05:03:37.329Z'
     readBy:
       - 2
+      - 5
   - id: 4
     author: Judas
     subject: dis atest
@@ -23,6 +25,7 @@ messages:
     postedAt: '2025-11-10T05:06:15.394Z'
     readBy:
       - 2
+      - 5
   - id: 5
     author: Judas
     subject: dis a test 2

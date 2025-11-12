@@ -13,7 +13,8 @@ import {
 	RequiredPlayerCredentials,
 } from "./character.js";
 import { CHANNEL } from "./channel.js";
-import { Mob, Dungeon } from "./dungeon.js";
+import { Dungeon } from "./dungeon.js";
+import { Mob } from "./mob.js";
 import type { MudClient } from "./io.js";
 
 suite("character.ts", () => {

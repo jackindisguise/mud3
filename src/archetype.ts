@@ -1,37 +1,4 @@
-/**
- * Core archetype registry utilities for races and classes.
- * Registries are populated by the archetype package at runtime.
- */
-
-export interface PrimaryAttributeSet {
-	strength: number;
-	agility: number;
-	intelligence: number;
-}
-
-export interface SecondaryAttributeSet {
-	attackPower: number;
-	vitality: number;
-	defense: number;
-	critRate: number;
-	avoidance: number;
-	accuracy: number;
-	endurance: number;
-	spellPower: number;
-	wisdom: number;
-	resilience: number;
-}
-
-export interface ResourceCapacities {
-	maxHealth: number;
-	maxMana: number;
-}
-
-export interface ResourceSnapshot {
-	health: number;
-	mana: number;
-	exhaustion: number;
-}
+import { PrimaryAttributeSet, ResourceCapacities } from "./mob.js";
 
 export interface GrowthModifierCurve {
 	base: number;

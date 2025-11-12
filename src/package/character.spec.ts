@@ -4,7 +4,7 @@ import { access, unlink } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
 import { Character } from "../character.js";
-import { Mob } from "../dungeon.js";
+import { Mob } from "../mob.js";
 import { saveCharacter, loadCharacter } from "./character.js";
 
 function filePathFor(username: string): string {

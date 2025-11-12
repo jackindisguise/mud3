@@ -19,12 +19,11 @@ import {
 	BaseArchetypeDefinition,
 	Class,
 	GrowthModifierCurve,
-	PrimaryAttributeSet,
 	Race,
-	ResourceCapacities,
 	ArchetypeSkillDefinition,
 	freezeArchetype,
 } from "../archetype.js";
+import { PrimaryAttributeSet, ResourceCapacities } from "../mob.js";
 
 const DATA_DIRECTORY = join(process.cwd(), "data");
 const RACES_DIRECTORY = join(DATA_DIRECTORY, "races");

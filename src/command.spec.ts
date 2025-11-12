@@ -9,7 +9,8 @@ import {
 	PRIORITY,
 } from "./command.js";
 import { JavaScriptCommandAdapter } from "./package/commands.js";
-import { Dungeon, DungeonObject, Mob, DIRECTION } from "./dungeon.js";
+import { Dungeon, DungeonObject, DIRECTION } from "./dungeon.js";
+import { Mob } from "./mob.js";
 
 suite("command.ts", () => {
 	suite("Command", () => {

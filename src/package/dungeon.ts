@@ -209,6 +209,8 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 		}
 		grid.push(layer);
 	}
+	// Reverse the grid so that top floor appears first in YAML files
+	const reversedGrid = [...grid].reverse();
 
 	// Serialize resets (only include if there are any)
 	const resets: SerializedReset[] = [];
@@ -248,7 +250,7 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 		dungeon: {
 			id: dungeon.id,
 			dimensions: dungeon.dimensions,
-			grid,
+			grid: reversedGrid,
 			rooms: roomTemplates,
 			...(templates.length > 0 && { templates }),
 			...(resets.length > 0 && { resets }),
@@ -337,8 +339,11 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		});
 
 		// Create rooms from grid
-		for (let z = 0; z < grid.length; z++) {
-			const layer = grid[z];
+		// Reverse the grid array so that YAML files can have top floor first
+		// but we still assign correct z-coordinates (z=0 is ground floor)
+		const reversedGrid = [...grid].reverse();
+		for (let z = 0; z < reversedGrid.length; z++) {
+			const layer = reversedGrid[z];
 			if (!Array.isArray(layer)) {
 				throw new Error(
 					`Invalid dungeon format: grid layer ${z} is not an array`

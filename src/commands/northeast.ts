@@ -20,7 +20,6 @@ import { executeMovement } from "./_movement.js";
 export default {
 	pattern: "northeast~",
 	aliases: ["ne"],
-	priority: PRIORITY.HIGH,
 	execute(context: CommandContext): void {
 		executeMovement(context, DIRECTION.NORTHEAST);
 	},

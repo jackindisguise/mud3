@@ -24,6 +24,10 @@ import { Mob, Room, DIRECTION, dir2text, DIRECTIONS } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { COLOR, color, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
+import { string } from "mud-ext";
+
+const ALTERNATING_MINIMAP_CHARS = [",", "'"];
+const ALTERNATING_MINIMAP_COLORS = [COLOR.DARK_GREEN, COLOR.TEAL];
 
 /**
  * Generates a minimap showing rooms around the current room.
@@ -50,17 +54,36 @@ function generateMinimap(
 	for (let y = coords.y - size; y <= coords.y + size; y++) {
 		const row: string[] = [];
 		for (let x = coords.x - size; x <= coords.x + size; x++) {
+			let mapText = " ";
+			let mapColor = COLOR.DARK_GREEN;
 			const targetRoom = dungeon.getRoom({ x, y, z: coords.z });
-			if (!targetRoom) {
-				// No room at this location
-				row.push("#");
-			} else if (targetRoom === room) {
-				// Current room - mark with @
-				row.push(color("@", COLOR.YELLOW));
-			} else {
-				// Other room - show as .
-				row.push(".");
+			if (targetRoom) {
+				mapText =
+					targetRoom.mapText ??
+					ALTERNATING_MINIMAP_CHARS[
+						(targetRoom.x * targetRoom.y + targetRoom.z) % 2
+					];
+				mapColor =
+					targetRoom.mapColor ??
+					ALTERNATING_MINIMAP_COLORS[
+						(targetRoom.x * targetRoom.y + targetRoom.z) % 2
+					];
+				if (targetRoom === room) {
+					mapText = "@";
+					mapColor = COLOR.PINK;
+				} else {
+					// Check if room has a mob
+					const mobInRoom = targetRoom.contents.find(
+						(obj) => obj instanceof Mob
+					) as Mob | undefined;
+					if (mobInRoom) {
+						// Room with mob - use mob's mapText/mapColor or default to !
+						mapText = mobInRoom.mapText ?? "!";
+						mapColor = mobInRoom.mapColor ?? COLOR.YELLOW;
+					}
+				}
 			}
+			row.push(color(mapText, mapColor));
 		}
 		lines.push(row.join(" "));
 	}
@@ -77,7 +100,7 @@ function generateMinimap(
  * @param room The room to display
  * @param minimapSize Optional size for the minimap (default: 1, which shows a 3x3 grid)
  */
-export function showRoom(mob: Mob, room: Room, minimapSize: number = 1): void {
+export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 	const character = mob.character;
 	if (!character) return;
 
@@ -98,6 +121,9 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 1): void {
 	// Add padding between minimap and room info
 	const minimapColumnWidth = minimapWidth + 4;
 
+	// Room description should be wrapped to 40 characters wide to account for minimap width
+	const DESCRIPTION_WIDTH = 40;
+
 	// Build room info lines (title and description only - for side-by-side display)
 	const roomInfoLines: string[] = [];
 
@@ -106,9 +132,11 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 1): void {
 		roomInfoLines.push(color(room.display, COLOR.CYAN));
 	}
 
-	// Room description
+	// Room description - wrap to 40 characters wide
 	if (room.description) {
-		roomInfoLines.push(room.description);
+		// Wrap the description to 40 characters wide
+		const wrappedDescription = string.wrap(room.description, DESCRIPTION_WIDTH);
+		roomInfoLines.push(...wrappedDescription);
 	} else {
 		roomInfoLines.push("You see nothing special.");
 	}
@@ -130,6 +158,13 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 1): void {
 	// Add any remaining minimap lines without padding (no room info to align with)
 	for (let i = minLines; i < minimapLines.length; i++) {
 		lines.push(minimapLines[i]);
+	}
+
+	// Add any remaining room info lines with padding (no minimap to align with)
+	for (let i = minLines; i < roomInfoLines.length; i++) {
+		const roomInfoLine = roomInfoLines[i];
+		const paddedMinimap = " ".repeat(minimapColumnWidth);
+		lines.push(paddedMinimap + roomInfoLine);
 	}
 
 	// Available exits - appears after minimap/room info block

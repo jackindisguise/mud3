@@ -59,6 +59,7 @@
 
 import { string } from "mud-ext";
 import { Character, MESSAGE_GROUP } from "./character.js";
+import { COLOR } from "./color.js";
 import logger from "./logger.js";
 
 /**
@@ -1552,6 +1553,8 @@ export interface DungeonObjectOptions {
 	display?: string;
 	description?: string;
 	roomDescription?: string;
+	mapText?: string;
+	mapColor?: COLOR;
 	dungeon?: Dungeon;
 	baseWeight?: number;
 }
@@ -1596,6 +1599,8 @@ export interface SerializedDungeonObject {
 	display: string;
 	description?: string;
 	roomDescription?: string;
+	mapText?: string;
+	mapColor?: COLOR;
 	contents?: SerializedDungeonObject[];
 	location?: string; // RoomRef value
 	baseWeight?: number;
@@ -1700,6 +1705,8 @@ export interface DungeonObjectTemplate {
 	display?: string;
 	description?: string;
 	roomDescription?: string;
+	mapText?: string;
+	mapColor?: COLOR;
 	baseWeight?: number;
 }
 
@@ -1965,6 +1972,18 @@ export class DungeonObject {
 	roomDescription?: string;
 
 	/**
+	 * Text character to display on the minimap for this object.
+	 * If undefined, the minimap will use default symbols (e.g., "!" for mobs).
+	 */
+	mapText?: string;
+
+	/**
+	 * Color to use when displaying this object on the minimap.
+	 * If undefined, the minimap will use default colors.
+	 */
+	mapColor?: COLOR;
+
+	/**
 	 * The intrinsic weight of this object, not including contents.
 	 * The currentWeight property tracks the total weight including contents.
 	 */
@@ -2066,6 +2085,8 @@ export class DungeonObject {
 		if (options.display) this.display = options.display;
 		if (options.description) this.description = options.description;
 		if (options.roomDescription) this.roomDescription = options.roomDescription;
+		if (options.mapText) this.mapText = options.mapText;
+		if (options.mapColor !== undefined) this.mapColor = options.mapColor;
 		if (options.baseWeight !== undefined) {
 			this.baseWeight = options.baseWeight;
 			this.currentWeight = options.baseWeight;
@@ -2439,6 +2460,8 @@ export class DungeonObject {
 			...(this.roomDescription !== undefined && {
 				roomDescription: this.roomDescription,
 			}),
+			...(this.mapText !== undefined && { mapText: this.mapText }),
+			...(this.mapColor !== undefined && { mapColor: this.mapColor }),
 			...(serializedContents.length > 0 && { contents: serializedContents }),
 			...(locationRef && { location: locationRef }),
 			...(this.baseWeight !== 0 && { baseWeight: this.baseWeight }),
@@ -2615,6 +2638,12 @@ export class DungeonObject {
 		}
 		if (template.roomDescription !== undefined) {
 			this.roomDescription = template.roomDescription;
+		}
+		if (template.mapText !== undefined) {
+			this.mapText = template.mapText;
+		}
+		if (template.mapColor !== undefined) {
+			this.mapColor = template.mapColor;
 		}
 		if (template.baseWeight !== undefined) {
 			this.baseWeight = template.baseWeight;

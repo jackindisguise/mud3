@@ -6,85 +6,20 @@ dungeon:
     layers: 10
   
   grid:
-    # Layer 0 (Ground Floor)
-    - # y=0 to y=9
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 3, 3, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 3, 3, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
-    
-    # Layer 1 (Second Floor)
+    # Layer 9 (Top Floor)
     - # y=0 to y=9
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 5, 5, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 5, 5, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     
-    # Layer 2 (Third Floor)
-    - # y=0 to y=9
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    
-    # Layer 3 (Fourth Floor)
-    - # y=0 to y=9
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    
-    # Layer 4 (Fifth Floor)
-    - # y=0 to y=9
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    
-    # Layer 5 (Sixth Floor)
-    - # y=0 to y=9
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    
-    # Layer 6 (Seventh Floor)
+    # Layer 8 (Ninth Floor)
     - # y=0 to y=9
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -110,7 +45,7 @@ dungeon:
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     
-    # Layer 8 (Ninth Floor)
+    # Layer 6 (Seventh Floor)
     - # y=0 to y=9
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -123,7 +58,7 @@ dungeon:
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     
-    # Layer 9 (Top Floor)
+    # Layer 5 (Sixth Floor)
     - # y=0 to y=9
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -135,6 +70,71 @@ dungeon:
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    
+    # Layer 4 (Fifth Floor)
+    - # y=0 to y=9
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    
+    # Layer 3 (Fourth Floor)
+    - # y=0 to y=9
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    
+    # Layer 2 (Third Floor)
+    - # y=0 to y=9
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    
+    # Layer 1 (Second Floor)
+    - # y=0 to y=9
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 2, 2, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      - [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    
+    # Layer 0 (Ground Floor)
+    - # y=0 to y=9
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 3, 3, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 3, 3, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+      - [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
   
   rooms:
     # Template 1: Regular room (horizontal movement only, for upper floors)
@@ -143,11 +143,13 @@ dungeon:
     
     # Template 2: Staircase room (allows UP/DOWN movement for middle floors)
     - display: "Staircase Up & Down"
+      mapText: "|"
       description: "A spiral staircase connects the floors of the tower."
       allowedExits: 783  # All horizontal directions (15) + UP (256) + DOWN (512) = 783
     
     # Template 3: Ground floor staircase (allows UP only, no DOWN)
     - display: "Staircase Up"
+      mapText: "^"
       description: "A room on the ground floor of the tower. A staircase leads up to the higher floors."
       allowedExits: 271  # All horizontal directions (15) + UP (256) = 271
     
@@ -156,4 +158,66 @@ dungeon:
       keywords: "grass field ground"
       description: "You stand on a patch of grass surrounding the tower. The ground is soft beneath your feet."
       # Default allowedExits (15) = horizontal only, no UP/DOWN
+    
+    # Template 5: Top floor staircase (allows DOWN only, no UP)
+    - display: "Staircase Down"
+      mapText: "v"
+      description: "A room on the top floor of the tower. A staircase leads down to the lower floors."
+      allowedExits: 527  # All horizontal directions (15) + DOWN (512) = 527
+
+  templates:
+    # Mob template for tower creatures
+    - id: "tower-guardian"
+      type: "Mob"
+      keywords: "guardian creature monster"
+      display: "Tower Guardian"
+      description: "A mysterious guardian creature that patrols the tower rooms."
+      roomDescription: "A mysterious guardian creature stands here, watching the room with an otherworldly gaze."
+
+  resets:
+    # Mob resets in random rooms across different floors
+    - templateId: "tower-guardian"
+      roomRef: "@tower{0,0,1}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{2,2,2}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{7,3,3}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{1,8,4}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{9,1,5}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{3,6,6}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{6,9,7}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{4,4,8}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-guardian"
+      roomRef: "@tower{8,7,9}"
+      minCount: 1
+      maxCount: 1
 

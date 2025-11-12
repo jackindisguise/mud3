@@ -13,165 +13,338 @@
  */
 
 import { readFile } from "fs/promises";
+import { readFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
-import { exec } from "child_process";
-import { promisify } from "util";
 import { loadBoard, saveBoard } from "../package/board.js";
 import logger from "../logger.js";
 import { string } from "mud-ext";
-import { SIZER, TEXT_STYLE, textStyleToTag } from "../color.js";
+import { COLOR, color, SIZER, TEXT_STYLE, textStyleToTag } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
-
-const execAsync = promisify(exec);
 
 const CHANGELOG_PATH = join(process.cwd(), "CHANGELOG.md");
 const CHANGES_BOARD_NAME = "changes";
 const SYSTEM_AUTHOR = "SYSTEM";
 
 /**
- * Parses a single version section from the changelog.
- *
- * @param lines - All lines from the changelog
- * @param versionLineIndex - Index of the version header line
- * @returns Object containing version, date, and formatted change content, or null if parsing fails
+ * Parsed bullet point data from a changelog entry.
  */
-async function parseVersionSection(
-	lines: string[],
-	versionLineIndex: number
-): Promise<{
+interface ParsedBulletPoint {
+	text: string;
+	prefixTag: string | null;
+	commitHash: string | null;
+	commitUrl: string | null;
+	issueNumber: string | null;
+	issueUrl: string | null;
+	urls: string[];
+}
+
+/**
+ * Parsed version section from changelog.
+ */
+interface ParsedVersion {
 	version: string;
-	date: string;
 	content: string;
-} | null> {
-	// Extract version and date from the header line
-	const versionMatch = lines[versionLineIndex].match(
-		/^##\s+\[?(\d+\.\d+\.\d+)\]?/
-	);
-	if (!versionMatch) {
-		return null;
+	fullSection: string;
+	features: ParsedBulletPoint[];
+	bugFixes: ParsedBulletPoint[];
+	breakingChanges: ParsedBulletPoint[];
+}
+
+/**
+ * Parses a bullet point line to extract prefix tag, commit hash, URLs, and issue numbers.
+ *
+ * @param bulletText - The bullet point text (without the leading `* `)
+ * @returns Parsed bullet point data
+ */
+function parseBulletPoint(bulletText: string): ParsedBulletPoint {
+	const result: ParsedBulletPoint = {
+		text: bulletText,
+		prefixTag: null,
+		commitHash: null,
+		commitUrl: null,
+		issueNumber: null,
+		issueUrl: null,
+		urls: [],
+	};
+
+	// Extract prefix tag (e.g., **deprecated:**, **deps:**)
+	const prefixMatch = bulletText.match(/^\*\*([^*]+):\*\*\s*/);
+	if (prefixMatch) {
+		result.prefixTag = prefixMatch[1].trim();
+		// Remove prefix from text for cleaner display
+		result.text = bulletText.replace(/^\*\*[^*]+:\*\*\s*/, "").trim();
 	}
 
-	const version = versionMatch[1];
-	let date: string | undefined;
-	const dateMatch = lines[versionLineIndex].match(/\((\d{4}-\d{2}-\d{2})\)/);
-	if (dateMatch) {
-		date = dateMatch[1];
-	}
+	// Extract all markdown links: [text](url)
+	const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+	let linkMatch: RegExpExecArray | null;
 
-	// Extract content until the next version header or end of file
-	const contentLines: string[] = [];
-	for (let i = versionLineIndex + 1; i < lines.length; i++) {
-		// Check for next version header (## [X.Y.Z] or ## X.Y.Z)
-		if (lines[i].match(/^##\s+\[?\d+\.\d+\.\d+\]?/)) {
-			break;
+	while ((linkMatch = linkPattern.exec(bulletText)) !== null) {
+		const linkText = linkMatch[1];
+		const linkUrl = linkMatch[2];
+
+		// Check if this is a commit hash (7+ character hex string)
+		if (/^[a-f0-9]{7,}$/i.test(linkText)) {
+			result.commitHash = linkText;
+			result.commitUrl = linkUrl;
 		}
-		contentLines.push(lines[i]);
-	}
 
-	// Trim empty lines from start and end
-	while (contentLines.length > 0 && contentLines[0].trim() === "") {
-		contentLines.shift();
-	}
-	while (
-		contentLines.length > 0 &&
-		contentLines[contentLines.length - 1].trim() === ""
-	) {
-		contentLines.pop();
-	}
-
-	if (contentLines.length === 0) {
-		return null;
-	}
-
-	let content = contentLines.join("\n");
-
-	// Extract commit hashes and fetch full commit bodies
-	const commitHashRegex =
-		/\[([^\]]+)\]\(https:\/\/[^)]+\/commit\/([a-f0-9]+)\)/g;
-	const commitHashes: string[] = [];
-	let match;
-	while ((match = commitHashRegex.exec(content)) !== null) {
-		commitHashes.push(match[2]);
-	}
-
-	// Fetch commit bodies for each hash
-	const commitDetails: Map<string, string> = new Map();
-	for (const hash of commitHashes) {
-		try {
-			const { stdout } = await execAsync(`git log -1 --format=%B ${hash}`);
-			const commitBody = stdout.trim();
-			if (commitBody) {
-				commitDetails.set(hash, commitBody);
-			}
-		} catch (error) {
-			logger.warn(`Failed to fetch commit body for ${hash}: ${error}`);
+		// Check if this is an issue number (starts with #)
+		if (linkText.startsWith("#")) {
+			result.issueNumber = linkText;
+			result.issueUrl = linkUrl;
 		}
+
+		// Collect all URLs
+		result.urls.push(linkUrl);
 	}
 
-	// Replace markdown links with short hash and append commit body if available
-	content = content.replace(
-		/\[([^\]]+)\]\(https:\/\/[^)]+\/commit\/([a-f0-9]+)\)/g,
-		(_, _text, fullHash) => {
-			const shortHash = fullHash.substring(0, 7);
-			const commitBody = commitDetails.get(fullHash);
-			if (commitBody) {
-				// Include commit body after the hash
-				return `${shortHash}\n\n${commitBody}`;
+	// Remove all markdown links from the text (replace [text](url) with just text, or remove entirely)
+	result.text = result.text.replace(
+		/ \(\[([^\]]+)\]\([^)]+\)\)/g,
+		(match, linkText) => {
+			// For commit hashes and issue numbers, remove them entirely (we'll add them back in formatBulletPoint)
+			if (/^[a-f0-9]{7,}$/i.test(linkText) || linkText.startsWith("#")) {
+				return "";
 			}
-			return shortHash;
+			// For other links, keep just the link text
+			return linkText;
 		}
 	);
 
-	// Trim whitespace from start and end
-	content = content.trim();
+	// Clean up extra spaces and trim
+	result.text = result.text.replace(/\s+/g, " ").trim();
 
-	return { version, date: date || "", content };
+	return result;
+}
+
+/**
+ * Parses version content to extract Features, Bug Fixes, and Breaking Changes.
+ *
+ * @param contentLines - All content lines for this version
+ * @param sectionLines - All lines including header
+ * @param version - Version number
+ * @returns Parsed version data
+ */
+function parseVersionContent(
+	contentLines: string[],
+	sectionLines: string[],
+	version: string
+): ParsedVersion {
+	const contentText = contentLines.join("\n");
+	const sectionText = sectionLines.join("\n");
+
+	const features: ParsedBulletPoint[] = [];
+	const bugFixes: ParsedBulletPoint[] = [];
+	const breakingChanges: ParsedBulletPoint[] = [];
+
+	let currentSubsection: string | null = null;
+
+	for (const line of contentLines) {
+		// Check for subsection header
+		const subsectionMatch = line.match(/^###\s+(.+)/);
+		if (subsectionMatch) {
+			const subsectionName = subsectionMatch[1].trim().toLowerCase();
+
+			// Normalize subsection names
+			if (subsectionName.includes("breaking") || subsectionName.includes("⚠")) {
+				currentSubsection = "breaking";
+			} else if (subsectionName.includes("feature")) {
+				currentSubsection = "feature";
+			} else if (
+				subsectionName.includes("bug") ||
+				subsectionName.includes("fix")
+			) {
+				currentSubsection = "bugfix";
+			} else {
+				currentSubsection = null;
+			}
+			continue;
+		}
+
+		// Check for bullet point
+		const bulletMatch = line.match(/^\* (.+)/);
+		if (bulletMatch && currentSubsection) {
+			const bulletText = bulletMatch[1].trim();
+			if (!bulletText) continue;
+
+			const parsed = parseBulletPoint(bulletText);
+
+			if (currentSubsection === "feature") {
+				features.push(parsed);
+			} else if (currentSubsection === "bugfix") {
+				bugFixes.push(parsed);
+			} else if (currentSubsection === "breaking") {
+				breakingChanges.push(parsed);
+			}
+		}
+	}
+
+	return {
+		version,
+		content: contentText,
+		fullSection: sectionText,
+		features,
+		bugFixes,
+		breakingChanges,
+	};
+}
+
+/**
+ * Parses a changelog file and returns structured version sections.
+ *
+ * @param filePath - Path to the changelog file
+ * @returns Array of parsed version sections
+ */
+function parseChangelog(filePath: string): ParsedVersion[] {
+	const content = readFileSync(filePath, "utf-8");
+	const lines = content.split(/\r?\n/);
+
+	const versions: ParsedVersion[] = [];
+	let currentVersion: string | null = null;
+	let currentContent: string[] = [];
+	let currentSection: string[] = [];
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+
+		// Check if this is a version header (## [version] or ## version)
+		const versionMatch = line.match(/^##\s+(?:\[([^\]]+)\]|([^\s(]+))/);
+
+		if (versionMatch) {
+			// Save previous version if exists
+			if (currentVersion !== null) {
+				const parsed = parseVersionContent(
+					currentContent,
+					currentSection,
+					currentVersion
+				);
+				versions.push(parsed);
+			}
+
+			// Start new version
+			const version = versionMatch[1] || versionMatch[2];
+			currentVersion = version;
+			currentContent = [];
+			currentSection = [line];
+		} else if (currentVersion !== null) {
+			// Add line to current version's content
+			currentContent.push(line);
+			currentSection.push(line);
+		}
+	}
+
+	// Don't forget the last version
+	if (currentVersion !== null) {
+		const parsed = parseVersionContent(
+			currentContent,
+			currentSection,
+			currentVersion
+		);
+		versions.push(parsed);
+	}
+
+	return versions;
+}
+
+/**
+ * Formats a parsed bullet point for display in the board message.
+ *
+ * @param bullet - Parsed bullet point
+ * @returns Formatted string
+ */
+function formatBulletPoint(bullet: ParsedBulletPoint): string {
+	let formatted = bullet.text;
+
+	// Add prefix tag if present
+	if (bullet.prefixTag) {
+		formatted = `[${bullet.prefixTag}] ${formatted}`;
+	}
+
+	// Add commit hash if present (shortened to 7 chars)
+	/**
+	if (bullet.commitHash) {
+		const shortHash = bullet.commitHash.substring(0, 7);
+		formatted += ` (${shortHash})`;
+	}
+
+	// Add issue number if present
+	if (bullet.issueNumber) {
+		formatted += ` ${bullet.issueNumber}`;
+	}
+	*/
+
+	return formatted;
+}
+
+/**
+ * Formats a parsed version into a board message content string.
+ *
+ * @param version - Parsed version data
+ * @returns Formatted content string
+ */
+function formatVersionContent(version: ParsedVersion): string[] {
+	const lines: string[] = [];
+
+	// Add breaking changes first (if any)
+	if (version.breakingChanges.length > 0) {
+		lines.push(color("BREAKING CHANGES:", COLOR.CRIMSON));
+		for (const change of version.breakingChanges) {
+			lines.push(...myformat(change, COLOR.MAROON, COLOR.CRIMSON));
+		}
+	}
+
+	// Add features
+	if (version.features.length > 0) {
+		if (lines.length > 0) lines.push("");
+		lines.push(color("Features:", COLOR.YELLOW));
+		for (const feature of version.features) {
+			lines.push(...myformat(feature, COLOR.OLIVE, COLOR.YELLOW));
+		}
+	}
+
+	// Add bug fixes
+	if (version.bugFixes.length > 0) {
+		if (lines.length > 0) lines.push("");
+		lines.push(color("Bug Fixes:", COLOR.LIME));
+		for (const fix of version.bugFixes) {
+			lines.push(...myformat(fix, COLOR.DARK_GREEN, COLOR.LIME));
+		}
+	}
+
+	return lines;
+}
+
+function myformat(
+	point: ParsedBulletPoint,
+	bulletColor: COLOR,
+	textColor: COLOR
+): string[] {
+	return string.wrap({
+		string: `${color(" *", bulletColor)} ${color(
+			formatBulletPoint(point),
+			textColor
+		)}`,
+		width: 72,
+		sizer: SIZER,
+		prefix: "   ",
+		color: (str) => color(str, textColor),
+	});
 }
 
 /**
  * Parses the CHANGELOG.md file to extract all versions.
  *
- * @returns Array of version entries, ordered from newest to oldest
+ * @returns Array of parsed version entries, ordered from newest to oldest
  */
-async function parseAllChangelogVersions(): Promise<
-	Array<{
-		version: string;
-		date: string;
-		content: string;
-	}>
-> {
+async function parseAllChangelogVersions(): Promise<ParsedVersion[]> {
 	try {
-		const changelogContent = await readFile(CHANGELOG_PATH, "utf-8");
-		const lines = changelogContent.split("\n");
-
-		// Find all version headers
-		const versionIndices: number[] = [];
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i].match(/^##\s+\[?\d+\.\d+\.\d+\]?/)) {
-				versionIndices.push(i);
-			}
-		}
-
-		if (versionIndices.length === 0) {
+		const versions = parseChangelog(CHANGELOG_PATH);
+		if (versions.length === 0) {
 			logger.warn("No version headers found in CHANGELOG.md");
 			return [];
 		}
-
-		// Parse each version section
-		const versions: Array<{
-			version: string;
-			date: string;
-			content: string;
-		}> = [];
-
-		for (const index of versionIndices) {
-			const versionData = await parseVersionSection(lines, index);
-			if (versionData) {
-				versions.push(versionData);
-			}
-		}
-
 		return versions;
 	} catch (error) {
 		logger.error(`Failed to parse CHANGELOG.md: ${error}`);
@@ -218,21 +391,12 @@ async function postChangelogToBoard(): Promise<void> {
 			}
 
 			const versionSubject = `Version ${versionData.version}`;
+			// Format the version content using parsed data
+			const formattedContent = formatVersionContent(versionData);
 			// Normalize line endings: replace multiple consecutive line breaks with single \n
-			const normalizedContent = versionData.content
-				.trim()
-				.split(/\r?\n/g)
-				.join("\n");
-			const wrappedContent = string.wrap(normalizedContent, 72, SIZER);
-			const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
-			const linesWithReset = wrappedContent.map((line) => line + resetTag);
-			console.log(linesWithReset);
+			const normalizedContent = formattedContent.join(LINEBREAK);
 			// Create the message
-			board.createMessage(
-				SYSTEM_AUTHOR,
-				versionSubject,
-				linesWithReset.join(LINEBREAK)
-			);
+			board.createMessage(SYSTEM_AUTHOR, versionSubject, normalizedContent);
 			postedCount++;
 
 			logger.info(
@@ -270,4 +434,12 @@ if (isMainModule) {
 		});
 }
 
-export { postChangelogToBoard, parseAllChangelogVersions, parseVersionSection };
+export {
+	postChangelogToBoard,
+	parseAllChangelogVersions,
+	parseChangelog,
+	parseBulletPoint,
+	formatVersionContent,
+	type ParsedVersion,
+	type ParsedBulletPoint,
+};

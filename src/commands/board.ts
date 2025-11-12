@@ -290,7 +290,7 @@ function displayBoard(
 			width: 76,
 			sizer: SIZER,
 			style: {
-				hAlign: string.PAD_SIDE.LEFT,
+				hAlign: string.ALIGN.RIGHT,
 			},
 		});
 		megaBoxInput = [...megaBoxInput, ...footer];
@@ -303,7 +303,7 @@ function displayBoard(
 		title: color(`${board.displayName} Board`, COLOR.YELLOW),
 		style: {
 			...string.BOX_STYLES.ROUNDED,
-			titleHAlign: string.PAD_SIDE.CENTER,
+			titleHAlign: string.ALIGN.CENTER,
 		},
 	});
 
@@ -357,7 +357,7 @@ function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
 		width: 76,
 		sizer: SIZER,
 		style: {
-			hAlign: string.PAD_SIDE.LEFT,
+			hAlign: string.ALIGN.RIGHT,
 		},
 	});
 	const megaBox = string.box({
@@ -367,7 +367,7 @@ function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
 		title: color(`${board.displayName} Message #${msg.id}`, COLOR.CYAN),
 		style: {
 			...string.BOX_STYLES.ROUNDED,
-			titleHAlign: string.PAD_SIDE.CENTER,
+			titleHAlign: string.ALIGN.CENTER,
 		},
 	});
 

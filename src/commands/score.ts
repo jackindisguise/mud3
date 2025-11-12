@@ -76,7 +76,7 @@ export default {
 			width: 80,
 			style: {
 				...string.BOX_STYLES.ROUNDED,
-				titleHAlign: string.PAD_SIDE.CENTER,
+				titleHAlign: string.ALIGN.CENTER,
 				titleBorder: {
 					left: ">",
 					right: "<",

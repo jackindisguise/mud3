@@ -83,7 +83,7 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 		color: (str) => color(str, COLOR.YELLOW),
 		style: {
 			...string.BOX_STYLES.ROUNDED,
-			titleHAlign: string.PAD_SIDE.CENTER,
+			titleHAlign: string.ALIGN.CENTER,
 			titleBorder: {
 				left: ">",
 				right: "<",

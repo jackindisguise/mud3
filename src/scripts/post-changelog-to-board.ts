@@ -430,7 +430,7 @@ function formatVersionContent(version: ParsedVersion): string[] {
 	if (version.breakingChanges.length > 0) {
 		lines.push(color("BREAKING CHANGES:", COLOR.CRIMSON));
 		for (const change of version.breakingChanges) {
-			lines.push(...myformat(change, COLOR.MAROON, COLOR.CRIMSON));
+			lines.push(...myformat(change, COLOR.CRIMSON, COLOR.MAROON));
 		}
 	}
 
@@ -439,7 +439,7 @@ function formatVersionContent(version: ParsedVersion): string[] {
 		if (lines.length > 0) lines.push("");
 		lines.push(color("Features:", COLOR.YELLOW));
 		for (const feature of version.features) {
-			lines.push(...myformat(feature, COLOR.OLIVE, COLOR.YELLOW));
+			lines.push(...myformat(feature, COLOR.YELLOW, COLOR.OLIVE));
 		}
 	}
 
@@ -448,7 +448,7 @@ function formatVersionContent(version: ParsedVersion): string[] {
 		if (lines.length > 0) lines.push("");
 		lines.push(color("Bug Fixes:", COLOR.LIME));
 		for (const fix of version.bugFixes) {
-			lines.push(...myformat(fix, COLOR.DARK_GREEN, COLOR.LIME));
+			lines.push(...myformat(fix, COLOR.LIME, COLOR.DARK_GREEN));
 		}
 	}
 
@@ -457,7 +457,7 @@ function formatVersionContent(version: ParsedVersion): string[] {
 		if (lines.length > 0) lines.push("");
 		lines.push(color("Miscellaneous:", COLOR.CYAN));
 		for (const misc of version.miscellaneous) {
-			lines.push(...myformat(misc, COLOR.LIGHT_BLUE, COLOR.CYAN));
+			lines.push(...myformat(misc, COLOR.CYAN, COLOR.TEAL));
 		}
 	}
 
@@ -502,7 +502,7 @@ async function parseAllChangelogVersions(): Promise<ParsedVersion[]> {
 
 /**
  * Posts all unposted changelog entries to the changes board.
- * Posts versions from newest to oldest, stopping when it finds a version that's already posted.
+ * Posts versions from oldest to newest, stopping when it finds a version that's already posted.
  */
 async function postChangelogToBoard(): Promise<void> {
 	try {
@@ -530,9 +530,9 @@ async function postChangelogToBoard(): Promise<void> {
 				.filter((v): v is string => v !== null)
 		);
 
-		// Post all unposted versions, starting from newest
+		// Post all unposted versions, starting from oldest (reverse order)
 		let postedCount = 0;
-		for (const versionData of versions) {
+		for (const versionData of [...versions].reverse()) {
 			if (postedVersions.has(versionData.version)) {
 				logger.info(`Version ${versionData.version} already posted, skipping`);
 				continue;

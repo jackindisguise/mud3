@@ -1,6 +1,7 @@
 import { loadPackage } from "package-loader";
 import commands from "./src/package/commands.js";
 import config from "./src/package/config.js";
+import archetype from "./src/package/archetype.js";
 import character from "./src/package/character.js";
 import lockfile from "./src/package/lockfile.js";
 import help from "./src/package/help.js";
@@ -13,6 +14,7 @@ import { startGame } from "./src/game.js";
 await loadPackage(lockfile); // always load first
 await loadPackage(commands);
 await loadPackage(config);
+await loadPackage(archetype);
 await loadPackage(character);
 await loadPackage(help);
 await loadPackage(board);

@@ -67,8 +67,15 @@ import {
 	SecondaryAttributeSet,
 	Class,
 	Race,
+	ResourceSnapshot,
 	evaluateGrowthModifier,
 } from "./archetype.js";
+import {
+	getRaceById,
+	getClassById,
+	getDefaultClass,
+	getDefaultRace,
+} from "./package/archetype.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -3511,9 +3518,9 @@ export class Prop extends DungeonObject {
  */
 export interface MobOptions extends DungeonObjectOptions {
 	/** Resolved race definition to use for this mob. */
-	race: Race;
+	race?: Race;
 	/** Resolved class definition to use for this mob. */
-	class: Class;
+	class?: Class;
 	level?: number;
 	experience?: number;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
@@ -3701,6 +3708,42 @@ function computeSecondaryAttributes(
 	return result;
 }
 
+function createPrimaryAttributesView(
+	source: PrimaryAttributeSet
+): Readonly<PrimaryAttributeSet> {
+	return Object.freeze({
+		strength: Math.floor(Number(source.strength) || 0),
+		agility: Math.floor(Number(source.agility) || 0),
+		intelligence: Math.floor(Number(source.intelligence) || 0),
+	});
+}
+
+function createSecondaryAttributesView(
+	source: SecondaryAttributeSet
+): Readonly<SecondaryAttributeSet> {
+	return Object.freeze({
+		attackPower: Math.floor(Number(source.attackPower) || 0),
+		vitality: Math.floor(Number(source.vitality) || 0),
+		defense: Math.floor(Number(source.defense) || 0),
+		critRate: Math.floor(Number(source.critRate) || 0),
+		avoidance: Math.floor(Number(source.avoidance) || 0),
+		accuracy: Math.floor(Number(source.accuracy) || 0),
+		endurance: Math.floor(Number(source.endurance) || 0),
+		spellPower: Math.floor(Number(source.spellPower) || 0),
+		wisdom: Math.floor(Number(source.wisdom) || 0),
+		resilience: Math.floor(Number(source.resilience) || 0),
+	});
+}
+
+function createResourceCapsView(
+	source: ResourceCapacities
+): Readonly<ResourceCapacities> {
+	return Object.freeze({
+		maxHealth: Math.floor(Number(source.maxHealth) || 0),
+		maxMana: Math.floor(Number(source.maxMana) || 0),
+	});
+}
+
 /**
  * These are mobs. They get into fights, interact with stuff, and die.
  */
@@ -3719,46 +3762,43 @@ export class Mob extends Movable {
 	private _secondaryAttributesView: Readonly<SecondaryAttributeSet>;
 	private _resourceCaps: ResourceCapacities;
 	private _resourceCapsView: Readonly<ResourceCapacities>;
-	private _health: number;
-	private _mana: number;
-	private _exhaustion: number;
-	constructor(options: MobOptions) {
+	private _health!: number;
+	private _mana!: number;
+	private _exhaustion!: number;
+	constructor(options?: MobOptions) {
 		super(options);
 
-		this._attributeBonuses = normalizePrimaryBonuses(options.attributeBonuses);
-		this._resourceBonuses = normalizeResourceBonuses(options.resourceBonuses);
-
+		this._attributeBonuses = normalizePrimaryBonuses(options?.attributeBonuses);
+		this._resourceBonuses = normalizeResourceBonuses(options?.resourceBonuses);
 		this._primaryAttributes = sumPrimaryAttributes();
-		this._primaryAttributesView = Object.freeze({ ...this._primaryAttributes });
+		this._primaryAttributesView = createPrimaryAttributesView(
+			this._primaryAttributes
+		);
 		this._secondaryAttributes = computeSecondaryAttributes(
 			this._primaryAttributes
 		);
-		this._secondaryAttributesView = Object.freeze({
-			...this._secondaryAttributes,
-		});
+		this._secondaryAttributesView = createSecondaryAttributesView(
+			this._secondaryAttributes
+		);
 		this._resourceCaps = sumResourceCaps();
-		this._resourceCapsView = Object.freeze({ ...this._resourceCaps });
+		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
 
-		this._health = 0;
-		this._mana = 0;
-		this._exhaustion = 0;
+		this._race = options?.race ?? getDefaultRace();
+		this._class = options?.class ?? getDefaultClass();
 
-		this._race = options.race;
-		this._class = options.class;
-
-		const providedLevel = Math.floor(Number(options.level ?? 1));
+		const providedLevel = Math.floor(Number(options?.level ?? 1));
 		this._level = providedLevel > 0 ? providedLevel : 1;
 		this._experience = 0;
 
 		this.recalculateDerivedAttributes({ bootstrap: true });
 
-		if (options.experience !== undefined) {
+		if (options?.experience !== undefined) {
 			this.experience = Number(options.experience);
 		}
 
-		this.health = options.health ?? this.maxHealth;
-		this.mana = options.mana ?? this.maxMana;
-		this.exhaustion = options.exhaustion ?? 0;
+		this.health = options?.health ?? this.maxHealth;
+		this.mana = options?.mana ?? this.maxMana;
+		this.exhaustion = options?.exhaustion ?? 0;
 	}
 	/**
 	 * Gets the Character that controls this mob (if any).
@@ -3822,16 +3862,16 @@ export class Mob extends Movable {
 			agility: roundTo(rawPrimary.agility, ATTRIBUTE_ROUND_DECIMALS),
 			intelligence: roundTo(rawPrimary.intelligence, ATTRIBUTE_ROUND_DECIMALS),
 		};
-		this._primaryAttributesView = Object.freeze({
-			...this._primaryAttributes,
-		});
+		this._primaryAttributesView = createPrimaryAttributesView(
+			this._primaryAttributes
+		);
 
 		this._secondaryAttributes = computeSecondaryAttributes(
 			this._primaryAttributes
 		);
-		this._secondaryAttributesView = Object.freeze({
-			...this._secondaryAttributes,
-		});
+		this._secondaryAttributesView = createSecondaryAttributesView(
+			this._secondaryAttributes
+		);
 
 		const rawCaps = sumResourceCaps(
 			race.startingResourceCaps,
@@ -3852,7 +3892,7 @@ export class Mob extends Movable {
 				ATTRIBUTE_ROUND_DECIMALS
 			),
 		};
-		this._resourceCapsView = Object.freeze({ ...this._resourceCaps });
+		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
 
 		if (opts.bootstrap) {
 			this._health = this._resourceCaps.maxHealth;
@@ -3995,6 +4035,14 @@ export class Mob extends Movable {
 
 	public get primaryAttributes(): Readonly<PrimaryAttributeSet> {
 		return this._primaryAttributesView;
+	}
+
+	public get race(): Race {
+		return this._race;
+	}
+
+	public get class(): Class {
+		return this._class;
 	}
 
 	public get strength(): number {

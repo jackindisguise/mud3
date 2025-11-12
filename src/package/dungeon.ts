@@ -498,7 +498,7 @@ export async function getAllDungeonIds(): Promise<string[]> {
 /**
  * Load all dungeons from disk.
  */
-export async function getAllDungeons(): Promise<Dungeon[]> {
+export async function loadDungeons(): Promise<Dungeon[]> {
 	const ids = await getAllDungeonIds();
 	logger.debug(`Found ${ids.length} dungeon file(s) to load`);
 	const dungeons: Dungeon[] = [];
@@ -516,15 +516,9 @@ export async function getAllDungeons(): Promise<Dungeon[]> {
 }
 
 /**
- * Timer that resets all dungeons every 60 seconds.
- * Stores the interval ID so it can be cleared if needed.
- */
-let resetTimer: number | undefined;
-
-/**
  * Execute resets on all registered dungeons.
  */
-function executeAllDungeonResets(): void {
+export function executeAllDungeonResets(): void {
 	let totalSpawned = 0;
 	let dungeonCount = 0;
 
@@ -544,17 +538,13 @@ function executeAllDungeonResets(): void {
 export default {
 	name: "dungeon",
 	loader: async () => {
-		await ensureDir();
-		const dungeons = await getAllDungeons();
+		logger.info("================================================");
+		logger.info("Loading dungeon definitions...");
+		const dungeons = await loadDungeons();
 		logger.info(
 			`Dungeon persistence package loaded: ${dungeons.length} dungeon(s)`
 		);
 
-		// Start the reset timer (every 60 seconds)
-		resetTimer = setAbsoluteInterval(() => {
-			executeAllDungeonResets();
-		}, 60000);
-
-		logger.info("Dungeon reset timer started: resets every 60 seconds");
+		logger.info("================================================");
 	},
 } as Package;

@@ -31,7 +31,7 @@
 import { MudServer, MudClient } from "./io.js";
 import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
-import { Mob, Room, getRoomByRef } from "./dungeon.js";
+import { Mob, Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
 import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./package/config.js";
 import {
@@ -44,15 +44,17 @@ import {
 	checkCharacterPassword,
 	loadCharacterFromSerialized,
 } from "./package/character.js";
-import { getAllBoards, saveBoard } from "./package/board.js";
+import { loadBoards, saveBoard } from "./package/board.js";
 import { Board } from "./board.js";
 import { saveGameState, getNextCharacterId } from "./package/gamestate.js";
+import { executeAllDungeonResets } from "./package/dungeon.js";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Game state and configuration
@@ -111,6 +113,7 @@ export class Game {
 	private saveTimer?: number;
 	private boardCleanupTimer?: number;
 	private gameStateSaveTimer?: number;
+	private dungeonResetTimer?: number;
 	private nextConnectionId = 1;
 
 	/** Static singleton instance of the Game */
@@ -188,6 +191,7 @@ export class Game {
 		}, DEFAULT_SAVE_INTERVAL_MS);
 
 		// Set up board cleanup timer (runs every hour)
+		this.cleanupExpiredBoardMessages();
 		this.boardCleanupTimer = setAbsoluteInterval(() => {
 			this.cleanupExpiredBoardMessages();
 		}, 60 * 60 * 1000); // 1 hour
@@ -196,6 +200,12 @@ export class Game {
 		this.gameStateSaveTimer = setAbsoluteInterval(() => {
 			this.saveGameState();
 		}, DEFAULT_SAVE_INTERVAL_MS);
+
+		// Set up dungeon reset timer
+		executeAllDungeonResets();
+		this.dungeonResetTimer = setAbsoluteInterval(() => {
+			executeAllDungeonResets();
+		}, DEFAULT_DUNGEON_RESET_INTERVAL_MS);
 	}
 
 	/**
@@ -223,6 +233,13 @@ export class Game {
 			clearCustomInterval(this.gameStateSaveTimer);
 			this.gameStateSaveTimer = undefined;
 			logger.debug("Game state save timer cleared");
+		}
+
+		// Clear dungeon reset timer
+		if (this.dungeonResetTimer !== undefined) {
+			clearCustomInterval(this.dungeonResetTimer);
+			this.dungeonResetTimer = undefined;
+			logger.debug("Dungeon reset timer cleared");
 		}
 
 		// Save game state before shutdown
@@ -616,7 +633,7 @@ export class Game {
 		lastLoginDate: Date
 	): Promise<void> {
 		try {
-			const boards = await getAllBoards();
+			const boards = await loadBoards();
 			const username = character.credentials.username.toLowerCase();
 			const boardActivity: Array<{
 				board: Board;
@@ -776,7 +793,7 @@ export class Game {
 	 */
 	private async cleanupExpiredBoardMessages() {
 		try {
-			const boards = await getAllBoards();
+			const boards = await loadBoards();
 			let totalRemoved = 0;
 
 			for (const board of boards) {
@@ -805,7 +822,7 @@ export class Game {
 	 */
 	private async saveAllBoards() {
 		try {
-			const boards = await getAllBoards();
+			const boards = await loadBoards();
 			if (boards.length === 0) return;
 
 			logger.info(`Saving ${boards.length} board(s)...`);

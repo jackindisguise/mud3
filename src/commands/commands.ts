@@ -2,7 +2,7 @@ import { CommandContext, CommandRegistry, Command } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 
 export default {
-	pattern: "commands",
+	pattern: "commands~",
 	execute(context: CommandContext, args: Map<string, any>) {
 		const commandLabelsSet = new Set<string>();
 		CommandRegistry.default.getCommands().forEach((cmd: Command) => {

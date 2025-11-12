@@ -68,90 +68,97 @@ export const CONFIG: Config = {
 	security: { ...CONFIG_DEFAULT.security },
 };
 
+export async function loadConfig() {
+	logger.info(`Loading config from ${relative(process.cwd(), CONFIG_PATH)}`);
+	try {
+		const content = await readFile(CONFIG_PATH, "utf-8");
+		const parsed = YAML.load(content) as Partial<Config> | undefined;
+		const config = parsed ?? {};
+
+		// merge game config
+		if (config.game) {
+			for (const key of Object.keys(config.game) as Array<keyof GameConfig>) {
+				if (key in CONFIG_DEFAULT.game) {
+					if (CONFIG.game[key] === config.game[key]) {
+						logger.debug(`DEFAULT game.${key} = ${config.game[key]}`);
+						continue;
+					}
+					CONFIG.game[key] = config.game[key] as any;
+					logger.debug(`Set game.${key} = ${config.game[key]}`, {
+						config: config,
+					});
+				}
+			}
+		}
+
+		// merge server config
+		if (config.server) {
+			for (const key of Object.keys(config.server) as Array<
+				keyof ServerConfig
+			>) {
+				if (key in CONFIG_DEFAULT.server) {
+					if (CONFIG.server[key] === config.server[key]) {
+						logger.debug(`DEFAULT server.${key} = ${config.server[key]}`);
+						continue;
+					}
+					CONFIG.server[key] = config.server[key] as any;
+					logger.debug(`Set server.${key} = ${config.server[key]}`);
+				}
+			}
+		}
+
+		// merge security config
+		if (config.security) {
+			for (const key of Object.keys(config.security) as Array<
+				keyof SecurityConfig
+			>) {
+				if (key in CONFIG_DEFAULT.security) {
+					if (CONFIG.security[key] === config.security[key]) {
+						logger.debug(`DEFAULT security.${key} = ${config.security[key]}`);
+						continue;
+					}
+					CONFIG.security[key] = config.security[key] as any;
+					logger.debug(`Set security.${key} = ${config.security[key]}`);
+				}
+			}
+		}
+
+		logger.info("Config loaded successfully");
+	} catch (error) {
+		// if file can't be read or doesn't exist, save default config
+		logger.debug(
+			`Config file not found or unreadable, creating default at ${CONFIG_PATH}`
+		);
+		const defaultContent = YAML.dump(CONFIG_DEFAULT, {
+			noRefs: true,
+			lineWidth: 120,
+		});
+		const tempPath = `${CONFIG_PATH}.tmp`;
+		try {
+			// Write to temporary file first
+			await writeFile(tempPath, defaultContent, "utf-8");
+			// Atomically rename temp file to final location
+			await rename(tempPath, CONFIG_PATH);
+			logger.info("Default config file created");
+		} catch (writeError) {
+			// Clean up temp file if it exists
+			try {
+				await unlink(tempPath);
+			} catch {
+				// Ignore cleanup errors
+			}
+			throw writeError;
+		}
+	}
+}
+
 export default {
 	name: "config",
 	loader: async () => {
 		// read config.yaml
-		logger.info(`Loading config from ${relative(process.cwd(), CONFIG_PATH)}`);
-		try {
-			const content = await readFile(CONFIG_PATH, "utf-8");
-			const parsed = YAML.load(content) as Partial<Config> | undefined;
-			const config = parsed ?? {};
-
-			// merge game config
-			if (config.game) {
-				for (const key of Object.keys(config.game) as Array<keyof GameConfig>) {
-					if (key in CONFIG_DEFAULT.game) {
-						if (CONFIG.game[key] === config.game[key]) {
-							logger.debug(`DEFAULT game.${key} = ${config.game[key]}`);
-							continue;
-						}
-						CONFIG.game[key] = config.game[key] as any;
-						logger.debug(`Set game.${key} = ${config.game[key]}`, {
-							config: config,
-						});
-					}
-				}
-			}
-
-			// merge server config
-			if (config.server) {
-				for (const key of Object.keys(config.server) as Array<
-					keyof ServerConfig
-				>) {
-					if (key in CONFIG_DEFAULT.server) {
-						if (CONFIG.server[key] === config.server[key]) {
-							logger.debug(`DEFAULT server.${key} = ${config.server[key]}`);
-							continue;
-						}
-						CONFIG.server[key] = config.server[key] as any;
-						logger.debug(`Set server.${key} = ${config.server[key]}`);
-					}
-				}
-			}
-
-			// merge security config
-			if (config.security) {
-				for (const key of Object.keys(config.security) as Array<
-					keyof SecurityConfig
-				>) {
-					if (key in CONFIG_DEFAULT.security) {
-						if (CONFIG.security[key] === config.security[key]) {
-							logger.debug(`DEFAULT security.${key} = ${config.security[key]}`);
-							continue;
-						}
-						CONFIG.security[key] = config.security[key] as any;
-						logger.debug(`Set security.${key} = ${config.security[key]}`);
-					}
-				}
-			}
-
-			logger.info("Config loaded successfully");
-		} catch (error) {
-			// if file can't be read or doesn't exist, save default config
-			logger.debug(
-				`Config file not found or unreadable, creating default at ${CONFIG_PATH}`
-			);
-			const defaultContent = YAML.dump(CONFIG_DEFAULT, {
-				noRefs: true,
-				lineWidth: 120,
-			});
-			const tempPath = `${CONFIG_PATH}.tmp`;
-			try {
-				// Write to temporary file first
-				await writeFile(tempPath, defaultContent, "utf-8");
-				// Atomically rename temp file to final location
-				await rename(tempPath, CONFIG_PATH);
-				logger.info("Default config file created");
-			} catch (writeError) {
-				// Clean up temp file if it exists
-				try {
-					await unlink(tempPath);
-				} catch {
-					// Ignore cleanup errors
-				}
-				throw writeError;
-			}
-		}
+		logger.info("================================================");
+		logger.info("Loading config...");
+		await loadConfig();
+		logger.info("================================================");
 	},
 } as Package;

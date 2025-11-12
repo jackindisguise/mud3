@@ -16,7 +16,7 @@
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP, Character } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { getAllBoards } from "../package/board.js";
+import { loadBoards } from "../package/board.js";
 import { color, COLOR } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { formatDuration } from "../time.js";
@@ -28,7 +28,7 @@ import { formatDuration } from "../time.js";
  */
 export function showBoardsList(char: Character): void {
 	const actor = char.mob;
-	getAllBoards()
+	loadBoards()
 		.then((boards) => {
 			const lines: string[] = [];
 			lines.push(color("=== Available Message Boards ===", COLOR.YELLOW));

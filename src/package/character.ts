@@ -50,6 +50,10 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
 import { Character, SerializedCharacter } from "../character.js";
+import archetypePkg, {
+	getRaceById,
+	getClassById,
+} from "../package/archetype.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 
@@ -142,7 +146,6 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 export async function saveCharacter(character: Character) {
-	await ensureDir();
 	const data: SerializedCharacter = character.serialize();
 	const filePath = getCharacterFilePath(character.credentials.username);
 	const tempPath = `${filePath}.tmp`;
@@ -188,7 +191,6 @@ export async function checkCharacterPassword(
 	username: string,
 	password: string
 ): Promise<SerializedCharacter | undefined> {
-	await ensureDir();
 	const filePath = getCharacterFilePath(username);
 
 	if (!(await characterExists(username))) {
@@ -232,7 +234,6 @@ export function loadCharacterFromSerialized(
 export async function loadCharacter(
 	username: string
 ): Promise<Character | undefined> {
-	await ensureDir();
 	const filePath = getCharacterFilePath(username);
 	// Prevent duplicate loads if this character is already active
 	if (isCharacterActive(username)) {
@@ -263,10 +264,12 @@ export async function loadCharacter(
 // Optional package object for package-loader compatibility
 export default {
 	name: "character",
+	dependencies: [archetypePkg],
 	loader: async () => {
-		await ensureDir();
+		logger.info("================================================");
 		logger.info(
 			`Character storage directory ready: ${relative(process.cwd(), CHAR_DIR)}`
 		);
+		logger.info("================================================");
 	},
 } as Package;

@@ -63,10 +63,6 @@ function getBoardMessagesFilePath(name: string): string {
 	return join(BOARD_DIR, `${safe}.messages.yaml`);
 }
 
-async function ensureDir() {
-	await mkdir(BOARD_DIR, { recursive: true });
-}
-
 async function fileExists(path: string): Promise<boolean> {
 	try {
 		await access(path, FS_CONSTANTS.F_OK);
@@ -82,8 +78,6 @@ async function fileExists(path: string): Promise<boolean> {
  * Saves board configuration and messages to separate files.
  */
 export async function saveBoard(board: Board): Promise<void> {
-	await ensureDir();
-
 	const configPath = getBoardConfigFilePath(board.name);
 	const messagesPath = getBoardMessagesFilePath(board.name);
 	const configTempPath = `${configPath}.tmp`;
@@ -183,7 +177,6 @@ export async function boardExists(name: string): Promise<boolean> {
  * Looks for config files (board.yaml) and ignores message files (board.messages.yaml).
  */
 export async function getAllBoardNames(): Promise<string[]> {
-	await ensureDir();
 	try {
 		const files = await readdir(BOARD_DIR);
 		const boardNames = new Set<string>();
@@ -213,7 +206,7 @@ export async function getAllBoardNames(): Promise<string[]> {
 /**
  * Load all boards from disk.
  */
-export async function getAllBoards(): Promise<Board[]> {
+export async function loadBoards(): Promise<Board[]> {
 	const names = await getAllBoardNames();
 	const boards: Board[] = [];
 
@@ -261,8 +254,9 @@ export async function deleteBoard(name: string): Promise<boolean> {
 export default {
 	name: "board",
 	loader: async () => {
-		await ensureDir();
-		await getAllBoards();
-		logger.info("Board package loaded");
+		logger.info("================================================");
+		logger.info("Loading board definitions...");
+		await loadBoards();
+		logger.info("================================================");
 	},
 } as Package;

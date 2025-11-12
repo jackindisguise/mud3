@@ -2170,6 +2170,15 @@ suite("dungeon.ts", () => {
 					display: "Orc Warrior",
 					description: "A fierce orc warrior.",
 					contents: [],
+					level: 1,
+					experience: 0,
+					race: "orc",
+					class: "warrior",
+					attributeBonuses: {},
+					resourceBonuses: {},
+					health: 100,
+					mana: 100,
+					exhaustion: 0,
 				};
 
 				const mob = DungeonObject.deserialize(data);

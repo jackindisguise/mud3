@@ -90,7 +90,9 @@ function freezePassives(passives: ReadonlyArray<string>) {
 	return Object.freeze(passives.map((value) => value.trim()));
 }
 
-function freezeArchetype(def: BaseArchetypeDefinition): ReadonlyArchetype {
+export function freezeArchetype(
+	def: BaseArchetypeDefinition
+): ReadonlyArchetype {
 	return Object.freeze({
 		id: def.id,
 		name: def.name,

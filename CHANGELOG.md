@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/jackindisguise/mud3/compare/v1.2.0...v1.3.0) (2025-11-12)
+
+
+### Features
+
+* added board alias commands and updated changelog posting order ([a27fee2](https://github.com/jackindisguise/mud3/commit/a27fee2a4c4e0e687b3cd59dfadc1f0353fa21a0))
+* added categorizeBulletPoint function to categorize bullet points by commit type ([bc7c2dc](https://github.com/jackindisguise/mud3/commit/bc7c2dc03707baa755acab1bebd0937654ecac68))
+* added changes, general, and trade commands as aliases for board command ([a27fee2](https://github.com/jackindisguise/mud3/commit/a27fee2a4c4e0e687b3cd59dfadc1f0353fa21a0))
+* added commit body parsing to post-changelog-to-board script ([bc7c2dc](https://github.com/jackindisguise/mud3/commit/bc7c2dc03707baa755acab1bebd0937654ecac68))
+* added extractCommitHashes function to scrape commit hashes from version sections ([bc7c2dc](https://github.com/jackindisguise/mud3/commit/bc7c2dc03707baa755acab1bebd0937654ecac68))
+* added fetchCommitBody function to retrieve and parse commit message bodies ([bc7c2dc](https://github.com/jackindisguise/mud3/commit/bc7c2dc03707baa755acab1bebd0937654ecac68))
+* added miscellaneous category for bullet points without commit type prefixes ([bc7c2dc](https://github.com/jackindisguise/mud3/commit/bc7c2dc03707baa755acab1bebd0937654ecac68))
+
 ## [1.2.0](https://github.com/jackindisguise/mud3/compare/v1.1.0...v1.2.0) (2025-11-12)
 
 

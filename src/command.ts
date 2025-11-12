@@ -129,7 +129,7 @@ export interface ParseResult {
  * @example
  * ```typescript
  * ARGUMENT_TYPE.TEXT       // "hello world" -> "hello world"
- * ARGUMENT_TYPE.WORD       // "hello world" -> "hello"
+ * ARGUMENT_TYPE.WORD       // "hello world" -> "hello", `"north wind"` -> "north wind"
  * ARGUMENT_TYPE.NUMBER     // "42 items" -> 42
  * ARGUMENT_TYPE.OBJECT     // "sword" -> DungeonObject (if found)
  * ARGUMENT_TYPE.MOB        // "bob" -> Mob (if found in room)
@@ -848,15 +848,17 @@ export abstract class Command {
 
 		// Now replace the placeholders with actual regex patterns
 		// For arguments with a preceding space, the space is required but the argument is optional
+		const wordTokenPattern = `(?:"[^"]+"|'[^']+'|\\S+)`;
+
 		regexStr = regexStr
 			.replace(/ ___OPTIONAL_TEXT___/g, "(?: (.+))?")
-			.replace(/ ___OPTIONAL_WORD___/g, "(?: (\\S+))?")
+			.replace(/ ___OPTIONAL_WORD___/g, `(?: (${wordTokenPattern}))?`)
 			.replace(/ ___OPTIONAL_NUMBER___/g, "(?: (\\d+))?")
 			.replace(/ ___OPTIONAL_GENERIC___/g, "(?: (.+?))?")
 			// Handle any remaining placeholders without preceding spaces
 			// No space required, argument can immediately follow the previous literal
 			.replace(/___OPTIONAL_TEXT___/g, "(?:(.+))?")
-			.replace(/___OPTIONAL_WORD___/g, "(?:(\\S+))?")
+			.replace(/___OPTIONAL_WORD___/g, `(?:(${wordTokenPattern}))?`)
 			.replace(/___OPTIONAL_NUMBER___/g, "(?:(\\d+))?")
 			.replace(/___OPTIONAL_GENERIC___/g, "(?:(.+?))?");
 
@@ -873,7 +875,7 @@ export abstract class Command {
 	 *
 	 * Type-specific behaviors:
 	 * - TEXT: Returns the value as-is (no parsing)
-	 * - WORD: Extracts only the first word (splits on whitespace)
+	 * - WORD: Extracts a single token, honoring quoted phrases
 	 * - NUMBER: Parses as integer, returns undefined if invalid
 	 * - OBJECT: Searches for matching DungeonObject in specified source
 	 * - MOB: Searches for matching Mob in current room
@@ -914,8 +916,17 @@ export abstract class Command {
 			case ARGUMENT_TYPE.TEXT:
 				return value;
 
-			case ARGUMENT_TYPE.WORD:
-				return value.split(/\s+/)[0];
+			case ARGUMENT_TYPE.WORD: {
+				const trimmed = value.trim();
+				if (!trimmed) return trimmed;
+				const startsWithQuote =
+					(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+					(trimmed.startsWith("'") && trimmed.endsWith("'"));
+				if (startsWithQuote && trimmed.length >= 2) {
+					return trimmed.substring(1, trimmed.length - 1);
+				}
+				return trimmed.split(/\s+/)[0];
+			}
 
 			case ARGUMENT_TYPE.NUMBER:
 				const num = parseInt(value, 10);

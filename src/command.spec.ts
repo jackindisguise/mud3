@@ -61,6 +61,24 @@ suite("command.ts", () => {
 			assert.strictEqual(result2.success, true);
 		});
 
+		test("should allow quoted phrases for word arguments", () => {
+			const command = new JavaScriptCommandAdapter({
+				pattern: "look <direction:word>",
+				execute() {},
+			});
+
+			const actor = new Mob();
+			const context: CommandContext = { actor };
+
+			const doubleQuoted = command.parse('look "north east"', context);
+			assert.strictEqual(doubleQuoted.success, true);
+			assert.strictEqual(doubleQuoted.args.get("direction"), "north east");
+
+			const singleQuoted = command.parse("look 'south west'", context);
+			assert.strictEqual(singleQuoted.success, true);
+			assert.strictEqual(singleQuoted.args.get("direction"), "south west");
+		});
+
 		test("should parse command with number argument", () => {
 			const command = new JavaScriptCommandAdapter({
 				pattern: "drop <amount:number> <item:text>",

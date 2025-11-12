@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.0](https://github.com/jackindisguise/mud3/compare/v1.1.0...v1.2.0) (2025-11-12)
+
+
+### Features
+
+* Added dungeon template registry and automatic reset system ([71192d1](https://github.com/jackindisguise/mud3/commit/71192d186266ad5c7d9b9338450f514cb0da469f))
+* implemented movement commands, look command, and room descriptions ([e241a09](https://github.com/jackindisguise/mud3/commit/e241a09cc68ff01f158bfc2f4d71ef937668c681))
+* improve changelog posting script with multi-version support and commit bodies ([2f457fb](https://github.com/jackindisguise/mud3/commit/2f457fbb3922b5f68a43a8784f4550e33b10d427))
+* Integrated structured changelog parser into post-changelog-to-board script ([6fd11ac](https://github.com/jackindisguise/mud3/commit/6fd11acb7fd328eac6f35a670482b3c329d740bc))
+
 ## [1.1.0](https://github.com/jackindisguise/mud3/compare/v1.0.0...v1.1.0) (2025-11-10)
 
 

@@ -138,7 +138,7 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 			coords.z.toString(),
 			COLOR.CYAN
 		)})`;
-		roomInfoLines.push(color(titleWithCoords, COLOR.CYAN));
+		roomInfoLines.push(titleWithCoords);
 	}
 
 	// Room description - wrap to 40 characters wide

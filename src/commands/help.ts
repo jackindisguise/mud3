@@ -63,7 +63,6 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 		const metaBox = string.box({
 			input: meta,
 			width: 76,
-			color: (str) => color(str, COLOR.YELLOW),
 			style: {
 				top: {
 					middle: "-",

@@ -61,6 +61,7 @@ import { CHANNEL, formatChannelMessage } from "./channel.js";
 import { isLocalhost } from "./io.js";
 import { LINEBREAK } from "./telnet.js";
 import { formatPlaytime } from "./time.js";
+import { COLOR, stickyColor } from "./color.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.
@@ -95,6 +96,8 @@ export interface PlayerSettings {
 	channels?: Set<CHANNEL>;
 	/** Set of blocked usernames (players who cannot send messages to this character) */
 	blockedUsers?: Set<string>;
+	/** Default terminal color for all messages sent to this character */
+	defaultColor?: COLOR;
 }
 
 /**
@@ -305,6 +308,8 @@ export interface SerializedPlayerSettings {
 	channels?: CHANNEL[];
 	/** Blocked usernames (serialized as array) */
 	blockedUsers?: string[];
+	/** Default terminal color for all messages sent to this character (serialized as number) */
+	defaultColor?: number;
 }
 
 export interface SerializedCharacter {
@@ -617,9 +622,17 @@ export class Character {
 	/**
 	 * Send raw text to the currently connected client for this character.
 	 * If no client is connected, this is a no-op.
+	 * If defaultColor is set in settings, applies stickyColor to the text.
 	 */
 	public send(text: string) {
-		this.session?.client.send(text, this.settings.colorEnabled);
+		if (!this.session?.client) return;
+
+		let finalText = text;
+		if (this.settings.defaultColor !== undefined) {
+			finalText = stickyColor(text, this.settings.defaultColor);
+		}
+
+		this.session.client.send(finalText, this.settings.colorEnabled);
 	}
 
 	/**
@@ -662,6 +675,41 @@ export class Character {
 		client.yesno(question, callback, _default);
 	}
 
+	/**
+	 * Formats a prompt string by replacing special placeholders with current values.
+	 *
+	 * Supported placeholders:
+	 * - %hh - current health
+	 * - %mm - current mana
+	 * - %ee - exhaustion level
+	 * - %HH - max health
+	 * - %MM - max mana
+	 * - %xp - current experience points
+	 * - %XX - experience needed to next level
+	 *
+	 * @param prompt The prompt string with placeholders
+	 * @returns The formatted prompt string with placeholders replaced
+	 */
+	private formatPrompt(prompt: string): string {
+		if (!this.mob) return prompt;
+
+		let formatted = prompt;
+
+		// Replace placeholders with actual values
+		formatted = formatted.replace(/%hh/g, this.mob.health.toString());
+		formatted = formatted.replace(/%mm/g, this.mob.mana.toString());
+		formatted = formatted.replace(/%ee/g, this.mob.exhaustion.toString());
+		formatted = formatted.replace(/%HH/g, this.mob.maxHealth.toString());
+		formatted = formatted.replace(/%MM/g, this.mob.maxMana.toString());
+		formatted = formatted.replace(/%xp/g, this.mob.experience.toString());
+		formatted = formatted.replace(
+			/%XX/g,
+			this.mob.experienceToLevel.toString()
+		);
+
+		return formatted;
+	}
+
 	/** Core routine for group-aware sending */
 	public sendMessage(text: string, group: MESSAGE_GROUP): void {
 		const session = this.session;
@@ -672,7 +720,8 @@ export class Character {
 		const last = session.lastMessageGroup;
 		if (last !== group) {
 			this.sendLine("");
-			this.send(this.settings.prompt ?? "> ");
+			const promptText = this.settings.prompt ?? "> ";
+			this.send(this.formatPrompt(promptText));
 		}
 		session.lastMessageGroup = group;
 	}
@@ -1006,6 +1055,7 @@ export class Character {
 		};
 
 		// Convert channels and blockedUsers arrays back to Sets
+		// Convert defaultColor number back to COLOR enum if present
 		const settings: PlayerSettings = {
 			...data.settings,
 			channels:
@@ -1016,6 +1066,10 @@ export class Character {
 				data.settings.blockedUsers !== undefined
 					? new Set(data.settings.blockedUsers)
 					: new Set<string>(),
+			defaultColor:
+				data.settings.defaultColor !== undefined
+					? (data.settings.defaultColor as COLOR)
+					: undefined,
 		};
 
 		const character = new Character({

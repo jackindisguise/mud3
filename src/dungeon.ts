@@ -2676,7 +2676,6 @@ export class DungeonObject {
 		};
 
 		// Only include fields that differ from the base
-		// Exclude contents and location as they are runtime state
 		for (const field in serialized) {
 			// Skip contents and location - they are runtime state, not template data
 			if (field === "contents" || field === "location") {

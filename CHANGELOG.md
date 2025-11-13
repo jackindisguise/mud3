@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/jackindisguise/mud3/compare/v1.4.0...v1.5.0) (2025-11-13)
+
+
+### Features
+
+* added character settings system with config command and prompt formatter ([cef443d](https://github.com/jackindisguise/mud3/commit/cef443da17b8bbaeeb6a6db00a2897cba7dfa027))
+* added config command for managing character settings ([cef443d](https://github.com/jackindisguise/mud3/commit/cef443da17b8bbaeeb6a6db00a2897cba7dfa027))
+* added defaultColor setting to PlayerSettings for terminal color customization ([cef443d](https://github.com/jackindisguise/mud3/commit/cef443da17b8bbaeeb6a6db00a2897cba7dfa027))
+* added prompt formatter with placeholders for health, mana, exhaustion, XP, and max values ([cef443d](https://github.com/jackindisguise/mud3/commit/cef443da17b8bbaeeb6a6db00a2897cba7dfa027))
+* implemented stickyColor application in Character.send() when defaultColor is set ([cef443d](https://github.com/jackindisguise/mud3/commit/cef443da17b8bbaeeb6a6db00a2897cba7dfa027))
+* updated serialization/deserialization to handle defaultColor setting ([cef443d](https://github.com/jackindisguise/mud3/commit/cef443da17b8bbaeeb6a6db00a2897cba7dfa027))
+
 ## [1.4.0](https://github.com/jackindisguise/mud3/compare/v1.3.0...v1.4.0) (2025-11-13)
 
 

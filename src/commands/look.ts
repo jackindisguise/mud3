@@ -128,9 +128,17 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 	// Build room info lines (title and description only - for side-by-side display)
 	const roomInfoLines: string[] = [];
 
-	// Room title
+	// Room title with coordinates
 	if (room.display) {
-		roomInfoLines.push(color(room.display, COLOR.CYAN));
+		const coords = room.coordinates;
+		const titleWithCoords = `${room.display} (${color(
+			coords.x.toString(),
+			COLOR.CYAN
+		)}, ${color(coords.y.toString(), COLOR.CYAN)}, ${color(
+			coords.z.toString(),
+			COLOR.CYAN
+		)})`;
+		roomInfoLines.push(color(titleWithCoords, COLOR.CYAN));
 	}
 
 	// Room description - wrap to 40 characters wide
@@ -186,10 +194,10 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 	// Room contents (excluding the viewer) - appears after minimap/room info block
 	const contents = room.contents.filter((obj) => obj !== mob);
 	if (contents.length > 0) {
-		const contentList = contents
-			.map((obj) => obj.roomDescription || obj.display || obj.keywords)
-			.join(", ");
-		lines.push(`- ${contentList}`);
+		const contentList = contents.map(
+			(obj) => obj.roomDescription || obj.display || obj.keywords
+		);
+		lines.push(...contentList);
 	}
 
 	character.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
@@ -197,7 +205,6 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 
 export default {
 	pattern: "look~ <direction:direction?>",
-	aliases: ["l <direction:direction?>"],
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor, room } = context;
 

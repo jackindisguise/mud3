@@ -1651,7 +1651,10 @@ export type SerializedDungeonObjectType =
 	| "Movable"
 	| "Mob"
 	| "Item"
-	| "Prop";
+	| "Prop"
+	| "Equipment"
+	| "Armor"
+	| "Weapon";
 
 /**
  * Union type representing any valid serialized dungeon object form.
@@ -1662,7 +1665,10 @@ export type AnySerializedDungeonObject =
 	| SerializedMovable
 	| SerializedMob
 	| SerializedItem
-	| SerializedProp;
+	| SerializedProp
+	| import("./equipment.js").SerializedEquipment
+	| import("./equipment.js").SerializedArmor
+	| import("./equipment.js").SerializedWeapon;
 
 type DungeonObjectDeserializer = (
 	data: SerializedDungeonObject
@@ -2701,6 +2707,58 @@ export class DungeonObject {
 			this.currentWeight = template.baseWeight;
 		}
 	}
+
+	/**
+	 * Completely destroy this object, removing all references and clearing all relationships.
+	 * This method:
+	 * - Removes the object from its location/container
+	 * - Removes the object from its dungeon
+	 * - Destroys all contained objects recursively
+	 * - Clears reset tracking
+	 * - Clears all internal references
+	 *
+	 * After calling this method, the object should not be used anymore.
+	 *
+	 * @param destroyContents If true (default), recursively destroys all contained objects. If false, just clears the contents array.
+	 *
+	 * @example
+	 * ```typescript
+	 * const item = new DungeonObject({ keywords: "test item" });
+	 * room.add(item);
+	 * item.destroy(); // Removes from room, clears all references
+	 * ```
+	 */
+	destroy(destroyContents: boolean = true): void {
+		// Clear reset tracking first (before removing from location/dungeon)
+		this.spawnedByReset = undefined;
+
+		// Remove from location (this will remove from container's contents)
+		this.location = undefined;
+
+		// Remove from dungeon (this will remove from dungeon's contents)
+		this.dungeon = undefined;
+
+		// Destroy or clear all contained objects
+		const contentsCopy = [...this._contents];
+		this._contents = [];
+		if (destroyContents) {
+			for (const obj of contentsCopy) {
+				obj.destroy(destroyContents);
+			}
+		}
+
+		// Clear weight
+		this.currentWeight = 0;
+		this.baseWeight = 0;
+
+		// Clear all properties to help with garbage collection
+		this.keywords = "";
+		this.display = "";
+		this.description = undefined;
+		this.roomDescription = undefined;
+		this.mapText = undefined;
+		this.mapColor = undefined;
+	}
 }
 
 /**
@@ -3234,6 +3292,66 @@ export class Room extends DungeonObject {
 			result.allowedExits = this.allowedExits;
 		}
 		return result;
+	}
+
+	/**
+	 * Override destroy to handle Room-specific cleanup:
+	 * - Remove all RoomLinks that reference this room
+	 * - Remove from dungeon grid
+	 */
+	override destroy(destroyContents: boolean = true): void {
+		// Remove all RoomLinks that reference this room
+		// Use the room's own links array if available, otherwise search all links
+		if (this._links) {
+			// Make a copy to avoid modifying array during iteration
+			const linksToRemove = [...this._links];
+			for (const link of linksToRemove) {
+				link.remove();
+			}
+		} else {
+			// If _links is undefined, search all ROOM_LINKS for links referencing this room
+			const linksToRemove: RoomLink[] = [];
+			for (const link of ROOM_LINKS) {
+				// Access private properties via type assertion
+				const linkPrivate = link as any;
+				if (
+					linkPrivate._from?.room === this ||
+					linkPrivate._to?.room === this
+				) {
+					linksToRemove.push(link);
+				}
+			}
+			for (const link of linksToRemove) {
+				link.remove();
+			}
+		}
+
+		// Remove from dungeon grid if in a dungeon
+		const dungeon = this.dungeon;
+		if (dungeon) {
+			const { x, y, z } = this.coordinates;
+			// Check bounds before accessing grid
+			if (
+				z >= 0 &&
+				z < dungeon.dimensions.layers &&
+				y >= 0 &&
+				y < dungeon.dimensions.height &&
+				x >= 0 &&
+				x < dungeon.dimensions.width
+			) {
+				const gridRoom = dungeon.getRoom({ x, y, z });
+				if (gridRoom === this) {
+					// Access private _rooms array to set to undefined
+					(dungeon as any)._rooms[z][y][x] = undefined;
+				}
+			}
+		}
+
+		// Clear links array
+		this._links = undefined;
+
+		// Call parent destroy
+		super.destroy(destroyContents);
 	}
 }
 

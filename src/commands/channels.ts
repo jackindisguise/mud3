@@ -25,7 +25,7 @@ import { color, COLOR } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 
 export default {
-	pattern: "channels <action:word?> <channel:word?>",
+	pattern: "channels~ <action:word?> <channel:word?>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const action = args.get("action") as string | undefined;
 		const channelName = args.get("channel") as string | undefined;

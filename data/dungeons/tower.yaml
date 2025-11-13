@@ -173,6 +173,31 @@ dungeon:
       display: "Tower Guardian"
       description: "A mysterious guardian creature that patrols the tower rooms."
       roomDescription: "A mysterious guardian creature stands here, watching the room with an otherworldly gaze."
+    
+    # Equipment templates
+    - id: "tower-sword"
+      type: "Weapon"
+      keywords: "sword blade weapon"
+      display: "Iron Sword"
+      description: "A well-crafted iron sword with a sharp blade and sturdy hilt."
+      slot: "mainHand"
+      attackPower: 5
+    
+    - id: "tower-helmet"
+      type: "Armor"
+      keywords: "helmet head armor"
+      display: "Steel Helmet"
+      description: "A sturdy steel helmet that provides protection for the head."
+      slot: "head"
+      defense: 3
+    
+    - id: "tower-chest"
+      type: "Armor"
+      keywords: "chest armor breastplate"
+      display: "Leather Chest Guard"
+      description: "A leather chest guard that offers moderate protection for the torso."
+      slot: "chest"
+      defense: 4
 
   resets:
     # Mob resets in random rooms across different floors
@@ -218,6 +243,22 @@ dungeon:
     
     - templateId: "tower-guardian"
       roomRef: "@tower{8,7,9}"
+      minCount: 1
+      maxCount: 1
+    
+    # Equipment resets on ground floor
+    - templateId: "tower-sword"
+      roomRef: "@tower{4,4,0}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-helmet"
+      roomRef: "@tower{4,4,0}"
+      minCount: 1
+      maxCount: 1
+    
+    - templateId: "tower-chest"
+      roomRef: "@tower{4,4,0}"
       minCount: 1
       maxCount: 1
 

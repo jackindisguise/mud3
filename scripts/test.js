@@ -8,25 +8,26 @@
 import { fileURLToPath } from "url";
 import { dirname, join, relative, resolve } from "path";
 import { existsSync } from "fs";
-import { inspect } from "node:util";
-
-// Configure inspect defaults for cleaner test output
-if (typeof inspect.defaultOptions !== "undefined") {
-	inspect.defaultOptions.depth = 2;
-	inspect.defaultOptions.maxArrayLength = 5;
-	inspect.defaultOptions.maxStringLength = 80;
-	inspect.defaultOptions.compact = true;
-	inspect.defaultOptions.showHidden = false;
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, "..");
 
-// Get all arguments after the script name
-const args = process.argv.slice(2);
+let reporter = "spec";
+
+// Check npm config for reporter (fallback for when arguments aren't passed through)
+// npm sets npm_config_* environment variables for config values
+if (process.env.npm_config_spec) reporter = "spec";
+else if (process.env.npm_config_dot) reporter = "dot";
+else if (process.env.npm_config_tap) reporter = "tap";
+else if (process.env.npm_config_nyan) reporter = "nyan";
+else if (process.env.npm_config_bdd) reporter = "bdd";
+else if (process.env.npm_config_min) reporter = "min";
+else if (process.env.npm_config_progress) reporter = "progress";
+else if (process.env.npm_config_list) reporter = "list";
 
 // Filter and convert test file paths
+const args = process.argv.slice(2);
 const testFiles = args
 	.map((arg) => {
 		// If it's a TypeScript file, convert to JavaScript
@@ -44,7 +45,7 @@ const testFiles = args
 		if (arg.endsWith(".js") || arg.includes("*")) {
 			return arg;
 		}
-		// Filter out TypeScript files that don't have a compiled version
+		// Filter out unrecognized arguments
 		return null;
 	})
 	.filter((file) => file !== null);
@@ -57,7 +58,7 @@ import { spawn } from "child_process";
 
 const testProcess = spawn(
 	"node",
-	["--test", "--test-reporter=spec", ...testArgs],
+	["--test", `--test-reporter=${reporter}`, ...testArgs],
 	{
 		stdio: "inherit",
 		shell: true,

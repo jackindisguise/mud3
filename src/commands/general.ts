@@ -19,7 +19,7 @@ import { CommandObject } from "../package/commands.js";
 import boardCommand from "./board.js";
 
 export default {
-	pattern: "general <action:word?> <id:word?>",
+	pattern: "general~ <action:word?> <id:word?>",
 	async execute(context: CommandContext, args: Map<string, any>) {
 		// Create new args map with boardname pre-filled
 		const newArgs = new Map<string, any>();

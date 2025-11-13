@@ -401,8 +401,8 @@ export class Character {
 	 *
 	 * @example
 	 * ```ts
- * import { Character } from "./character.js";
- * import { Mob } from "./mob.js";
+	 * import { Character } from "./character.js";
+	 * import { Mob } from "./mob.js";
 	 *
 	 * // Minimal setup: only username is required; other fields get sensible defaults
 	 * const character = new Character({

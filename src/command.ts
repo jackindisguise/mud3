@@ -7,12 +7,12 @@
  * What you get
  * - `Command`: abstract base class with pattern parsing and `execute()` hook
  * - `CommandRegistry`: register commands and execute user input centrally
- * - `ARGUMENT_TYPE`: built-in argument types (text, word, number, object, mob, item, direction, character)
+ * - `ARGUMENT_TYPE`: built-in argument types (text, word, number, object, mob, item, equipment, direction, character)
  * - Types: `CommandContext`, `ParseResult`, `ArgumentConfig`, `CommandOptions`
  *
  * Pattern basics
  * - Placeholders: `<name:type>` (required), `<name:type?>` (optional)
- * - Object sources: `<item:object@room>`, `<item:object@inventory>`, `<item:object@all>`
+ * - Object sources: `<item:object@room>`, `<item:object@inventory>`, `<item:object@all>`, `<item:object@container>` (references another argument)
  * - Autocomplete: `word~` (matches partial input like "o", "oo", "ooc" for "ooc~")
  * - Common types: `text`, `word`, `number`, `object`, `mob`, `item`, `direction`
  *
@@ -46,6 +46,7 @@
 
 import { DungeonObject, Item, Room, DIRECTION, text2dir } from "./dungeon.js";
 import { Mob } from "./mob.js";
+import { Equipment } from "./equipment.js";
 import { Character } from "./character.js";
 import { Game } from "./game.js";
 import logger from "./logger.js";
@@ -124,6 +125,7 @@ export interface ParseResult {
  * - OBJECT: Looks up a DungeonObject by keywords. Respects \@source modifiers.
  * - MOB: Looks up a Mob in the current room by keywords.
  * - ITEM: Looks up an Item by keywords. Respects \@source modifiers.
+ * - EQUIPMENT: Looks up an Equipment item by keywords. Respects \@source modifiers.
  * - DIRECTION: Parses direction names/abbreviations into DIRECTION values.
  *
  * @example
@@ -134,6 +136,7 @@ export interface ParseResult {
  * ARGUMENT_TYPE.OBJECT     // "sword" -> DungeonObject (if found)
  * ARGUMENT_TYPE.MOB        // "bob" -> Mob (if found in room)
  * ARGUMENT_TYPE.ITEM       // "potion" -> Item (if found)
+ * ARGUMENT_TYPE.EQUIPMENT  // "helmet" -> Equipment (if found)
  * ARGUMENT_TYPE.DIRECTION  // "north" or "n" -> DIRECTION.NORTH
  * ARGUMENT_TYPE.CHARACTER  // "alice" -> Character (online player)
  * ```
@@ -145,6 +148,7 @@ export enum ARGUMENT_TYPE {
 	OBJECT = "object",
 	MOB = "mob",
 	ITEM = "item",
+	EQUIPMENT = "equipment",
 	DIRECTION = "direction",
 	CHARACTER = "character",
 }
@@ -170,6 +174,7 @@ export enum ARGUMENT_TYPE {
  *                    Extracted from the @ modifier in the pattern (e.g., "<item:object@inventory>").
  *                    - "room": Search only in the current room's contents
  *                    - "inventory": Search only in the actor's inventory
+ *                    - "equipment": Search only in the actor's equipped items
  *                    - "all": Search both room and inventory (default)
  *
  * @example
@@ -187,7 +192,7 @@ export interface ArgumentConfig {
 	name: string;
 	type: ARGUMENT_TYPE;
 	required?: boolean;
-	source?: "room" | "inventory" | "all";
+	source?: "room" | "inventory" | "all" | string; // string = argument name reference
 }
 
 /**
@@ -229,12 +234,14 @@ export interface CommandOptions {
  * - `object` - Finds a DungeonObject by keyword matching
  * - `mob` - Finds a Mob entity by keyword matching in current room
  * - `item` - Finds an Item entity by keyword matching
+ * - `equipment` - Finds an Equipment entity by keyword matching
  * - `direction` - Parses direction names/abbreviations into DIRECTION enum values
  * - `character` - Finds an online Character (player) by username or mob keywords
  *
- * ### Source Modifiers (for object and item types)
+ * ### Source Modifiers (for object, item, and equipment types)
  * - `@room` - Search only in the current room's contents
  * - `@inventory` - Search only in the actor's inventory
+ * - `@equipment` - Search only in the actor's equipped items
  * - `@all` - Search both room and inventory (default if not specified)
  *
  * ### Autocomplete Suffix (`~`)
@@ -680,6 +687,8 @@ export abstract class Command {
 			};
 		}
 
+		// First pass: parse all arguments without resolving argument-based sources
+		const tempArgs = new Map<string, any>();
 		for (let i = 0; i < argConfigs.length; i++) {
 			const config = argConfigs[i];
 			const rawValue = match[i + 1];
@@ -697,17 +706,68 @@ export abstract class Command {
 				continue;
 			}
 
-			const parsedValue = this.parseArgument(rawValue.trim(), config, context);
-			if (parsedValue === undefined && config.required !== false) {
-				return {
-					success: false,
-					args,
-					error: `Could not parse argument: ${config.name}`,
-				};
-			}
+			// Check if this argument's source references another argument
+			const needsDeferredResolution =
+				config.source &&
+				config.source !== "room" &&
+				config.source !== "inventory" &&
+				config.source !== "all" &&
+				!tempArgs.has(config.source);
 
-			if (parsedValue !== undefined) {
-				args.set(config.name, parsedValue);
+			if (needsDeferredResolution) {
+				// Store raw value for deferred parsing
+				tempArgs.set(config.name, { rawValue: rawValue.trim(), config });
+			} else {
+				const parsedValue = this.parseArgument(
+					rawValue.trim(),
+					config,
+					context,
+					tempArgs
+				);
+				if (parsedValue === undefined && config.required !== false) {
+					return {
+						success: false,
+						args,
+						error: `Could not parse argument: ${config.name}`,
+					};
+				}
+
+				if (parsedValue !== undefined) {
+					tempArgs.set(config.name, parsedValue);
+				}
+			}
+		}
+
+		// Second pass: resolve deferred arguments that reference other arguments
+		for (const [name, value] of tempArgs.entries()) {
+			if (value && typeof value === "object" && value.rawValue !== undefined) {
+				const deferred = value as { rawValue: string; config: ArgumentConfig };
+				const parsedValue = this.parseArgument(
+					deferred.rawValue,
+					deferred.config,
+					context,
+					tempArgs
+				);
+				if (parsedValue === undefined && deferred.config.required !== false) {
+					return {
+						success: false,
+						args,
+						error: `Could not parse argument: ${name}`,
+					};
+				}
+
+				if (parsedValue !== undefined) {
+					tempArgs.set(name, parsedValue);
+				}
+			}
+		}
+
+		// Copy all parsed arguments to the final args map
+		for (const [name, value] of tempArgs.entries()) {
+			if (
+				!(value && typeof value === "object" && value.rawValue !== undefined)
+			) {
+				args.set(name, value);
 			}
 		}
 
@@ -725,6 +785,8 @@ export abstract class Command {
 	 * - `<name:type>` - Required argument
 	 * - `<name:type?>` - Optional argument (? suffix)
 	 * - `<name:type@source>` - Object argument with source modifier
+	 *   - Literal sources: `@room`, `@inventory`, `@equipment`, `@all`
+	 *   - Argument reference: `@container` (references another argument named "container")
 	 *
 	 * The extraction process:
 	 * 1. Find all `<...>` placeholders using regex
@@ -745,6 +807,17 @@ export abstract class Command {
 	 *   { name: "container", type: ARGUMENT_TYPE.OBJECT, required: false, source: "all" }
 	 * ]
 	 * ```
+	 *
+	 * @example
+	 * Pattern: "get <item:item@container> from <container:object>"
+	 * Returns:
+	 * ```typescript
+	 * [
+	 *   { name: "item", type: ARGUMENT_TYPE.ITEM, required: true, source: "container" },
+	 *   { name: "container", type: ARGUMENT_TYPE.OBJECT, required: true, source: "all" }
+	 * ]
+	 * ```
+	 * The "item" argument will search inside the "container" argument's contents.
 	 */
 	private extractArgumentConfigs(pattern: string): ArgumentConfig[] {
 		const configs: ArgumentConfig[] = [];
@@ -755,7 +828,23 @@ export abstract class Command {
 			const [, name, typeStr, optional] = match;
 			const parts = typeStr.split("@");
 			const type = parts[0] as ARGUMENT_TYPE;
-			const source = parts[1] as "room" | "inventory" | "all" | undefined;
+			const sourceStr = parts[1];
+
+			// Determine if source is a literal or an argument reference
+			let source: "room" | "inventory" | "all" | string | undefined;
+			if (sourceStr) {
+				// Check if it's a literal source value
+				if (
+					sourceStr === "room" ||
+					sourceStr === "inventory" ||
+					sourceStr === "all"
+				) {
+					source = sourceStr;
+				} else {
+					// Otherwise, treat it as an argument name reference
+					source = sourceStr;
+				}
+			}
 
 			configs.push({
 				name,
@@ -910,7 +999,8 @@ export abstract class Command {
 	private parseArgument(
 		value: string,
 		config: ArgumentConfig,
-		context: CommandContext
+		context: CommandContext,
+		parsedArgs: Map<string, any>
 	): any {
 		switch (config.type) {
 			case ARGUMENT_TYPE.TEXT:
@@ -933,13 +1023,31 @@ export abstract class Command {
 				return isNaN(num) ? undefined : num;
 
 			case ARGUMENT_TYPE.OBJECT:
-				return this.findObject(value, config.source || "all", context);
+				return this.findObject(
+					value,
+					config.source || "all",
+					context,
+					parsedArgs
+				);
 
 			case ARGUMENT_TYPE.MOB:
 				return this.findMob(value, context);
 
 			case ARGUMENT_TYPE.ITEM:
-				return this.findItem(value, config.source || "all", context);
+				return this.findItem(
+					value,
+					config.source || "all",
+					context,
+					parsedArgs
+				);
+
+			case ARGUMENT_TYPE.EQUIPMENT:
+				return this.findEquipment(
+					value,
+					config.source || "all",
+					context,
+					parsedArgs
+				);
 
 			case ARGUMENT_TYPE.DIRECTION:
 				return this.parseDirection(value);
@@ -953,6 +1061,100 @@ export abstract class Command {
 	}
 
 	/**
+	 * Parse a number prefix from keywords (e.g., "2.sword" -> { index: 1, keywords: "sword" }).
+	 * Returns undefined for index if no number prefix is found.
+	 */
+	private parseNumberPrefix(keywords: string): {
+		index: number | undefined;
+		keywords: string;
+	} {
+		const match = keywords.match(/^(\d+)\.(.+)$/);
+		if (match) {
+			const index = parseInt(match[1], 10) - 1; // Convert to 0-based index
+			return { index, keywords: match[2] };
+		}
+		return { index: undefined, keywords };
+	}
+
+	/**
+	 * Generic helper to find objects by keywords with source resolution and number prefix support.
+	 *
+	 * @param keywords - The keywords to search for (may include number prefix like "2.sword")
+	 * @param source - Where to search: "room", "inventory", "all", "equipment", or container argument name
+	 * @param context - The execution context providing room and actor
+	 * @param parsedArgs - Map of already parsed arguments (for argument-based sources)
+	 * @param predicate - Function to filter objects (e.g., `obj => obj instanceof Item && obj.match(keywords)`)
+	 * @returns Matching object at specified index, or undefined if none found
+	 */
+	private findObjectsBySource<T extends DungeonObject>(
+		keywords: string,
+		source: "room" | "inventory" | "all" | "equipment" | string,
+		context: CommandContext,
+		parsedArgs: Map<string, any>,
+		predicate: (obj: DungeonObject, searchKeywords: string) => obj is T
+	): T | undefined {
+		const { index, keywords: searchKeywords } =
+			this.parseNumberPrefix(keywords);
+		const searchLocations: DungeonObject[] = [];
+
+		// Resolve argument-based source
+		let resolvedSource = source;
+		if (
+			source !== "room" &&
+			source !== "inventory" &&
+			source !== "all" &&
+			source !== "equipment" &&
+			source !== undefined
+		) {
+			// Check if source refers to another argument (container)
+			const containerArg = parsedArgs.get(source);
+			if (containerArg instanceof DungeonObject) {
+				// Search inside the specified container
+				searchLocations.push(...containerArg.contents);
+				const matches = searchLocations.filter((obj) =>
+					predicate(obj, searchKeywords)
+				);
+				return index !== undefined ? matches[index] : matches[0];
+			}
+			// If argument not found or not a DungeonObject, fall back to "all"
+			resolvedSource = "all";
+		}
+
+		// Handle equipment source
+		if (resolvedSource === "equipment") {
+			if (context.actor instanceof Mob) {
+				const allEquipped = context.actor.getAllEquipped();
+				for (const equipment of allEquipped) {
+					searchLocations.push(equipment);
+				}
+				const matches = searchLocations.filter((obj) =>
+					predicate(obj, searchKeywords)
+				);
+				return index !== undefined ? matches[index] : matches[0];
+			}
+			return undefined;
+		}
+
+		// Add room contents if needed
+		if (
+			(resolvedSource === "room" || resolvedSource === "all") &&
+			context.room
+		) {
+			searchLocations.push(...context.room.contents);
+		}
+
+		// Add inventory if needed
+		if (resolvedSource === "inventory" || resolvedSource === "all") {
+			searchLocations.push(...context.actor.contents);
+		}
+
+		const matches = searchLocations.filter((obj) =>
+			predicate(obj, searchKeywords)
+		);
+		return index !== undefined ? matches[index] : matches[0];
+	}
+
+	/**
 	 * Find an object by keywords in the specified source.
 	 *
 	 * This method searches for a DungeonObject that matches the given keywords,
@@ -961,21 +1163,22 @@ export abstract class Command {
 	 * Search locations by source:
 	 * - "room": Current room contents + objects inside room containers
 	 * - "inventory": Actor's inventory contents only
+	 * - "equipment": Actor's equipped items only
 	 * - "all": Both room and inventory (default)
 	 *
 	 * The search uses the DungeonObject's keyword matching system, which supports
-	 * partial matches and handles multiple keywords. The first matching object
-	 * is returned.
+	 * partial matches and handles multiple keywords. Supports number prefixes
+	 * like "2.sword" to select the 2nd matching object (1-based).
 	 *
 	 * Nested container support: When searching in the room, this method also
 	 * searches inside containers (objects with contents), allowing commands like
 	 * "get coin from chest" to work properly.
 	 *
 	 * @private
-	 * @param keywords - The keywords to search for (from user input)
+	 * @param keywords - The keywords to search for (from user input, may include number prefix like "2.sword")
 	 * @param source - Where to search: "room", "inventory", or "all"
 	 * @param context - The execution context providing room and actor
-	 * @returns {DungeonObject | undefined} First matching object, or undefined if none found
+	 * @returns {DungeonObject | undefined} Matching object at specified index, or undefined if none found
 	 *
 	 * @example
 	 * // Search for "sword" in room only
@@ -983,30 +1186,23 @@ export abstract class Command {
 	 * // Returns: <DungeonObject with keywords "sword"> or undefined
 	 *
 	 * @example
-	 * // Search for "coin" in actor's inventory
-	 * findObject("coin", "inventory", context)
-	 * // Returns: <DungeonObject> from actor.contents or undefined
+	 * // Search for 2nd "coin" in actor's inventory
+	 * findObject("2.coin", "inventory", context)
+	 * // Returns: 2nd <DungeonObject> from actor.contents or undefined
 	 */
 	private findObject(
 		keywords: string,
-		source: "room" | "inventory" | "all",
-		context: CommandContext
+		source: "room" | "inventory" | "all" | string,
+		context: CommandContext,
+		parsedArgs: Map<string, any>
 	): DungeonObject | undefined {
-		const searchLocations: DungeonObject[] = [];
-
-		if ((source === "room" || source === "all") && context.room) {
-			searchLocations.push(...context.room.contents);
-			// Also search inside containers in the room
-			for (const obj of context.room.contents) {
-				searchLocations.push(...obj.contents);
-			}
-		}
-
-		if (source === "inventory" || source === "all") {
-			searchLocations.push(...context.actor.contents);
-		}
-
-		return searchLocations.find((obj) => obj.match(keywords));
+		return this.findObjectsBySource(
+			keywords,
+			source,
+			context,
+			parsedArgs,
+			(obj, searchKeywords): obj is DungeonObject => obj.match(searchKeywords)
+		);
 	}
 
 	/**
@@ -1020,26 +1216,37 @@ export abstract class Command {
 	 * mob-targeting commands (tell, attack, give, etc.) should only target
 	 * entities that can act, not inanimate objects or generic items.
 	 *
+	 * Supports number prefixes like "2.bob" to select the 2nd matching mob (1-based).
+	 *
 	 * Returns undefined if:
 	 * - The actor is not in a room (context.room is undefined)
 	 * - No Mob entity in the room matches the keywords
+	 * - The specified index is out of range
 	 *
 	 * @private
-	 * @param keywords - The keywords to search for (typically a name)
+	 * @param keywords - The keywords to search for (typically a name, may include number prefix like "2.bob")
 	 * @param context - The execution context providing the room
-	 * @returns {Mob | undefined} First matching Mob, or undefined if none found
+	 * @returns {Mob | undefined} Matching Mob at specified index, or undefined if none found
 	 *
 	 * @example
 	 * // Search for "bob" in current room
 	 * findMob("bob", context)
 	 * // Returns: <Mob with keywords "bob"> or undefined
+	 *
+	 * @example
+	 * // Search for 2nd "goblin" in current room
+	 * findMob("2.goblin", context)
+	 * // Returns: 2nd <Mob> matching "goblin" or undefined
 	 */
 	private findMob(keywords: string, context: CommandContext): Mob | undefined {
 		if (!context.room) return undefined;
 
-		return context.room.contents.find(
-			(obj) => obj instanceof Mob && obj.match(keywords)
-		) as Mob | undefined;
+		const { index, keywords: searchKeywords } =
+			this.parseNumberPrefix(keywords);
+		const matches = context.room.contents.filter(
+			(obj) => obj instanceof Mob && obj.match(searchKeywords)
+		) as Mob[];
+		return index !== undefined ? matches[index] : matches[0];
 	}
 
 	/**
@@ -1050,17 +1257,18 @@ export abstract class Command {
 	 * players using the Game instance.
 	 *
 	 * The search is case-insensitive for usernames and uses the mob's keyword
-	 * matching system which supports partial matches. The first matching character
-	 * is returned.
+	 * matching system which supports partial matches. Supports number prefixes
+	 * like "2.alice" to select the 2nd matching character (1-based).
 	 *
 	 * Returns undefined if:
 	 * - No Game instance is available (Game.game is undefined)
 	 * - No online character matches the provided username/keywords
+	 * - The specified index is out of range
 	 *
 	 * @private
-	 * @param keywords - The username or keywords to search for
+	 * @param keywords - The username or keywords to search for (may include number prefix like "2.alice")
 	 * @param context - The execution context (unused but kept for consistency)
-	 * @returns {Character | undefined} First matching Character, or undefined if none found
+	 * @returns {Character | undefined} Matching Character at specified index, or undefined if none found
 	 *
 	 * @example
 	 * // Search for character by username
@@ -1068,9 +1276,9 @@ export abstract class Command {
 	 * // Returns: <Character with username "alice"> or undefined
 	 *
 	 * @example
-	 * // Search for character by mob keywords
-	 * findCharacter("ali", context)
-	 * // Returns: <Character whose mob matches "ali"> or undefined
+	 * // Search for 2nd character by mob keywords
+	 * findCharacter("2.ali", context)
+	 * // Returns: 2nd <Character> whose mob matches "ali"> or undefined
 	 */
 	private findCharacter(
 		keywords: string,
@@ -1078,22 +1286,27 @@ export abstract class Command {
 	): Character | undefined {
 		if (!Game.game) return undefined;
 
-		let foundCharacter: Character | undefined;
+		const { index, keywords: searchKeywords } =
+			this.parseNumberPrefix(keywords);
+		const matches: Character[] = [];
+
 		Game.game.forEachCharacter((char: Character) => {
 			// Check username match (case-insensitive)
-			if (char.credentials.username.toLowerCase() === keywords.toLowerCase()) {
-				foundCharacter = char;
+			if (
+				char.credentials.username.toLowerCase() === searchKeywords.toLowerCase()
+			) {
+				matches.push(char);
 				return;
 			}
 
 			// Check mob keyword match
-			if (char.mob && char.mob.match(keywords)) {
-				foundCharacter = char;
+			if (char.mob && char.mob.match(searchKeywords)) {
+				matches.push(char);
 				return;
 			}
 		});
 
-		return foundCharacter;
+		return index !== undefined ? matches[index] : matches[0];
 	}
 
 	/**
@@ -1105,53 +1318,100 @@ export abstract class Command {
 	 * Search locations by source:
 	 * - "room": Current room contents + items inside room containers
 	 * - "inventory": Actor's inventory contents only
+	 * - "equipment": Actor's equipped items only
 	 * - "all": Both room and inventory (default)
 	 *
 	 * The search uses the Item's keyword matching system, which supports
-	 * partial matches and handles multiple keywords. The first matching item
-	 * is returned.
+	 * partial matches and handles multiple keywords. Supports number prefixes
+	 * like "2.potion" to select the 2nd matching item (1-based).
 	 *
 	 * Nested container support: When searching in the room, this method also
 	 * searches inside containers (objects with contents), allowing commands like
 	 * "get potion from bag" to work properly.
 	 *
 	 * @private
-	 * @param keywords - The keywords to search for (from user input)
+	 * @param keywords - The keywords to search for (from user input, may include number prefix like "2.potion")
 	 * @param source - Where to search: "room", "inventory", or "all"
 	 * @param context - The execution context providing room and actor
-	 * @returns {Item | undefined} First matching item, or undefined if none found
+	 * @returns {Item | undefined} Matching item at specified index, or undefined if none found
 	 *
 	 * @example
 	 * // Search for "potion" in room only
 	 * findItem("potion", "room", context)
 	 * // Returns: <Item with "potion" keywords> or undefined
+	 *
+	 * @example
+	 * // Search for 2nd "coin" in inventory
+	 * findItem("2.coin", "inventory", context)
+	 * // Returns: 2nd <Item> matching "coin" or undefined
 	 */
 	private findItem(
 		keywords: string,
-		source: "room" | "inventory" | "all",
-		context: CommandContext
+		source: "room" | "inventory" | "all" | string,
+		context: CommandContext,
+		parsedArgs: Map<string, any>
 	): Item | undefined {
-		const searchLocations: DungeonObject[] = [];
+		return this.findObjectsBySource(
+			keywords,
+			source,
+			context,
+			parsedArgs,
+			(obj, searchKeywords): obj is Item =>
+				obj instanceof Item && obj.match(searchKeywords)
+		);
+	}
 
-		// Add room contents if needed
-		if (source !== "inventory" && context.room) {
-			searchLocations.push(...context.room.contents);
-			// Also search inside containers in the room
-			for (const obj of context.room.contents) {
-				if (obj.contents.length > 0) {
-					searchLocations.push(...obj.contents);
-				}
-			}
-		}
-
-		// Add inventory if needed
-		if (source !== "room") {
-			searchLocations.push(...context.actor.contents);
-		}
-
-		return searchLocations.find(
-			(obj) => obj instanceof Item && obj.match(keywords)
-		) as Item | undefined;
+	/**
+	 * Find an equipment item by keywords in the specified source.
+	 *
+	 * This method searches for an Equipment entity that matches the given keywords,
+	 * respecting the source modifier to determine where to search.
+	 *
+	 * Search locations by source:
+	 * - "room": Current room contents + items inside room containers
+	 * - "inventory": Actor's inventory contents only
+	 * - "equipment": Actor's equipped items only
+	 * - "all": Both room and inventory (default)
+	 *
+	 * The search uses the Equipment's keyword matching system, which supports
+	 * partial matches and handles multiple keywords. Supports number prefixes
+	 * like "2.helmet" to select the 2nd matching equipment (1-based).
+	 *
+	 * Nested container support: When searching in the room, this method also
+	 * searches inside containers (objects with contents), allowing commands like
+	 * "wear helmet from chest" to work properly.
+	 *
+	 * @private
+	 * @param keywords - The keywords to search for (from user input, may include number prefix like "2.helmet")
+	 * @param source - Where to search: "room", "inventory", "equipment", or "all"
+	 * @param context - The execution context providing room and actor
+	 * @param parsedArgs - Map of already parsed arguments (for argument-based sources)
+	 * @returns {Equipment | undefined} Matching equipment at specified index, or undefined if none found
+	 *
+	 * @example
+	 * // Search for "helmet" in inventory only
+	 * findEquipment("helmet", "inventory", context, parsedArgs)
+	 * // Returns: <Equipment with "helmet" keywords> or undefined
+	 *
+	 * @example
+	 * // Search for 2nd "ring" in equipment
+	 * findEquipment("2.ring", "equipment", context, parsedArgs)
+	 * // Returns: 2nd <Equipment> matching "ring" or undefined
+	 */
+	private findEquipment(
+		keywords: string,
+		source: "room" | "inventory" | "all" | "equipment" | string,
+		context: CommandContext,
+		parsedArgs: Map<string, any>
+	): Equipment | undefined {
+		return this.findObjectsBySource(
+			keywords,
+			source,
+			context,
+			parsedArgs,
+			(obj, searchKeywords): obj is Equipment =>
+				obj instanceof Equipment && obj.match(searchKeywords)
+		);
 	}
 
 	/**
@@ -1421,7 +1681,7 @@ export class CommandRegistry {
 	 */
 
 	execute(input: string, context: CommandContext): boolean {
-		input = input.trim().toLowerCase();
+		input = input.trim();
 		if (!input) return false;
 
 		// Commands are already sorted by priority and pattern length

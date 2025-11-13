@@ -19,7 +19,7 @@
 
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../mob.js";
+import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
 import { CHANNEL, formatChannelMessage } from "../channel.js";

@@ -32,7 +32,7 @@ import { MudServer, MudClient } from "./io.js";
 import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
-import { Mob } from "./mob.js";
+import { Mob } from "./dungeon.js";
 import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./package/config.js";
 import {

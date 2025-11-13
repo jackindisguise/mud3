@@ -15,17 +15,17 @@
 
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Equipment, Armor, Weapon } from "../equipment.js";
+import { Equipment, Armor, Weapon } from "../dungeon.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
 	ResourceCapacities,
-} from "../mob.js";
+} from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../telnet.js";
 import { COLOR, color } from "../color.js";
 
-// Helper functions to sum bonuses (duplicated from mob.ts since they're not exported)
+// Helper functions to sum bonuses (duplicated from dungeon.ts since they're not exported)
 function sumPrimaryAttributes(
 	...components: Array<Partial<PrimaryAttributeSet> | undefined>
 ): PrimaryAttributeSet {

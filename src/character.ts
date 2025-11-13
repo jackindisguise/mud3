@@ -53,7 +53,7 @@
  * @module character
  */
 
-import { Mob, SerializedMob } from "./mob.js";
+import { Mob, SerializedMob } from "./dungeon.js";
 import { createHash } from "crypto";
 import { CONFIG } from "./package/config.js";
 import type { MudClient } from "./io.js";

@@ -1,4 +1,4 @@
-import { PrimaryAttributeSet, ResourceCapacities } from "./mob.js";
+import { PrimaryAttributeSet, ResourceCapacities } from "./dungeon.js";
 
 export interface GrowthModifierCurve {
 	base: number;

@@ -14,7 +14,7 @@ import {
 } from "./character.js";
 import { CHANNEL } from "./channel.js";
 import { Dungeon } from "./dungeon.js";
-import { Mob } from "./mob.js";
+import { Mob } from "./dungeon.js";
 import type { MudClient } from "./io.js";
 
 suite("character.ts", () => {

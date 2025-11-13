@@ -12,7 +12,11 @@
  * - Core types: `Coordinates`, `MapDimensions`, `DungeonOptions`
  * - Registry and lookup: `DUNGEON_REGISTRY`, `getDungeonById(id)`, `ROOM_LINKS`
  * - Reference parsing: `getRoomByRef("@id{x,y,z}")`
- * - Classes: `Dungeon`, `DungeonObject`, `Room`, `Movable`, `Mob`, `Item`, `Prop`, `RoomLink`
+ * - Classes: `Dungeon`, `DungeonObject`, `Room`, `Movable`, `Mob`, `Item`, `Prop`, `RoomLink`,
+ *   `Equipment`, `Armor`, `Weapon`
+ * - Attribute types: `PrimaryAttributeSet`, `SecondaryAttributeSet`, `ResourceCapacities`,
+ *   `ResourceSnapshot`
+ * - Equipment types: `EQUIPMENT_SLOT`, `EquipmentOptions`, `ArmorOptions`, `WeaponOptions`
  * - Serialization types: `Serialized*`, `AnySerializedDungeonObject`
  *
  * Quick start
@@ -60,7 +64,14 @@
 import { string } from "mud-ext";
 import { COLOR } from "./color.js";
 import logger from "./logger.js";
-import type { SerializedMob } from "./mob.js";
+import { Race, Class, evaluateGrowthModifier } from "./archetype.js";
+import {
+	getDefaultRace,
+	getDefaultClass,
+	getRaceById,
+	getClassById,
+} from "./package/archetype.js";
+import { Character, MESSAGE_GROUP } from "./character.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -1626,6 +1637,23 @@ export interface SerializedMovable extends SerializedDungeonObject {
 	type: "Movable";
 }
 
+export interface SerializedMob extends SerializedDungeonObject {
+	type: "Mob";
+	level: number;
+	experience: number;
+	race: string;
+	class: string;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	health: number;
+	mana: number;
+	exhaustion: number;
+	equipped?: Record<
+		EQUIPMENT_SLOT,
+		SerializedEquipment | SerializedArmor | SerializedWeapon
+	>;
+}
+
 /**
  * Serialized form for Item objects.
  * Currently identical to base form but defined for type safety and future extensions.
@@ -1642,6 +1670,47 @@ export interface SerializedProp extends SerializedDungeonObject {
 	type: "Prop";
 }
 
+/**
+ * Type union representing the different equipment types.
+ */
+export type equipmentType = "Equipment" | "Armor" | "Weapon";
+
+/**
+ * Serialized form for Equipment objects.
+ * Used for persistence and template storage. All equipment properties are included.
+ *
+ * @property type - The equipment type ("Equipment", "Armor", or "Weapon")
+ * @property slot - The equipment slot this item occupies
+ * @property defense - Defense value (0 for Weapons and base Equipment)
+ * @property attributeBonuses - Optional primary attribute bonuses
+ * @property resourceBonuses - Optional resource capacity bonuses
+ * @property secondaryAttributeBonuses - Optional secondary attribute bonuses
+ */
+export interface SerializedEquipment extends SerializedDungeonObject {
+	type: equipmentType;
+	slot: EQUIPMENT_SLOT;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
+}
+
+export interface SerializedArmor extends SerializedDungeonObject {
+	type: "Armor";
+	slot: EQUIPMENT_SLOT;
+	defense: number;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
+}
+
+export interface SerializedWeapon extends SerializedDungeonObject {
+	type: "Weapon";
+	slot: EQUIPMENT_SLOT;
+	attackPower: number;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
+}
 /**
  * Union type representing valid serialized object types.
  */
@@ -1666,22 +1735,9 @@ export type AnySerializedDungeonObject =
 	| SerializedMob
 	| SerializedItem
 	| SerializedProp
-	| import("./equipment.js").SerializedEquipment
-	| import("./equipment.js").SerializedArmor
-	| import("./equipment.js").SerializedWeapon;
-
-type DungeonObjectDeserializer = (
-	data: SerializedDungeonObject
-) => DungeonObject;
-type DungeonObjectTemplateFactory = () => DungeonObject;
-type BaseSerializedFactory = () => SerializedDungeonObject;
-
-const CUSTOM_DESERIALIZERS = new Map<string, DungeonObjectDeserializer>();
-const CUSTOM_BASE_SERIALIZED = new Map<string, BaseSerializedFactory>();
-const CUSTOM_TEMPLATE_FACTORIES = new Map<
-	string,
-	DungeonObjectTemplateFactory
->();
+	| SerializedEquipment
+	| SerializedArmor
+	| SerializedWeapon;
 
 export interface DungeonObjectTypeRegistration<
 	TSerialized extends SerializedDungeonObject
@@ -1690,27 +1746,6 @@ export interface DungeonObjectTypeRegistration<
 	deserialize: (data: TSerialized) => DungeonObject;
 	createBaseSerialized?: () => TSerialized;
 	createTemplateInstance?: () => DungeonObject;
-}
-
-export function registerDungeonObjectType<
-	TSerialized extends SerializedDungeonObject
->(registration: DungeonObjectTypeRegistration<TSerialized>): void {
-	const { type, deserialize, createBaseSerialized, createTemplateInstance } =
-		registration;
-
-	if (CUSTOM_DESERIALIZERS.has(type)) {
-		throw new Error(`Dungeon object type '${type}' is already registered.`);
-	}
-
-	CUSTOM_DESERIALIZERS.set(type, (data) => deserialize(data as TSerialized));
-
-	if (createBaseSerialized) {
-		CUSTOM_BASE_SERIALIZED.set(type, () => createBaseSerialized());
-	}
-
-	if (createTemplateInstance) {
-		CUSTOM_TEMPLATE_FACTORIES.set(type, createTemplateInstance);
-	}
 }
 
 /**
@@ -2549,16 +2584,19 @@ export class DungeonObject {
 		const type: SerializedDungeonObjectType =
 			(data.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
 
-		const customDeserializer = CUSTOM_DESERIALIZERS.get(type);
-		if (customDeserializer) {
-			return customDeserializer(data);
-		}
-
 		/** shortcut support */
 		switch (type) {
 			case "Room":
 				// Delegate to Room-specific deserializer
 				return Room.deserialize(data as SerializedRoom);
+			case "Mob":
+				return Mob.deserialize(data as SerializedMob);
+			case "Equipment":
+				return Equipment.deserialize(data as SerializedEquipment);
+			case "Armor":
+				return Armor.deserialize(data as SerializedArmor);
+			case "Weapon":
+				return Weapon.deserialize(data as SerializedWeapon);
 			case "Movable":
 				return Movable.deserialize(data as SerializedMovable);
 			case "Item":
@@ -2596,11 +2634,6 @@ export class DungeonObject {
 	private static getBaseSerialized(
 		type: SerializedDungeonObjectType
 	): SerializedDungeonObject {
-		const customFactory = CUSTOM_BASE_SERIALIZED.get(type);
-		if (customFactory) {
-			return customFactory();
-		}
-
 		const baseSerialized = baseSerializedTypes[type];
 		if (!baseSerialized) {
 			throw new Error(`No base serialized data registered for type '${type}'.`);
@@ -2783,19 +2816,24 @@ export function createFromTemplate(
 ): DungeonObject {
 	let obj: DungeonObject;
 
-	const customFactory = CUSTOM_TEMPLATE_FACTORIES.get(template.type);
-	if (customFactory) {
-		obj = customFactory();
-		obj.applyTemplate(template);
-		return obj;
-	}
-
 	// Create the appropriate object type
 	switch (template.type) {
 		case "Room":
 			throw new Error(
 				"Room templates require coordinates - use Room.createFromTemplate() instead"
 			);
+		case "Mob":
+			obj = new Mob();
+			break;
+		case "Equipment":
+			obj = new Equipment();
+			break;
+		case "Armor":
+			obj = new Armor();
+			break;
+		case "Weapon":
+			obj = new Weapon();
+			break;
 		case "Movable":
 			obj = new Movable();
 			break;
@@ -3669,8 +3707,8 @@ export class Item extends Movable {
 	/**
 	 * Deserialize a SerializedItem into an Item instance.
 	 */
-	public static deserialize(data: SerializedItem): Item {
-		const item = new Item(data);
+	public static deserialize(data: AnySerializedDungeonObject): Item {
+		const item = new Item(data as SerializedItem);
 		if (data.contents && Array.isArray(data.contents)) {
 			for (const contentData of data.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
@@ -3706,6 +3744,2332 @@ export class Item extends Movable {
 	 */
 	override get location() {
 		return super.location;
+	}
+}
+
+/**
+ * Primary attribute set representing the three core attributes for mobs.
+ * These attributes directly influence secondary attributes and resource capacities.
+ *
+ * @property strength - Physical power, affects attack power, vitality, and defense
+ * @property agility - Dexterity and speed, affects crit rate, avoidance, accuracy, and endurance
+ * @property intelligence - Mental acuity, affects spell power, wisdom, and resilience
+ *
+ * @example
+ * ```typescript
+ * import { Mob, PrimaryAttributeSet } from "./dungeon.js";
+ *
+ * const warrior = new Mob({
+ *   attributeBonuses: {
+ *     strength: 10,
+ *     agility: 5,
+ *     intelligence: 2
+ *   } as Partial<PrimaryAttributeSet>
+ * });
+ *
+ * console.log(warrior.strength); // Shows total strength including bonuses
+ * ```
+ */
+export interface PrimaryAttributeSet {
+	strength: number;
+	agility: number;
+	intelligence: number;
+}
+
+/**
+ * Secondary attribute set representing derived combat and utility stats for mobs.
+ * These attributes are calculated from primary attributes and can be modified by equipment.
+ *
+ * @property attackPower - Physical damage output (derived from strength, modified by weapons)
+ * @property vitality - Health capacity modifier (derived from strength, affects max health)
+ * @property defense - Damage reduction (derived from strength, modified by armor defense)
+ * @property critRate - Critical hit chance (derived from agility)
+ * @property avoidance - Dodge chance (derived from agility)
+ * @property accuracy - Hit chance (derived from agility)
+ * @property endurance - Stamina/energy capacity (derived from agility)
+ * @property spellPower - Magical damage output (derived from intelligence)
+ * @property wisdom - Mana capacity modifier (derived from intelligence, affects max mana)
+ * @property resilience - Magical resistance (derived from intelligence)
+ *
+ * @example
+ * ```typescript
+ * import { Mob, Armor, Weapon } from "./dungeon.js";
+ * import { EQUIPMENT_SLOT } from "./dungeon.js";
+ *
+ * const fighter = new Mob();
+ * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 10 });
+ * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+ *
+ * fighter.equip(sword);
+ * fighter.equip(helmet);
+ *
+ * console.log(fighter.attackPower); // Includes weapon bonus
+ * console.log(fighter.defense); // Includes armor bonus
+ * ```
+ */
+export interface SecondaryAttributeSet {
+	attackPower: number;
+	vitality: number;
+	defense: number;
+	critRate: number;
+	avoidance: number;
+	accuracy: number;
+	endurance: number;
+	spellPower: number;
+	wisdom: number;
+	resilience: number;
+}
+
+/**
+ * Resource capacity values representing the maximum amounts of health and mana a mob can have.
+ * These values are calculated from race/class starting values, level growth, bonuses, and
+ * secondary attributes (vitality for health, wisdom for mana).
+ *
+ * @property maxHealth - Maximum health points (affected by vitality and resource bonuses)
+ * @property maxMana - Maximum mana points (affected by wisdom and resource bonuses)
+ *
+ * @example
+ * ```typescript
+ * import { Mob, ResourceCapacities } from "./dungeon.js";
+ *
+ * const mage = new Mob({
+ *   resourceBonuses: {
+ *     maxMana: 50
+ *   } as Partial<ResourceCapacities>
+ * });
+ *
+ * console.log(mage.maxHealth); // Base health + vitality bonus
+ * console.log(mage.maxMana); // Base mana + wisdom bonus + equipment bonus
+ * ```
+ */
+export interface ResourceCapacities {
+	maxHealth: number;
+	maxMana: number;
+}
+
+/**
+ * Snapshot of current mutable resource values for a mob.
+ * Used for persistence and UI display. Values are clamped between 0 and their maximums.
+ *
+ * @property health - Current health points (0 to maxHealth)
+ * @property mana - Current mana points (0 to maxMana)
+ * @property exhaustion - Current exhaustion level (0 to 100)
+ *
+ * @example
+ * ```typescript
+ * import { Mob } from "./dungeon.js";
+ *
+ * const player = new Mob();
+ * const resources = player.resources;
+ *
+ * console.log(`HP: ${resources.health}/${player.maxHealth}`);
+ * console.log(`MP: ${resources.mana}/${player.maxMana}`);
+ * console.log(`Exhaustion: ${resources.exhaustion}%`);
+ * ```
+ */
+export interface ResourceSnapshot {
+	health: number;
+	mana: number;
+	exhaustion: number;
+}
+
+/**
+ * Equipment slot types that items can be equipped to on a mob.
+ * Each slot can hold one piece of equipment. Weapons can only be equipped in mainHand/offHand,
+ * Armor cannot be equipped in mainHand/offHand, and base Equipment can be equipped in offHand
+ * (but not mainHand).
+ *
+ * @example
+ * ```typescript
+ * import { EQUIPMENT_SLOT, Armor, Weapon } from "./dungeon.js";
+ *
+ * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+ * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 10 });
+ * const shield = new Armor({ slot: EQUIPMENT_SLOT.OFF_HAND, defense: 3 });
+ *
+ * mob.equip(helmet);
+ * mob.equip(sword);
+ * mob.equip(shield);
+ * ```
+ */
+export enum EQUIPMENT_SLOT {
+	HEAD = "head",
+	NECK = "neck",
+	SHOULDERS = "shoulders",
+	HANDS = "hands",
+	MAIN_HAND = "mainHand",
+	OFF_HAND = "offHand",
+	FINGER = "finger",
+	CHEST = "chest",
+	WAIST = "waist",
+	LEGS = "legs",
+	FEET = "feet",
+}
+
+/**
+ * Creation options for {@link Equipment}.
+ * Base equipment can provide attribute bonuses, resource bonuses, and secondary attribute bonuses,
+ * but does not provide defense or attack power (those are specific to Armor and Weapon).
+ *
+ * @property slot - The equipment slot this item occupies when equipped (required)
+ * @property defense - Defense value (only used by Armor, defaults to 0 for base Equipment)
+ * @property attributeBonuses - Primary attribute bonuses (e.g., +5 strength)
+ * @property resourceBonuses - Resource capacity bonuses (e.g., +20 maxHealth)
+ * @property secondaryAttributeBonuses - Secondary attribute bonuses (e.g., +3 critRate)
+ *
+ * @example
+ * ```typescript
+ * import { Equipment, EQUIPMENT_SLOT } from "./dungeon.js";
+ *
+ * // Create a rare ring with bonuses
+ * const ring = new Equipment({
+ *   slot: EQUIPMENT_SLOT.FINGER,
+ *   keywords: "ring of power",
+ *   display: "Ring of Power",
+ *   attributeBonuses: { strength: 5, intelligence: 3 },
+ *   resourceBonuses: { maxMana: 20 },
+ *   secondaryAttributeBonuses: { critRate: 2 }
+ * });
+ * ```
+ */
+export interface EquipmentOptions extends DungeonObjectOptions {
+	/** The equipment slot this item occupies when equipped. */
+	slot: EQUIPMENT_SLOT;
+	/** Defense value provided by this equipment. */
+	defense?: number;
+	/** Attribute bonuses provided by this equipment (for rare equipment). */
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	/** Resource capacity bonuses provided by this equipment (for rare equipment). */
+	resourceBonuses?: Partial<ResourceCapacities>;
+	/** Secondary attribute bonuses provided by this equipment (for rare equipment). */
+	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
+}
+
+/**
+ * Base Equipment class that can be equipped to a Mob.
+ * Equipment extends Item and can be equipped to specific slots on a mob. Base Equipment
+ * provides attribute bonuses, resource bonuses, and secondary attribute bonuses, but does
+ * not provide defense or attack power (those are specific to Armor and Weapon subclasses).
+ *
+ * Equipment can be used in offHand slots (for orbs, relics, etc.) but not in mainHand.
+ * For combat equipment, use Armor (defense) or Weapon (attack power) instead.
+ *
+ * @example
+ * ```typescript
+ * import { Equipment, EQUIPMENT_SLOT, Mob } from "./dungeon.js";
+ *
+ * // Create a utility item (like an orb or relic)
+ * const orb = new Equipment({
+ *   slot: EQUIPMENT_SLOT.OFF_HAND,
+ *   keywords: "orb power",
+ *   display: "Orb of Power",
+ *   attributeBonuses: { intelligence: 10 },
+ *   resourceBonuses: { maxMana: 50 }
+ * });
+ *
+ * const mob = new Mob();
+ * mob.equip(orb);
+ * console.log(mob.intelligence); // Increased by 10
+ * console.log(mob.maxMana); // Increased by 50
+ * ```
+ */
+export class Equipment extends Item {
+	protected _slot: EQUIPMENT_SLOT;
+	protected _attributeBonuses: Partial<PrimaryAttributeSet>;
+	protected _resourceBonuses: Partial<ResourceCapacities>;
+	protected _secondaryAttributeBonuses: Partial<SecondaryAttributeSet>;
+
+	constructor(options?: EquipmentOptions) {
+		super(options);
+		this._slot = options?.slot ?? EQUIPMENT_SLOT.HEAD;
+		this._attributeBonuses = options?.attributeBonuses ?? {};
+		this._resourceBonuses = options?.resourceBonuses ?? {};
+		this._secondaryAttributeBonuses = options?.secondaryAttributeBonuses ?? {};
+	}
+
+	/**
+	 * Gets the equipment slot this item occupies when equipped.
+	 *
+	 * @returns The equipment slot enum value
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+	 * console.log(helmet.slot); // EQUIPMENT_SLOT.HEAD
+	 * ```
+	 */
+	public get slot(): EQUIPMENT_SLOT {
+		return this._slot;
+	}
+
+	/**
+	 * Gets the defense value provided by this equipment.
+	 * Overridden by Armor to return the actual defense value.
+	 * Returns 0 for base Equipment and Weapon.
+	 *
+	 * @returns Defense value (0 for base Equipment)
+	 *
+	 * @example
+	 * ```typescript
+	 * const armor = new Armor({ slot: EQUIPMENT_SLOT.CHEST, defense: 10 });
+	 * const equipment = new Equipment({ slot: EQUIPMENT_SLOT.FINGER });
+	 *
+	 * console.log(armor.defense); // 10
+	 * console.log(equipment.defense); // 0
+	 * ```
+	 */
+	public get defense(): number {
+		return 0;
+	}
+
+	/**
+	 * Gets the attack power value provided by this equipment.
+	 * Overridden by Weapon to return the actual attack power value.
+	 * Returns 0 for base Equipment and Armor.
+	 *
+	 * @returns Attack power value (0 for base Equipment)
+	 *
+	 * @example
+	 * ```typescript
+	 * const weapon = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
+	 * const equipment = new Equipment({ slot: EQUIPMENT_SLOT.FINGER });
+	 *
+	 * console.log(weapon.attackPower); // 15
+	 * console.log(equipment.attackPower); // 0
+	 * ```
+	 */
+	public get attackPower(): number {
+		return 0;
+	}
+
+	/**
+	 * Gets the attribute bonuses provided by this equipment.
+	 * These bonuses are added to the mob's primary attributes when equipped.
+	 *
+	 * @returns Readonly object containing primary attribute bonuses
+	 *
+	 * @example
+	 * ```typescript
+	 * const ring = new Equipment({
+	 *   slot: EQUIPMENT_SLOT.FINGER,
+	 *   attributeBonuses: { strength: 5, agility: 3 }
+	 * });
+	 *
+	 * const bonuses = ring.attributeBonuses;
+	 * console.log(bonuses.strength); // 5
+	 * ```
+	 */
+	public get attributeBonuses(): Readonly<Partial<PrimaryAttributeSet>> {
+		return this._attributeBonuses;
+	}
+
+	/**
+	 * Gets the resource capacity bonuses provided by this equipment.
+	 * These bonuses are added to the mob's max health/mana when equipped.
+	 *
+	 * @returns Readonly object containing resource capacity bonuses
+	 *
+	 * @example
+	 * ```typescript
+	 * const amulet = new Equipment({
+	 *   slot: EQUIPMENT_SLOT.NECK,
+	 *   resourceBonuses: { maxHealth: 50, maxMana: 30 }
+	 * });
+	 *
+	 * const bonuses = amulet.resourceBonuses;
+	 * console.log(bonuses.maxHealth); // 50
+	 * ```
+	 */
+	public get resourceBonuses(): Readonly<Partial<ResourceCapacities>> {
+		return this._resourceBonuses;
+	}
+
+	/**
+	 * Gets the secondary attribute bonuses provided by this equipment.
+	 * These bonuses are added directly to the mob's secondary attributes when equipped.
+	 *
+	 * @returns Readonly object containing secondary attribute bonuses
+	 *
+	 * @example
+	 * ```typescript
+	 * const boots = new Equipment({
+	 *   slot: EQUIPMENT_SLOT.FEET,
+	 *   secondaryAttributeBonuses: { critRate: 5, avoidance: 3 }
+	 * });
+	 *
+	 * const bonuses = boots.secondaryAttributeBonuses;
+	 * console.log(bonuses.critRate); // 5
+	 * ```
+	 */
+	public get secondaryAttributeBonuses(): Readonly<
+		Partial<SecondaryAttributeSet>
+	> {
+		return this._secondaryAttributeBonuses;
+	}
+
+	/**
+	 * Serialize this Equipment instance to a serializable format.
+	 * Includes all equipment-specific properties: slot, defense, and all bonus types.
+	 *
+	 * @returns Serialized equipment object suitable for JSON/YAML persistence
+	 *
+	 * @example
+	 * ```typescript
+	 * const equipment = new Equipment({
+	 *   slot: EQUIPMENT_SLOT.FINGER,
+	 *   attributeBonuses: { strength: 5 }
+	 * });
+	 *
+	 * const serialized = equipment.serialize();
+	 * // Can be saved to file or sent over network
+	 * ```
+	 */
+	public serialize(): SerializedEquipment {
+		const base = super.serialize();
+		return {
+			...base,
+			type: "Equipment",
+			slot: this._slot,
+			...(Object.keys(this._attributeBonuses).length > 0
+				? { attributeBonuses: this._attributeBonuses }
+				: {}),
+			...(Object.keys(this._resourceBonuses).length > 0
+				? { resourceBonuses: this._resourceBonuses }
+				: {}),
+			...(Object.keys(this._secondaryAttributeBonuses).length > 0
+				? { secondaryAttributeBonuses: this._secondaryAttributeBonuses }
+				: {}),
+		} as SerializedEquipment;
+	}
+
+	/**
+	 * Deserialize a SerializedEquipment into an Equipment instance.
+	 * Restores all equipment properties including slot, bonuses, and nested contents.
+	 *
+	 * @param data - Serialized equipment data
+	 * @returns New Equipment instance with restored properties
+	 *
+	 * @example
+	 * ```typescript
+	 * const serialized: SerializedEquipment = {
+	 *   type: "Equipment",
+	 *   slot: EQUIPMENT_SLOT.FINGER,
+	 *   keywords: "ring",
+	 *   display: "Ring",
+	 *   defense: 0,
+	 *   attributeBonuses: { strength: 5 }
+	 * };
+	 *
+	 * const equipment = Equipment.deserialize(serialized);
+	 * console.log(equipment.slot); // EQUIPMENT_SLOT.FINGER
+	 * ```
+	 */
+	public static deserialize(data: SerializedEquipment): Equipment {
+		const { type, ...equipmentData } = data;
+		const equipment = new Equipment({
+			...equipmentData,
+			slot: equipmentData.slot,
+			attributeBonuses: equipmentData.attributeBonuses,
+			resourceBonuses: equipmentData.resourceBonuses,
+			secondaryAttributeBonuses: equipmentData.secondaryAttributeBonuses,
+		});
+		if (equipmentData.contents && Array.isArray(equipmentData.contents)) {
+			for (const contentData of equipmentData.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				equipment.add(contentObj);
+			}
+		}
+		return equipment;
+	}
+
+	/**
+	 * Override applyTemplate to handle Equipment-specific properties.
+	 * Applies slot, attributeBonuses, resourceBonuses, and secondaryAttributeBonuses
+	 * from the template (even though they're not in the base DungeonObjectTemplate interface,
+	 * they can be present when loading from YAML).
+	 *
+	 * @param template - Template object potentially containing equipment properties
+	 *
+	 * @example
+	 * ```typescript
+	 * const equipment = new Equipment();
+	 * equipment.applyTemplate({
+	 *   id: "ring-rare",
+	 *   type: "Equipment",
+	 *   slot: EQUIPMENT_SLOT.FINGER,
+	 *   attributeBonuses: { strength: 10 }
+	 * } as any);
+	 * ```
+	 */
+	override applyTemplate(template: DungeonObjectTemplate): void {
+		// Call parent to apply base properties
+		super.applyTemplate(template);
+
+		// Handle Equipment-specific properties that may be in the template
+		// (even though they're not in the DungeonObjectTemplate interface,
+		// they can be present when loading from YAML)
+		const equipmentTemplate = template as any;
+		if (equipmentTemplate.slot !== undefined) {
+			this._slot = equipmentTemplate.slot as EQUIPMENT_SLOT;
+		}
+		if (equipmentTemplate.attributeBonuses !== undefined) {
+			this._attributeBonuses = equipmentTemplate.attributeBonuses;
+		}
+		if (equipmentTemplate.resourceBonuses !== undefined) {
+			this._resourceBonuses = equipmentTemplate.resourceBonuses;
+		}
+		if (equipmentTemplate.secondaryAttributeBonuses !== undefined) {
+			this._secondaryAttributeBonuses =
+				equipmentTemplate.secondaryAttributeBonuses;
+		}
+	}
+}
+
+/**
+ * Creation options for {@link Armor}.
+ * Armor must have a defense value and cannot be equipped in mainHand or offHand slots.
+ *
+ * @property defense - Defense value provided by this armor (required)
+ *
+ * @example
+ * ```typescript
+ * import { Armor, EQUIPMENT_SLOT } from "./dungeon.js";
+ *
+ * const helmet = new Armor({
+ *   slot: EQUIPMENT_SLOT.HEAD,
+ *   defense: 5,
+ *   keywords: "steel helmet",
+ *   display: "Steel Helmet"
+ * });
+ * ```
+ */
+export interface ArmorOptions extends EquipmentOptions {
+	/** Defense value provided by this armor. */
+	defense: number;
+}
+
+/**
+ * Armor is a type of Equipment that provides defense.
+ * Armor can only be equipped in armor slots (head, neck, shoulders, hands, chest, waist, legs, feet).
+ * It cannot be equipped in mainHand or offHand slots. Defense from armor is added directly
+ * to the mob's secondary defense attribute.
+ *
+ * @example
+ * ```typescript
+ * import { Armor, EQUIPMENT_SLOT, Mob } from "./dungeon.js";
+ *
+ * // Create and equip armor
+ * const chestplate = new Armor({
+ *   slot: EQUIPMENT_SLOT.CHEST,
+ *   defense: 10,
+ *   keywords: "plate chest",
+ *   display: "Steel Chestplate"
+ * });
+ *
+ * const mob = new Mob();
+ * mob.equip(chestplate);
+ *
+ * console.log(mob.defense); // Includes +10 from chestplate
+ * console.log(chestplate.defense); // 10
+ * ```
+ */
+export class Armor extends Equipment {
+	private _defense: number;
+
+	constructor(options?: ArmorOptions) {
+		super(options);
+		this._defense = options?.defense ?? 0;
+	}
+
+	/**
+	 * Gets the defense value provided by this armor.
+	 * Overrides the base Equipment.defense getter to return the actual defense value.
+	 *
+	 * @returns Defense value provided by this armor
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+	 * console.log(helmet.defense); // 5
+	 * ```
+	 */
+	public override get defense(): number {
+		return this._defense;
+	}
+
+	/**
+	 * Serialize this Armor instance to a serializable format.
+	 * Returns SerializedArmor with type "Armor".
+	 *
+	 * @returns Serialized armor object
+	 */
+	public serialize(): SerializedArmor {
+		const { type, ...base } = super.serialize();
+		return {
+			...base,
+			type: "Armor",
+			defense: this._defense,
+		} as SerializedArmor;
+	}
+
+	/**
+	 * Deserialize a SerializedArmor into an Armor instance.
+	 * Restores the armor's defense value and all other equipment properties.
+	 *
+	 * @param data - Serialized armor data
+	 * @returns New Armor instance with restored properties
+	 *
+	 * @example
+	 * ```typescript
+	 * const serialized: SerializedArmor = {
+	 *   type: "Armor",
+	 *   slot: EQUIPMENT_SLOT.HEAD,
+	 *   defense: 5,
+	 *   keywords: "helmet",
+	 *   display: "Helmet"
+	 * };
+	 *
+	 * const armor = Armor.deserialize(serialized);
+	 * console.log(armor.defense); // 5
+	 * ```
+	 */
+	public static deserialize(data: SerializedArmor): Armor {
+		const armorData = data;
+		const armor = new Armor({
+			...armorData,
+			slot: armorData.slot,
+			defense: armorData.defense ?? 0,
+			attributeBonuses: armorData.attributeBonuses,
+			resourceBonuses: armorData.resourceBonuses,
+			secondaryAttributeBonuses: armorData.secondaryAttributeBonuses,
+		});
+		if (armorData.contents && Array.isArray(armorData.contents)) {
+			for (const contentData of armorData.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				armor.add(contentObj);
+			}
+		}
+		return armor;
+	}
+
+	/**
+	 * Override applyTemplate to handle Armor-specific properties.
+	 * Applies the defense value from the template if present.
+	 *
+	 * @param template - Template object potentially containing defense property
+	 */
+	override applyTemplate(template: DungeonObjectTemplate): void {
+		super.applyTemplate(template);
+		const armorTemplate = template as any;
+		if (armorTemplate.defense !== undefined) {
+			this._defense = armorTemplate.defense;
+		}
+	}
+}
+
+/**
+ * Creation options for {@link Weapon}.
+ * Weapons must have an attackPower value and can only be equipped in mainHand or offHand slots.
+ *
+ * @property attackPower - Attack power value provided by this weapon (required)
+ *
+ * @example
+ * ```typescript
+ * import { Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
+ *
+ * const sword = new Weapon({
+ *   slot: EQUIPMENT_SLOT.MAIN_HAND,
+ *   attackPower: 15,
+ *   keywords: "iron sword",
+ *   display: "Iron Sword"
+ * });
+ * ```
+ */
+export interface WeaponOptions extends EquipmentOptions {
+	/** Attack power value provided by this weapon. */
+	attackPower: number;
+}
+
+/**
+ * Weapon is a type of Equipment that provides attack power.
+ * Weapons can only be equipped in mainHand or offHand slots. Attack power from weapons
+ * is added directly to the mob's secondary attackPower attribute.
+ *
+ * @example
+ * ```typescript
+ * import { Weapon, EQUIPMENT_SLOT, Mob } from "./dungeon.js";
+ *
+ * // Create and equip a weapon
+ * const sword = new Weapon({
+ *   slot: EQUIPMENT_SLOT.MAIN_HAND,
+ *   attackPower: 15,
+ *   keywords: "sword blade",
+ *   display: "Iron Sword"
+ * });
+ *
+ * const mob = new Mob();
+ * mob.equip(sword);
+ *
+ * console.log(mob.attackPower); // Includes +15 from sword
+ * console.log(sword.attackPower); // 15
+ * ```
+ */
+export class Weapon extends Equipment {
+	private _attackPower: number;
+
+	constructor(options?: WeaponOptions) {
+		super(options);
+		this._attackPower = options?.attackPower ?? 0;
+	}
+
+	/**
+	 * Gets the attack power value provided by this weapon.
+	 * Overrides the base Equipment.attackPower getter to return the actual attack power value.
+	 *
+	 * @returns Attack power value provided by this weapon
+	 *
+	 * @example
+	 * ```typescript
+	 * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
+	 * console.log(sword.attackPower); // 15
+	 * ```
+	 */
+	public override get attackPower(): number {
+		return this._attackPower;
+	}
+
+	/**
+	 * Serialize this Weapon instance to a serializable format.
+	 * Returns SerializedWeapon with type "Weapon" and attackPower.
+	 * Defense is explicitly set to 0.
+	 *
+	 * @returns Serialized weapon object
+	 */
+	public override serialize(): SerializedWeapon {
+		const base = super.serialize();
+		return {
+			...base,
+			type: "Weapon",
+			attackPower: this._attackPower,
+		} as SerializedWeapon;
+	}
+
+	/**
+	 * Deserialize a SerializedWeapon into a Weapon instance.
+	 * Restores the weapon's attackPower value and all other equipment properties.
+	 *
+	 * @param data - Serialized weapon data
+	 * @returns New Weapon instance with restored properties
+	 *
+	 * @example
+	 * ```typescript
+	 * const serialized: SerializedWeapon = {
+	 *   type: "Weapon",
+	 *   slot: EQUIPMENT_SLOT.MAIN_HAND,
+	 *   attackPower: 15,
+	 *   defense: 0,
+	 *   keywords: "sword",
+	 *   display: "Sword"
+	 * };
+	 *
+	 * const weapon = Weapon.deserialize(serialized);
+	 * console.log(weapon.attackPower); // 15
+	 * ```
+	 */
+	public static deserialize(data: SerializedWeapon): Weapon {
+		const weaponData = data as unknown as SerializedWeapon;
+		const weapon = new Weapon({
+			...weaponData,
+			slot: weaponData.slot,
+			attackPower: weaponData.attackPower ?? 0,
+			attributeBonuses: weaponData.attributeBonuses,
+			resourceBonuses: weaponData.resourceBonuses,
+			secondaryAttributeBonuses: weaponData.secondaryAttributeBonuses,
+		});
+		if (weaponData.contents && Array.isArray(weaponData.contents)) {
+			for (const contentData of weaponData.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				weapon.add(contentObj);
+			}
+		}
+		return weapon;
+	}
+
+	/**
+	 * Override applyTemplate to handle Weapon-specific properties.
+	 * Applies the attackPower value from the template if present.
+	 *
+	 * @param template - Template object potentially containing attackPower property
+	 */
+	override applyTemplate(template: DungeonObjectTemplate): void {
+		super.applyTemplate(template);
+		const weaponTemplate = template as any;
+		if (weaponTemplate.attackPower !== undefined) {
+			this._attackPower = weaponTemplate.attackPower;
+		}
+	}
+}
+
+/**
+ * Creation options for {@link Mob}.
+ * Mobs represent characters and NPCs in the game world with attributes, equipment, and resources.
+ *
+ * @property race - Resolved race definition (defaults to default race if not provided)
+ * @property class - Resolved class definition (defaults to default class if not provided)
+ * @property level - Starting level (defaults to 1)
+ * @property experience - Starting experience points (defaults to 0)
+ * @property attributeBonuses - Additional primary attribute bonuses
+ * @property resourceBonuses - Additional resource capacity bonuses
+ * @property health - Starting health (defaults to maxHealth if not provided)
+ * @property mana - Starting mana (defaults to maxMana if not provided)
+ * @property exhaustion - Starting exhaustion level (defaults to 0)
+ *
+ * @example
+ * ```typescript
+ * import { Mob, Race, Class } from "./dungeon.js";
+ * import { getRaceById, getClassById } from "./package/archetype.js";
+ *
+ * const warrior = new Mob({
+ *   race: getRaceById("human"),
+ *   class: getClassById("warrior"),
+ *   level: 5,
+ *   attributeBonuses: { strength: 5 }
+ * });
+ *
+ * console.log(warrior.level); // 5
+ * console.log(warrior.strength); // Includes race/class/level bonuses + 5
+ * ```
+ */
+export interface MobOptions extends DungeonObjectOptions {
+	/** Resolved race definition to use for this mob. */
+	race?: Race;
+	/** Resolved class definition to use for this mob. */
+	class?: Class;
+	level?: number;
+	experience?: number;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	health?: number;
+	mana?: number;
+	exhaustion?: number;
+}
+
+const SECONDARY_ATTRIBUTE_FACTORS: Readonly<
+	Record<keyof SecondaryAttributeSet, Partial<PrimaryAttributeSet>>
+> = Object.freeze({
+	attackPower: { strength: 0.5 },
+	vitality: { strength: 0.5 },
+	defense: { strength: 0.5 },
+	critRate: { agility: 0.2 },
+	avoidance: { agility: 0.2 },
+	accuracy: { agility: 0.2 },
+	endurance: { agility: 1 },
+	spellPower: { intelligence: 0.5 },
+	wisdom: { intelligence: 0.5 },
+	resilience: { intelligence: 0.5 },
+});
+
+const SECONDARY_ATTRIBUTE_BASE: Readonly<
+	Record<keyof SecondaryAttributeSet, number>
+> = Object.freeze({
+	attackPower: 0,
+	vitality: 0,
+	defense: 0,
+	critRate: 0,
+	avoidance: 0,
+	accuracy: 0,
+	endurance: 0,
+	spellPower: 0,
+	wisdom: 0,
+	resilience: 0,
+});
+
+const HEALTH_PER_VITALITY = 2;
+const MANA_PER_WISDOM = 2;
+const MAX_EXHAUSTION = 100;
+const EXPERIENCE_THRESHOLD = 100;
+const ATTRIBUTE_ROUND_DECIMALS = 2;
+const EXPERIENCE_ROUND_DECIMALS = 4;
+
+function sumPrimaryAttributes(
+	...components: Array<Partial<PrimaryAttributeSet> | undefined>
+): PrimaryAttributeSet {
+	let strength = 0;
+	let agility = 0;
+	let intelligence = 0;
+	for (const part of components) {
+		if (!part) continue;
+		strength += Number(part.strength ?? 0);
+		agility += Number(part.agility ?? 0);
+		intelligence += Number(part.intelligence ?? 0);
+	}
+	return {
+		strength,
+		agility,
+		intelligence,
+	};
+}
+
+function sumSecondaryAttributes(
+	...components: Array<Partial<SecondaryAttributeSet> | undefined>
+): SecondaryAttributeSet {
+	const result: SecondaryAttributeSet = {
+		attackPower: 0,
+		vitality: 0,
+		defense: 0,
+		critRate: 0,
+		avoidance: 0,
+		accuracy: 0,
+		endurance: 0,
+		spellPower: 0,
+		wisdom: 0,
+		resilience: 0,
+	};
+	for (const part of components) {
+		if (!part) continue;
+		result.attackPower += Number(part.attackPower ?? 0);
+		result.vitality += Number(part.vitality ?? 0);
+		result.defense += Number(part.defense ?? 0);
+		result.critRate += Number(part.critRate ?? 0);
+		result.avoidance += Number(part.avoidance ?? 0);
+		result.accuracy += Number(part.accuracy ?? 0);
+		result.endurance += Number(part.endurance ?? 0);
+		result.spellPower += Number(part.spellPower ?? 0);
+		result.wisdom += Number(part.wisdom ?? 0);
+		result.resilience += Number(part.resilience ?? 0);
+	}
+	return result;
+}
+
+function multiplyPrimaryAttributes(
+	source: PrimaryAttributeSet,
+	factor: number
+): PrimaryAttributeSet {
+	return {
+		strength: source.strength * factor,
+		agility: source.agility * factor,
+		intelligence: source.intelligence * factor,
+	};
+}
+
+function sumResourceCaps(
+	...components: Array<Partial<ResourceCapacities> | undefined>
+): ResourceCapacities {
+	let maxHealth = 0;
+	let maxMana = 0;
+	for (const part of components) {
+		if (!part) continue;
+		maxHealth += Number(part.maxHealth ?? 0);
+		maxMana += Number(part.maxMana ?? 0);
+	}
+	return {
+		maxHealth,
+		maxMana,
+	};
+}
+
+function multiplyResourceCaps(
+	source: ResourceCapacities,
+	factor: number
+): ResourceCapacities {
+	return {
+		maxHealth: source.maxHealth * factor,
+		maxMana: source.maxMana * factor,
+	};
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+	if (!Number.isFinite(value)) return min;
+	return Math.min(Math.max(value, min), max);
+}
+
+function roundTo(value: number, decimals: number): number {
+	const factor = 10 ** decimals;
+	return Math.round((value + Number.EPSILON) * factor) / factor;
+}
+
+function normalizePrimaryBonuses(
+	bonuses?: Partial<PrimaryAttributeSet>
+): PrimaryAttributeSet {
+	return sumPrimaryAttributes(bonuses);
+}
+
+function normalizeResourceBonuses(
+	bonuses?: Partial<ResourceCapacities>
+): ResourceCapacities {
+	return sumResourceCaps(bonuses);
+}
+
+function prunePrimaryBonuses(
+	bonuses: PrimaryAttributeSet
+): Partial<PrimaryAttributeSet> | undefined {
+	const result: Partial<PrimaryAttributeSet> = {};
+	if (bonuses.strength !== 0)
+		result.strength = roundTo(bonuses.strength, ATTRIBUTE_ROUND_DECIMALS);
+	if (bonuses.agility !== 0)
+		result.agility = roundTo(bonuses.agility, ATTRIBUTE_ROUND_DECIMALS);
+	if (bonuses.intelligence !== 0)
+		result.intelligence = roundTo(
+			bonuses.intelligence,
+			ATTRIBUTE_ROUND_DECIMALS
+		);
+	return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function pruneResourceBonuses(
+	bonuses: ResourceCapacities
+): Partial<ResourceCapacities> | undefined {
+	const result: Partial<ResourceCapacities> = {};
+	if (bonuses.maxHealth !== 0)
+		result.maxHealth = roundTo(bonuses.maxHealth, ATTRIBUTE_ROUND_DECIMALS);
+	if (bonuses.maxMana !== 0)
+		result.maxMana = roundTo(bonuses.maxMana, ATTRIBUTE_ROUND_DECIMALS);
+	return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function computeSecondaryAttributes(
+	primary: PrimaryAttributeSet
+): SecondaryAttributeSet {
+	const result: SecondaryAttributeSet = {
+		attackPower: 0,
+		vitality: 0,
+		defense: 0,
+		critRate: 0,
+		avoidance: 0,
+		accuracy: 0,
+		endurance: 0,
+		spellPower: 0,
+		wisdom: 0,
+		resilience: 0,
+	};
+
+	(
+		Object.keys(SECONDARY_ATTRIBUTE_FACTORS) as Array<
+			keyof SecondaryAttributeSet
+		>
+	).forEach((key) => {
+		const base = SECONDARY_ATTRIBUTE_BASE[key];
+		const weights = SECONDARY_ATTRIBUTE_FACTORS[key];
+		let value = base;
+		if (weights.strength)
+			value += primary.strength * Number(weights.strength ?? 0);
+		if (weights.agility)
+			value += primary.agility * Number(weights.agility ?? 0);
+		if (weights.intelligence)
+			value += primary.intelligence * Number(weights.intelligence ?? 0);
+		result[key] = roundTo(value, ATTRIBUTE_ROUND_DECIMALS);
+	});
+
+	return result;
+}
+
+function createPrimaryAttributesView(
+	source: PrimaryAttributeSet
+): Readonly<PrimaryAttributeSet> {
+	return Object.freeze({
+		strength: Math.floor(Number(source.strength) || 0),
+		agility: Math.floor(Number(source.agility) || 0),
+		intelligence: Math.floor(Number(source.intelligence) || 0),
+	});
+}
+
+function createSecondaryAttributesView(
+	source: SecondaryAttributeSet
+): Readonly<SecondaryAttributeSet> {
+	return Object.freeze({
+		attackPower: Math.floor(Number(source.attackPower) || 0),
+		vitality: Math.floor(Number(source.vitality) || 0),
+		defense: Math.floor(Number(source.defense) || 0),
+		critRate: Math.floor(Number(source.critRate) || 0),
+		avoidance: Math.floor(Number(source.avoidance) || 0),
+		accuracy: Math.floor(Number(source.accuracy) || 0),
+		endurance: Math.floor(Number(source.endurance) || 0),
+		spellPower: Math.floor(Number(source.spellPower) || 0),
+		wisdom: Math.floor(Number(source.wisdom) || 0),
+		resilience: Math.floor(Number(source.resilience) || 0),
+	});
+}
+
+function createResourceCapsView(
+	source: ResourceCapacities
+): Readonly<ResourceCapacities> {
+	return Object.freeze({
+		maxHealth: Math.floor(Number(source.maxHealth) || 0),
+		maxMana: Math.floor(Number(source.maxMana) || 0),
+	});
+}
+
+/**
+ * Serialized form for Mob objects.
+ * Used for persistence and template storage. Includes all mob-specific properties including
+ * level, experience, race/class IDs, bonuses, resources, and equipped items.
+ *
+ * @property type - Always "Mob"
+ * @property level - Current level
+ * @property experience - Current experience points
+ * @property race - Race ID string
+ * @property class - Class ID string
+ * @property attributeBonuses - Optional primary attribute bonuses
+ * @property resourceBonuses - Optional resource capacity bonuses
+ * @property health - Current health points
+ * @property mana - Current mana points
+ * @property exhaustion - Current exhaustion level
+ * @property equipped - Optional record of equipped items by slot
+ */
+export interface SerializedMob extends SerializedDungeonObject {
+	type: "Mob";
+	level: number;
+	experience: number;
+	race: string;
+	class: string;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	health: number;
+	mana: number;
+	exhaustion: number;
+	equipped?: Record<
+		EQUIPMENT_SLOT,
+		SerializedEquipment | SerializedArmor | SerializedWeapon
+	>;
+}
+
+/**
+ * Mob class representing characters and NPCs in the game world.
+ * Mobs extend Movable and can move between rooms. They have:
+ * - Primary attributes (strength, agility, intelligence) derived from race/class/level
+ * - Secondary attributes (attackPower, defense, etc.) calculated from primary attributes
+ * - Resource capacities (maxHealth, maxMana) affected by attributes and bonuses
+ * - Current resources (health, mana, exhaustion) that can change during gameplay
+ * - Equipment system allowing items to be equipped in various slots
+ * - Experience and leveling system
+ *
+ * Attributes are automatically recalculated when equipment changes, level changes, or
+ * bonuses are modified. Equipment bonuses are applied to attributes and resources.
+ *
+ * @example
+ * ```typescript
+ * import { Mob, Armor, Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
+ * import { getRaceById, getClassById } from "./package/archetype.js";
+ *
+ * // Create a warrior mob
+ * const warrior = new Mob({
+ *   race: getRaceById("human"),
+ *   class: getClassById("warrior"),
+ *   level: 10
+ * });
+ *
+ * // Equip gear
+ * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
+ * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+ * warrior.equip(sword);
+ * warrior.equip(helmet);
+ *
+ * // Check stats
+ * console.log(warrior.attackPower); // Includes weapon bonus
+ * console.log(warrior.defense); // Includes armor bonus
+ * console.log(warrior.maxHealth); // Calculated from race/class/level/vitality
+ *
+ * // Gain experience
+ * warrior.gainExperience(150);
+ * console.log(warrior.level); // May have leveled up
+ * ```
+ */
+export class Mob extends Movable {
+	/** Private storage for the Character reference */
+	private _character?: Character;
+	private _race: Race;
+	private _class: Class;
+	private _level: number;
+	private _experience: number;
+	private _attributeBonuses: PrimaryAttributeSet;
+	private _resourceBonuses: ResourceCapacities;
+	private _primaryAttributes: PrimaryAttributeSet;
+	private _primaryAttributesView: Readonly<PrimaryAttributeSet>;
+	private _secondaryAttributes: SecondaryAttributeSet;
+	private _secondaryAttributesView: Readonly<SecondaryAttributeSet>;
+	private _resourceCaps: ResourceCapacities;
+	private _resourceCapsView: Readonly<ResourceCapacities>;
+	private _health!: number;
+	private _mana!: number;
+	private _exhaustion!: number;
+	private _equipped: Map<EQUIPMENT_SLOT, Equipment>;
+	constructor(options?: MobOptions) {
+		super(options);
+
+		this._equipped = new Map<EQUIPMENT_SLOT, Equipment>();
+		this._attributeBonuses = normalizePrimaryBonuses(options?.attributeBonuses);
+		this._resourceBonuses = normalizeResourceBonuses(options?.resourceBonuses);
+		this._primaryAttributes = sumPrimaryAttributes();
+		this._primaryAttributesView = createPrimaryAttributesView(
+			this._primaryAttributes
+		);
+		this._secondaryAttributes = computeSecondaryAttributes(
+			this._primaryAttributes
+		);
+		this._secondaryAttributesView = createSecondaryAttributesView(
+			this._secondaryAttributes
+		);
+		this._resourceCaps = sumResourceCaps();
+		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
+
+		this._race = options?.race ?? getDefaultRace();
+		this._class = options?.class ?? getDefaultClass();
+
+		const providedLevel = Math.floor(Number(options?.level ?? 1));
+		this._level = providedLevel > 0 ? providedLevel : 1;
+		this._experience = 0;
+
+		this.recalculateDerivedAttributes({ bootstrap: true });
+
+		if (options?.experience !== undefined) {
+			this.experience = Number(options.experience);
+		}
+
+		this.health = options?.health ?? this.maxHealth;
+		this.mana = options?.mana ?? this.maxMana;
+		this.exhaustion = options?.exhaustion ?? 0;
+	}
+	/**
+	 * Gets the Character that controls this mob (if any).
+	 * Player-controlled mobs have a Character reference, NPCs do not.
+	 *
+	 * @returns The Character instance or undefined for NPCs
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * const character = new Character({ username: "player", password: "pass" });
+	 * mob.character = character;
+	 *
+	 * console.log(mob.character === character); // true
+	 * ```
+	 */
+	public get character(): Character | undefined {
+		return this._character;
+	}
+
+	/**
+	 * Sets the Character that controls this mob and establishes bidirectional reference.
+	 * When setting a character, the mob automatically updates the character's mob reference.
+	 * When clearing (setting to undefined), the previous character's mob reference is cleared.
+	 *
+	 * @param char The Character instance to associate with this mob
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * const character = new Character({ username: "player", password: "pass" });
+	 *
+	 * mob.character = character;
+	 * console.log(character.mob === mob); // true (bidirectional reference)
+	 *
+	 * mob.character = undefined;
+	 * console.log(character.mob); // undefined (cleared)
+	 * ```
+	 */
+	public set character(char: Character | undefined) {
+		if (this.character === char) return;
+		const ochar = this.character;
+		this._character = char;
+
+		// If we're clearing or there was no change for the new character, still detach previous owner
+		if (ochar && ochar.mob === this) {
+			ochar.mob = new Mob();
+		}
+
+		// Ensure the new character points to this mob
+		if (char && char.mob !== this) {
+			char.mob = this;
+		}
+	}
+	private captureResourceRatios(): {
+		healthRatio?: number;
+		manaRatio?: number;
+	} {
+		return {
+			healthRatio:
+				this._resourceCaps.maxHealth > 0
+					? this._health / this._resourceCaps.maxHealth
+					: undefined,
+			manaRatio:
+				this._resourceCaps.maxMana > 0
+					? this._mana / this._resourceCaps.maxMana
+					: undefined,
+		};
+	}
+
+	private recalculateDerivedAttributes(
+		opts: { bootstrap?: boolean; healthRatio?: number; manaRatio?: number } = {}
+	): void {
+		const race = this._race;
+		const clazz = this._class;
+		const levelStages = Math.max(0, this._level - 1);
+
+		// Collect equipment bonuses
+		const equipmentAttributeBonuses: Partial<PrimaryAttributeSet>[] = [];
+		const equipmentResourceBonuses: Partial<ResourceCapacities>[] = [];
+		const equipmentSecondaryAttributeBonuses: Partial<SecondaryAttributeSet>[] =
+			[];
+		let totalArmorDefense = 0;
+		let totalWeaponAttackPower = 0;
+		for (const equipment of this._equipped.values()) {
+			if (equipment.attributeBonuses)
+				equipmentAttributeBonuses.push(equipment.attributeBonuses);
+			if (equipment.resourceBonuses)
+				equipmentResourceBonuses.push(equipment.resourceBonuses);
+			if (equipment.secondaryAttributeBonuses)
+				equipmentSecondaryAttributeBonuses.push(
+					equipment.secondaryAttributeBonuses
+				);
+			// Sum armor defense and weapon attack power separately
+			if (equipment instanceof Armor) {
+				totalArmorDefense += equipment.defense;
+			} else if (equipment instanceof Weapon) {
+				totalWeaponAttackPower += equipment.attackPower;
+			}
+		}
+
+		const rawPrimary = sumPrimaryAttributes(
+			race.startingAttributes,
+			clazz.startingAttributes,
+			multiplyPrimaryAttributes(race.attributeGrowthPerLevel, levelStages),
+			multiplyPrimaryAttributes(clazz.attributeGrowthPerLevel, levelStages),
+			this._attributeBonuses,
+			...equipmentAttributeBonuses
+		);
+		this._primaryAttributes = {
+			strength: roundTo(rawPrimary.strength, ATTRIBUTE_ROUND_DECIMALS),
+			agility: roundTo(rawPrimary.agility, ATTRIBUTE_ROUND_DECIMALS),
+			intelligence: roundTo(rawPrimary.intelligence, ATTRIBUTE_ROUND_DECIMALS),
+		};
+		this._primaryAttributesView = createPrimaryAttributesView(
+			this._primaryAttributes
+		);
+
+		this._secondaryAttributes = computeSecondaryAttributes(
+			this._primaryAttributes
+		);
+
+		// Add armor defense directly to secondary defense attribute
+		if (totalArmorDefense > 0) {
+			this._secondaryAttributes.defense = roundTo(
+				this._secondaryAttributes.defense + totalArmorDefense,
+				ATTRIBUTE_ROUND_DECIMALS
+			);
+		}
+
+		// Add weapon attack power directly to secondary attackPower attribute
+		if (totalWeaponAttackPower > 0) {
+			this._secondaryAttributes.attackPower = roundTo(
+				this._secondaryAttributes.attackPower + totalWeaponAttackPower,
+				ATTRIBUTE_ROUND_DECIMALS
+			);
+		}
+
+		// Apply equipment secondary attribute bonuses
+		if (equipmentSecondaryAttributeBonuses.length > 0) {
+			const equipmentSecondaryBonuses = sumSecondaryAttributes(
+				...equipmentSecondaryAttributeBonuses
+			);
+			// Add each bonus to the corresponding secondary attribute
+			(
+				Object.keys(equipmentSecondaryBonuses) as Array<
+					keyof SecondaryAttributeSet
+				>
+			).forEach((key) => {
+				const bonus = equipmentSecondaryBonuses[key];
+				if (bonus !== 0) {
+					this._secondaryAttributes[key] = roundTo(
+						this._secondaryAttributes[key] + bonus,
+						ATTRIBUTE_ROUND_DECIMALS
+					);
+				}
+			});
+		}
+
+		this._secondaryAttributesView = createSecondaryAttributesView(
+			this._secondaryAttributes
+		);
+
+		const rawCaps = sumResourceCaps(
+			race.startingResourceCaps,
+			clazz.startingResourceCaps,
+			multiplyResourceCaps(race.resourceGrowthPerLevel, levelStages),
+			multiplyResourceCaps(clazz.resourceGrowthPerLevel, levelStages),
+			this._resourceBonuses,
+			...equipmentResourceBonuses
+		);
+
+		this._resourceCaps = {
+			maxHealth: roundTo(
+				rawCaps.maxHealth +
+					this._secondaryAttributes.vitality * HEALTH_PER_VITALITY,
+				ATTRIBUTE_ROUND_DECIMALS
+			),
+			maxMana: roundTo(
+				rawCaps.maxMana + this._secondaryAttributes.wisdom * MANA_PER_WISDOM,
+				ATTRIBUTE_ROUND_DECIMALS
+			),
+		};
+		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
+
+		if (opts.bootstrap) {
+			this._health = this._resourceCaps.maxHealth;
+			this._mana = this._resourceCaps.maxMana;
+			this._exhaustion = 0;
+			return;
+		}
+
+		if (opts.healthRatio !== undefined && Number.isFinite(opts.healthRatio)) {
+			this._health = clampNumber(
+				opts.healthRatio * this._resourceCaps.maxHealth,
+				0,
+				this._resourceCaps.maxHealth
+			);
+		} else {
+			this._health = clampNumber(this._health, 0, this._resourceCaps.maxHealth);
+		}
+
+		if (opts.manaRatio !== undefined && Number.isFinite(opts.manaRatio)) {
+			this._mana = clampNumber(
+				opts.manaRatio * this._resourceCaps.maxMana,
+				0,
+				this._resourceCaps.maxMana
+			);
+		} else {
+			this._mana = clampNumber(this._mana, 0, this._resourceCaps.maxMana);
+		}
+
+		this._exhaustion = clampNumber(this._exhaustion, 0, MAX_EXHAUSTION);
+	}
+
+	private applyLevelDelta(delta: number): void {
+		if (delta === 0) return;
+		const ratios = this.captureResourceRatios();
+		this._level = Math.max(1, this._level + delta);
+		this.recalculateDerivedAttributes(ratios);
+	}
+
+	private resolveGrowthModifier(): number {
+		const raceModifier = evaluateGrowthModifier(
+			this._race.growthModifier,
+			this._level
+		);
+		const classModifier = evaluateGrowthModifier(
+			this._class.growthModifier,
+			this._level
+		);
+		const combined = raceModifier * classModifier;
+		return combined > 0 ? combined : 1;
+	}
+
+	/**
+	 * Gets the current level of this mob.
+	 * Level affects attribute growth and experience requirements.
+	 *
+	 * @returns Current level (minimum 1)
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob({ level: 5 });
+	 * console.log(mob.level); // 5
+	 * ```
+	 */
+	public get level(): number {
+		return this._level;
+	}
+
+	/**
+	 * Sets the level of this mob.
+	 * Changing level automatically recalculates all derived attributes while preserving
+	 * health/mana ratios.
+	 *
+	 * @param value - Target level (minimum 1)
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.level = 10; // Automatically recalculates attributes
+	 * ```
+	 */
+	public set level(value: number) {
+		const target = Math.max(1, Math.floor(Number(value) || 1));
+		this.applyLevelDelta(target - this._level);
+	}
+
+	/**
+	 * Gets the current experience points of this mob.
+	 * Experience is rounded to 4 decimal places for precision.
+	 *
+	 * @returns Current experience points
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.gainExperience(50);
+	 * console.log(mob.experience); // 50.0 (or less if modifiers applied)
+	 * ```
+	 */
+	public get experience(): number {
+		return roundTo(this._experience, EXPERIENCE_ROUND_DECIMALS);
+	}
+
+	/**
+	 * Sets the experience points of this mob.
+	 * Setting experience automatically handles level-ups if the threshold is reached.
+	 *
+	 * @param value - Experience points to set
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.experience = 150; // May level up if threshold reached
+	 * ```
+	 */
+	public set experience(value: number) {
+		let numeric = Number(value);
+		if (!Number.isFinite(numeric) || numeric <= 0) {
+			this._experience = 0;
+			return;
+		}
+
+		let delta = 0;
+		while (numeric >= EXPERIENCE_THRESHOLD) {
+			numeric -= EXPERIENCE_THRESHOLD;
+			delta += 1;
+		}
+
+		if (delta !== 0) {
+			this.applyLevelDelta(delta);
+		}
+
+		this._experience = roundTo(numeric, EXPERIENCE_ROUND_DECIMALS);
+	}
+
+	/**
+	 * Gets the experience points needed to reach the next level.
+	 *
+	 * @returns Experience points remaining until next level
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.experience = 75;
+	 * console.log(mob.experienceToLevel); // 25 (100 - 75)
+	 * ```
+	 */
+	public get experienceToLevel(): number {
+		return roundTo(
+			Math.max(0, EXPERIENCE_THRESHOLD - this._experience),
+			EXPERIENCE_ROUND_DECIMALS
+		);
+	}
+
+	/**
+	 * Grant experience and automatically handle level-ups and overflow.
+	 *
+	 * @param amount Raw experience awarded before growth modifiers.
+	 * @returns Adjusted experience actually applied after modifiers.
+	 *
+	 * @example
+	 * const adjusted = mob.gainExperience(120);
+	 * console.log(`Applied ${adjusted} XP, now level ${mob.level}`);
+	 */
+	public gainExperience(amount: number): number {
+		const numeric = Number(amount);
+		if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+
+		const modifier = this.resolveGrowthModifier();
+		const adjusted = numeric / (modifier > 0 ? modifier : 1);
+
+		let total = this._experience + adjusted;
+		let levels = 0;
+		while (total >= EXPERIENCE_THRESHOLD) {
+			total -= EXPERIENCE_THRESHOLD;
+			levels += 1;
+		}
+
+		this._experience = roundTo(total, EXPERIENCE_ROUND_DECIMALS);
+		if (levels > 0) {
+			this.applyLevelDelta(levels);
+		}
+
+		return adjusted;
+	}
+
+	/**
+	 * Award the standard kill experience for defeating a target of a given level.
+	 * Baseline is 10 XP, with bonuses for higher-level targets (+2 per level above)
+	 * and penalties for lower-level targets. Experience is adjusted by growth modifiers.
+	 *
+	 * @param targetLevel - Level of the defeated target
+	 * @returns Adjusted experience actually applied after modifiers
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob({ level: 5 });
+	 * const xp = mob.awardKillExperience(7); // Higher level target
+	 * console.log(`Gained ${xp} adjusted XP`); // More than base 10
+	 * ```
+	 */
+	public awardKillExperience(targetLevel: number): number {
+		const sanitizedTarget = Math.max(1, Math.floor(Number(targetLevel) || 1));
+		const diff = sanitizedTarget - this._level;
+		let amount = 10;
+		if (diff > 0) amount += diff * 2;
+		else if (diff < 0) amount = Math.max(1, amount + diff);
+		return this.gainExperience(amount);
+	}
+
+	/**
+	 * Gets the primary attributes (strength, agility, intelligence) of this mob.
+	 * These are calculated from race/class starting values, level growth, bonuses, and equipment.
+	 *
+	 * @returns Readonly object containing primary attributes
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * const attrs = mob.primaryAttributes;
+	 * console.log(`Str: ${attrs.strength}, Agi: ${attrs.agility}, Int: ${attrs.intelligence}`);
+	 * ```
+	 */
+	public get primaryAttributes(): Readonly<PrimaryAttributeSet> {
+		return this._primaryAttributesView;
+	}
+
+	/**
+	 * Gets the race definition for this mob.
+	 *
+	 * @returns Race object
+	 */
+	public get race(): Race {
+		return this._race;
+	}
+
+	/**
+	 * Gets the class definition for this mob.
+	 *
+	 * @returns Class object
+	 */
+	public get class(): Class {
+		return this._class;
+	}
+
+	/**
+	 * Gets the strength attribute value.
+	 * Shorthand for `mob.primaryAttributes.strength`.
+	 *
+	 * @returns Strength value
+	 */
+	public get strength(): number {
+		return this._primaryAttributesView.strength;
+	}
+
+	/**
+	 * Gets the agility attribute value.
+	 * Shorthand for `mob.primaryAttributes.agility`.
+	 *
+	 * @returns Agility value
+	 */
+	public get agility(): number {
+		return this._primaryAttributesView.agility;
+	}
+
+	/**
+	 * Gets the intelligence attribute value.
+	 * Shorthand for `mob.primaryAttributes.intelligence`.
+	 *
+	 * @returns Intelligence value
+	 */
+	public get intelligence(): number {
+		return this._primaryAttributesView.intelligence;
+	}
+
+	/**
+	 * Gets the secondary attributes (attackPower, defense, critRate, etc.) of this mob.
+	 * These are calculated from primary attributes and modified by equipment bonuses.
+	 *
+	 * @returns Readonly object containing secondary attributes
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * const secAttrs = mob.secondaryAttributes;
+	 * console.log(`Attack: ${secAttrs.attackPower}, Defense: ${secAttrs.defense}`);
+	 * ```
+	 */
+	public get secondaryAttributes(): Readonly<SecondaryAttributeSet> {
+		return this._secondaryAttributesView;
+	}
+
+	/**
+	 * Gets the attack power secondary attribute.
+	 * Includes base value from strength, weapon bonuses, and equipment secondary bonuses.
+	 *
+	 * @returns Attack power value
+	 */
+	public get attackPower(): number {
+		return this._secondaryAttributesView.attackPower;
+	}
+
+	/**
+	 * Gets the vitality secondary attribute.
+	 * Affects max health (2 health per vitality point).
+	 *
+	 * @returns Vitality value
+	 */
+	public get vitality(): number {
+		return this._secondaryAttributesView.vitality;
+	}
+
+	/**
+	 * Gets the defense secondary attribute.
+	 * Includes base value from strength, armor defense bonuses, and equipment secondary bonuses.
+	 *
+	 * @returns Defense value
+	 */
+	public get defense(): number {
+		return this._secondaryAttributesView.defense;
+	}
+
+	/**
+	 * Gets the crit rate secondary attribute.
+	 * Critical hit chance percentage.
+	 *
+	 * @returns Crit rate value
+	 */
+	public get critRate(): number {
+		return this._secondaryAttributesView.critRate;
+	}
+
+	/**
+	 * Gets the avoidance secondary attribute.
+	 * Dodge chance percentage.
+	 *
+	 * @returns Avoidance value
+	 */
+	public get avoidance(): number {
+		return this._secondaryAttributesView.avoidance;
+	}
+
+	/**
+	 * Gets the accuracy secondary attribute.
+	 * Hit chance percentage.
+	 *
+	 * @returns Accuracy value
+	 */
+	public get accuracy(): number {
+		return this._secondaryAttributesView.accuracy;
+	}
+
+	/**
+	 * Gets the endurance secondary attribute.
+	 * Stamina/energy capacity.
+	 *
+	 * @returns Endurance value
+	 */
+	public get endurance(): number {
+		return this._secondaryAttributesView.endurance;
+	}
+
+	/**
+	 * Gets the spell power secondary attribute.
+	 * Magical damage output.
+	 *
+	 * @returns Spell power value
+	 */
+	public get spellPower(): number {
+		return this._secondaryAttributesView.spellPower;
+	}
+
+	/**
+	 * Gets the wisdom secondary attribute.
+	 * Affects max mana (2 mana per wisdom point).
+	 *
+	 * @returns Wisdom value
+	 */
+	public get wisdom(): number {
+		return this._secondaryAttributesView.wisdom;
+	}
+
+	/**
+	 * Gets the resilience secondary attribute.
+	 * Magical resistance.
+	 *
+	 * @returns Resilience value
+	 */
+	public get resilience(): number {
+		return this._secondaryAttributesView.resilience;
+	}
+
+	/**
+	 * Gets the runtime attribute bonuses for this mob.
+	 * These are runtime-only bonuses (e.g., from temporary effects) that are excluded
+	 * from serialization and must be rebuilt after login. Equipment bonuses are handled
+	 * separately and automatically applied.
+	 *
+	 * @returns Readonly object containing runtime attribute bonuses
+	 */
+	public get attributeBonuses(): Readonly<PrimaryAttributeSet> {
+		return this._attributeBonuses;
+	}
+
+	/**
+	 * Replace the runtime attribute bonus totals and refresh all derived stats.
+	 * This is used for temporary effects or runtime modifications. Equipment bonuses
+	 * are automatically calculated and do not need to be set here.
+	 *
+	 * @param bonuses - Partial primary attribute bonuses to apply
+	 *
+	 * @example
+	 * ```typescript
+	 * const warrior = new Mob();
+	 * // Apply temporary buff
+	 * warrior.setAttributeBonuses({ strength: 5 });
+	 * console.log(warrior.primaryAttributes.strength); // Includes +5 bonus
+	 * ```
+	 */
+	public setAttributeBonuses(bonuses: Partial<PrimaryAttributeSet>): void {
+		this._attributeBonuses = normalizePrimaryBonuses(bonuses);
+		this.recalculateDerivedAttributes(this.captureResourceRatios());
+	}
+
+	/**
+	 * Gets the runtime resource bonuses for this mob.
+	 * These are runtime-only bonuses (e.g., from temporary effects) that are excluded
+	 * from serialization. Equipment bonuses are handled separately and automatically applied.
+	 *
+	 * @returns Readonly object containing runtime resource bonuses
+	 */
+	public get resourceBonuses(): Readonly<ResourceCapacities> {
+		return this._resourceBonuses;
+	}
+
+	/**
+	 * Replace the runtime resource bonus totals and refresh max health/mana.
+	 * This is used for temporary effects or runtime modifications. Equipment bonuses
+	 * are automatically calculated and do not need to be set here.
+	 *
+	 * @param bonuses - Partial resource capacity bonuses to apply
+	 *
+	 * @example
+	 * ```typescript
+	 * const cleric = new Mob();
+	 * // Apply temporary buff
+	 * cleric.setResourceBonuses({ maxMana: 25 });
+	 * console.log(cleric.maxMana); // Includes +25 bonus
+	 * ```
+	 */
+	public setResourceBonuses(bonuses: Partial<ResourceCapacities>): void {
+		this._resourceBonuses = normalizeResourceBonuses(bonuses);
+		this.recalculateDerivedAttributes(this.captureResourceRatios());
+	}
+
+	/**
+	 * Gets the maximum health capacity for this mob.
+	 * Calculated from race/class starting values, level growth, resource bonuses,
+	 * equipment bonuses, and vitality (2 health per vitality point).
+	 *
+	 * @returns Maximum health points
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * console.log(`Max HP: ${mob.maxHealth}`);
+	 * ```
+	 */
+	public get maxHealth(): number {
+		return this._resourceCapsView.maxHealth;
+	}
+
+	/**
+	 * Gets the maximum mana capacity for this mob.
+	 * Calculated from race/class starting values, level growth, resource bonuses,
+	 * equipment bonuses, and wisdom (2 mana per wisdom point).
+	 *
+	 * @returns Maximum mana points
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * console.log(`Max MP: ${mob.maxMana}`);
+	 * ```
+	 */
+	public get maxMana(): number {
+		return this._resourceCapsView.maxMana;
+	}
+
+	/**
+	 * Gets the current health points of this mob.
+	 * Value is clamped between 0 and maxHealth.
+	 *
+	 * @returns Current health points
+	 */
+	public get health(): number {
+		return this._health;
+	}
+
+	/**
+	 * Sets the current health points of this mob.
+	 * Value is automatically clamped between 0 and maxHealth.
+	 *
+	 * @param value - Health points to set
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.health = 50; // Sets health to 50
+	 * mob.health = 9999; // Clamped to maxHealth
+	 * ```
+	 */
+	public set health(value: number) {
+		this._health = clampNumber(value, 0, this.maxHealth);
+	}
+
+	/**
+	 * Gets the current mana points of this mob.
+	 * Value is clamped between 0 and maxMana.
+	 *
+	 * @returns Current mana points
+	 */
+	public get mana(): number {
+		return this._mana;
+	}
+
+	/**
+	 * Sets the current mana points of this mob.
+	 * Value is automatically clamped between 0 and maxMana.
+	 *
+	 * @param value - Mana points to set
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.mana = 30; // Sets mana to 30
+	 * mob.mana = 9999; // Clamped to maxMana
+	 * ```
+	 */
+	public set mana(value: number) {
+		this._mana = clampNumber(value, 0, this.maxMana);
+	}
+
+	/**
+	 * Gets the current exhaustion level of this mob.
+	 * Value is clamped between 0 and 100.
+	 *
+	 * @returns Current exhaustion level (0-100)
+	 */
+	public get exhaustion(): number {
+		return this._exhaustion;
+	}
+
+	/**
+	 * Sets the current exhaustion level of this mob.
+	 * Value is automatically clamped between 0 and 100.
+	 *
+	 * @param value - Exhaustion level to set (0-100)
+	 */
+	public set exhaustion(value: number) {
+		this._exhaustion = clampNumber(value, 0, MAX_EXHAUSTION);
+	}
+
+	/**
+	 * Gets the maximum exhaustion level (always 100).
+	 *
+	 * @returns Maximum exhaustion value
+	 */
+	public get maxExhaustion(): number {
+		return MAX_EXHAUSTION;
+	}
+
+	/**
+	 * Resets all resources to their maximum values.
+	 * Sets health to maxHealth, mana to maxMana, and exhaustion to 0.
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.health = 10;
+	 * mob.mana = 5;
+	 * mob.exhaustion = 50;
+	 *
+	 * mob.resetResources();
+	 * console.log(mob.health); // maxHealth
+	 * console.log(mob.mana); // maxMana
+	 * console.log(mob.exhaustion); // 0
+	 * ```
+	 */
+	public resetResources(): void {
+		this._health = this.maxHealth;
+		this._mana = this.maxMana;
+		this._exhaustion = 0;
+	}
+
+	/**
+	 * Snapshot of current mutable resources used by UI and persistence layers.
+	 *
+	 * @example
+	 * const { health, mana } = mob.resources;
+	 * console.log(`HP: ${health}/${mob.maxHealth}`);
+	 */
+	public get resources(): ResourceSnapshot {
+		return {
+			health: this._health,
+			mana: this._mana,
+			exhaustion: this._exhaustion,
+		};
+	}
+	/**
+	 * Send text to the controlling character's client, if any.
+	 * If this mob is not controlled by a player, nothing happens.
+	 *
+	 * @param text - Text to send to the character's client
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.character = character;
+	 * mob.send("Hello, player!");
+	 * ```
+	 */
+	public send(text: string): void {
+		this.character?.send(text);
+	}
+
+	/**
+	 * Send a line to the controlling character's client, if any.
+	 * Adds a newline after the text. If this mob is not controlled by a player, nothing happens.
+	 *
+	 * @param text - Text to send as a line to the character's client
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.character = character;
+	 * mob.sendLine("You see a goblin!");
+	 * ```
+	 */
+	public sendLine(text: string): void {
+		this.character?.sendLine(text);
+	}
+
+	/**
+	 * Send a message to the controlling character's client with a message group.
+	 * Message groups are used for categorizing different types of messages (command responses,
+	 * combat messages, etc.). If this mob is not controlled by a player, nothing happens.
+	 *
+	 * @param text - Message text to send
+	 * @param group - Message group category
+	 *
+	 * @example
+	 * ```typescript
+	 * import { MESSAGE_GROUP } from "./character.js";
+	 *
+	 * const mob = new Mob();
+	 * mob.character = character;
+	 * mob.sendMessage("You attack the goblin!", MESSAGE_GROUP.COMBAT);
+	 * ```
+	 */
+	public sendMessage(text: string, group: MESSAGE_GROUP) {
+		this.character?.sendMessage(text, group);
+	}
+
+	/**
+	 * Equip an item to the appropriate slot.
+	 * The equipment is moved to the mob's inventory if not already there, and all
+	 * attributes are automatically recalculated to include the equipment's bonuses.
+	 * If an item is already equipped in that slot, it is replaced (but not returned).
+	 *
+	 * @param equipment - The equipment item to equip
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+	 * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 10 });
+	 *
+	 * mob.equip(helmet);
+	 * mob.equip(sword);
+	 *
+	 * // Attributes automatically updated
+	 * console.log(mob.defense); // Includes +5 from helmet
+	 * console.log(mob.attackPower); // Includes +10 from sword
+	 * ```
+	 */
+	public equip(equipment: Equipment) {
+		const slot = equipment.slot;
+		this._equipped.set(slot, equipment);
+
+		// Move equipment to mob's inventory if not already there
+		if (equipment.location !== this) {
+			this.add(equipment);
+		}
+
+		// Recalculate attributes with new equipment bonuses
+		this.recalculateDerivedAttributes(this.captureResourceRatios());
+	}
+
+	/**
+	 * Unequip an item by its Equipment object.
+	 * Removes the equipment from the slot and recalculates attributes. The equipment
+	 * remains in the mob's inventory.
+	 *
+	 * @param equipment - The equipment item to unequip
+	 * @returns The unequipped equipment, or undefined if not found/equipped in that slot
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = mob.getEquipped(EQUIPMENT_SLOT.HEAD);
+	 * if (helmet) {
+	 *   mob.unequip(helmet);
+	 *   // Attributes automatically updated (defense reduced)
+	 * }
+	 * ```
+	 */
+	public unequip(equipment: Equipment) {
+		const slot = equipment.slot;
+		const currentEquipment = this._equipped.get(slot);
+
+		if (currentEquipment !== equipment) {
+			return undefined; // Equipment not found in this slot
+		}
+
+		this._equipped.delete(slot);
+
+		// Recalculate attributes without this equipment's bonuses
+		this.recalculateDerivedAttributes(this.captureResourceRatios());
+	}
+
+	/**
+	 * Unequip an item from a slot by slot enum.
+	 * Removes the equipment from the specified slot and recalculates attributes.
+	 * The equipment remains in the mob's inventory.
+	 *
+	 * @param slot - The equipment slot to unequip
+	 * @returns The unequipped equipment, or undefined if slot is empty
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = mob.unequipBySlot(EQUIPMENT_SLOT.HEAD);
+	 * if (helmet) {
+	 *   console.log(`Unequipped ${helmet.display}`);
+	 *   // Attributes automatically updated
+	 * }
+	 * ```
+	 */
+	public unequipBySlot(slot: EQUIPMENT_SLOT): Equipment | undefined {
+		const equipment = this._equipped.get(slot);
+		if (!equipment) {
+			return undefined;
+		}
+
+		this._equipped.delete(slot);
+
+		// Recalculate attributes without this equipment's bonuses
+		this.recalculateDerivedAttributes(this.captureResourceRatios());
+
+		return equipment;
+	}
+
+	/**
+	 * Get the equipment currently equipped in a slot.
+	 *
+	 * @param slot - The equipment slot to check
+	 * @returns The equipped equipment, or undefined if slot is empty
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = mob.getEquipped(EQUIPMENT_SLOT.HEAD);
+	 * if (helmet) {
+	 *   console.log(`Wearing ${helmet.display}`);
+	 * }
+	 * ```
+	 */
+	public getEquipped(slot: EQUIPMENT_SLOT): Equipment | undefined {
+		return this._equipped.get(slot);
+	}
+
+	/**
+	 * Get all equipped items as an array.
+	 * Returns a copy of all equipped items (order is not guaranteed).
+	 *
+	 * @returns Array of all equipped items
+	 *
+	 * @example
+	 * ```typescript
+	 * const allEquipment = mob.getAllEquipped();
+	 * console.log(`Wearing ${allEquipment.length} pieces of equipment`);
+	 * for (const item of allEquipment) {
+	 *   console.log(`- ${item.display}`);
+	 * }
+	 * ```
+	 */
+	public getAllEquipped(): Equipment[] {
+		return [...this._equipped.values()];
+	}
+
+	/**
+	 * Get total defense from all equipped armor pieces.
+	 * Only counts Armor instances, not base Equipment or Weapons.
+	 *
+	 * @returns Total defense value from all equipped armor
+	 *
+	 * @example
+	 * ```typescript
+	 * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
+	 * const chest = new Armor({ slot: EQUIPMENT_SLOT.CHEST, defense: 10 });
+	 * mob.equip(helmet);
+	 * mob.equip(chest);
+	 *
+	 * console.log(mob.getTotalDefense()); // 15
+	 * ```
+	 */
+	public getTotalDefense(): number {
+		let total = 0;
+		for (const equipment of this._equipped.values()) {
+			if (equipment instanceof Armor) {
+				total += equipment.defense;
+			}
+		}
+		return total;
+	}
+
+	/**
+	 * Get total attack power from all equipped weapons.
+	 * Only counts Weapon instances, not base Equipment or Armor.
+	 *
+	 * @returns Total attack power value from all equipped weapons
+	 *
+	 * @example
+	 * ```typescript
+	 * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
+	 * const dagger = new Weapon({ slot: EQUIPMENT_SLOT.OFF_HAND, attackPower: 8 });
+	 * mob.equip(sword);
+	 * mob.equip(dagger);
+	 *
+	 * console.log(mob.getTotalAttackPower()); // 23
+	 * ```
+	 */
+	public getTotalAttackPower(): number {
+		let total = 0;
+		for (const equipment of this._equipped.values()) {
+			if (equipment instanceof Weapon) {
+				total += equipment.attackPower;
+			}
+		}
+		return total;
+	}
+
+	/**
+	 * Serialize this Mob instance to a serializable format.
+	 * Includes all mob-specific properties: level, experience, race/class IDs,
+	 * bonuses, resources, and equipped items. Used for persistence and network transfer.
+	 *
+	 * @returns Serialized mob object suitable for JSON/YAML persistence
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob({ level: 10 });
+	 * const serialized = mob.serialize();
+	 * // Can be saved to file or sent over network
+	 * ```
+	 */
+	public serialize(): SerializedMob {
+		const base = super.serialize();
+		const equipped: Record<
+			EQUIPMENT_SLOT,
+			SerializedEquipment | SerializedArmor | SerializedWeapon
+		> = {} as Record<
+			EQUIPMENT_SLOT,
+			SerializedEquipment | SerializedArmor | SerializedWeapon
+		>;
+		for (const [slot, equipment] of this._equipped.entries()) {
+			equipped[slot] = equipment.serialize();
+		}
+
+		return {
+			...base,
+			type: "Mob",
+			level: this._level,
+			experience: this._experience,
+			race: this._race.id,
+			class: this._class.id,
+			...(this._attributeBonuses &&
+			Object.keys(this._attributeBonuses).length > 0
+				? { attributeBonuses: prunePrimaryBonuses(this._attributeBonuses) }
+				: {}),
+			...(this._resourceBonuses && Object.keys(this._resourceBonuses).length > 0
+				? { resourceBonuses: pruneResourceBonuses(this._resourceBonuses) }
+				: {}),
+			health: this._health,
+			mana: this._mana,
+			exhaustion: this._exhaustion,
+			...(equipped && Object.keys(equipped).length > 0 ? { equipped } : {}),
+		};
+	}
+
+	/**
+	 * Deserialize a SerializedMob into a Mob instance.
+	 */
+	public static deserialize(data: SerializedMob): Mob {
+		const { race: raceId, class: classId, equipped, ...rest } = data;
+		const race = getRaceById(raceId);
+		const _class = getClassById(classId);
+		const mob = new Mob({
+			race,
+			class: _class,
+			...rest,
+		});
+		if (data.contents && Array.isArray(data.contents)) {
+			for (const contentData of data.contents) {
+				const contentObj = DungeonObject.deserialize(contentData);
+				mob.add(contentObj);
+			}
+		}
+		// Restore equipped items
+		if (equipped) {
+			for (const [slotStr, equipmentData] of Object.entries(equipped)) {
+				const slot = slotStr as EQUIPMENT_SLOT;
+				// Handle both single items and arrays (for backward compatibility)
+				if (Array.isArray(equipmentData)) {
+					// Legacy format - take first item only
+					const equipment = DungeonObject.deserialize(
+						equipmentData[0] as unknown as AnySerializedDungeonObject
+					) as Equipment;
+					mob._equipped.set(slot, equipment);
+					if (!mob.contains(equipment)) {
+						mob.add(equipment);
+					}
+				} else {
+					const equipment = DungeonObject.deserialize(
+						equipmentData as unknown as AnySerializedDungeonObject
+					) as Equipment;
+					mob._equipped.set(slot, equipment);
+					if (!mob.contains(equipment)) {
+						mob.add(equipment);
+					}
+				}
+			}
+			// Recalculate attributes with equipment bonuses
+			mob.recalculateDerivedAttributes(mob.captureResourceRatios());
+		}
+		return mob;
+	}
+
+	/**
+	 * Override destroy to handle Mob-specific cleanup:
+	 * - Clear character reference
+	 * - Clear equipped items
+	 */
+	override destroy(destroyContents: boolean = true): void {
+		// Clear character reference (this will also clear character.mob)
+		this.character = undefined;
+
+		// Clear equipped items map
+		this._equipped.clear();
+
+		// Call parent destroy
+		super.destroy(destroyContents);
 	}
 }
 
@@ -3967,6 +6331,10 @@ const baseSerializedTypes: Partial<
 	Record<SerializedDungeonObjectType, SerializedDungeonObject>
 > = {
 	Movable: new Movable().serialize(),
+	Mob: new Mob().serialize(),
+	Equipment: new Equipment().serialize(),
+	Armor: new Armor().serialize(),
+	Weapon: new Weapon().serialize(),
 	Item: new Item().serialize(),
 	Prop: new Prop().serialize(),
 	Room: new DungeonObject().serialize(),

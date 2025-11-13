@@ -10,7 +10,7 @@ import {
 } from "./command.js";
 import { JavaScriptCommandAdapter } from "./package/commands.js";
 import { Dungeon, DungeonObject, DIRECTION } from "./dungeon.js";
-import { Mob } from "./mob.js";
+import { Mob } from "./dungeon.js";
 
 suite("command.ts", () => {
 	suite("Command", () => {
@@ -770,7 +770,7 @@ suite("command.ts", () => {
 
 		test("Get from container command example", () => {
 			const getFromCommand = new JavaScriptCommandAdapter({
-				pattern: "get <item:object> from <container:object>",
+				pattern: "get <item:object@container> from <container:object>",
 				execute(context: CommandContext, args: Map<string, any>) {
 					const item = args.get("item") as DungeonObject;
 					context.actor.add(item);

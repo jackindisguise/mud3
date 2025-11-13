@@ -21,8 +21,7 @@
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { DungeonObject } from "../dungeon.js";
-import { Equipment, Armor, Weapon, EQUIPMENT_SLOT } from "../equipment.js";
-import { Mob } from "../mob.js";
+import { Equipment, Armor, Weapon, EQUIPMENT_SLOT, Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 const slotMessages: Record<EQUIPMENT_SLOT, string> = {

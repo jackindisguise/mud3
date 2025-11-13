@@ -27,7 +27,7 @@ import {
 	type DungeonObjectTemplate,
 	type RoomTemplate,
 } from "./dungeon.js";
-import { Mob, type SerializedMob } from "./mob.js";
+import { Mob, type SerializedMob } from "./dungeon.js";
 
 suite("dungeon.ts", () => {
 	suite("DIRECTION", () => {

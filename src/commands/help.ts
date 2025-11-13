@@ -30,7 +30,7 @@ import {
 	Helpfile,
 } from "../package/help.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../mob.js";
+import { Mob } from "../dungeon.js";
 import { LINEBREAK } from "../telnet.js";
 import { SIZER, color, COLOR } from "../color.js";
 import { string } from "mud-ext";

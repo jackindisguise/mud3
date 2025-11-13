@@ -18,7 +18,7 @@
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Item } from "../dungeon.js";
-import { Equipment } from "../equipment.js";
+import { Equipment } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../telnet.js";
 

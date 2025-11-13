@@ -17,7 +17,7 @@
 
 import { CommandContext, PRIORITY } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { EQUIPMENT_SLOT } from "../equipment.js";
+import { EQUIPMENT_SLOT } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../telnet.js";
 import { COLOR, color, SIZER, stickyColor } from "../color.js";

@@ -14,6 +14,7 @@ export interface BaseArchetypeDefinition {
 	readonly id: string;
 	readonly name: string;
 	readonly description?: string;
+	readonly isStarter?: boolean;
 	readonly startingAttributes: PrimaryAttributeSet;
 	readonly attributeGrowthPerLevel: PrimaryAttributeSet;
 	readonly startingResourceCaps: ResourceCapacities;
@@ -64,6 +65,7 @@ export function freezeArchetype(
 		id: def.id,
 		name: def.name,
 		description: def.description,
+		isStarter: def.isStarter === true,
 		startingAttributes: freezeAttributes(def.startingAttributes),
 		attributeGrowthPerLevel: freezeAttributes(def.attributeGrowthPerLevel),
 		startingResourceCaps: freezeResources(def.startingResourceCaps),

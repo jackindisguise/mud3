@@ -2,6 +2,7 @@ archetype:
   id: human
   name: Human
   description: A balanced race suited for varied roles.
+  isStarter: true
   startingAttributes:
     strength: 5
     agility: 5
@@ -24,4 +25,3 @@ archetype:
   growthModifier:
     base: 1.0
     perLevel: 0.05
-

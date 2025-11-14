@@ -74,11 +74,14 @@ export enum MESSAGE_GROUP {
 	COMMAND_RESPONSE = "COMMAND_RESPONSE",
 	SYSTEM = "SYSTEM",
 	CHANNELS = "CHANNELS",
+	PROMPT = "PROMPT",
 }
 
 /**
  * Player-specific settings and configuration.
  */
+export type EchoMode = "client" | "server" | "off";
+
 export interface PlayerSettings {
 	/** Whether to receive out-of-character (OOC) messages */
 	receiveOOC?: boolean;
@@ -98,6 +101,8 @@ export interface PlayerSettings {
 	blockedUsers?: Set<string>;
 	/** Default terminal color for all messages sent to this character */
 	defaultColor?: COLOR;
+	/** Input echo preference */
+	echoMode?: EchoMode;
 }
 
 /**
@@ -136,6 +141,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	colorEnabled: true,
 	autoLook: true,
 	briefMode: false,
+	echoMode: "client",
 } as const;
 
 /**
@@ -627,12 +633,20 @@ export class Character {
 	public send(text: string) {
 		if (!this.session?.client) return;
 
+		const session = this.session;
+		const client = session.client;
+
+		if (session.lastMessageGroup === MESSAGE_GROUP.PROMPT) {
+			client.send(LINEBREAK, false);
+			session.lastMessageGroup = undefined;
+		}
+
 		let finalText = text;
 		if (this.settings.defaultColor !== undefined) {
 			finalText = stickyColor(text, this.settings.defaultColor);
 		}
 
-		this.session.client.send(finalText, this.settings.colorEnabled);
+		client.send(finalText, this.settings.colorEnabled);
 	}
 
 	/**
@@ -715,15 +729,25 @@ export class Character {
 		const session = this.session;
 		const client = session?.client;
 		if (!session || !client || !client.isConnected()) return;
-		else this.sendLine(text);
 
 		const last = session.lastMessageGroup;
-		if (last !== group) {
+		if (last && last !== group && last !== MESSAGE_GROUP.PROMPT) {
 			this.sendLine("");
-			const promptText = this.settings.prompt ?? "> ";
-			this.send(this.formatPrompt(promptText));
 		}
+
+		this.sendLine(text);
 		session.lastMessageGroup = group;
+	}
+
+	public showPrompt(): void {
+		const session = this.session;
+		const client = session?.client;
+		if (!session || !client || !client.isConnected()) return;
+
+		const promptText = this.settings.prompt ?? "> ";
+		this.sendLine("");
+		this.send(this.formatPrompt(promptText));
+		session.lastMessageGroup = MESSAGE_GROUP.PROMPT;
 	}
 
 	/**

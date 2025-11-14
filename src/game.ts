@@ -33,6 +33,7 @@ import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
 import { Mob } from "./dungeon.js";
+import { Race, Class } from "./archetype.js";
 import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./package/config.js";
 import {
@@ -52,6 +53,9 @@ import { executeAllDungeonResets } from "./package/dungeon.js";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
+import { getStarterRaces, getStarterClasses } from "./package/archetype.js";
+import { getHelpfile, searchHelpfiles } from "./package/help.js";
+import { LINEBREAK } from "./telnet.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -345,6 +349,174 @@ export class Game {
 		let username = "";
 		let password = "";
 		let colorEnabled = true;
+		let selectedRace: Race | undefined;
+		let selectedClass: Class | undefined;
+
+		const starterRaces = getStarterRaces();
+		const starterClasses = getStarterClasses();
+
+		const formatDescription = (text?: string): string => {
+			const normalized = text?.replace(/\s+/g, " ").trim();
+			return normalized && normalized.length > 0
+				? normalized
+				: "No description provided.";
+		};
+
+		const listOptions = (
+			heading: string,
+			options: ReadonlyArray<{ name: string; description?: string }>,
+			infoHint?: string
+		) => {
+			sendLine("");
+			sendLine(heading);
+			if (options.length === 0) {
+				sendLine("  (none available)");
+				sendLine("");
+				return;
+			}
+			options.forEach((option, index) => {
+				const prefix = String(index + 1).padStart(2, " ");
+				sendLine(
+					`  ${prefix}. ${option.name} - ${formatDescription(
+						option.description
+					)}`
+				);
+			});
+			sendLine("");
+			if (infoHint) {
+				sendLine(infoHint);
+				sendLine("");
+			}
+		};
+
+		const showHelpfile = (topic: string, category: "race" | "class") => {
+			const normalized = topic.trim().toLowerCase();
+			if (!normalized) {
+				sendLine(`Usage: !info <${category} name>`);
+				return;
+			}
+			const helpfile = searchHelpfiles(`${category}-${normalized}`);
+			if (!helpfile.bestMatch) {
+				sendLine(
+					`No ${category} information found for "${topic}". Try another name.`
+				);
+				return;
+			}
+			sendLine("");
+			sendLine(helpfile.bestMatch.content.split("\n").slice(2).join(LINEBREAK));
+			sendLine("");
+		};
+
+		const maybeHandleInfoCommand = (
+			rawInput: string | undefined,
+			category: "race" | "class"
+		): boolean => {
+			const trimmed = rawInput?.trim();
+			if (!trimmed || !trimmed.toLowerCase().startsWith("!info")) {
+				return false;
+			}
+			const topic = trimmed.slice("!info".length).trim();
+			showHelpfile(topic, category);
+			return true;
+		};
+
+		const resolveSelection = <T extends { id: string; name: string }>(
+			input: string | undefined,
+			options: ReadonlyArray<T>
+		): T | undefined => {
+			if (options.length === 0) return undefined;
+			if (!input || input.trim().length === 0) {
+				return options[0];
+			}
+			const trimmed = input.trim();
+			const numericChoice = Number.parseInt(trimmed, 10);
+			if (!Number.isNaN(numericChoice)) {
+				const index = numericChoice - 1;
+				if (index >= 0 && index < options.length) {
+					return options[index];
+				}
+			}
+			const normalized = trimmed.toLowerCase();
+			return options.find(
+				(option) =>
+					option.id.toLowerCase() === normalized ||
+					option.name.toLowerCase() === normalized
+			);
+		};
+
+		const chooseClass = (showList: boolean = false) => {
+			if (starterClasses.length === 0) {
+				sendLine(
+					"No classes are currently available. A default class will be assigned."
+				);
+				selectedClass = undefined;
+				MOTD();
+				return;
+			}
+
+			if (showList) {
+				listOptions(
+					"Available classes:",
+					starterClasses,
+					"Type !info <class name> to read its helpfile."
+				);
+			}
+
+			ask("Choose your class (name or number):", (input) => {
+				if (maybeHandleInfoCommand(input, "class")) {
+					return chooseClass(false);
+				}
+				const trimmed = input?.trim().toLowerCase();
+				if (trimmed === "!list") {
+					return chooseClass(true);
+				}
+				const choice = resolveSelection(input, starterClasses);
+				if (!choice) {
+					sendLine("That class wasn't recognized. Please pick again.");
+					return chooseClass(false);
+				}
+				selectedClass = choice as Class;
+				sendLine(`Class locked in: ${choice.name}.`);
+				MOTD();
+			});
+		};
+
+		const chooseRace = (showList: boolean = true) => {
+			if (starterRaces.length === 0) {
+				sendLine(
+					"No races are currently available. A default race will be assigned."
+				);
+				selectedRace = undefined;
+				chooseClass();
+				return;
+			}
+
+			if (showList) {
+				listOptions(
+					"Available races:",
+					starterRaces,
+					"Type !info <race name> to read its helpfile."
+				);
+			}
+
+			ask("Choose your race (name or number):", (input) => {
+				if (maybeHandleInfoCommand(input, "race")) {
+					return chooseRace(false);
+				}
+				const trimmed = input?.trim().toLowerCase();
+				if (trimmed === "!list") {
+					return chooseRace(true);
+				}
+				const choice = resolveSelection(input, starterRaces);
+				if (!choice) {
+					sendLine("That race wasn't recognized. Please pick again.");
+					return chooseRace(false);
+				}
+				selectedRace = choice as Race;
+				sendLine(`Race locked in: ${choice.name}.`);
+				chooseClass(true);
+			});
+		};
 
 		const send = (line: string) => client.send(line, colorEnabled);
 		const sendLine = (line: string) => client.sendLine(line, colorEnabled);
@@ -432,7 +604,7 @@ export class Game {
 					sendLine("Those passwords don't match! Try again.");
 					return getNewPassword();
 				}
-				MOTD();
+				chooseRace();
 			});
 		};
 
@@ -457,6 +629,8 @@ export class Game {
 					const mob = new Mob({
 						display: username,
 						keywords: username,
+						race: selectedRace,
+						class: selectedClass,
 					});
 					character = new Character({
 						credentials: { username, characterId },
@@ -491,12 +665,16 @@ export class Game {
 			return;
 		}
 
-		logger.debug(`${character.credentials.username} input: ${input}`);
-
-		// Reset message group on new input to ensure clean prompt behavior
-		if (character.session) {
-			character.session.lastMessageGroup = undefined;
+		const echoMode = character.settings.echoMode ?? "client";
+		if (echoMode === "client" || echoMode === "server") {
+			const session = character.session;
+			if (session) session.lastMessageGroup = undefined;
+			if (echoMode === "server" && character.session?.client) {
+				session?.client?.sendLine(input);
+			}
 		}
+
+		logger.debug(`${character.credentials.username} input: ${input}`);
 
 		// generate the context
 		const context: CommandContext = {
@@ -510,6 +688,7 @@ export class Game {
 		if (!executed) {
 			character.sendMessage("Do what?", MESSAGE_GROUP.COMMAND_RESPONSE);
 		}
+		character.showPrompt();
 	}
 
 	/**
@@ -605,14 +784,15 @@ export class Game {
 			}
 		}
 
+		// Check for unread messages
+		this.checkUnreadMessages(character, lastLoginDate);
+
 		// Move the character to the target room and show it
 		if (targetRoom) {
 			targetRoom.add(character.mob);
 			showRoom(character.mob, targetRoom);
 		}
-
-		// Check for unread messages
-		this.checkUnreadMessages(character, lastLoginDate);
+		character.showPrompt();
 
 		// Wire gameplay input handler now that the player is in the world
 		session.client.on("input", (line: string) => {

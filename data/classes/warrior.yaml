@@ -2,6 +2,7 @@ archetype:
   id: warrior
   name: Warrior
   description: A frontline fighter specializing in physical combat.
+  isStarter: true
   startingAttributes:
     strength: 7
     agility: 4
@@ -26,4 +27,3 @@ archetype:
   growthModifier:
     base: 1.1
     perLevel: 0.03
-

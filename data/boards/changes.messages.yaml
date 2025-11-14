@@ -34,3 +34,10 @@ messages:
     postedAt: '2025-11-13T05:00:15.090Z'
     readBy:
       - 5
+  - id: 102
+    author: SYSTEM
+    subject: Version 1.5.0
+    content: "{YFeatures:{x\r\n{y{Y *{x {yadded character settings system with config command and prompt{x\r\n   {yformatter{x{x\r\n{y{Y *{x {yadded defaultColor setting to PlayerSettings for terminal color{x\r\n   {ycustomization{x{x\r\n{y{Y *{x {yimplemented stickyColor application in Character.send() when{x\r\n   {ydefaultColor is set{x{x\r\n{y{Y *{x {yadded config command for managing character settings{x{x\r\n{y{Y *{x {yadded prompt formatter with placeholders for health, mana,{x\r\n   {yexhaustion, XP, and max values{x{x\r\n{y{Y *{x {yupdated serialization/deserialization to handle defaultColor setting{x{x"
+    postedAt: '2025-11-13T16:42:52.200Z'
+    readBy:
+      - 5

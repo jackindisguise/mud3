@@ -103,9 +103,8 @@ export class MudClient extends EventEmitter {
 	}
 
 	private setupSocketHandlers(): void {
-		this.socket.setEncoding("utf8");
-
-		this.socket.on("data", (data: string) => {
+		this.socket.setEncoding("binary");
+		this.socket.on("data", (data: Buffer) => {
 			this.handleData(data);
 		});
 
@@ -120,8 +119,24 @@ export class MudClient extends EventEmitter {
 		});
 	}
 
-	private handleData(data: string): void {
-		this.buffer += data;
+	private sanitizeTelnetCommands(input: Buffer): string {
+		// Work in binary (latin1) space so every byte is preserved verbatim.
+		const binary = input.toString("binary");
+
+		// Remove IAC SB ... IAC SE subnegotiations.
+		const noSubNegotiation = binary.replace(/\xff\xfa[\s\S]*?\xff\xf0/g, "");
+
+		// Remove IAC WILL/WONT/DO/DONT <option> negotiations.
+		const noNegotiations = noSubNegotiation.replace(/\xff[\xfb-\xfe]./g, "");
+
+		// Collapse escaped IAC bytes (IAC IAC -> literal 0xFF).
+		const unescaped = noNegotiations.replace(/\xff\xff/g, "\xff");
+
+		return Buffer.from(unescaped, "binary").toString("utf8");
+	}
+
+	private handleData(data: Buffer): void {
+		this.buffer += this.sanitizeTelnetCommands(data);
 
 		// Process complete lines
 		let newlineIndex: number;

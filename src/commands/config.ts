@@ -21,7 +21,7 @@
  */
 
 import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { MESSAGE_GROUP, EchoMode } from "../character.js";
 import { CommandObject } from "../package/commands.js";
 import { COLOR, COLOR_NAMES, COLORS, color, nameToColor } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
@@ -70,6 +70,19 @@ function formatColor(value: COLOR | undefined): string {
 		return color("(not set)", COLOR.GREY);
 	}
 	return color(COLOR_NAMES[value], COLOR.CYAN);
+}
+
+const VALID_ECHO_MODES: EchoMode[] = ["client", "server", "off"];
+
+function formatEchoMode(value: EchoMode | undefined): string {
+	const mode = value ?? "client";
+	const label =
+		mode === "client"
+			? "client (local echo)"
+			: mode === "server"
+			? "server (manual echo)"
+			: "off";
+	return color(label, COLOR.CYAN);
 }
 
 export default {
@@ -168,6 +181,23 @@ export default {
 			);
 			lines.push("");
 
+			// Echo mode setting
+			lines.push(
+				`  ${color("Echo Mode", COLOR.TEAL).padEnd(20)} ${formatEchoMode(
+					character.settings.echoMode
+				)}`
+			);
+			lines.push(
+				`    ${color("Usage:", COLOR.GREY)} config echomode <client|server|off>`
+			);
+			lines.push(
+				`    ${color(
+					"Notes:",
+					COLOR.GREY
+				)} client = your telnet client echoes, server = game echoes, off = no echo`
+			);
+			lines.push("");
+
 			// Prompt setting
 			const currentPrompt = character.settings.prompt ?? "> ";
 			lines.push(
@@ -245,6 +275,41 @@ export default {
 					COLOR_NAMES[colorEnum],
 					COLOR.CYAN
 				)}.`,
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+
+		// Handle echo mode setting
+		if (normalizedSetting === "echomode" || normalizedSetting === "echo") {
+			if (!value) {
+				const lines: string[] = [];
+				lines.push(
+					`Current echo mode: ${formatEchoMode(character.settings.echoMode)}`
+				);
+				lines.push(`Usage: config echomode <client|server|off>`);
+				lines.push(
+					`client = your telnet client echoes locally, server = game echoes input back, off = no echo`
+				);
+				actor.sendMessage(
+					lines.join(LINEBREAK),
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			const normalizedValue = value.toLowerCase().trim();
+			if (!VALID_ECHO_MODES.includes(normalizedValue as EchoMode)) {
+				actor.sendMessage(
+					`Invalid echo mode "${value}". Use client, server, or off.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			character.updateSettings({ echoMode: normalizedValue as EchoMode });
+			actor.sendMessage(
+				`Echo mode set to ${normalizedValue}.`,
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;
@@ -363,7 +428,7 @@ export default {
 
 		// Unknown setting
 		actor.sendMessage(
-			`Unknown setting "${setting}". Available settings: color, autolook, verbose, brief, colorEnabled, prompt`,
+			`Unknown setting "${setting}". Available settings: color, autolook, verbose, brief, colorEnabled, prompt, echomode`,
 			MESSAGE_GROUP.COMMAND_RESPONSE
 		);
 	},

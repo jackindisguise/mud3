@@ -57,7 +57,7 @@ type RawArchetypeFile = {
 		skills?: Array<unknown>;
 		passives?: Array<unknown>;
 		growthModifier?: Partial<Record<keyof GrowthModifierCurve, unknown>>;
-		isDefault?: unknown;
+		isStarter?: unknown;
 	};
 };
 
@@ -198,6 +198,7 @@ function parseArchetypeFile(
 				typeof archetype.description === "string"
 					? archetype.description.trim()
 					: undefined,
+			isStarter: archetype.isStarter === true,
 			startingAttributes: normalizePrimary(
 				(archetype.startingAttributes ?? {}) as Partial<PrimaryAttributeSet>
 			),
@@ -308,17 +309,29 @@ export function getAllRaces(): ReadonlyArray<Race> {
 	return Array.from(raceRegistry.values());
 }
 
+export function getStarterRaces(): ReadonlyArray<Race> {
+	const starters = getAllRaces().filter((race) => race.isStarter);
+	return starters.length > 0 ? starters : getAllRaces();
+}
+
 export function getAllClasses(): ReadonlyArray<Class> {
 	return Array.from(classRegistry.values());
 }
 
+export function getStarterClasses(): ReadonlyArray<Class> {
+	const starters = getAllClasses().filter((classDef) => classDef.isStarter);
+	return starters.length > 0 ? starters : getAllClasses();
+}
+
 export function getDefaultRace(): Race {
-	const firstRace = getAllRaces()[0];
+	const starters = getStarterRaces();
+	const firstRace = starters[0] ?? getAllRaces()[0];
 	return firstRace ?? FALLBACK_RACE;
 }
 
 export function getDefaultClass(): Class {
-	const firstClass = getAllClasses()[0];
+	const starters = getStarterClasses();
+	const firstClass = starters[0] ?? getAllClasses()[0];
 	return firstClass ?? FALLBACK_CLASS;
 }
 

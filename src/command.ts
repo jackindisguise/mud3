@@ -462,7 +462,7 @@ export abstract class Command {
 	/**
 	 * Initialize the command and build cached regex patterns.
 	 * Builds the pattern cache immediately using the provided options (if any)
-	 * or the subclass’s own `pattern`/`aliases` fields.
+	 * or the subclass's own `pattern`/`aliases` fields.
 	 *
 	 * @param options - Optional CommandOptions: `{ pattern, aliases }`
 	 *

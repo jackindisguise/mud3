@@ -1,21 +1,32 @@
 keyword: channels
-aliases: [channel]
-related: [communication, ooc, say, whisper, reply]
-topic: [communication, chat, channels, settings, preferences]
-content: |
+aliases:
+  - channel
+related:
+  - communication
+  - ooc
+  - say
+  - whisper
+  - reply
+topic:
+  - communication
+  - chat
+  - channels
+  - settings
+  - preferences
+content: |-
   CHANNELS - Manage Channel Subscriptions
-  
+
   Usage:
     channels                        - List all channels and their status
     channels on <channel>           - Subscribe to a channel
     channels off <channel>          - Unsubscribe from a channel
     channels enable <channel>       - Subscribe to a channel
     channels disable <channel>      - Unsubscribe from a channel
-  
+
   The channels command allows you to control which communication channels you
   are subscribed to. When you unsubscribe from a channel, you will no longer
   receive messages sent on that channel.
-  
+
   Available Channels:
     OOC     - Out of Character      (Default: ON)
     GOSSIP  - General gossip chat   (Default: ON)
@@ -23,7 +34,7 @@ content: |
     WHISPER - Private messages      (Default: ON)
     NEWBIE  - Help for new players  (Default: OFF)
     TRADE   - Trading and commerce  (Default: OFF)
-  
+
   Examples:
     channels
       Shows your current channel subscriptions with [*] (on) or [ ] (off).

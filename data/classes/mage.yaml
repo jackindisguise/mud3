@@ -2,6 +2,7 @@ archetype:
   id: mage
   name: Mage
   description: A spellcaster who channels arcane energies.
+  isStarter: true
   startingAttributes:
     strength: 2
     agility: 3
@@ -26,4 +27,3 @@ archetype:
   growthModifier:
     base: 1.08
     perLevel: 0.05
-

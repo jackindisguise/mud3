@@ -79,6 +79,7 @@ export interface SerializedDungeonFormat {
 		rooms: Array<Omit<RoomTemplate, "id" | "type">>; // Room templates without id/type
 		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets)
 		resets?: SerializedReset[]; // Optional array of resets
+		resetMessage?: string;
 	};
 }
 
@@ -254,6 +255,7 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 			rooms: roomTemplates,
 			...(templates.length > 0 && { templates }),
 			...(resets.length > 0 && { resets }),
+			...(dungeon.resetMessage ? { resetMessage: dungeon.resetMessage } : {}),
 		},
 	};
 
@@ -304,7 +306,8 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			throw new Error("Invalid dungeon format: missing 'dungeon' key");
 		}
 
-		const { dimensions, grid, rooms, templates, resets } = data.dungeon;
+		const { dimensions, grid, rooms, templates, resets, resetMessage } =
+			data.dungeon;
 
 		// Validate dimensions
 		if (
@@ -336,6 +339,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		const dungeon = new Dungeon({
 			id: data.dungeon.id || id,
 			dimensions,
+			resetMessage,
 		});
 
 		// Create rooms from grid

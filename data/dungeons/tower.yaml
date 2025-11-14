@@ -4,6 +4,7 @@ dungeon:
     width: 10
     height: 10
     layers: 10
+  resetMessage: "A deep hum reverberates through the tower as hidden mechanisms reset."
   
   grid:
     # Layer 9 (Top Floor)

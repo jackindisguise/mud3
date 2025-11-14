@@ -72,6 +72,7 @@ import {
 	getClassById,
 } from "./package/archetype.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
+import { Game } from "./game.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -734,6 +735,7 @@ export interface MapDimensions {
 export interface DungeonOptions {
 	id?: string;
 	dimensions: MapDimensions;
+	resetMessage?: string;
 }
 
 /**
@@ -878,6 +880,7 @@ export class Dungeon {
 	 * @private
 	 */
 	private _templates: Map<string, DungeonObjectTemplate> = new Map();
+	private _resetMessage?: string;
 
 	/**
 	 * The size of the dungeon in all three dimensions. Used for bounds checking
@@ -928,6 +931,7 @@ export class Dungeon {
 		// assign id early so the registry contains the dungeon immediately
 		if (options.id) this.id = options.id;
 		this._rooms = this.generateGrid();
+		this._resetMessage = options.resetMessage?.trim();
 	}
 
 	/**
@@ -996,6 +1000,24 @@ export class Dungeon {
 			height: this._dimensions.height,
 			layers: this._dimensions.layers,
 		};
+	}
+
+	public get resetMessage(): string | undefined {
+		return this._resetMessage;
+	}
+
+	public set resetMessage(message: string | undefined) {
+		this._resetMessage = message?.trim();
+	}
+
+	public broadcast(
+		message: string,
+		group: MESSAGE_GROUP = MESSAGE_GROUP.SYSTEM
+	): void {
+		Game.game!.forEachCharacter((character) => {
+			if (character.mob.dungeon !== this) return;
+			character.sendMessage(message, group);
+		});
 	}
 
 	/**
@@ -1530,6 +1552,7 @@ export class Dungeon {
 			const spawned = reset.execute(this._templates);
 			totalSpawned += spawned.length;
 		}
+		if (this.resetMessage) this.broadcast(this.resetMessage);
 		return totalSpawned;
 	}
 }

@@ -9,8 +9,7 @@
 
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Room, DIRECTION, dir2text, dir2reverse } from "../dungeon.js";
-import { showRoom } from "./look.js";
+import { Room, DIRECTION, dir2text } from "../dungeon.js";
 
 /**
  * Executes a movement command in the specified direction.
@@ -47,8 +46,5 @@ export function executeMovement(
 		return;
 	}
 
-	room.onExit(actor, direction);
-	actor.move(destination);
-	destination.onEnter(actor, dir2reverse(direction));
-	showRoom(actor, destination);
+	actor.step(direction);
 }

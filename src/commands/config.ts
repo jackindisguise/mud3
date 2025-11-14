@@ -23,8 +23,16 @@
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP, EchoMode } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { COLOR, COLOR_NAMES, COLORS, color, nameToColor } from "../color.js";
+import {
+	COLOR,
+	COLOR_NAMES,
+	COLORS,
+	color,
+	nameToColor,
+	SIZER,
+} from "../color.js";
 import { LINEBREAK } from "../telnet.js";
+import { string } from "mud-ext";
 
 /**
  * Helper function to find a COLOR enum value by name (case-insensitive)
@@ -85,6 +93,374 @@ function formatEchoMode(value: EchoMode | undefined): string {
 	return color(label, COLOR.CYAN);
 }
 
+type Actor = CommandContext["actor"];
+type PlayerCharacter = NonNullable<Actor["character"]>;
+type BooleanSettingHandler = (
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+) => void;
+
+type UsageHelper = (prefix?: number) => string[];
+
+const prefixSpaces = (prefix: number = 0): string => " ".repeat(prefix);
+
+const createToggleUsage = (command: string, prefix: number = 0): string[] => {
+	const _prefix = prefixSpaces(prefix);
+	return [
+		`${_prefix}${color(
+			"Usage:",
+			COLOR.GREY
+		)} config ${command} on | config ${command} off`,
+	];
+};
+
+const getColorUsage: UsageHelper = (prefix = 0) => {
+	const _prefix = prefixSpaces(prefix);
+	const availableColors = COLORS.map((_color) => {
+		let __color = findColorByName(_color) as COLOR;
+		if (__color === COLOR.BLACK) __color = COLOR.GREY;
+		return color(_color, __color);
+	});
+	const wrappedColors = string.wrap({
+		string: `${color("Available colors", COLOR.GREY)}: ${availableColors.join(
+			", "
+		)}`,
+		width: 50,
+		sizer: SIZER,
+		prefix: prefixSpaces(prefix + "Available colors: ".length),
+	});
+	return [
+		`${_prefix}${color(
+			"Usage:",
+			COLOR.GREY
+		)} config color <color> | config color off`,
+		`${_prefix}${wrappedColors.join(LINEBREAK)}`,
+	];
+};
+
+const getEchoModeUsage: UsageHelper = (prefix = 0) => {
+	const _prefix = prefixSpaces(prefix);
+	return [
+		`${_prefix}${color(
+			"Usage:",
+			COLOR.GREY
+		)} config echomode <client|server|off>`,
+		`${_prefix}${color(
+			"Notes:",
+			COLOR.GREY
+		)} client = your telnet client echoes locally, server = game echoes input back, off = no echo`,
+	];
+};
+
+const getPromptUsage: UsageHelper = (prefix = 0) => {
+	const lines: string[] = [];
+	const _prefix = prefixSpaces(prefix);
+	lines.push(`${_prefix}${color("Usage:", COLOR.GREY)} config prompt "<text>"`);
+	lines.push(`${_prefix}${color("Placeholders:", COLOR.GREY)}`);
+	const health = color("%hh (health)", COLOR.CRIMSON);
+	const mana = color("%mm (mana)".padEnd(10), COLOR.CYAN);
+	const exhaustion = color("%ee (exhaustion)".padEnd(10), COLOR.LIME);
+	const maxHealth = color("%HH (max health)".padEnd(10), COLOR.CRIMSON);
+	const maxMana = color("%MM (max mana)".padEnd(10), COLOR.CYAN);
+	const xp = color("%xp (XP)".padEnd(10), COLOR.YELLOW);
+	const xpToLevel = color("%XX (XP to level)".padEnd(10), COLOR.YELLOW);
+	lines.push(`${_prefix}  ${health} ${mana} ${exhaustion}`);
+	lines.push(`${_prefix}  ${maxHealth} ${maxMana}`);
+	lines.push(`${_prefix}  ${xp} ${xpToLevel}`);
+	return lines;
+};
+
+const getAutolookUsage: UsageHelper = (prefix = 0) =>
+	createToggleUsage("autolook", prefix);
+
+const getVerboseUsage: UsageHelper = (prefix = 0) =>
+	createToggleUsage("verbose", prefix);
+
+const getBriefUsage: UsageHelper = (prefix = 0) =>
+	createToggleUsage("brief", prefix);
+
+const getColorEnabledUsage: UsageHelper = (prefix = 0) =>
+	createToggleUsage("colorEnabled", prefix);
+
+function showSettingsOverview(actor: Actor, character: PlayerCharacter): void {
+	const lines: string[] = [];
+	lines.push(color("Current Settings:", COLOR.YELLOW));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Default Color", COLOR.TEAL).padEnd(20)} ${formatColor(
+			character.settings.defaultColor
+		)}`
+	);
+	lines.push(...getColorUsage(4));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Auto-look", COLOR.TEAL).padEnd(20)} ${formatBoolean(
+			character.settings.autoLook,
+			true
+		)}`
+	);
+	lines.push(...getAutolookUsage(4));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Verbose", COLOR.TEAL).padEnd(20)} ${formatBoolean(
+			character.settings.verboseMode,
+			true
+		)}`
+	);
+	lines.push(...getVerboseUsage(4));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Brief", COLOR.TEAL).padEnd(20)} ${formatBoolean(
+			character.settings.briefMode,
+			false
+		)}`
+	);
+	lines.push(...getBriefUsage(4));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Color Enabled", COLOR.TEAL).padEnd(20)} ${formatBoolean(
+			character.settings.colorEnabled,
+			true
+		)}`
+	);
+	lines.push(...getColorEnabledUsage(4));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Echo Mode", COLOR.TEAL).padEnd(20)} ${formatEchoMode(
+			character.settings.echoMode
+		)}`
+	);
+	lines.push(...getEchoModeUsage(4));
+	lines.push("");
+
+	const currentPrompt = character.settings.prompt ?? "> ";
+	const promptPlaceholders = getPromptUsage(4);
+	lines.push(
+		`  ${color("Prompt", COLOR.TEAL).padEnd(20)} ${color(
+			`"${currentPrompt.replace(/\{/g, "{{")}"`,
+			COLOR.CYAN
+		)}`
+	);
+	lines.push(...promptPlaceholders);
+	lines.push("");
+
+	lines.push(
+		color("Type 'config <setting> <value>' to change a setting.", COLOR.GREY)
+	);
+
+	actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+}
+
+function setDefaultColor(
+	actor: Actor,
+	character: PlayerCharacter,
+	value: string | undefined
+): void {
+	if (!value) {
+		const lines: string[] = [];
+		lines.push(
+			`Current default color: ${formatColor(character.settings.defaultColor)}`
+		);
+		lines.push(...getColorUsage());
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+		return;
+	}
+
+	const normalizedValue = value.toLowerCase().trim();
+	if (
+		normalizedValue === "off" ||
+		normalizedValue === "none" ||
+		normalizedValue === "clear"
+	) {
+		character.updateSettings({ defaultColor: undefined });
+		actor.sendMessage(
+			"Default terminal color cleared.",
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	const colorEnum = findColorByName(normalizedValue);
+	if (colorEnum === null) {
+		actor.sendMessage(
+			`Unknown color "${value}". Available colors: ${COLORS.join(", ")}`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	character.updateSettings({ defaultColor: colorEnum });
+	actor.sendMessage(
+		`Default terminal color set to ${color(
+			COLOR_NAMES[colorEnum],
+			COLOR.CYAN
+		)}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function setEchoMode(
+	actor: Actor,
+	character: PlayerCharacter,
+	value: string | undefined
+): void {
+	if (!value) {
+		const lines: string[] = [];
+		lines.push(
+			`Current echo mode: ${formatEchoMode(character.settings.echoMode)}`
+		);
+		lines.push(...getEchoModeUsage());
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+		return;
+	}
+
+	const normalizedValue = value.toLowerCase().trim();
+	if (!VALID_ECHO_MODES.includes(normalizedValue as EchoMode)) {
+		actor.sendMessage(
+			`Invalid echo mode "${value}". Use client, server, or off.`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	character.updateSettings({ echoMode: normalizedValue as EchoMode });
+	actor.sendMessage(
+		`Echo mode set to ${normalizedValue}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function setPrompt(
+	actor: Actor,
+	character: PlayerCharacter,
+	value: string | undefined
+): void {
+	if (!value) {
+		const currentPrompt = character.settings.prompt ?? "> ";
+		const lines: string[] = [];
+		lines.push(`Current prompt: "${currentPrompt.replace(/\{/g, "{{")}"`);
+		lines.push(...getPromptUsage(1));
+		lines.push("");
+		lines.push(`Example: config prompt "[%hh/%HH HP] [%xp XP] > "`);
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+		return;
+	}
+
+	let promptValue = value.trim();
+	if (
+		(promptValue.startsWith('"') && promptValue.endsWith('"')) ||
+		(promptValue.startsWith("'") && promptValue.endsWith("'"))
+	) {
+		promptValue = promptValue.slice(1, -1);
+	}
+
+	character.updateSettings({ prompt: promptValue });
+	actor.sendMessage(
+		`Prompt set to "${promptValue}".`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function parseBooleanFlag(value: string): boolean | undefined {
+	const normalizedValue = value.toLowerCase().trim();
+	if (
+		normalizedValue === "on" ||
+		normalizedValue === "true" ||
+		normalizedValue === "1" ||
+		normalizedValue === "yes"
+	) {
+		return true;
+	}
+
+	if (
+		normalizedValue === "off" ||
+		normalizedValue === "false" ||
+		normalizedValue === "0" ||
+		normalizedValue === "no"
+	) {
+		return false;
+	}
+}
+
+function setAutoLook(
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+): void {
+	character.updateSettings({ autoLook: isOn });
+	actor.sendMessage(
+		`Auto-look ${isOn ? "enabled" : "disabled"}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function setVerboseMode(
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+): void {
+	character.updateSettings({ verboseMode: isOn });
+	actor.sendMessage(
+		`Verbose mode ${isOn ? "enabled" : "disabled"}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function setBriefMode(
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+): void {
+	character.updateSettings({ briefMode: isOn });
+	actor.sendMessage(
+		`Brief mode ${isOn ? "enabled" : "disabled"}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function setColorEnabled(
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+): void {
+	character.updateSettings({ colorEnabled: isOn });
+	actor.sendMessage(
+		`Color display ${isOn ? "enabled" : "disabled"}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+const BOOLEAN_SETTING_HANDLERS: Record<string, BooleanSettingHandler> = {
+	autolook: setAutoLook,
+	"auto-look": setAutoLook,
+	verbose: setVerboseMode,
+	verbosemode: setVerboseMode,
+	brief: setBriefMode,
+	briefmode: setBriefMode,
+	colorenabled: setColorEnabled,
+	"color-enabled": setColorEnabled,
+	colors: setColorEnabled,
+};
+
+const BOOLEAN_USAGE_HELPERS: Record<string, UsageHelper> = {
+	autolook: getAutolookUsage,
+	"auto-look": getAutolookUsage,
+	verbose: getVerboseUsage,
+	verbosemode: getVerboseUsage,
+	brief: getBriefUsage,
+	briefmode: getBriefUsage,
+	colorenabled: getColorEnabledUsage,
+	"color-enabled": getColorEnabledUsage,
+	colors: getColorEnabledUsage,
+};
+
 export default {
 	pattern: "config~ <setting:word?> <value:text?>",
 	execute(context: CommandContext, args: Map<string, any>): void {
@@ -103,326 +479,48 @@ export default {
 
 		// If no setting provided, show all current settings
 		if (!setting) {
-			const lines: string[] = [];
-			lines.push(color("Current Settings:", COLOR.YELLOW));
-			lines.push("");
-
-			// Color setting
-			lines.push(
-				`  ${color("Color", COLOR.TEAL).padEnd(20)} ${formatColor(
-					character.settings.defaultColor
-				)}`
-			);
-			lines.push(
-				`    ${color(
-					"Usage:",
-					COLOR.GREY
-				)} config color <color> | config color off`
-			);
-			lines.push(
-				`    ${color("Available colors:", COLOR.GREY)} ${COLORS.join(", ")}`
-			);
-			lines.push("");
-
-			// Auto-look setting
-			lines.push(
-				`  ${color("Auto-look", COLOR.TEAL).padEnd(20)} ${formatBoolean(
-					character.settings.autoLook,
-					true
-				)}`
-			);
-			lines.push(
-				`    ${color(
-					"Usage:",
-					COLOR.GREY
-				)} config autolook on | config autolook off`
-			);
-			lines.push("");
-
-			// Verbose mode setting
-			lines.push(
-				`  ${color("Verbose", COLOR.TEAL).padEnd(20)} ${formatBoolean(
-					character.settings.verboseMode,
-					true
-				)}`
-			);
-			lines.push(
-				`    ${color(
-					"Usage:",
-					COLOR.GREY
-				)} config verbose on | config verbose off`
-			);
-			lines.push("");
-
-			// Brief mode setting
-			lines.push(
-				`  ${color("Brief", COLOR.TEAL).padEnd(20)} ${formatBoolean(
-					character.settings.briefMode,
-					false
-				)}`
-			);
-			lines.push(
-				`    ${color("Usage:", COLOR.GREY)} config brief on | config brief off`
-			);
-			lines.push("");
-
-			// Color enabled setting
-			lines.push(
-				`  ${color("Color Enabled", COLOR.TEAL).padEnd(20)} ${formatBoolean(
-					character.settings.colorEnabled,
-					true
-				)}`
-			);
-			lines.push(
-				`    ${color(
-					"Usage:",
-					COLOR.GREY
-				)} config colorEnabled on | config colorEnabled off`
-			);
-			lines.push("");
-
-			// Echo mode setting
-			lines.push(
-				`  ${color("Echo Mode", COLOR.TEAL).padEnd(20)} ${formatEchoMode(
-					character.settings.echoMode
-				)}`
-			);
-			lines.push(
-				`    ${color("Usage:", COLOR.GREY)} config echomode <client|server|off>`
-			);
-			lines.push(
-				`    ${color(
-					"Notes:",
-					COLOR.GREY
-				)} client = your telnet client echoes, server = game echoes, off = no echo`
-			);
-			lines.push("");
-
-			// Prompt setting
-			const currentPrompt = character.settings.prompt ?? "> ";
-			lines.push(
-				`  ${color("Prompt", COLOR.TEAL).padEnd(20)} ${color(
-					`"${currentPrompt.replace(/\{/g, "{{")}"`,
-					COLOR.CYAN
-				)}`
-			);
-			lines.push(`    ${color("Usage:", COLOR.GREY)} config prompt "<text>"`);
-			lines.push(
-				`    ${color(
-					"Placeholders:",
-					COLOR.GREY
-				)} %hh (health), %mm (mana), %ee (exhaustion), %HH (max health), %MM (max mana), %xp (XP), %XX (XP to level)`
-			);
-			lines.push("");
-
-			lines.push(
-				color(
-					"Type 'config <setting> <value>' to change a setting.",
-					COLOR.GREY
-				)
-			);
-
-			actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+			showSettingsOverview(actor, character);
 			return;
 		}
 
 		const normalizedSetting = setting.toLowerCase();
-
-		// Handle color setting
 		if (normalizedSetting === "color") {
-			if (!value) {
-				const lines: string[] = [];
-				lines.push(
-					`Current default color: ${formatColor(
-						character.settings.defaultColor
-					)}`
-				);
-				lines.push(`Usage: config color <color> | config color off`);
-				lines.push(`Available colors: ${COLORS.join(", ")}`);
-				actor.sendMessage(
-					lines.join(LINEBREAK),
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				return;
-			}
-
-			const normalizedValue = value.toLowerCase().trim();
-			if (
-				normalizedValue === "off" ||
-				normalizedValue === "none" ||
-				normalizedValue === "clear"
-			) {
-				character.updateSettings({ defaultColor: undefined });
-				actor.sendMessage(
-					"Default terminal color cleared.",
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				return;
-			}
-
-			const colorEnum = findColorByName(normalizedValue);
-			if (colorEnum === null) {
-				actor.sendMessage(
-					`Unknown color "${value}". Available colors: ${COLORS.join(", ")}`,
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				return;
-			}
-
-			character.updateSettings({ defaultColor: colorEnum });
-			actor.sendMessage(
-				`Default terminal color set to ${color(
-					COLOR_NAMES[colorEnum],
-					COLOR.CYAN
-				)}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
+			setDefaultColor(actor, character, value);
 			return;
 		}
 
-		// Handle echo mode setting
 		if (normalizedSetting === "echomode" || normalizedSetting === "echo") {
-			if (!value) {
-				const lines: string[] = [];
-				lines.push(
-					`Current echo mode: ${formatEchoMode(character.settings.echoMode)}`
-				);
-				lines.push(`Usage: config echomode <client|server|off>`);
-				lines.push(
-					`client = your telnet client echoes locally, server = game echoes input back, off = no echo`
-				);
-				actor.sendMessage(
-					lines.join(LINEBREAK),
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				return;
-			}
-
-			const normalizedValue = value.toLowerCase().trim();
-			if (!VALID_ECHO_MODES.includes(normalizedValue as EchoMode)) {
-				actor.sendMessage(
-					`Invalid echo mode "${value}". Use client, server, or off.`,
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				return;
-			}
-
-			character.updateSettings({ echoMode: normalizedValue as EchoMode });
-			actor.sendMessage(
-				`Echo mode set to ${normalizedValue}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
+			setEchoMode(actor, character, value);
 			return;
 		}
 
-		// Handle prompt setting (string value, not boolean)
 		if (normalizedSetting === "prompt") {
+			setPrompt(actor, character, value);
+			return;
+		}
+
+		const booleanHandler = BOOLEAN_SETTING_HANDLERS[normalizedSetting];
+		if (booleanHandler) {
 			if (!value) {
-				const currentPrompt = character.settings.prompt ?? "> ";
-				const lines: string[] = [];
-				lines.push(`Current prompt: "${currentPrompt.replace(/\{/g, "{{")}"`);
-				lines.push(`Usage: config prompt "<text>"`);
-				lines.push(
-					`Placeholders: %hh (health), %mm (mana), %ee (exhaustion), %HH (max health), %MM (max mana), %xp (XP), %XX (XP to level)`
-				);
-				lines.push(`Example: config prompt "[%hh/%HH HP] [%xp XP] > "`);
+				const usageHelper = BOOLEAN_USAGE_HELPERS[normalizedSetting];
+				const usageLines = usageHelper();
 				actor.sendMessage(
-					lines.join(LINEBREAK),
+					usageLines.join(LINEBREAK),
 					MESSAGE_GROUP.COMMAND_RESPONSE
 				);
 				return;
 			}
 
-			// Remove quotes if present
-			let promptValue = value.trim();
-			if (
-				(promptValue.startsWith('"') && promptValue.endsWith('"')) ||
-				(promptValue.startsWith("'") && promptValue.endsWith("'"))
-			) {
-				promptValue = promptValue.slice(1, -1);
+			const parsedValue = parseBooleanFlag(value);
+			if (parsedValue === undefined) {
+				actor.sendMessage(
+					`Invalid value "${value}". Use "on" or "off".`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
 			}
 
-			character.updateSettings({ prompt: promptValue });
-			actor.sendMessage(
-				`Prompt set to "${promptValue}".`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Handle boolean settings
-		if (!value) {
-			actor.sendMessage(
-				`Usage: config ${setting} on | config ${setting} off`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		const normalizedValue = value.toLowerCase().trim();
-		const isOn =
-			normalizedValue === "on" ||
-			normalizedValue === "true" ||
-			normalizedValue === "1" ||
-			normalizedValue === "yes";
-		const isOff =
-			normalizedValue === "off" ||
-			normalizedValue === "false" ||
-			normalizedValue === "0" ||
-			normalizedValue === "no";
-
-		if (!isOn && !isOff) {
-			actor.sendMessage(
-				`Invalid value "${value}". Use "on" or "off".`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Handle autolook setting
-		if (normalizedSetting === "autolook" || normalizedSetting === "auto-look") {
-			character.updateSettings({ autoLook: isOn });
-			actor.sendMessage(
-				`Auto-look ${isOn ? "enabled" : "disabled"}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Handle verbose setting
-		if (
-			normalizedSetting === "verbose" ||
-			normalizedSetting === "verbosemode"
-		) {
-			character.updateSettings({ verboseMode: isOn });
-			actor.sendMessage(
-				`Verbose mode ${isOn ? "enabled" : "disabled"}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Handle brief setting
-		if (normalizedSetting === "brief" || normalizedSetting === "briefmode") {
-			character.updateSettings({ briefMode: isOn });
-			actor.sendMessage(
-				`Brief mode ${isOn ? "enabled" : "disabled"}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Handle colorEnabled setting
-		if (
-			normalizedSetting === "colorenabled" ||
-			normalizedSetting === "color-enabled" ||
-			normalizedSetting === "colors"
-		) {
-			character.updateSettings({ colorEnabled: isOn });
-			actor.sendMessage(
-				`Color display ${isOn ? "enabled" : "disabled"}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
+			booleanHandler(actor, character, parsedValue);
 			return;
 		}
 

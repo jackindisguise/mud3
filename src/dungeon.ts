@@ -73,6 +73,7 @@ import {
 } from "./package/archetype.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 import { Game } from "./game.js";
+import { showRoom } from "./commands/look.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -5797,6 +5798,22 @@ export class Mob extends Movable {
 		this.character?.sendMessage(text, group);
 	}
 
+	public override step(direction: DIRECTION): boolean {
+		const moved = super.step(direction);
+		if (!moved) {
+			return false;
+		}
+
+		if (!this.character) return true;
+		if (!(this.location instanceof Room)) return true;
+		this.sendMessage(
+			`You move ${dir2text(direction)}.`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		if (this.character.settings.autoLook) showRoom(this, this.location);
+		return true;
+	}
+
 	/**
 	 * Equip an item to the appropriate slot.
 	 * The equipment is moved to the mob's inventory if not already there, and all
@@ -5998,6 +6015,17 @@ export class Mob extends Movable {
 	 */
 	public serialize(): SerializedMob {
 		const base = super.serialize();
+		if (this._equipped.size > 0 && base.contents) {
+			const equipped = this.getAllEquipped();
+			const filteredContents = this.contents
+				.filter((obj) => !(obj instanceof Equipment) || !equipped.includes(obj))
+				.map((obj) => obj.serialize());
+			if (filteredContents.length > 0) {
+				base.contents = filteredContents;
+			} else {
+				delete base.contents;
+			}
+		}
 		const equipped: Record<
 			EQUIPMENT_SLOT,
 			SerializedEquipment | SerializedArmor | SerializedWeapon

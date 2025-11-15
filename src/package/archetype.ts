@@ -257,6 +257,9 @@ async function loadDirectory(
 ): Promise<number> {
 	const entries = await readdir(directory, { withFileTypes: true });
 	let count = 0;
+	logger.debug(
+		`Loading archetypes from ${relative(process.cwd(), directory)}...`
+	);
 
 	for (const entry of entries) {
 		if (!entry.isFile()) continue;
@@ -267,6 +270,7 @@ async function loadDirectory(
 		const parsed = parseArchetypeFile(raw, filePath, type);
 		if (!parsed) continue;
 
+		logger.debug(`Loaded ${parsed.definition.name} archetype`);
 		registerArchetype(type, parsed.definition);
 		count++;
 	}
@@ -354,33 +358,35 @@ export function registerClass(
 export default {
 	name: "archetype",
 	loader: async () => {
-		logger.info("================================================");
-		logger.info("Loading archetype definitions...");
+		await logger.block("archetype", async () => {
+			logger.debug("Loading races...");
+			await logger.block("races", async () => {
+				const raceCount = await loadDirectory(RACES_DIRECTORY, "race");
+				if (raceCount === 0) {
+					logger.warn(
+						`No race archetypes found in ${relative(
+							process.cwd(),
+							RACES_DIRECTORY
+						)}`
+					);
+					throw new Error("No race archetypes found");
+				}
+			});
+			logger.debug("Loading classes...");
+			await logger.block("classes", async () => {
+				const classCount = await loadDirectory(CLASSES_DIRECTORY, "class");
+				if (classCount === 0) {
+					logger.warn(
+						`No class archetypes found in ${relative(
+							process.cwd(),
+							CLASSES_DIRECTORY
+						)}`
+					);
+					throw new Error("No class archetypes found");
+				}
+			});
 
-		const raceCount = await loadDirectory(RACES_DIRECTORY, "race");
-		const classCount = await loadDirectory(CLASSES_DIRECTORY, "class");
-
-		if (raceCount === 0) {
-			logger.warn(
-				`No race archetypes found in ${relative(
-					process.cwd(),
-					RACES_DIRECTORY
-				)}`
-			);
-			throw new Error("No race archetypes found");
-		}
-
-		if (classCount === 0) {
-			logger.warn(
-				`No class archetypes found in ${relative(
-					process.cwd(),
-					CLASSES_DIRECTORY
-				)}`
-			);
-			throw new Error("No class archetypes found");
-		}
-
-		logSummary();
-		logger.info("================================================");
+			logSummary();
+		});
 	},
 } as Package;

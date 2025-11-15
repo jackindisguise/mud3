@@ -46,7 +46,7 @@ import {
 	checkCharacterPassword,
 	loadCharacterFromSerialized,
 } from "./package/character.js";
-import { loadBoards, saveBoard } from "./package/board.js";
+import { getBoards, loadBoards } from "./package/board.js";
 import { Board } from "./board.js";
 import { saveGameState, getNextCharacterId } from "./package/gamestate.js";
 import { executeAllDungeonResets } from "./package/dungeon.js";
@@ -814,7 +814,7 @@ export class Game {
 		lastLoginDate: Date
 	): Promise<void> {
 		try {
-			const boards = await loadBoards();
+			let boards = getBoards();
 			const username = character.credentials.username.toLowerCase();
 			const boardActivity: Array<{
 				board: Board;
@@ -980,13 +980,13 @@ export class Game {
 	 */
 	private async cleanupExpiredBoardMessages() {
 		try {
-			const boards = await loadBoards();
+			let boards = getBoards();
 			let totalRemoved = 0;
 
 			for (const board of boards) {
 				const removed = board.removeExpiredMessages();
 				if (removed > 0) {
-					await saveBoard(board);
+					await board.save();
 					totalRemoved += removed;
 					logger.debug(
 						`Removed ${removed} expired message(s) from board "${board.name}"`
@@ -1009,12 +1009,12 @@ export class Game {
 	 */
 	private async saveAllBoards() {
 		try {
-			const boards = await loadBoards();
+			let boards = getBoards();
 			if (boards.length === 0) return;
 
 			logger.info(`Saving ${boards.length} board(s)...`);
 
-			const savePromises = boards.map((board) => saveBoard(board));
+			const savePromises = boards.map((board) => board.save());
 			await Promise.all(savePromises);
 
 			logger.info(`All boards saved successfully`);

@@ -32,7 +32,7 @@ import {
 	PRIORITY,
 } from "../command.js";
 import { Package } from "package-loader";
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, stat } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import { runInNewContext } from "vm";
@@ -40,6 +40,8 @@ import YAML from "js-yaml";
 import logger from "../logger.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Game } from "../game.js";
+import { access } from "fs/promises";
+import { constants } from "fs";
 
 /**
  * Interface for command objects (JavaScript or TypeScript plain objects)
@@ -188,6 +190,15 @@ export class YAMLCommandAdapter extends Command {
 	}
 }
 
+async function fileExists(path: string): Promise<boolean> {
+	try {
+		await access(path, constants.F_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** Directory for runtime command files (user-editable) */
 const DATA_COMMAND_DIRECTORY = join(process.cwd(), "data", "commands");
 /** Directory for compiled built-in commands */
@@ -196,6 +207,7 @@ const SRC_COMMAND_DIRECTORY = join(process.cwd(), "dist", "src", "commands");
 async function loadCommands() {
 	const directories = [DATA_COMMAND_DIRECTORY, SRC_COMMAND_DIRECTORY];
 	for (const commandDir of directories) {
+		if (!(await fileExists(commandDir))) continue;
 		logger.info(`Loading commands from ${relative(process.cwd(), commandDir)}`);
 		try {
 			const files = await readdir(commandDir);
@@ -242,7 +254,7 @@ async function loadCommands() {
 					if (commandObj && commandObj.pattern && commandObj.execute) {
 						const command = new JavaScriptCommandAdapter(commandObj);
 						CommandRegistry.default.register(command);
-						logger.info(
+						logger.debug(
 							`Loaded command "${commandObj.pattern}" from ${relative(
 								process.cwd(),
 								filePath
@@ -329,9 +341,8 @@ async function loadCommands() {
 export default {
 	name: "commands",
 	loader: async () => {
-		logger.info("================================================");
-		logger.info("Loading command definitions...");
-		await loadCommands();
-		logger.info("================================================");
+		await logger.block("commands", async () => {
+			await loadCommands();
+		});
 	},
 } as Package;

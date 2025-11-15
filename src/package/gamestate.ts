@@ -93,7 +93,7 @@ export async function getNextCharacterId(): Promise<number> {
  * Calculates downtime and adds it to elapsed time.
  */
 export async function loadGameState(): Promise<void> {
-	logger.info(
+	logger.debug(
 		`Loading game state from ${relative(process.cwd(), GAMESTATE_PATH)}`
 	);
 	try {
@@ -115,7 +115,7 @@ export async function loadGameState(): Promise<void> {
 			// Add downtime to elapsed time
 			GAME_STATE.elapsedTime = data.elapsedTime + downtime;
 
-			logger.info(
+			logger.debug(
 				`Game state loaded. Server was down for ${Math.round(
 					downtime / 1000
 				)} seconds. Total elapsed time: ${Math.round(
@@ -156,7 +156,7 @@ export async function loadGameState(): Promise<void> {
 				)}`
 			);
 			await saveGameState();
-			logger.info("Default game state file created");
+			logger.debug("Default game state file created");
 		} else {
 			logger.error(`Failed to load game state: ${error}`);
 		}
@@ -206,16 +206,18 @@ export async function saveGameState() {
 export default {
 	name: "gamestate",
 	loader: async () => {
-		// Clean up any leftover temp files from previous crashes
-		const tempPath = `${GAMESTATE_PATH}.tmp`;
-		try {
-			await unlink(tempPath);
-			logger.debug("Cleaned up leftover temp file from previous session");
-		} catch {
-			// Temp file doesn't exist, which is fine
-		}
+		await logger.block("gamestate", async () => {
+			// Clean up any leftover temp files from previous crashes
+			const tempPath = `${GAMESTATE_PATH}.tmp`;
+			try {
+				await unlink(tempPath);
+				logger.debug("Cleaned up leftover temp file from previous session");
+			} catch {
+				// Temp file doesn't exist, which is fine
+			}
 
-		// Load saved values from file
-		await loadGameState();
+			// Load saved values from file
+			await loadGameState();
+		});
 	},
 } as Package;

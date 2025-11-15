@@ -266,10 +266,13 @@ export default {
 	name: "character",
 	dependencies: [archetypePkg],
 	loader: async () => {
-		logger.info("================================================");
-		logger.info(
-			`Character storage directory ready: ${relative(process.cwd(), CHAR_DIR)}`
-		);
-		logger.info("================================================");
+		await logger.block("character", async () => {
+			logger.debug(
+				`Character storage directory ready: ${relative(
+					process.cwd(),
+					CHAR_DIR
+				)}`
+			);
+		});
 	},
 } as Package;

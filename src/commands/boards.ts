@@ -16,10 +16,12 @@
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP, Character } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { loadBoards } from "../package/board.js";
-import { color, COLOR } from "../color.js";
+import { getBoards, loadBoards } from "../package/board.js";
+import { color, COLOR, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { formatDuration } from "../time.js";
+import { Board } from "../board.js";
+import { string } from "mud-ext";
 
 /**
  * Displays a list of all available message boards.
@@ -28,53 +30,59 @@ import { formatDuration } from "../time.js";
  */
 export function showBoardsList(char: Character): void {
 	const actor = char.mob;
-	loadBoards()
-		.then((boards) => {
-			const lines: string[] = [];
-			lines.push(color("=== Available Message Boards ===", COLOR.YELLOW));
-			lines.push("");
-
-			if (boards.length === 0) {
-				lines.push(color("No boards available.", COLOR.SILVER));
-			} else {
-				for (const board of boards) {
-					const typeLabel = board.permanent
-						? color("Permanent", COLOR.LIME)
-						: color("Time-limited", COLOR.YELLOW);
-					const expirationInfo = board.permanent
-						? ""
-						: ` (expires after ${formatDuration(board.expirationMs || 0)})`;
-
-					lines.push(
-						`${color(board.displayName, COLOR.CYAN)} ${color(
-							`(${board.name})`,
-							COLOR.SILVER
-						)}`
-					);
-					lines.push(`  ${board.description}`);
-					lines.push(`  ${typeLabel}${expirationInfo}`);
-					lines.push(
-						`  ${color("Messages:", COLOR.CYAN)} ${board.getMessageCount()}`
-					);
-					lines.push("");
-				}
+	const render = (boards: Board[]) => {
+		const lines: string[] = [];
+		if (boards.length === 0) {
+			lines.push(color("No boards available.", COLOR.SILVER));
+		} else {
+			for (const board of boards) {
+				const typeLabel = board.permanent
+					? color("Permanent", COLOR.LIME)
+					: color("Time-limited", COLOR.YELLOW);
+				const expirationInfo = board.permanent
+					? ""
+					: ` (expires after ${formatDuration(board.expirationMs || 0)})`;
 
 				lines.push(
-					`Use ${color("board <name>", COLOR.CYAN)} to read a board, or ${color(
-						"board <name> write",
-						COLOR.CYAN
-					)} to post.`
+					`${color(board.displayName, COLOR.CYAN)} ${color(
+						`(${board.name})`,
+						COLOR.SILVER
+					)}`
 				);
+				lines.push(`  ${board.description}`);
+				lines.push(`  ${typeLabel}${expirationInfo}`);
+				lines.push(
+					`  ${color("Messages:", COLOR.CYAN)} ${board.getMessageCount()}`
+				);
+				lines.push("");
 			}
 
-			actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
-		})
-		.catch((err) => {
-			actor.sendMessage(
-				"Error loading boards. Please try again.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
+			lines.push(
+				`Use ${color("board <name>", COLOR.CYAN)} to read a board, or ${color(
+					"board <name> write",
+					COLOR.CYAN
+				)} to post.`
 			);
+		}
+
+		const box = string.box({
+			input: lines,
+			width: 80,
+			sizer: SIZER,
+			style: {
+				...string.BOX_STYLES.PLAIN,
+				titleHAlign: string.ALIGN.CENTER,
+			},
+			title: color("Message Boards", COLOR.YELLOW),
 		});
+		actor.sendMessage(box.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+	};
+
+	const cachedBoards = getBoards();
+	if (cachedBoards.length > 0) {
+		render(cachedBoards);
+		return;
+	}
 }
 
 export default {

@@ -218,7 +218,7 @@ export class Board {
 		if (!message.readBy.includes(characterId)) {
 			message.readBy.push(characterId);
 			// Save the board to persist the read status
-			await saveBoard(this).catch((err) => {
+			await this.save().catch((err) => {
 				// Error saving is logged by saveBoard, continue anyway
 			});
 		}
@@ -359,6 +359,13 @@ export class Board {
 		return {
 			messages: this.getAllMessages(),
 		};
+	}
+
+	/**
+	 * Persists this board's current state to disk.
+	 */
+	public async save(): Promise<void> {
+		await saveBoard(this);
 	}
 
 	/**

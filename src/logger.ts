@@ -79,9 +79,23 @@ const testSuffix = isTestMode ? ".test" : "";
  * ```
  */
 
+const _prefix: string[] = [];
+interface PrefixedLogger extends winston.Logger {
+	block(prefix: string, fn: () => Promise<void>): Promise<void>;
+}
+
+const applyPrefixFormat = winston.format((info) => {
+	const prefix = _prefix;
+	if (prefix.length > 0 && info.message) {
+		info.message = `${prefix.join("/")} >> ${info.message}`;
+	}
+	return info;
+});
+
 const logger = winston.createLogger({
 	level: "debug", // Set to debug to capture all levels
 	format: winston.format.combine(
+		applyPrefixFormat(),
 		winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
 		winston.format.errors({ stack: true }),
 		winston.format.splat(),
@@ -135,7 +149,7 @@ const logger = winston.createLogger({
 		...(!isTestMode
 			? [
 					new winston.transports.Console({
-						level: process.env.LOG_LEVEL || "debug", // Console respects LOG_LEVEL or defaults to info
+						level: process.env.LOG_LEVEL || "info", // Console respects LOG_LEVEL or defaults to info
 						format: winston.format.combine(
 							winston.format.colorize(),
 							winston.format.timestamp({ format: "HH:mm:ss" }),
@@ -152,6 +166,20 @@ const logger = winston.createLogger({
 			  ]
 			: []),
 	],
-});
+}) as PrefixedLogger;
+
+logger.block = async function (
+	prefix: string,
+	fn: () => Promise<void>
+): Promise<void> {
+	_prefix.push(prefix);
+	try {
+		await fn();
+		_prefix.pop();
+	} catch (error) {
+		_prefix.pop();
+		throw error;
+	}
+};
 
 export default logger;

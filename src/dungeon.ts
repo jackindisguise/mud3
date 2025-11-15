@@ -977,7 +977,7 @@ export class Dungeon {
 			this._dimensions.width *
 			this._dimensions.height *
 			this._dimensions.layers;
-		logger.info(
+		logger.debug(
 			`Registered dungeon "${id}" with ${roomCount} cells (${this._dimensions.width}x${this._dimensions.height}x${this._dimensions.layers})`
 		);
 	}

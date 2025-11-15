@@ -17,7 +17,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
-import { loadBoard, saveBoard } from "../package/board.js";
+import { loadBoard } from "../package/board.js";
 import logger from "../logger.js";
 import { string } from "mud-ext";
 import { COLOR, color, SIZER, TEXT_STYLE, textStyleToTag } from "../color.js";
@@ -554,7 +554,7 @@ async function postChangelogToBoard(): Promise<void> {
 
 		if (postedCount > 0) {
 			// Save the board after posting all new versions
-			await saveBoard(board);
+			await board.save();
 			logger.info(`Posted ${postedCount} new changelog version(s)`);
 		} else {
 			logger.info("All changelog versions are already posted");

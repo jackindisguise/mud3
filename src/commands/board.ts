@@ -19,7 +19,7 @@
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { loadBoard, saveBoard } from "../package/board.js";
+import { getBoard, loadBoard } from "../package/board.js";
 import { Board, BoardMessage } from "../board.js";
 import { color, COLOR, textStyleToTag, TEXT_STYLE, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
@@ -32,7 +32,6 @@ export default {
 		const boardName = args.get("boardname") as string | undefined;
 		const action = args.get("action") as string | undefined;
 		const idArg = args.get("id") as string | undefined;
-		const message = args.get("message") as string | undefined;
 		const { actor } = context;
 		const character = actor.character;
 
@@ -52,7 +51,7 @@ export default {
 
 		// Load the board
 		try {
-			const board = await loadBoard(boardName);
+			let board = getBoard(boardName);
 			if (!board) {
 				actor.sendMessage(
 					`Board "${color(
@@ -70,8 +69,8 @@ export default {
 			// Remove expired messages before processing
 			const removed = board.removeExpiredMessages();
 			if (removed > 0) {
-				saveBoard(board).catch((err) => {
-					// Error saving is logged by saveBoard, continue anyway
+				board.save().catch(() => {
+					// Error is logged by board.save(), continue anyway
 				});
 			}
 
@@ -300,9 +299,9 @@ function displayBoard(
 		input: megaBoxInput,
 		width: 80,
 		sizer: SIZER,
-		title: color(`${board.displayName} Board`, COLOR.YELLOW),
+		title: color(`${board.displayName}`, COLOR.YELLOW),
 		style: {
-			...string.BOX_STYLES.ROUNDED,
+			...string.BOX_STYLES.PLAIN,
 			titleHAlign: string.ALIGN.CENTER,
 		},
 	});
@@ -366,7 +365,7 @@ function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
 		sizer: SIZER,
 		title: color(`${board.displayName} Message #${msg.id}`, COLOR.CYAN),
 		style: {
-			...string.BOX_STYLES.ROUNDED,
+			...string.BOX_STYLES.PLAIN,
 			titleHAlign: string.ALIGN.CENTER,
 		},
 	});
@@ -495,6 +494,30 @@ function startWriteSequence(
 		);
 	};
 
+	// Helper function to replace a line
+	const replaceLine = (lineNum: number, text: string) => {
+		const index = lineNum - 1; // Convert to 0-based index
+		if (index < 0 || index >= bodyLines.length) {
+			sendLine(
+				color(
+					`Invalid line number. Body has ${bodyLines.length} line(s).`,
+					COLOR.CRIMSON
+				)
+			);
+			return;
+		}
+		const wrapped = string.wrap(text, 72);
+		const resetTag = textStyleToTag(TEXT_STYLE.RESET_ALL);
+		const linesWithReset = wrapped.map((line) => line + resetTag);
+		bodyLines.splice(index, 1, ...linesWithReset);
+		sendLine(
+			color(
+				`Replaced line ${lineNum} with ${linesWithReset.length} line(s).`,
+				COLOR.LIME
+			)
+		);
+	};
+
 	// Helper function to show help
 	const showHelp = () => {
 		sendLine("");
@@ -519,6 +542,12 @@ function startWriteSequence(
 				"!insert <n> <text>",
 				COLOR.CYAN
 			)} - Insert a line at position <n>, pushing existing lines down`
+		);
+		sendLine(
+			`${color(
+				"!replace <n> <text>",
+				COLOR.CYAN
+			)} - Replace line <n> with new wrapped text`
 		);
 		sendLine(
 			`${color("!subject <text>", COLOR.CYAN)} - Change the message subject`
@@ -623,6 +652,53 @@ function startWriteSequence(
 				return;
 			}
 			insertLine(lineNum, text);
+			askBody();
+		} else if (lower.startsWith("!replace")) {
+			const rest = trimmed.substring(9).trim();
+			const spaceIndex = rest.indexOf(" ");
+			if (spaceIndex === -1) {
+				sendLine(
+					color(
+						`Invalid format. Use: ${color(
+							"!replace <number> <text>",
+							COLOR.CYAN
+						)}`,
+						COLOR.CRIMSON
+					)
+				);
+				askBody();
+				return;
+			}
+			const lineNumStr = rest.substring(0, spaceIndex);
+			const text = rest.substring(spaceIndex + 1).trim();
+			if (!text) {
+				sendLine(
+					color(
+						`Text cannot be empty. Use: ${color(
+							"!replace <number> <text>",
+							COLOR.CYAN
+						)}`,
+						COLOR.CRIMSON
+					)
+				);
+				askBody();
+				return;
+			}
+			const lineNum = parseInt(lineNumStr, 10);
+			if (isNaN(lineNum)) {
+				sendLine(
+					color(
+						`Invalid line number. Use: ${color(
+							"!replace <number> <text>",
+							COLOR.CYAN
+						)}`,
+						COLOR.CRIMSON
+					)
+				);
+				askBody();
+				return;
+			}
+			replaceLine(lineNum, text);
 			askBody();
 		} else if (lower.startsWith("!subject ")) {
 			const newSubject = trimmed.substring(9).trim();

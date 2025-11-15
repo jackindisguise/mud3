@@ -11,15 +11,18 @@ import dungeon from "./src/package/dungeon.js";
 import logger from "./src/logger.js";
 import { startGame } from "./src/game.js";
 
-await loadPackage(lockfile); // always load first
-await loadPackage(commands);
-await loadPackage(config);
-await loadPackage(archetype);
-await loadPackage(character);
-await loadPackage(help);
-await loadPackage(board);
-await loadPackage(dungeon);
-await loadPackage(gamestate);
+await logger.block("packages", async () => {
+	logger.info("Loading packages...");
+	await loadPackage(lockfile); // always load first
+	await loadPackage(commands);
+	await loadPackage(config);
+	await loadPackage(archetype);
+	await loadPackage(character);
+	await loadPackage(help);
+	await loadPackage(board);
+	await loadPackage(dungeon);
+	await loadPackage(gamestate);
+});
 
 // Start the game using startGame() to properly set Game.game singleton
 const game = await startGame();

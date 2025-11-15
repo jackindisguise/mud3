@@ -6,6 +6,7 @@ messages:
     postedAt: '2025-11-12T03:14:45.608Z'
     readBy:
       - 5
+      - 6
   - id: 98
     author: SYSTEM
     subject: Version 1.1.0
@@ -13,6 +14,7 @@ messages:
     postedAt: '2025-11-12T03:14:45.609Z'
     readBy:
       - 5
+      - 6
   - id: 99
     author: SYSTEM
     subject: Version 1.2.0
@@ -20,6 +22,7 @@ messages:
     postedAt: '2025-11-12T03:14:45.610Z'
     readBy:
       - 5
+      - 6
   - id: 100
     author: SYSTEM
     subject: Version 1.3.0
@@ -27,6 +30,7 @@ messages:
     postedAt: '2025-11-12T04:29:04.674Z'
     readBy:
       - 5
+      - 6
   - id: 101
     author: SYSTEM
     subject: Version 1.4.0
@@ -34,6 +38,7 @@ messages:
     postedAt: '2025-11-13T05:00:15.090Z'
     readBy:
       - 5
+      - 6
   - id: 102
     author: SYSTEM
     subject: Version 1.5.0
@@ -41,3 +46,4 @@ messages:
     postedAt: '2025-11-13T16:42:52.200Z'
     readBy:
       - 5
+      - 6

@@ -69,7 +69,7 @@ export const CONFIG: Config = {
 };
 
 export async function loadConfig() {
-	logger.info(`Loading config from ${relative(process.cwd(), CONFIG_PATH)}`);
+	logger.debug(`Loading config from ${relative(process.cwd(), CONFIG_PATH)}`);
 	try {
 		const content = await readFile(CONFIG_PATH, "utf-8");
 		const parsed = YAML.load(content) as Partial<Config> | undefined;
@@ -139,7 +139,7 @@ export async function loadConfig() {
 			await writeFile(tempPath, defaultContent, "utf-8");
 			// Atomically rename temp file to final location
 			await rename(tempPath, CONFIG_PATH);
-			logger.info("Default config file created");
+			logger.debug("Default config file created");
 		} catch (writeError) {
 			// Clean up temp file if it exists
 			try {
@@ -156,9 +156,8 @@ export default {
 	name: "config",
 	loader: async () => {
 		// read config.yaml
-		logger.info("================================================");
-		logger.info("Loading config...");
-		await loadConfig();
-		logger.info("================================================");
+		await logger.block("config", async () => {
+			await loadConfig();
+		});
 	},
 } as Package;

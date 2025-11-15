@@ -21,7 +21,7 @@ import logger from "../logger.js";
 
 export default {
 	pattern: "save~",
-	execute(context: CommandContext): void {
+	async execute(context: CommandContext): Promise<void> {
 		const { actor } = context;
 		const character = actor.character;
 
@@ -34,18 +34,8 @@ export default {
 		}
 
 		// Save the character
-		saveCharacter(character)
-			.then(() => {
-				actor.sendMessage("Character saved.", MESSAGE_GROUP.COMMAND_RESPONSE);
-			})
-			.catch((error) => {
-				actor.sendMessage(
-					"Error saving character. Please try again.",
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				logger.error(
-					`Failed to save character ${character.credentials.username}: ${error}`
-				);
-			});
+		actor.sendMessage("Saving character...", MESSAGE_GROUP.COMMAND_RESPONSE);
+		await saveCharacter(character);
+		actor.sendMessage("Character saved.", MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;

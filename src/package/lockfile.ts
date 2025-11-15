@@ -61,7 +61,7 @@ export async function createLock() {
 
 	await writeFile(LOCKFILE_PATH, JSON.stringify(lockInfo, null, 2), "utf-8");
 	isLocked = true;
-	logger.info(`Lockfile created: PID ${process.pid}`);
+	logger.debug(`Lockfile created: PID ${process.pid}`);
 }
 
 /**
@@ -116,62 +116,64 @@ export async function checkLock() {
 export default {
 	name: "lockfile",
 	loader: async () => {
-		logger.info("Checking for existing instance...");
+		await logger.block("lockfile", async () => {
+			logger.debug("Checking for existing instance...");
 
-		// Check if another instance is running
-		const isRunning = await checkLock();
-		if (isRunning) {
-			logger.error(
-				"Cannot start: another instance is already running. Exiting."
-			);
-			process.exit(1);
-		}
-
-		// Create lock for this instance
-		await createLock();
-
-		// Clean up lockfile on exit
-		const cleanup = async () => {
-			await removeLock();
-		};
-
-		// Handle various exit scenarios
-		process.on("exit", () => {
-			// Synchronous cleanup on exit
-			if (isLocked && existsSync(LOCKFILE_PATH)) {
-				try {
-					unlinkSync(LOCKFILE_PATH);
-					logger.info("Lockfile removed (exit)");
-				} catch (error) {
-					logger.error(`Failed to remove lockfile on exit: ${error}`);
-				}
+			// Check if another instance is running
+			const isRunning = await checkLock();
+			if (isRunning) {
+				logger.error(
+					"Cannot start: another instance is already running. Exiting."
+				);
+				process.exit(1);
 			}
-		});
 
-		process.on("SIGINT", async () => {
-			logger.info("Received SIGINT, cleaning up...");
-			await cleanup();
-			process.exit(0);
-		});
+			// Create lock for this instance
+			await createLock();
 
-		process.on("SIGTERM", async () => {
-			logger.info("Received SIGTERM, cleaning up...");
-			await cleanup();
-			process.exit(0);
-		});
+			// Clean up lockfile on exit
+			const cleanup = async () => {
+				await removeLock();
+			};
 
-		process.on("uncaughtException", async (error) => {
-			logger.error("Uncaught exception:", error);
-			await cleanup();
-			process.exit(1);
-		});
+			// Handle various exit scenarios
+			process.on("exit", () => {
+				// Synchronous cleanup on exit
+				if (isLocked && existsSync(LOCKFILE_PATH)) {
+					try {
+						unlinkSync(LOCKFILE_PATH);
+						logger.info("Lockfile removed (exit)");
+					} catch (error) {
+						logger.error(`Failed to remove lockfile on exit: ${error}`);
+					}
+				}
+			});
 
-		process.on("unhandledRejection", async (reason, promise) => {
-			logger.error("Unhandled rejection:", { reason, promise });
-			await cleanup();
-			process.exit(1);
-		});
+			process.on("SIGINT", async () => {
+				logger.debug("Received SIGINT, cleaning up...");
+				await cleanup();
+				process.exit(0);
+			});
 
-		logger.info("Instance lock acquired successfully");
+			process.on("SIGTERM", async () => {
+				logger.debug("Received SIGTERM, cleaning up...");
+				await cleanup();
+				process.exit(0);
+			});
+
+			process.on("uncaughtException", async (error) => {
+				logger.error("Uncaught exception:", error);
+				await cleanup();
+				process.exit(1);
+			});
+
+			process.on("unhandledRejection", async (reason, promise) => {
+				logger.error("Unhandled rejection:", { reason, promise });
+				await cleanup();
+				process.exit(1);
+			});
+
+			logger.info("Instance lock acquired successfully");
+		});
 	},
 } as Package;

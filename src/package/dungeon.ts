@@ -542,13 +542,11 @@ export function executeAllDungeonResets(): void {
 export default {
 	name: "dungeon",
 	loader: async () => {
-		logger.info("================================================");
-		logger.info("Loading dungeon definitions...");
-		const dungeons = await loadDungeons();
-		logger.info(
-			`Dungeon persistence package loaded: ${dungeons.length} dungeon(s)`
-		);
-
-		logger.info("================================================");
+		await logger.block("dungeon", async () => {
+			const dungeons = await loadDungeons();
+			logger.info(
+				`Dungeon persistence package loaded: ${dungeons.length} dungeon(s)`
+			);
+		});
 	},
 } as Package;

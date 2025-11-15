@@ -35,7 +35,7 @@
 	},
 	"dependencies": {
 		"accurate-intervals": "github:jackindisguise/accurate-intervals",
-		"mud-ext": "github:jackindisguise/mud-ext#v2.12.0",
+		"mud-ext": "github:jackindisguise/mud-ext#v2.12.1",
 		"node-test-reporter": "^1.2.0",
 		"package-loader": "github:jackindisguise/package-loader"
 	}

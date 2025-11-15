@@ -947,10 +947,13 @@ export class Game {
 		await saveCharacterFile(session.character);
 
 		logger.info(`${session.character} has left the game`);
+		const name = session.character.toString();
 
 		// Destroy the mob (clears all references and prepares for garbage collection)
-		if (session.character.mob) session.character.mob.destroy();
-		logger.info(`${session.character.mob} has been destroyed`);
+		if (session.character.mob) {
+			session.character.mob.destroy();
+			logger.info(`${name} has been destroyed`);
+		}
 
 		// Clean up tracking
 		this.activeCharacters.delete(session.character);
@@ -958,7 +961,7 @@ export class Game {
 		// Remove from character package registry (local lock)
 		unregisterActiveCharacter(session.character);
 
-		logger.info(`${session.character} has been removed from active characters`);
+		logger.info(`${name} has been removed from active characters`);
 	}
 
 	/**

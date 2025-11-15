@@ -43,7 +43,7 @@ function generateMinimap(
 	room: Room,
 	mob: Mob,
 	size: number
-): string | undefined {
+): string[] | undefined {
 	const dungeon = room.dungeon;
 	if (!dungeon) return undefined;
 
@@ -86,10 +86,21 @@ function generateMinimap(
 			}
 			row.push(color(mapText, mapColor));
 		}
-		lines.push(row.join(" "));
+		lines.push(row.join(""));
 	}
 
-	return lines.join("\n");
+	const box = string.box({
+		input: lines,
+		width: gridSize + 2,
+		sizer: SIZER,
+		style: {
+			...string.BOX_STYLES.PLAIN,
+			hPadding: 0,
+			titleHAlign: string.ALIGN.CENTER,
+		},
+		title: "Minimap",
+	});
+	return box;
 }
 
 /**
@@ -109,7 +120,7 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 
 	// Get minimap and split into lines
 	const minimap = generateMinimap(room, mob, minimapSize);
-	const minimapLines = minimap ? minimap.split("\n") : [];
+	const minimapLines = minimap ?? [];
 
 	// Calculate minimap width (find the longest line, accounting for color codes)
 	let minimapWidth = 0;

@@ -69,9 +69,3 @@ content: |-
     - Your block list is private and only visible to you
     - Blocked users are not notified when you block or unblock them
     - No public indication that someone is on your block list
-
-  Related Commands:
-    - unblock: Remove a user from your blocked list
-    - channels: Manage which channels you're subscribed to
-    - whisper: Send private messages
-    - reply: Respond to whispers

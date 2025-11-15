@@ -47,3 +47,8 @@ messages:
     readBy:
       - 5
       - 6
+  - id: 103
+    author: SYSTEM
+    subject: Version 1.6.0
+    content: "{YFeatures:{x\r\n{y{Y *{x {yexpand archetypes and polish ux{x{x\r\n{y{Y *{x {yadded dozens of new starter races/classes with lore helpfiles and{x\r\n   {yscripts{x{x\r\n{y{Y *{x {yreworked character creation storing archetype objects plus !info{x\r\n   {ysupport{x{x\r\n{y{Y *{x {yenriched help and features docs, added config and who command ux{x\r\n   {ytweaks{x{x\r\n{y{Y *{x {ybroadcast dungeon reset messages and updated dungeon data{x{x\r\n{y{Y *{x {yimprove config guidance and auto-look handling{x{x\r\n{y{Y *{x {yrefactored the config command with helper functions, richer usage{x\r\n   {ytext, and color listings via mud-ext{x{x\r\n{y{Y *{x {yrouted movement through Mob.step() so movement feedback and auto-look{x\r\n   {ydisplay live with the mob{x{x\r\n\r\n{GBug Fixes:{x\r\n{g{G *{x {gimproved prompt/echo handling and telnet IAC stripping compatibility{x{x\r\n{g{G *{x {gprevented equipped items from being duplicated in serialized mob{x\r\n   {gcontents{x{x\r\n\r\n{CMiscellaneous:{x\r\n{c{C *{x {creorganized archetype, dungeon, and command loading utilities{x{x\r\n{c{C *{x {cbumped mud-ext to v2.12.0 and updated the lockfile{x{x\r\n{c{C *{x {crefreshed gamestate metadata{x{x"
+    postedAt: '2025-11-15T03:43:59.646Z'

@@ -50,12 +50,31 @@ import {
 	Reset,
 	ResetOptions,
 	DUNGEON_REGISTRY,
+	dir2text,
+	text2dir,
+	dir2reverse,
+	DirectionText,
+	RoomLink,
+	getRoomByRef,
+	getDungeonById,
 } from "../dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 
 const DUNGEON_DIR = join(process.cwd(), "data", "dungeons");
+
+/**
+ * Pending room links to be processed after all dungeons are loaded.
+ * Stores room coordinates and their roomLinks data.
+ */
+interface PendingRoomLink {
+	roomRef: string; // Room reference for the source room
+	direction: DirectionText; // Direction name
+	targetRoomRef: string; // Room reference for the destination room
+}
+
+const pendingRoomLinks: PendingRoomLink[] = [];
 
 /**
  * Serialized reset format (for YAML persistence).
@@ -163,13 +182,42 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 					}
 					// Note: baseWeight is not included for rooms
 
+					// Extract roomLinks from room's _links array
+					const roomLinks: Record<string, string> = {};
+					const roomPrivate = room as any;
+					if (roomPrivate._links && roomPrivate._links.length > 0) {
+						for (const link of roomPrivate._links) {
+							const linkPrivate = link as any;
+							// Only include links where this room is the "from" room
+							if (linkPrivate._from?.room === room) {
+								const direction = linkPrivate._from.direction;
+								const destination = linkPrivate._to?.room;
+								if (destination) {
+									const directionText = dir2text(direction);
+									const roomRef = destination.getRoomRef();
+									if (roomRef && directionText) {
+										roomLinks[directionText] = roomRef;
+									}
+								}
+							}
+						}
+					}
+					if (Object.keys(roomLinks).length > 0) {
+						template.roomLinks = roomLinks as Record<DirectionText, string>;
+					}
+
 					// Check if this template already exists in our list
+					// Include roomLinks in comparison so rooms with different links get different templates
 					templateIndex = roomTemplates.findIndex((t) => {
+						const roomLinksMatch =
+							JSON.stringify(t.roomLinks || {}) ===
+							JSON.stringify(template.roomLinks || {});
 						return (
 							t.keywords === template.keywords &&
 							t.display === template.display &&
 							t.description === template.description &&
-							t.allowedExits === template.allowedExits
+							t.allowedExits === template.allowedExits &&
+							roomLinksMatch
 						);
 					});
 
@@ -410,6 +458,22 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					if (!dungeon.addRoom(room)) {
 						throw new Error(`Failed to add room at coordinates ${x},${y},${z}`);
 					}
+
+					// Collect roomLinks from template for later processing
+					if (roomTemplate.roomLinks) {
+						const roomRef = room.getRoomRef();
+						if (roomRef) {
+							for (const [directionText, targetRoomRef] of Object.entries(
+								roomTemplate.roomLinks
+							)) {
+								pendingRoomLinks.push({
+									roomRef,
+									direction: directionText as DirectionText,
+									targetRoomRef,
+								});
+							}
+						}
+					}
 				}
 			}
 		}
@@ -500,6 +564,127 @@ export async function getAllDungeonIds(): Promise<string[]> {
 }
 
 /**
+ * Process all pending room links after all dungeons are loaded.
+ * Detects bidirectional links and makes them two-way automatically.
+ */
+function processPendingRoomLinks(): void {
+	if (pendingRoomLinks.length === 0) {
+		logger.debug("No pending room links to process");
+		return;
+	}
+
+	logger.debug(`Processing ${pendingRoomLinks.length} pending room link(s)`);
+
+	// Track processed links to avoid duplicates
+	const processedLinks = new Set<string>();
+	let createdCount = 0;
+	let skippedCount = 0;
+	let oneWayCount = 0;
+	let twoWayCount = 0;
+
+	for (const pending of pendingRoomLinks) {
+		logger.debug(
+			`Processing room link: ${pending.roomRef} ${pending.direction} -> ${pending.targetRoomRef}`
+		);
+
+		const fromRoom = getRoomByRef(pending.roomRef);
+		if (!fromRoom) {
+			// Debug: check if dungeon exists
+			const match = pending.roomRef.match(/^@([^{]+)\{(\d+),(\d+),(\d+)\}$/);
+			if (match) {
+				const [, dungeonId] = match;
+				const dungeon = getDungeonById(dungeonId);
+				logger.debug(
+					`Source room lookup: dungeon "${dungeonId}" ${
+						dungeon ? "exists" : "not found"
+					}`
+				);
+			}
+			logger.warn(
+				`Failed to process room link: source room "${pending.roomRef}" not found`
+			);
+			continue;
+		}
+
+		const toRoom = getRoomByRef(pending.targetRoomRef);
+		if (!toRoom) {
+			logger.warn(
+				`Failed to process room link: target room "${pending.targetRoomRef}" not found`
+			);
+			continue;
+		}
+
+		const direction = text2dir(pending.direction);
+		if (!direction) {
+			logger.warn(
+				`Failed to process room link: invalid direction "${pending.direction}"`
+			);
+			continue;
+		}
+
+		// Create a unique key for this link (normalize by sorting room refs)
+		const linkKey = `${pending.roomRef}:${pending.direction}:${pending.targetRoomRef}`;
+		const reverseDirection = dir2reverse(direction);
+		const reverseDirectionText = dir2text(reverseDirection);
+		const reverseLinkKey = `${pending.targetRoomRef}:${reverseDirectionText}:${pending.roomRef}`;
+
+		// Check if this link or its reverse has already been processed
+		if (processedLinks.has(linkKey) || processedLinks.has(reverseLinkKey)) {
+			// This is a duplicate or reverse of an already processed link
+			// RoomLink.createTunnel already creates two-way links, so we skip the duplicate
+			logger.debug(
+				`Skipping duplicate room link: ${pending.roomRef} ${pending.direction} -> ${pending.targetRoomRef}`
+			);
+			skippedCount++;
+			continue;
+		}
+
+		// Check if a reverse link exists in the pending list (bidirectional detection)
+		// If both rooms have links pointing to each other, we'll create a two-way link
+		const hasReverseLink = pendingRoomLinks.some(
+			(p) =>
+				p.roomRef === pending.targetRoomRef &&
+				p.targetRoomRef === pending.roomRef &&
+				p.direction === reverseDirectionText
+		);
+
+		// Determine if this should be a one-way or two-way link
+		// If both rooms have links pointing to each other, make it two-way
+		// Otherwise, make it one-way
+		const oneWay = !hasReverseLink;
+
+		if (hasReverseLink) {
+			logger.debug(
+				`Bidirectional link detected: ${pending.roomRef} ${pending.direction} <-> ${pending.targetRoomRef} ${reverseDirectionText}`
+			);
+			twoWayCount++;
+		} else {
+			logger.debug(
+				`One-way link: ${pending.roomRef} ${pending.direction} -> ${pending.targetRoomRef}`
+			);
+			oneWayCount++;
+		}
+
+		// Create the link
+		RoomLink.createTunnel(fromRoom, direction, toRoom, oneWay);
+		createdCount++;
+
+		// Mark both this link and its reverse as processed to avoid duplicates
+		processedLinks.add(linkKey);
+		processedLinks.add(reverseLinkKey);
+	}
+
+	// Clear pending links
+	pendingRoomLinks.length = 0;
+
+	logger.info(
+		`Processed ${createdCount} room link(s): ${oneWayCount} one-way, ${twoWayCount} two-way${
+			skippedCount > 0 ? ` (skipped ${skippedCount} duplicate(s))` : ""
+		}`
+	);
+}
+
+/**
  * Load all dungeons from disk.
  */
 export async function loadDungeons(): Promise<Dungeon[]> {
@@ -515,6 +700,9 @@ export async function loadDungeons(): Promise<Dungeon[]> {
 			logger.warn(`Failed to load dungeon with id: ${id}`);
 		}
 	}
+
+	// Process all pending room links after all dungeons are loaded
+	processPendingRoomLinks();
 
 	return dungeons;
 }

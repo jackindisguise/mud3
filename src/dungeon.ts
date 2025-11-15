@@ -1819,6 +1819,12 @@ export interface DungeonObjectTemplate {
 export interface RoomTemplate extends DungeonObjectTemplate {
 	type: "Room";
 	allowedExits?: DIRECTION;
+	/**
+	 * Room links defined on this template.
+	 * Keys are direction names (e.g., "north", "up") and values are room references (e.g., "@tower{0,0,1}").
+	 * Links are processed after all dungeons are loaded, and bidirectional links are automatically detected.
+	 */
+	roomLinks?: Record<DirectionText, string>;
 }
 
 /**

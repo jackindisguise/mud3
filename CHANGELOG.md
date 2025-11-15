@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.6.0](https://github.com/jackindisguise/mud3/compare/v1.5.0...v1.6.0) (2025-11-14)
+
+
+### Features
+
+* added dozens of new starter races/classes with lore helpfiles and scripts ([aae31e1](https://github.com/jackindisguise/mud3/commit/aae31e1b6ae771c6ee0e1feaf44f707c381df817))
+* broadcast dungeon reset messages and updated dungeon data ([aae31e1](https://github.com/jackindisguise/mud3/commit/aae31e1b6ae771c6ee0e1feaf44f707c381df817))
+* **core:** improve config guidance and auto-look handling ([6fd77b4](https://github.com/jackindisguise/mud3/commit/6fd77b49d80aa682b786652bb2eb03110a6910f5))
+* enriched help and features docs, added config and who command ux tweaks ([aae31e1](https://github.com/jackindisguise/mud3/commit/aae31e1b6ae771c6ee0e1feaf44f707c381df817))
+* expand archetypes and polish ux ([aae31e1](https://github.com/jackindisguise/mud3/commit/aae31e1b6ae771c6ee0e1feaf44f707c381df817))
+* refactored the config command with helper functions, richer usage text, and color listings via mud-ext ([6fd77b4](https://github.com/jackindisguise/mud3/commit/6fd77b49d80aa682b786652bb2eb03110a6910f5))
+* reworked character creation storing archetype objects plus !info support ([aae31e1](https://github.com/jackindisguise/mud3/commit/aae31e1b6ae771c6ee0e1feaf44f707c381df817))
+* routed movement through Mob.step() so movement feedback and auto-look display live with the mob ([6fd77b4](https://github.com/jackindisguise/mud3/commit/6fd77b49d80aa682b786652bb2eb03110a6910f5))
+
+
+### Bug Fixes
+
+* improved prompt/echo handling and telnet IAC stripping compatibility ([aae31e1](https://github.com/jackindisguise/mud3/commit/aae31e1b6ae771c6ee0e1feaf44f707c381df817))
+* prevented equipped items from being duplicated in serialized mob contents ([6fd77b4](https://github.com/jackindisguise/mud3/commit/6fd77b49d80aa682b786652bb2eb03110a6910f5))
+
 ## [1.5.0](https://github.com/jackindisguise/mud3/compare/v1.4.0...v1.5.0) (2025-11-13)
 
 

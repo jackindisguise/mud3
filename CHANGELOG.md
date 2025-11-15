@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.7.0](https://github.com/jackindisguise/mud3/compare/v1.6.0...v1.7.0) (2025-11-15)
+
+
+### Features
+
+* add action queue visibility and cancellation ([90443ed](https://github.com/jackindisguise/mud3/commit/90443ed0e7131ee319df51a9056f87e6ffc21268))
+* add per-character action queue cooldowns ([85af1bd](https://github.com/jackindisguise/mud3/commit/85af1bdadcd305af200e2ff1e5affb88b77e9520))
+* added automatic bidirectional link detection - if two rooms link to each other, creates two-way link, otherwise creates one-way link ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* added cancel and queue commands for action management ([90443ed](https://github.com/jackindisguise/mud3/commit/90443ed0e7131ee319df51a9056f87e6ffc21268))
+* added Command.getActionCooldownMs with registry queueing/notifications ([85af1bd](https://github.com/jackindisguise/mud3/commit/85af1bdadcd305af200e2ff1e5affb88b77e9520))
+* added comprehensive debug logging to room link processing including per-link processing, bidirectional detection, and summary statistics ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* added item templates for Materia orbs and potions ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* added NPC templates for Sector 7 residents, shopkeepers, and Mako trains ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* added persistent room links system ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* added processPendingRoomLinks function that creates RoomLink instances after all dungeons are loaded ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* added roomLinks field to RoomTemplate interface for storing room links in dungeon files ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* added Sector 7 dungeon from Final Fantasy 7 ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* added tests covering cancel, queue, and prompt formatting ([90443ed](https://github.com/jackindisguise/mud3/commit/90443ed0e7131ee319df51a9056f87e6ffc21268))
+* added upper plate layer accessible via stairs ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* allowed package commands to declare cooldowns and applied defaults to movement plus new work command ([85af1bd](https://github.com/jackindisguise/mud3/commit/85af1bdadcd305af200e2ff1e5affb88b77e9520))
+* configured resets for NPCs and items at appropriate locations ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* created sector7.yaml dungeon file with 15x15 slums layer ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* enhanced minimap display with box formatting in look command ([0f56443](https://github.com/jackindisguise/mud3/commit/0f564438e0eea3bccf0aedc864a6cb18a1e2d55d))
+* implemented room link loading in loadDungeon to collect roomLinks and defer creation until all dungeons are loaded ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* implemented room link serialization in saveDungeon to extract links from rooms and save them in templates ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* implemented room templates for slums, Seventh Heaven bar, train station, pillar, houses, shops, and plate areas ([cd749a6](https://github.com/jackindisguise/mud3/commit/cd749a694d8f49dc7d7ea0bd847ab8c7552522e7))
+* improved minimap display and fixed logging issues ([0f56443](https://github.com/jackindisguise/mud3/commit/0f564438e0eea3bccf0aedc864a6cb18a1e2d55d))
+* included raw command text in prompts and listing output ([90443ed](https://github.com/jackindisguise/mud3/commit/90443ed0e7131ee319df51a9056f87e6ffc21268))
+* moved action state into Character and exposed queue prompt status ([85af1bd](https://github.com/jackindisguise/mud3/commit/85af1bdadcd305af200e2ff1e5affb88b77e9520))
+* stored input on action queue entries for later display ([90443ed](https://github.com/jackindisguise/mud3/commit/90443ed0e7131ee319df51a9056f87e6ffc21268))
+* updated tower dungeon configuration ([0f56443](https://github.com/jackindisguise/mud3/commit/0f564438e0eea3bccf0aedc864a6cb18a1e2d55d))
+
+
+### Bug Fixes
+
+* added debug logging to diagnose room lookup failures in room link processing ([a297d26](https://github.com/jackindisguise/mud3/commit/a297d26ac4a7894f6f092ef5575652d9200864ac))
+* fixed logging issue where mob was logged after destruction in game.ts ([0f56443](https://github.com/jackindisguise/mud3/commit/0f564438e0eea3bccf0aedc864a6cb18a1e2d55d))
+
 ## [1.6.0](https://github.com/jackindisguise/mud3/compare/v1.5.0...v1.6.0) (2025-11-14)
 
 

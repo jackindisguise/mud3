@@ -1481,6 +1481,7 @@ export abstract class Command {
 }
 
 export interface ActionQueueEntry {
+	input: string;
 	command: Command;
 	args: Map<string, any>;
 	cooldownMs: number;
@@ -1725,7 +1726,13 @@ export class CommandRegistry {
 				const cooldownMs =
 					command.getActionCooldownMs(context, result.args) ?? 0;
 				if (cooldownMs > 0) {
-					this.handleActionCommand(command, context, result.args, cooldownMs);
+					this.handleActionCommand(
+						input,
+						command,
+						context,
+						result.args,
+						cooldownMs
+					);
 				} else {
 					command.execute(context, result.args);
 				}
@@ -1748,6 +1755,7 @@ export class CommandRegistry {
 	}
 
 	private handleActionCommand(
+		input: string,
 		command: Command,
 		context: CommandContext,
 		args: Map<string, any>,
@@ -1766,6 +1774,7 @@ export class CommandRegistry {
 			state.queue.length > 0 || state.isProcessing || !!state.cooldownTimer;
 
 		const entry: ActionQueueEntry = {
+			input,
 			command,
 			args: new Map(args),
 			cooldownMs,

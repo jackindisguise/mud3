@@ -79,6 +79,10 @@ suite("character.ts", () => {
 		return mock as unknown as MudClient & { sendHistory: string[] };
 	}
 
+	function stripColorCodes(value: string): string {
+		return value.replace(/\{./g, "");
+	}
+
 	suite("Constructor", () => {
 		test("should create character with provided credentials", () => {
 			const credentials = createTestCredentials();
@@ -826,6 +830,7 @@ suite("character.ts", () => {
 		character.actionState = {
 			queue: [
 				{
+					input: "work",
 					command: { pattern: "work" } as any,
 					args: new Map(),
 					cooldownMs: 1000,
@@ -839,15 +844,17 @@ suite("character.ts", () => {
 
 		character.showPrompt();
 
-		const history = mockClient.sendHistory;
-		const queueLine = history.find((line) =>
-			line.includes("Action queue (1): next work in 3s")
-		);
+		const history = mockClient.sendHistory.map((line) => stripColorCodes(line));
+		const queueLine = history.find((line) => line.includes("[QUEUE]"));
 		assert.ok(
 			queueLine,
 			`Expected queued action line before prompt, got history: ${history.join(
 				" | "
 			)}`
+		);
+		assert.ok(
+			queueLine?.includes("work"),
+			`Queued action line should include raw input, got: ${queueLine}`
 		);
 		const lastEntry = history[history.length - 1];
 		assert.strictEqual(lastEntry, "> ");

@@ -765,10 +765,7 @@ export class Character {
 		}
 
 		const nextEntry = state.queue[0];
-		const pattern =
-			nextEntry?.command?.pattern ??
-			nextEntry?.command?.constructor?.name ??
-			"action";
+		const pattern = nextEntry.input;
 		const remainingMs =
 			state.cooldownExpiresAt !== undefined
 				? Math.max(0, state.cooldownExpiresAt - Date.now())

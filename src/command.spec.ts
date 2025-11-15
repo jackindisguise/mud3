@@ -12,6 +12,8 @@ import { JavaScriptCommandAdapter } from "./package/commands.js";
 import { Dungeon, DungeonObject, DIRECTION, Room } from "./dungeon.js";
 import { Mob } from "./dungeon.js";
 import { Character } from "./character.js";
+import cancelCommand from "./commands/cancel.js";
+import queueCommand from "./commands/queue.js";
 
 let nextTestCharacterId = 1;
 const attachCharacterToMob = (mob: Mob, username = "tester") =>
@@ -806,6 +808,134 @@ suite("command.ts", () => {
 
 			await new Promise((resolve) => setTimeout(resolve, 40));
 			registry.unregister(command);
+		});
+
+		test("cancel removes the next queued action", () => {
+			const registry = new CommandRegistry();
+			class WorkCommand extends Command {
+				constructor() {
+					super({ pattern: "work" });
+				}
+				execute(): void {
+					// no-op
+				}
+				getActionCooldownMs(): number {
+					return 40;
+				}
+			}
+
+			const work = new WorkCommand();
+			const cancelAdapter = new JavaScriptCommandAdapter(cancelCommand);
+			registry.register(work);
+			registry.register(cancelAdapter);
+
+			const actor = new Mob();
+			const character = attachCharacterToMob(actor, "canceler");
+			assert.ok(character === actor.character);
+			const context: CommandContext = { actor };
+
+			assert.strictEqual(registry.execute("work", context), true);
+			assert.strictEqual(registry.execute("work", context), true);
+
+			const state = character.actionState;
+			assert.ok(state);
+			assert.strictEqual(state.queue.length, 1);
+
+			assert.strictEqual(registry.execute("cancel", context), true);
+			assert.strictEqual(state.queue.length, 0);
+
+			registry.unregister(work);
+			registry.unregister(cancelAdapter);
+		});
+
+		test("cancel all removes every queued action", () => {
+			const registry = new CommandRegistry();
+			class WorkCommand extends Command {
+				constructor() {
+					super({ pattern: "work" });
+				}
+				execute(): void {
+					// no-op
+				}
+				getActionCooldownMs(): number {
+					return 35;
+				}
+			}
+
+			const work = new WorkCommand();
+			const cancelAdapter = new JavaScriptCommandAdapter(cancelCommand);
+			registry.register(work);
+			registry.register(cancelAdapter);
+
+			const actor = new Mob();
+			const character = attachCharacterToMob(actor, "canceler-all");
+			assert.ok(character === actor.character);
+			const context: CommandContext = { actor };
+
+			assert.strictEqual(registry.execute("work", context), true);
+			assert.strictEqual(registry.execute("work", context), true);
+			assert.strictEqual(registry.execute("work", context), true);
+
+			const state = character.actionState;
+			assert.ok(state);
+			assert.strictEqual(state.queue.length, 2);
+
+			assert.strictEqual(registry.execute("cancel all", context), true);
+			assert.strictEqual(state.queue.length, 0);
+
+			registry.unregister(work);
+			registry.unregister(cancelAdapter);
+		});
+
+		test("queue command lists queued raw inputs", () => {
+			const registry = new CommandRegistry();
+			class TaskCommand extends Command {
+				constructor() {
+					super({ pattern: "task <item:text>" });
+				}
+				execute(): void {
+					// no-op
+				}
+				getActionCooldownMs(): number {
+					return 40;
+				}
+			}
+
+			const task = new TaskCommand();
+			const queueAdapter = new JavaScriptCommandAdapter(queueCommand);
+			registry.register(task);
+			registry.register(queueAdapter);
+
+			const actor = new Mob();
+			const character = attachCharacterToMob(actor, "queue-test");
+			assert.ok(character === actor.character);
+			const captured: string[] = [];
+			const originalSendMessage = actor.sendMessage.bind(actor);
+			actor.sendMessage = ((text: string) => {
+				captured.push(text);
+			}) as typeof actor.sendMessage;
+
+			const context: CommandContext = { actor };
+
+			assert.strictEqual(registry.execute("task mining", context), true);
+			assert.strictEqual(registry.execute("task smithing", context), true);
+
+			// Drop previous "Action queued" message
+			captured.length = 0;
+			assert.strictEqual(registry.execute("queue", context), true);
+
+			assert.ok(
+				captured.some((line) => line.includes("Queued actions (1):")),
+				`Expected queue header message, got: ${captured.join(" | ")}`
+			);
+			assert.ok(
+				captured.some((line) => line.includes("task smithing")),
+				`Expected raw input line, got: ${captured.join(" | ")}`
+			);
+
+			actor.sendMessage = originalSendMessage;
+			registry.unregister(task);
+			registry.unregister(queueAdapter);
 		});
 	});
 

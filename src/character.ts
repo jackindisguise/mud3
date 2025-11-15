@@ -61,7 +61,8 @@ import { CHANNEL, formatChannelMessage } from "./channel.js";
 import { isLocalhost } from "./io.js";
 import { LINEBREAK } from "./telnet.js";
 import { formatPlaytime } from "./time.js";
-import { COLOR, stickyColor } from "./color.js";
+import { color, COLOR, stickyColor } from "./color.js";
+import type { ActionState } from "./command.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.
@@ -401,6 +402,9 @@ export class Character {
 
 	/** Current session information (runtime data, not persisted) */
 	public session?: PlayerSession;
+
+	/** Runtime command action state (cooldowns/queues) */
+	public actionState?: ActionState;
 
 	/** Character ID of the last person who whispered to this character (for reply command) */
 	public lastWhisperFromId?: number;
@@ -746,8 +750,39 @@ export class Character {
 
 		const promptText = this.settings.prompt ?? "> ";
 		this.sendLine("");
+		const queuedLine = this.formatQueuedActionLine();
+		if (queuedLine) {
+			this.sendLine(queuedLine);
+		}
 		this.send(this.formatPrompt(promptText));
 		session.lastMessageGroup = MESSAGE_GROUP.PROMPT;
+	}
+
+	private formatQueuedActionLine(): string | undefined {
+		const state = this.actionState;
+		if (!state || state.queue.length === 0) {
+			return undefined;
+		}
+
+		const nextEntry = state.queue[0];
+		const pattern =
+			nextEntry?.command?.pattern ??
+			nextEntry?.command?.constructor?.name ??
+			"action";
+		const remainingMs =
+			state.cooldownExpiresAt !== undefined
+				? Math.max(0, state.cooldownExpiresAt - Date.now())
+				: 0;
+		const remainingSeconds = remainingMs === 0 ? 0 : remainingMs / 1000;
+
+		const time = remainingSeconds > 0 ? `~${remainingSeconds}s` : "";
+		return stickyColor(
+			`[QUEUE] '${color(pattern, COLOR.WHITE)}' in ${color(
+				time,
+				COLOR.CRIMSON
+			)}`,
+			COLOR.OLIVE
+		);
 	}
 
 	/**
@@ -1090,11 +1125,13 @@ export class Character {
 				data.settings.blockedUsers !== undefined
 					? new Set(data.settings.blockedUsers)
 					: new Set<string>(),
-			defaultColor:
-				data.settings.defaultColor !== undefined
-					? (data.settings.defaultColor as COLOR)
-					: undefined,
 		};
+
+		if (data.settings.defaultColor !== undefined) {
+			settings.defaultColor = data.settings.defaultColor as COLOR;
+		} else if ("defaultColor" in settings) {
+			delete settings.defaultColor;
+		}
 
 		const character = new Character({
 			credentials: creds,

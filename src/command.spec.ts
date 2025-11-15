@@ -9,8 +9,19 @@ import {
 	PRIORITY,
 } from "./command.js";
 import { JavaScriptCommandAdapter } from "./package/commands.js";
-import { Dungeon, DungeonObject, DIRECTION } from "./dungeon.js";
+import { Dungeon, DungeonObject, DIRECTION, Room } from "./dungeon.js";
 import { Mob } from "./dungeon.js";
+import { Character } from "./character.js";
+
+let nextTestCharacterId = 1;
+const attachCharacterToMob = (mob: Mob, username = "tester") =>
+	new Character({
+		credentials: {
+			username: `${username}-${nextTestCharacterId}`,
+			characterId: nextTestCharacterId++,
+		},
+		mob,
+	});
 
 suite("command.ts", () => {
 	suite("Command", () => {
@@ -710,6 +721,91 @@ suite("command.ts", () => {
 			// Clean up
 			CommandRegistry.default.unregister(cmd1);
 			CommandRegistry.default.unregister(cmd2);
+		});
+
+		test("queues action commands during cooldown", async () => {
+			const registry = new CommandRegistry();
+			const executions: number[] = [];
+
+			class ActionCommand extends Command {
+				constructor() {
+					super({ pattern: "work" });
+				}
+				execute(): void {
+					executions.push(Date.now());
+				}
+				getActionCooldownMs(): number {
+					return 30;
+				}
+			}
+
+			const command = new ActionCommand();
+			registry.register(command);
+
+			const actor = new Mob();
+			const character = attachCharacterToMob(actor, "worker");
+			assert.ok(character === actor.character);
+			const context: CommandContext = { actor };
+
+			const first = registry.execute("work", context);
+			const second = registry.execute("work", context);
+
+			assert.strictEqual(first, true);
+			assert.strictEqual(second, true);
+			assert.strictEqual(executions.length, 1);
+
+			await new Promise((resolve) => setTimeout(() => resolve(undefined), 70));
+			assert.strictEqual(executions.length, 2);
+
+			// Allow the final cooldown timer to finish before ending the test
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			registry.unregister(command);
+		});
+
+		test("queued action commands rebuild context from the actor", async () => {
+			const registry = new CommandRegistry();
+			const seenRooms: Array<Room | undefined> = [];
+
+			class TrackingCommand extends Command {
+				constructor() {
+					super({ pattern: "gather" });
+				}
+				execute(context: CommandContext): void {
+					seenRooms.push(context.room);
+				}
+				getActionCooldownMs(): number {
+					return 25;
+				}
+			}
+
+			const command = new TrackingCommand();
+			registry.register(command);
+
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 2, height: 1, layers: 1 },
+			});
+			const roomA = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+			const roomB = dungeon.getRoom({ x: 1, y: 0, z: 0 })!;
+			const actor = new Mob();
+			const character = attachCharacterToMob(actor, "gatherer");
+			assert.ok(character === actor.character);
+			roomA.add(actor);
+
+			const contextA: CommandContext = { actor, room: roomA };
+			const contextB: CommandContext = { actor, room: roomB };
+
+			assert.strictEqual(registry.execute("gather", contextA), true);
+			roomB.add(actor);
+			assert.strictEqual(registry.execute("gather", contextB), true);
+
+			await new Promise((resolve) => setTimeout(resolve, 70));
+
+			assert.strictEqual(seenRooms.length, 2);
+			assert.strictEqual(seenRooms[0], roomA);
+			assert.strictEqual(seenRooms[1], roomB);
+
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			registry.unregister(command);
 		});
 	});
 

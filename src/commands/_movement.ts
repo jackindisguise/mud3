@@ -10,6 +10,7 @@
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Room, DIRECTION, dir2text } from "../dungeon.js";
+import { CommandObject } from "../package/commands.js";
 
 /**
  * Executes a movement command in the specified direction.
@@ -48,3 +49,7 @@ export function executeMovement(
 
 	actor.step(direction);
 }
+
+export const DEFAULT_COMMAND_VALUES: Partial<CommandObject> = {
+	cooldown: 300,
+};

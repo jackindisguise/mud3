@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, "..");
 
-let reporter = "node-test-reporter";
+let reporter = "dot";
 
 // Check npm config for reporter (fallback for when arguments aren't passed through)
 // npm sets npm_config_* environment variables for config values

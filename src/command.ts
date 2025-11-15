@@ -46,7 +46,7 @@
 
 import { DungeonObject, Item, Room, DIRECTION, text2dir } from "./dungeon.js";
 import { Mob, Equipment } from "./dungeon.js";
-import { Character } from "./character.js";
+import { Character, MESSAGE_GROUP } from "./character.js";
 import { Game } from "./game.js";
 import logger from "./logger.js";
 
@@ -549,6 +549,23 @@ export abstract class Command {
 	 * @returns {void}
 	 */
 	abstract execute(context: CommandContext, args: Map<string, any>): void;
+
+	/**
+	 * Optional cooldown (in milliseconds) for action commands.
+	 *
+	 * Override this to opt-in to the action queue system. Return a positive
+	 * number to mark the command as an action that should respect cooldowns
+	 * and queue subsequent action inputs until the cooldown elapses.
+	 *
+	 * Returning 0 or undefined means the command executes immediately without
+	 * entering the action queue.
+	 */
+	getActionCooldownMs(
+		_context: CommandContext,
+		_args: Map<string, any>
+	): number | undefined {
+		return undefined;
+	}
 
 	/**
 	 * Handle parsing errors with custom messaging.
@@ -1463,6 +1480,20 @@ export abstract class Command {
 	}
 }
 
+export interface ActionQueueEntry {
+	command: Command;
+	args: Map<string, any>;
+	cooldownMs: number;
+	enqueuedAt: number;
+}
+
+export interface ActionState {
+	queue: ActionQueueEntry[];
+	cooldownTimer?: NodeJS.Timeout;
+	cooldownExpiresAt?: number;
+	isProcessing: boolean;
+}
+
 /**
  * Registry and executor for commands.
  *
@@ -1470,6 +1501,10 @@ export abstract class Command {
  * centralized command execution. It attempts to parse user input against
  * all registered commands in order, executing the first command that
  * successfully matches.
+ *
+ * Commands that declare a positive cooldown via {@link Command.getActionCooldownMs}
+ * are automatically tracked with a per-actor action queue to ensure only one
+ * action command is processed per cooldown window.
  *
  * This class can be instantiated to create separate command registries
  * (e.g., for skill commands, admin commands, etc.), or you can use the
@@ -1687,7 +1722,13 @@ export class CommandRegistry {
 		for (const command of this.commands) {
 			const result = command.parse(input, context);
 			if (result.success) {
-				command.execute(context, result.args);
+				const cooldownMs =
+					command.getActionCooldownMs(context, result.args) ?? 0;
+				if (cooldownMs > 0) {
+					this.handleActionCommand(command, context, result.args, cooldownMs);
+				} else {
+					command.execute(context, result.args);
+				}
 				return true;
 			}
 			// If pattern matched but parsing failed, call onError if implemented
@@ -1704,6 +1745,133 @@ export class CommandRegistry {
 		}
 
 		return false;
+	}
+
+	private handleActionCommand(
+		command: Command,
+		context: CommandContext,
+		args: Map<string, any>,
+		cooldownMs: number
+	): void {
+		const actor = context.actor;
+		const character = actor.character;
+
+		if (!character) {
+			command.execute(context, args);
+			return;
+		}
+
+		const state = this.getActionState(character);
+		const wasQueued =
+			state.queue.length > 0 || state.isProcessing || !!state.cooldownTimer;
+
+		const entry: ActionQueueEntry = {
+			command,
+			args: new Map(args),
+			cooldownMs,
+			enqueuedAt: Date.now(),
+		};
+
+		state.queue.push(entry);
+		this.tryProcessActionQueue(actor, character, state, context);
+
+		if (wasQueued) {
+			this.notifyQueued(actor, state);
+		}
+	}
+
+	private getActionState(character: Character): ActionState {
+		if (!character.actionState) {
+			character.actionState = {
+				queue: [],
+				isProcessing: false,
+			};
+		}
+		return character.actionState;
+	}
+
+	private tryProcessActionQueue(
+		actor: Mob,
+		character: Character,
+		state: ActionState,
+		contextOverride?: CommandContext
+	): void {
+		if (state.isProcessing || state.cooldownTimer) {
+			return;
+		}
+
+		const nextEntry = state.queue.shift();
+		if (!nextEntry) {
+			return;
+		}
+
+		state.isProcessing = true;
+		const executionContext =
+			contextOverride ?? this.buildContextFromActor(actor);
+
+		try {
+			nextEntry.command.execute(executionContext, nextEntry.args);
+		} catch (error) {
+			logger.error(
+				`Failed to execute action command "${nextEntry.command.pattern}" for ${actor.display}: ${error}`
+			);
+		} finally {
+			state.isProcessing = false;
+		}
+
+		this.beginCooldown(actor, character, state, nextEntry.cooldownMs);
+
+		if (!contextOverride) {
+			character.showPrompt();
+		}
+	}
+
+	private beginCooldown(
+		actor: Mob,
+		character: Character,
+		state: ActionState,
+		cooldownMs: number
+	): void {
+		if (state.cooldownTimer) {
+			clearTimeout(state.cooldownTimer);
+			state.cooldownTimer = undefined;
+		}
+
+		if (cooldownMs <= 0) {
+			this.tryProcessActionQueue(actor, character, state);
+			return;
+		}
+
+		state.cooldownExpiresAt = Date.now() + cooldownMs;
+		state.cooldownTimer = setTimeout(() => {
+			state.cooldownTimer = undefined;
+			state.cooldownExpiresAt = undefined;
+			this.tryProcessActionQueue(actor, character, state);
+		}, cooldownMs);
+	}
+
+	private notifyQueued(actor: Mob, state: ActionState): void {
+		const position = state.queue.length;
+		if (position <= 0) return;
+
+		const remainingMs =
+			state.cooldownExpiresAt !== undefined
+				? Math.max(0, state.cooldownExpiresAt - Date.now())
+				: undefined;
+		const timeFragment =
+			remainingMs && remainingMs > 0
+				? ` (~${Math.ceil(remainingMs / 1000)}s)`
+				: "";
+
+		actor.sendMessage(`Action queued...`, MESSAGE_GROUP.COMMAND_RESPONSE);
+	}
+
+	private buildContextFromActor(actor: Mob): CommandContext {
+		return {
+			actor,
+			room:
+				actor.location instanceof Room ? (actor.location as Room) : undefined,
+		};
 	}
 
 	/**

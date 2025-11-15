@@ -815,4 +815,41 @@ suite("character.ts", () => {
 			assert.strictEqual(deserialized.settings.channels.size, 0);
 		});
 	});
+
+	test("shows queued action line before prompt when actions are queued", () => {
+		const character = createTestCharacter();
+		const mockClient = createMockClient();
+		character.startSession(1, mockClient);
+
+		character.settings.prompt = "> ";
+		const now = Date.now();
+		character.actionState = {
+			queue: [
+				{
+					command: { pattern: "work" } as any,
+					args: new Map(),
+					cooldownMs: 1000,
+					enqueuedAt: now,
+				},
+			],
+			isProcessing: false,
+			cooldownTimer: undefined,
+			cooldownExpiresAt: now + 2500,
+		};
+
+		character.showPrompt();
+
+		const history = mockClient.sendHistory;
+		const queueLine = history.find((line) =>
+			line.includes("Action queue (1): next work in 3s")
+		);
+		assert.ok(
+			queueLine,
+			`Expected queued action line before prompt, got history: ${history.join(
+				" | "
+			)}`
+		);
+		const lastEntry = history[history.length - 1];
+		assert.strictEqual(lastEntry, "> ");
+	});
 });

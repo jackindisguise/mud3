@@ -53,6 +53,10 @@ export interface CommandObject {
 	aliases?: string[];
 	/** Priority level for command execution order */
 	priority?: PRIORITY;
+	/** Optional cooldown (ms) or resolver for action commands */
+	cooldown?:
+		| number
+		| ((context: CommandContext, args: Map<string, any>) => number | undefined);
 	/** Execute handler invoked after successful parse */
 	execute: (context: CommandContext, args: Map<string, any>) => void;
 	/** Optional parse error handler */
@@ -85,6 +89,10 @@ export class JavaScriptCommandAdapter extends Command {
 		context: CommandContext,
 		result: ParseResult
 	) => void;
+	private cooldownResolver?: (
+		context: CommandContext,
+		args: Map<string, any>
+	) => number | undefined;
 
 	constructor(commandObj: CommandObject) {
 		super({
@@ -94,6 +102,12 @@ export class JavaScriptCommandAdapter extends Command {
 		});
 		this.executeFunction = commandObj.execute;
 		this.errorFunction = commandObj.onError;
+		if (typeof commandObj.cooldown === "function") {
+			this.cooldownResolver = commandObj.cooldown;
+		} else if (typeof commandObj.cooldown === "number") {
+			const value = commandObj.cooldown;
+			this.cooldownResolver = () => value;
+		}
 	}
 
 	execute(context: CommandContext, args: Map<string, any>): void {
@@ -106,6 +120,15 @@ export class JavaScriptCommandAdapter extends Command {
 		} else {
 			logger.error(`Command error: ${result.error}`);
 		}
+	}
+
+	override getActionCooldownMs(
+		context: CommandContext,
+		args: Map<string, any>
+	): number | undefined {
+		if (!this.cooldownResolver) return undefined;
+		const value = this.cooldownResolver(context, args);
+		return typeof value === "number" ? value : undefined;
 	}
 }
 

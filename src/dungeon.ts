@@ -2554,24 +2554,47 @@ export class DungeonObject {
 	 * // saveData contains type, keywords, display, description, contents, and dungeonId (if any)
 	 * ```
 	 */
-	serialize(): SerializedDungeonObject {
+	serialize(options?: { compress?: boolean }): SerializedDungeonObject {
 		const locationRef =
 			this.location instanceof Room ? this.location.getRoomRef() : undefined;
-		const serializedContents = this._contents.map((obj) => obj.serialize());
-		return {
+		const serializedContents = this._contents.map((obj) =>
+			obj.serialize(options)
+		);
+
+		// Uncompressed/base form includes selected keys even when undefined
+		const uncompressed: SerializedDungeonObject = {
 			type: this.constructor.name as SerializedDungeonObjectType,
 			keywords: this.keywords,
 			display: this.display,
-			...(this.description !== undefined && { description: this.description }),
-			...(this.roomDescription !== undefined && {
-				roomDescription: this.roomDescription,
-			}),
-			...(this.mapText !== undefined && { mapText: this.mapText }),
-			...(this.mapColor !== undefined && { mapColor: this.mapColor }),
+			// Always include these keys in base serialization, even if undefined
+			description: this.description,
+			roomDescription: this.roomDescription,
+			mapText: this.mapText,
+			mapColor: this.mapColor,
 			...(serializedContents.length > 0 && { contents: serializedContents }),
 			...(locationRef && { location: locationRef }),
 			...(this.baseWeight !== 0 && { baseWeight: this.baseWeight }),
 		};
+
+		if (options?.compress) {
+			// Remove keys that are equal to the base for this type, always keep 'type'
+			const type = uncompressed.type;
+			const base = baseSerializedTypes[type];
+
+			const compressed: Partial<SerializedDungeonObject> = { type };
+			for (const [key, value] of Object.entries(uncompressed) as Array<
+				[keyof SerializedDungeonObject, unknown]
+			>) {
+				if (key === "type") continue;
+				const baseValue = base ? (base as any)[key] : undefined;
+				if (value !== baseValue) {
+					(compressed as any)[key] = value;
+				}
+			}
+			return compressed as SerializedDungeonObject;
+		}
+
+		return uncompressed;
 	}
 
 	/**
@@ -2614,25 +2637,29 @@ export class DungeonObject {
 		const type: SerializedDungeonObjectType =
 			(data.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
 
+		// Normalize compressed data by overlaying onto the base serialization for the type.
+		// This ensures compressed and uncompressed inputs deserialize identically.
+		const normalized = normalizeSerializedData(data);
+
 		/** shortcut support */
 		switch (type) {
 			case "Room":
 				// Delegate to Room-specific deserializer
-				return Room.deserialize(data as SerializedRoom);
+				return Room.deserialize(normalized as SerializedRoom);
 			case "Mob":
-				return Mob.deserialize(data as SerializedMob);
+				return Mob.deserialize(normalized as SerializedMob);
 			case "Equipment":
-				return Equipment.deserialize(data as SerializedEquipment);
+				return Equipment.deserialize(normalized as SerializedEquipment);
 			case "Armor":
-				return Armor.deserialize(data as SerializedArmor);
+				return Armor.deserialize(normalized as SerializedArmor);
 			case "Weapon":
-				return Weapon.deserialize(data as SerializedWeapon);
+				return Weapon.deserialize(normalized as SerializedWeapon);
 			case "Movable":
-				return Movable.deserialize(data as SerializedMovable);
+				return Movable.deserialize(normalized as SerializedMovable);
 			case "Item":
-				return Item.deserialize(data as SerializedItem);
+				return Item.deserialize(normalized as SerializedItem);
 			case "Prop":
-				return Prop.deserialize(data as SerializedProp);
+				return Prop.deserialize(normalized as SerializedProp);
 			case "DungeonObject":
 				// handled in main body
 				break;
@@ -3338,8 +3365,8 @@ export class Room extends DungeonObject {
 	 * // saveData includes coordinates along with other room properties
 	 * ```
 	 */
-	serialize(): SerializedRoom {
-		const baseData = super.serialize();
+	serialize(options?: { compress?: boolean }): SerializedRoom {
+		const baseData = super.serialize(options);
 		const result: SerializedRoom = {
 			...baseData,
 			type: "Room" as const,
@@ -4153,8 +4180,8 @@ export class Equipment extends Item {
 	 * // Can be saved to file or sent over network
 	 * ```
 	 */
-	public serialize(): SerializedEquipment {
-		const base = super.serialize();
+	public serialize(options?: { compress?: boolean }): SerializedEquipment {
+		const base = super.serialize(options);
 		return {
 			...base,
 			type: "Equipment",
@@ -4332,8 +4359,8 @@ export class Armor extends Equipment {
 	 *
 	 * @returns Serialized armor object
 	 */
-	public serialize(): SerializedArmor {
-		const { type, ...base } = super.serialize();
+	public serialize(options?: { compress?: boolean }): SerializedArmor {
+		const { type, ...base } = super.serialize(options);
 		return {
 			...base,
 			type: "Armor",
@@ -4474,8 +4501,10 @@ export class Weapon extends Equipment {
 	 *
 	 * @returns Serialized weapon object
 	 */
-	public override serialize(): SerializedWeapon {
-		const base = super.serialize();
+	public override serialize(options?: {
+		compress?: boolean;
+	}): SerializedWeapon {
+		const base = super.serialize(options);
 		return {
 			...base,
 			type: "Weapon",
@@ -6019,13 +6048,13 @@ export class Mob extends Movable {
 	 * // Can be saved to file or sent over network
 	 * ```
 	 */
-	public serialize(): SerializedMob {
-		const base = super.serialize();
+	public serialize(options?: { compress?: boolean }): SerializedMob {
+		const base = super.serialize(options);
 		if (this._equipped.size > 0 && base.contents) {
 			const equipped = this.getAllEquipped();
 			const filteredContents = this.contents
 				.filter((obj) => !(obj instanceof Equipment) || !equipped.includes(obj))
-				.map((obj) => obj.serialize());
+				.map((obj) => obj.serialize(options));
 			if (filteredContents.length > 0) {
 				base.contents = filteredContents;
 			} else {
@@ -6040,7 +6069,7 @@ export class Mob extends Movable {
 			SerializedEquipment | SerializedArmor | SerializedWeapon
 		>;
 		for (const [slot, equipment] of this._equipped.entries()) {
-			equipped[slot] = equipment.serialize();
+			equipped[slot] = equipment.serialize(options);
 		}
 
 		return {
@@ -6396,3 +6425,31 @@ const baseSerializedTypes: Partial<
 	Room: new DungeonObject().serialize(),
 	DungeonObject: new DungeonObject().serialize(),
 };
+
+/**
+ * Creates a normalized, uncompressed serialized object by overlaying the provided
+ * data on top of the base serialization for its declared type. Contents are normalized
+ * recursively. The original input is not mutated.
+ */
+function normalizeSerializedData<T extends AnySerializedDungeonObject>(
+	data: T
+): T {
+	const type: SerializedDungeonObjectType =
+		(data.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
+	const base = baseSerializedTypes[type];
+
+	// Shallow overlay: input overrides base
+	const merged: Record<string, unknown> = {
+		...(base ?? {}),
+		...data,
+	};
+
+	// Normalize contents recursively if present
+	if (Array.isArray((merged as any).contents)) {
+		(merged as any).contents = (merged as any).contents.map((c: unknown) =>
+			normalizeSerializedData(c as AnySerializedDungeonObject)
+		);
+	}
+
+	return merged as T;
+}

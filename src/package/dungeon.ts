@@ -96,7 +96,7 @@ export interface SerializedDungeonFormat {
 		dimensions: MapDimensions;
 		grid: number[][][]; // [z][y][x] - layers, rows, columns
 		rooms: Array<Omit<RoomTemplate, "id" | "type">>; // Room templates without id/type
-		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets)
+		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets). In-file ids are local (no "@").
 		resets?: SerializedReset[]; // Optional array of resets
 		resetMessage?: string;
 	};
@@ -133,6 +133,30 @@ async function fileExists(path: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
+}
+
+function localizeTemplateId(
+	globalOrLocalId: string,
+	dungeonId: string
+): string {
+	// If already global and matches dungeon, strip prefix
+	const m = globalOrLocalId.match(/^@([^:]+):(.+)$/);
+	if (m) {
+		const [, did, local] = m;
+		return did === dungeonId ? local : globalOrLocalId;
+	}
+	return globalOrLocalId;
+}
+
+function globalizeTemplateId(
+	globalOrLocalId: string,
+	dungeonId: string
+): string {
+	// If missing '@', prefix with @<dungeonId>:
+	if (!globalOrLocalId.includes("@")) {
+		return `@${dungeonId}:${globalOrLocalId}`;
+	}
+	return globalOrLocalId;
 }
 
 /**
@@ -240,6 +264,8 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 		const layer: number[][] = [];
 		for (let y = 0; y < dungeon.dimensions.height; y++) {
 			const row: number[] = [];
+			// Map output row index (top-first) to internal y coordinate (bottom-first)
+			const sourceY = dungeon.dimensions.height - 1 - y;
 			for (let x = 0; x < dungeon.dimensions.width; x++) {
 				const room = dungeon.getRoom({ x, y, z });
 				if (room) {
@@ -265,7 +291,7 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 	const resets: SerializedReset[] = [];
 	for (const reset of dungeon.resets) {
 		const serialized: SerializedReset = {
-			templateId: reset.templateId,
+			templateId: localizeTemplateId(reset.templateId, dungeon.id!),
 			roomRef: reset.roomRef,
 		};
 		// Only include minCount/maxCount if they differ from defaults (1)
@@ -287,7 +313,11 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 	for (const templateId of templateIds) {
 		const template = dungeon.templates.get(templateId);
 		if (template) {
-			templates.push(template);
+			const localized: DungeonObjectTemplate = {
+				...template,
+				id: localizeTemplateId(template.id, dungeon.id!),
+			};
+			templates.push(localized);
 		} else {
 			logger.warn(
 				`Template "${templateId}" referenced by reset not found in dungeon's template registry`
@@ -451,8 +481,14 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 						...roomTemplate,
 					};
 
+					// Map YAML row index (top-first) to internal y coordinate (bottom-first)
+					const targetY = dimensions.height - 1 - y;
 					// Create room from template
-					const room = Room.createFromTemplate(fullTemplate, { x, y, z });
+					const room = Room.createFromTemplate(fullTemplate, {
+						x,
+						y,
+						z,
+					});
 
 					// Add room to dungeon
 					if (!dungeon.addRoom(room)) {
@@ -487,7 +523,11 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					);
 					continue;
 				}
-				dungeon.addTemplate(template);
+				const hydrated: DungeonObjectTemplate = {
+					...template,
+					id: globalizeTemplateId(template.id, dungeon.id!),
+				};
+				dungeon.addTemplate(hydrated);
 			}
 		}
 
@@ -502,7 +542,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 				}
 
 				const reset = new Reset({
-					templateId: resetData.templateId,
+					templateId: globalizeTemplateId(resetData.templateId, dungeon.id!),
 					roomRef: resetData.roomRef,
 					minCount: resetData.minCount ?? 1,
 					maxCount: resetData.maxCount ?? 1,

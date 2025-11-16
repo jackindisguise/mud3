@@ -1513,6 +1513,21 @@ export class Dungeon {
 	 * ```
 	 */
 	addTemplate(template: DungeonObjectTemplate): void {
+		// Populate baseSerialized snapshot if missing so compression/normalization
+		// can diff against the template even outside of this registry.
+		if (!template.baseSerialized) {
+			if (template.type === "Room") {
+				const room = Room.createFromTemplate(template as RoomTemplate, {
+					x: 0,
+					y: 0,
+					z: 0,
+				});
+				template.baseSerialized = room.serialize();
+			} else {
+				const obj = createFromTemplate(template);
+				template.baseSerialized = obj.serialize();
+			}
+		}
 		this._templates.set(template.id, template);
 	}
 
@@ -1592,6 +1607,7 @@ export interface DungeonObjectOptions {
 	mapColor?: COLOR;
 	dungeon?: Dungeon;
 	baseWeight?: number;
+	templateId?: string;
 }
 
 /**
@@ -1632,6 +1648,7 @@ export interface SerializedDungeonObject {
 	type: SerializedDungeonObjectType;
 	keywords: string;
 	display: string;
+	templateId?: string;
 	description?: string;
 	roomDescription?: string;
 	mapText?: string;
@@ -1799,6 +1816,12 @@ export interface DungeonObjectTemplate {
 	mapText?: string;
 	mapColor?: COLOR;
 	baseWeight?: number;
+	/**
+	 * Optional cached baseline serialization produced by this template.
+	 * When present, compression/normalization can diff against this
+	 * instead of a plain type baseline.
+	 */
+	baseSerialized?: SerializedDungeonObject;
 }
 
 /**
@@ -2050,6 +2073,19 @@ export class DungeonObject {
 	keywords: string = "dungeon object";
 
 	/**
+	 * If constructed from a template, this records the template id.
+	 * Undefined for ad-hoc objects.
+	 */
+	templateId?: string;
+
+	/**
+	 * Snapshot of the serialized base produced by the template at creation time.
+	 * Used for compression when the template registry cannot resolve templateId.
+	 * Not serialized; internal only.
+	 */
+	private _templateBaseSnapshot?: SerializedDungeonObject;
+
+	/**
 	 * Human-readable name for this object, shown in interfaces and output.
 	 */
 	display: string = "Dungeon Object";
@@ -2188,6 +2224,7 @@ export class DungeonObject {
 			this.baseWeight = options.baseWeight;
 			this.currentWeight = options.baseWeight;
 		}
+		if (options.templateId) this.templateId = options.templateId;
 	}
 
 	toString() {
@@ -2549,7 +2586,7 @@ export class DungeonObject {
 		const locationRef =
 			this.location instanceof Room ? this.location.getRoomRef() : undefined;
 		const serializedContents = this._contents.map((obj) =>
-			obj.serialize(options)
+			obj.serialize({ compress: true })
 		);
 
 		// Uncompressed/base form includes selected keys even when undefined
@@ -2557,6 +2594,7 @@ export class DungeonObject {
 			type: this.constructor.name as SerializedDungeonObjectType,
 			keywords: this.keywords,
 			display: this.display,
+			...(this.templateId !== undefined && { templateId: this.templateId }),
 			// Always include these keys in base serialization, even if undefined
 			description: this.description,
 			roomDescription: this.roomDescription,
@@ -2568,21 +2606,7 @@ export class DungeonObject {
 		};
 
 		if (options?.compress) {
-			// Remove keys that are equal to the base for this type, always keep 'type'
-			const type = uncompressed.type;
-			const base = baseSerializedTypes[type];
-
-			const compressed: Partial<SerializedDungeonObject> = { type };
-			for (const [key, value] of Object.entries(uncompressed) as Array<
-				[keyof SerializedDungeonObject, unknown]
-			>) {
-				if (key === "type") continue;
-				const baseValue = base ? (base as any)[key] : undefined;
-				if (value !== baseValue) {
-					(compressed as any)[key] = value;
-				}
-			}
-			return compressed as SerializedDungeonObject;
+			return compressSerializedObject(uncompressed, this.templateId);
 		}
 
 		return uncompressed;
@@ -2625,8 +2649,10 @@ export class DungeonObject {
 	 * ```
 	 */
 	public static deserialize(data: AnySerializedDungeonObject): DungeonObject {
+		const typed = data as SerializedDungeonObject;
 		const type: SerializedDungeonObjectType =
-			(data.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
+			(typed.type as SerializedDungeonObjectType | undefined) ??
+			"DungeonObject";
 
 		// Normalize compressed data by overlaying onto the base serialization for the type.
 		// This ensures compressed and uncompressed inputs deserialize identically.
@@ -2660,11 +2686,13 @@ export class DungeonObject {
 		}
 
 		// DungeonObjects in particular
-		let obj: DungeonObject = new DungeonObject(data);
+		let obj: DungeonObject = new DungeonObject(
+			typed as unknown as DungeonObjectOptions
+		);
 
 		// Handle contents for all object types
-		if (data.contents) {
-			for (const contentData of data.contents) {
+		if (typed.contents) {
+			for (const contentData of typed.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
 				obj.add(contentObj);
 			}
@@ -2689,6 +2717,8 @@ export class DungeonObject {
 
 		return baseSerialized;
 	}
+
+	// templateId now lives as a public optional field on the instance
 
 	/**
 	 * Creates a template from this object, storing only fields that differ from defaults.
@@ -2870,34 +2900,52 @@ export function createFromTemplate(
 				"Room templates require coordinates - use Room.createFromTemplate() instead"
 			);
 		case "Mob":
-			obj = new Mob();
+			obj = new Mob({ templateId: template.id });
 			break;
 		case "Equipment":
-			obj = new Equipment();
+			obj = new Equipment({
+				templateId: template.id,
+				slot: EQUIPMENT_SLOT.HEAD,
+			});
 			break;
 		case "Armor":
-			obj = new Armor();
+			obj = new Armor({
+				templateId: template.id,
+				slot: EQUIPMENT_SLOT.HEAD,
+				defense: 0,
+			});
 			break;
 		case "Weapon":
-			obj = new Weapon();
+			obj = new Weapon({
+				templateId: template.id,
+				slot: EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: 0,
+			});
 			break;
 		case "Movable":
-			obj = new Movable();
+			obj = new Movable({ templateId: template.id });
 			break;
 		case "Item":
-			obj = new Item();
+			obj = new Item({ templateId: template.id });
 			break;
 		case "Prop":
-			obj = new Prop();
+			obj = new Prop({ templateId: template.id });
 			break;
 		case "DungeonObject":
 		default:
-			obj = new DungeonObject();
+			obj = new DungeonObject({ templateId: template.id });
 			break;
 	}
 
 	// Apply template properties
 	obj.applyTemplate(template);
+
+	// Populate global cache and template snapshot for baseline compression
+	try {
+		const baseline = obj.serialize();
+		SAFE_TEMPLATE_BASE_CACHE.set(template.id, baseline);
+		template.baseSerialized = template.baseSerialized ?? baseline;
+	} catch {}
 
 	return obj;
 }
@@ -3133,8 +3181,23 @@ export class Room extends DungeonObject {
 	): Room {
 		const room = new Room({
 			coordinates,
+			templateId: template.id,
 		});
 		room.applyTemplate(template);
+
+		// Store a neutral-coordinate baseline (0,0,0) to ensure compressed rooms
+		// include actual coordinates as diffs.
+		try {
+			const neutral = new Room({
+				coordinates: { x: 0, y: 0, z: 0 },
+				templateId: template.id,
+			});
+			neutral.applyTemplate(template);
+			const baseline = neutral.serialize();
+			SAFE_TEMPLATE_BASE_CACHE.set(template.id, baseline);
+			template.baseSerialized = template.baseSerialized ?? baseline;
+		} catch {}
+
 		return room;
 	}
 
@@ -4176,9 +4239,10 @@ export class Equipment extends Item {
 	 * ```
 	 */
 	public serialize(options?: { compress?: boolean }): SerializedEquipment {
-		const base = super.serialize(options);
-		return {
-			...base,
+		// Build uncompressed including subclass fields, then apply common compression if requested
+		const base = super.serialize(); // always uncompressed shape
+		const uncompressed: SerializedEquipment = {
+			...(base as SerializedDungeonObject),
 			type: "Equipment",
 			slot: this._slot,
 			...(Object.keys(this._attributeBonuses).length > 0
@@ -4190,7 +4254,13 @@ export class Equipment extends Item {
 			...(Object.keys(this._secondaryAttributeBonuses).length > 0
 				? { secondaryAttributeBonuses: this._secondaryAttributeBonuses }
 				: {}),
-		} as SerializedEquipment;
+		};
+		return options?.compress
+			? (compressSerializedObject(
+					uncompressed,
+					(base as SerializedDungeonObject).templateId
+			  ) as SerializedEquipment)
+			: uncompressed;
 	}
 
 	/**
@@ -4357,12 +4427,20 @@ export class Armor extends Equipment {
 	 * @returns Serialized armor object
 	 */
 	public serialize(options?: { compress?: boolean }): SerializedArmor {
-		const { type, ...base } = super.serialize(options);
-		return {
-			...base,
+		// Build full uncompressed then compress against template baseline if requested
+		const base = super.serialize();
+		const uncompressed: SerializedArmor = {
+			...(base as SerializedDungeonObject),
 			type: "Armor",
+			slot: this._slot,
 			defense: this._defense,
-		} as SerializedArmor;
+		};
+		return options?.compress
+			? (compressSerializedObject(
+					uncompressed,
+					(base as SerializedDungeonObject).templateId
+			  ) as SerializedArmor)
+			: uncompressed;
 	}
 
 	/**
@@ -4501,12 +4579,20 @@ export class Weapon extends Equipment {
 	public override serialize(options?: {
 		compress?: boolean;
 	}): SerializedWeapon {
-		const base = super.serialize(options);
-		return {
-			...base,
+		// Build full uncompressed then compress against template baseline if requested
+		const base = super.serialize();
+		const uncompressed: SerializedWeapon = {
+			...(base as SerializedDungeonObject),
 			type: "Weapon",
+			slot: this._slot,
 			attackPower: this._attackPower,
-		} as SerializedWeapon;
+		};
+		return options?.compress
+			? (compressSerializedObject(
+					uncompressed,
+					(base as SerializedDungeonObject).templateId
+			  ) as SerializedWeapon)
+			: uncompressed;
 	}
 
 	/**
@@ -6431,6 +6517,97 @@ const baseSerializedTypes: Partial<
 };
 
 /**
+ * Global cache of templateId -> baseline serialization snapshots.
+ * Populated when objects are created from templates outside of a dungeon registry.
+ */
+const SAFE_TEMPLATE_BASE_CACHE: Map<string, SerializedDungeonObject> =
+	new Map();
+
+/**
+ * Returns the baseline serialization for a given type and optional templateId.
+ * Prefers the template baseline when available; falls back to type baseline.
+ */
+function getCompressionBaseline(
+	type: SerializedDungeonObjectType,
+	templateId?: string
+): SerializedDungeonObject {
+	let base: SerializedDungeonObject | undefined = undefined;
+	if (templateId) {
+		const t = resolveTemplateById(templateId);
+		if (t) {
+			if (t.baseSerialized) {
+				base = t.baseSerialized;
+			} else if (t.type === "Room") {
+				const tmp = Room.createFromTemplate(t as RoomTemplate, {
+					x: 0,
+					y: 0,
+					z: 0,
+				});
+				base = tmp.serialize();
+			} else {
+				const tmp = createFromTemplate(t);
+				base = tmp.serialize();
+			}
+		} else {
+			const cached = SAFE_TEMPLATE_BASE_CACHE.get(templateId);
+			if (cached) base = cached;
+		}
+	}
+	return (base ?? baseSerializedTypes[type]) as SerializedDungeonObject;
+}
+
+/**
+ * Produces a compressed serialized object by removing keys equal to baseline.
+ * Always preserves 'type' and includes 'templateId' when provided.
+ */
+function compressSerializedObject<T extends SerializedDungeonObject>(
+	uncompressed: T,
+	templateId?: string
+): T {
+	const type = uncompressed.type;
+	const base = getCompressionBaseline(type, templateId);
+	const compressed: Partial<SerializedDungeonObject> = {
+		type,
+		...(templateId ? { templateId } : {}),
+	};
+	for (const [key, value] of Object.entries(uncompressed) as Array<
+		[keyof SerializedDungeonObject, unknown]
+	>) {
+		if (key === "type") continue;
+		if (key === "templateId") continue;
+		const baseValue = (base as any)?.[key];
+		if (value !== baseValue) {
+			(compressed as any)[key] = value;
+		}
+	}
+	return compressed as T;
+}
+
+/**
+ * Resolve a template id into a DungeonObjectTemplate.
+ * Supports fully-qualified ids of the form "@<dungeonId>:<id>".
+ * If no dungeon prefix is provided, attempts to find a matching template
+ * in any registered dungeon (first match wins).
+ */
+function resolveTemplateById(id: string): DungeonObjectTemplate | undefined {
+	// Parse @dungeon:id form
+	const m = id.match(/^@([^:]+):(.+)$/);
+	if (m) {
+		const dungeonId = m[1];
+		const templateId = m[2];
+		const dungeon = getDungeonById(dungeonId);
+		return dungeon?.templates.get(templateId);
+	}
+
+	// Fallback: scan all registered dungeons for a matching template id
+	for (const dungeon of DUNGEON_REGISTRY.values()) {
+		const t = dungeon.templates.get(id);
+		if (t) return t;
+	}
+	return undefined;
+}
+
+/**
  * Creates a normalized, uncompressed serialized object by overlaying the provided
  * data on top of the base serialization for its declared type. Contents are normalized
  * recursively. The original input is not mutated.
@@ -6438,9 +6615,42 @@ const baseSerializedTypes: Partial<
 function normalizeSerializedData<T extends AnySerializedDungeonObject>(
 	data: T
 ): T {
+	const hasTemplate = data.templateId;
+	let base: Record<string, unknown> | undefined = undefined;
+	if (hasTemplate) {
+		const t = resolveTemplateById((data as any).templateId);
+		if (t) {
+			// Prefer cached template baseline when available
+			if (t.baseSerialized) {
+				base = { ...t.baseSerialized } as Record<string, unknown>;
+			} else {
+				if (t.type === "Room") {
+					const tmp = Room.createFromTemplate(t as RoomTemplate, {
+						x: 0,
+						y: 0,
+						z: 0,
+					});
+					base = tmp.serialize() as unknown as Record<string, unknown>;
+				} else {
+					const tmp = createFromTemplate(t);
+					base = tmp.serialize() as unknown as Record<string, unknown>;
+				}
+			}
+		} else {
+			// Fallback to global cache when not in registry
+			const cached = SAFE_TEMPLATE_BASE_CACHE.get(data.templateId!);
+			if (cached) base = { ...cached } as Record<string, unknown>;
+		}
+	}
+
 	const type: SerializedDungeonObjectType =
 		(data.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
-	const base = baseSerializedTypes[type];
+	if (!base) {
+		base = (baseSerializedTypes[type] ?? {}) as unknown as Record<
+			string,
+			unknown
+		>;
+	}
 
 	// Shallow overlay: input overrides base
 	const merged: Record<string, unknown> = {

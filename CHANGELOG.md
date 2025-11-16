@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.9.0](https://github.com/jackindisguise/mud3/compare/v1.8.0...v1.9.0) (2025-11-16)
+
+
+### Features
+
+* accepted local templateId in resets and auto-prefixed with current dungeon id on load ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+* added shared helpers getCompressionBaseline and compressSerializedObject to centralize diffing ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+* added templateId to DungeonObject and SerializedDungeonObject for instance-template linkage ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+* based compression/normalization on template baselines to omit redundant fields ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+* localized template ids when saving dungeons and globalized them on load ([@dungeon](https://github.com/dungeon):id) ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+* supported room templates with neutral-coordinate baseline caching for consistent diffs ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+* template-aware serialization, global template ids, and compression helpers ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+
+
+### Bug Fixes
+
+* omitted templateId in uncompressed output when undefined to match serializer expectations ([1ef2415](https://github.com/jackindisguise/mud3/commit/1ef2415d5bbb8f73fffe433653dc920c4840e2f9))
+
 ## [1.8.0](https://github.com/jackindisguise/mud3/compare/v1.7.0...v1.8.0) (2025-11-16)
 
 

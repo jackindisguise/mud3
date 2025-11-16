@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.10.0](https://github.com/jackindisguise/mud3/compare/v1.9.0...v1.10.0) (2025-11-16)
+
+
+### Features
+
+* **data:** added tiny-a and tiny-b dungeons and linked them (↔ and to tower) ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+* **mob:** applied template-aware compression to mob serializer ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+* **mob:** compressed equipped by omitting slots matching baseline ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+* **pathfinding:** add flat-step APIs, caching, and startup pre-cache ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+* **pathfinding:** added findDirectionsBetweenRooms and findDirectionsViaRefs ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+* **pathfinding:** implemented suffix-based path cache for direction lookups ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+* **startup:** pre-cached gateway-to-gateway paths across all dungeons in index.ts ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+
+
+### Performance Improvements
+
+* **pathfinding:** memoized dungeon graph via buildDungeonGraph cache ([a4c3992](https://github.com/jackindisguise/mud3/commit/a4c3992063ee3c1518ff90fbe203e2bb4a84bbc3))
+
 ## [1.9.0](https://github.com/jackindisguise/mud3/compare/v1.8.0...v1.9.0) (2025-11-16)
 
 

@@ -11,7 +11,6 @@
 		"build": "tsc",
 		"pretest": "npm run build",
 		"test": "node scripts/test.js",
-		"setup:hooks": "node scripts/setup-hooks.js",
 		"test:compiled": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
 		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test:compiled",
 		"doc": "npx typedoc",

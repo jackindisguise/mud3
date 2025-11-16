@@ -58,14 +58,17 @@ for (let i = bodyStart; i < lines.length; i++) {
 }
 
 if (violations.length > 0) {
-	console.error("post-commit: commit body includes lines without a conventional-commit prefix:");
+	console.error(
+		"post-commit: commit body includes lines without a conventional-commit prefix:"
+	);
 	for (const v of violations) {
 		console.error(`  line ${v.lineNo}: ${v.line}`);
 	}
 	console.error(
 		`Allowed prefixes are: ${allowed.map((t) => `${t}:`).join(", ")}`
 	);
-	console.error("Tip: amend the commit with `git commit --amend` to fix the body prefixes.");
+	console.error(
+		"Tip: amend the commit with `git commit --amend` to fix the body prefixes."
+	);
 	process.exit(1);
 }
-

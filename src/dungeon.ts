@@ -909,9 +909,12 @@ export class Dungeon {
 	 * console.log(room instanceof Room); // true
 	 * ```
 	 */
-	static generateEmptyDungeon(options: DungeonOptions) {
+	static generateEmptyDungeon(
+		options: DungeonOptions,
+		roomOptions?: Partial<RoomOptions>
+	) {
 		const dungeon = new Dungeon(options);
-		dungeon.generateRooms();
+		dungeon.generateRooms(roomOptions);
 		return dungeon;
 	}
 
@@ -1254,11 +1257,11 @@ export class Dungeon {
 	 * console.log(start instanceof Room); // true
 	 * ```
 	 */
-	generateRooms() {
+	generateRooms(options?: Partial<RoomOptions>) {
 		for (let z = 0; z < this._dimensions.layers; z++)
 			for (let y = 0; y < this._dimensions.height; y++)
 				for (let x = 0; x < this._dimensions.width; x++)
-					this.createRoom({ coordinates: { x, y, z } });
+					this.createRoom({ coordinates: { x, y, z }, ...options });
 	}
 
 	/**
@@ -2079,13 +2082,6 @@ export class DungeonObject {
 	templateId?: string;
 
 	/**
-	 * Snapshot of the serialized base produced by the template at creation time.
-	 * Used for compression when the template registry cannot resolve templateId.
-	 * Not serialized; internal only.
-	 */
-	private _templateBaseSnapshot?: SerializedDungeonObject;
-
-	/**
 	 * Human-readable name for this object, shown in interfaces and output.
 	 */
 	display: string = "Dungeon Object";
@@ -2586,7 +2582,7 @@ export class DungeonObject {
 		const locationRef =
 			this.location instanceof Room ? this.location.getRoomRef() : undefined;
 		const serializedContents = this._contents.map((obj) =>
-			obj.serialize({ compress: true })
+			obj.serialize(options)
 		);
 
 		// Uncompressed/base form includes selected keys even when undefined
@@ -6134,16 +6130,20 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public serialize(options?: { compress?: boolean }): SerializedMob {
-		const base = super.serialize(options);
-		if (this._equipped.size > 0 && base.contents) {
+		// Always build from an uncompressed base so compression can compare against template baselines
+		const base = super.serialize(); // uncompressed base shape
+		const uncompressed = {
+			...(base as SerializedDungeonObject),
+		} as SerializedMob;
+		if (this._equipped.size > 0 && uncompressed.contents) {
 			const equipped = this.getAllEquipped();
 			const filteredContents = this.contents
 				.filter((obj) => !(obj instanceof Equipment) || !equipped.includes(obj))
 				.map((obj) => obj.serialize(options));
 			if (filteredContents.length > 0) {
-				base.contents = filteredContents;
+				uncompressed.contents = filteredContents;
 			} else {
-				delete base.contents;
+				delete uncompressed.contents;
 			}
 		}
 		const equipped: Record<
@@ -6157,8 +6157,8 @@ export class Mob extends Movable {
 			equipped[slot] = equipment.serialize(options);
 		}
 
-		return {
-			...base,
+		const full: SerializedMob = {
+			...(uncompressed as SerializedDungeonObject),
 			type: "Mob",
 			level: this._level,
 			experience: this._experience,
@@ -6176,6 +6176,15 @@ export class Mob extends Movable {
 			exhaustion: this._exhaustion,
 			...(equipped && Object.keys(equipped).length > 0 ? { equipped } : {}),
 		};
+
+		// If compressing, prefer template-aware compression and also prune equipped entries
+		if (options?.compress) {
+			// Compress the mob object against its baseline (template or type)
+			const compressed = compressSerializedObject(full, base.templateId);
+			return compressed;
+		}
+
+		return full;
 	}
 
 	/**

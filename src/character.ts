@@ -1062,11 +1062,10 @@ export class Character {
 
 		// Serialize mob and remove 'type' field
 		const mobData: SerializedMob = {
-			...(this.mob.serialize() as SerializedMob),
+			...(this.mob.serialize({ compress: true }) as SerializedMob),
 		};
 
-		const { type, ...mobDataWithoutType } =
-			this.mob.serialize() as SerializedMob;
+		const { type, ...mobDataWithoutType } = mobData;
 
 		return {
 			credentials: serializedCreds,

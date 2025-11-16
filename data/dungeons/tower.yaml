@@ -475,9 +475,9 @@ dungeon:
         allowedExits: 527,
       }
     - {
-        display: To Sector 7,
-        keywords: sector7 sector,
+        display: To Tiny B,
         description: We're goin' to Midgar,
+        roomLinks: { west: "@tiny-b{10,10,0}" },
       }
   templates:
     - {

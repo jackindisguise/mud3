@@ -5,3 +5,4 @@ logs/*.log
 **/*.tmp
 .cursor
 guides
+commit-message.md

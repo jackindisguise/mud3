@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { suite, test } from "node:test";
 import { DungeonObject, Equipment, EQUIPMENT_SLOT } from "./dungeon.js";
+import { serializedToOptions } from "./dungeon.js";
 
 suite("compressed serialization", () => {
 	test("base serialization includes keys with undefined for a vanilla DungeonObject", () => {
@@ -111,5 +112,38 @@ suite("deserialize normalization", () => {
 		const fromCompressed = DungeonObject.deserialize(compressed);
 
 		assert.deepEqual(fromCompressed.serialize(), fromUncompressed.serialize());
+	});
+});
+
+suite("serializedToOptions", () => {
+	test("DungeonObject -> DungeonObjectOptions", () => {
+		const obj = new DungeonObject();
+		obj.display = "X";
+		obj.description = "Y";
+		const ser = obj.serialize({ compress: true });
+
+		const opts = serializedToOptions(ser);
+		assert.deepEqual(opts, {
+			keywords: "dungeon object",
+			display: "X",
+			description: "Y",
+		});
+	});
+
+	test("Equipment -> EquipmentOptions", () => {
+		const eq = new Equipment({
+			slot: EQUIPMENT_SLOT.NECK,
+			attributeBonuses: { strength: 1 },
+			resourceBonuses: { maxHealth: 5 },
+		});
+		const ser = eq.serialize({ compress: true });
+		const opts = serializedToOptions(ser);
+		assert.deepEqual(opts, {
+			keywords: "dungeon object",
+			display: "Dungeon Object",
+			slot: EQUIPMENT_SLOT.NECK,
+			attributeBonuses: { strength: 1 },
+			resourceBonuses: { maxHealth: 5 },
+		});
 	});
 });

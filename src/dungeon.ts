@@ -1763,15 +1763,6 @@ export type AnySerializedDungeonObject =
 	| SerializedArmor
 	| SerializedWeapon;
 
-export interface DungeonObjectTypeRegistration<
-	TSerialized extends SerializedDungeonObject
-> {
-	type: SerializedDungeonObjectType;
-	deserialize: (data: TSerialized) => DungeonObject;
-	createBaseSerialized?: () => TSerialized;
-	createTemplateInstance?: () => DungeonObject;
-}
-
 /**
  * Template definition for dungeon objects.
  * Templates store only fields that differ from the base object's default values.
@@ -6452,4 +6443,105 @@ function normalizeSerializedData<T extends AnySerializedDungeonObject>(
 	}
 
 	return merged as T;
+}
+
+function pruneUndefined<T extends Record<string, unknown>>(obj: T): T {
+	const out: Record<string, unknown> = {};
+	for (const [k, v] of Object.entries(obj)) {
+		if (v !== undefined) out[k] = v;
+	}
+	return out as T;
+}
+
+/**
+ * Converts a serialized object into constructor options for its class.
+ * Contents and location are intentionally excluded; callers should attach
+ * contents and place the object into rooms after construction.
+ */
+export function serializedToOptions(
+	data: AnySerializedDungeonObject
+):
+	| DungeonObjectOptions
+	| RoomOptions
+	| EquipmentOptions
+	| ArmorOptions
+	| WeaponOptions
+	| MobOptions {
+	const norm = normalizeSerializedData(data);
+	const base: DungeonObjectOptions = pruneUndefined({
+		keywords: norm.keywords,
+		display: norm.display,
+		description: norm.description,
+		roomDescription: norm.roomDescription,
+		mapText: norm.mapText,
+		mapColor: norm.mapColor,
+		baseWeight: norm.baseWeight,
+	});
+
+	switch (norm.type) {
+		case "Room": {
+			const r = norm as SerializedRoom;
+			const opts: RoomOptions = pruneUndefined({
+				...base,
+				coordinates: r.coordinates,
+				allowedExits: r.allowedExits,
+			});
+			return opts;
+		}
+		case "Equipment": {
+			const e = norm as SerializedEquipment;
+			const opts: EquipmentOptions = pruneUndefined({
+				...base,
+				slot: e.slot,
+				attributeBonuses: e.attributeBonuses,
+				resourceBonuses: e.resourceBonuses,
+				secondaryAttributeBonuses: e.secondaryAttributeBonuses,
+			});
+			return opts;
+		}
+		case "Armor": {
+			const a = norm as SerializedArmor;
+			const opts: ArmorOptions = pruneUndefined({
+				...(serializedToOptions({
+					...a,
+					type: "Equipment",
+				}) as EquipmentOptions),
+				defense: a.defense,
+			});
+			return opts;
+		}
+		case "Weapon": {
+			const w = norm as SerializedWeapon;
+			const opts: WeaponOptions = pruneUndefined({
+				...(serializedToOptions({
+					...w,
+					type: "Equipment",
+				}) as EquipmentOptions),
+				attackPower: w.attackPower,
+			});
+			return opts;
+		}
+		case "Mob": {
+			const m = norm as SerializedMob;
+			const opts: MobOptions = pruneUndefined({
+				...base,
+				level: m.level,
+				experience: m.experience,
+				race: getRaceById(m.race),
+				class: getClassById(m.class),
+				attributeBonuses: m.attributeBonuses,
+				resourceBonuses: m.resourceBonuses,
+				health: m.health,
+				mana: m.mana,
+				exhaustion: m.exhaustion,
+			});
+			return opts;
+		}
+		case "Item":
+		case "Prop":
+		case "Movable":
+		case "DungeonObject":
+		default:
+			return base;
+	}
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/jackindisguise/mud3/compare/v1.7.0...v1.8.0) (2025-11-16)
+
+
+### Features
+
+* **serialization:** add base+compressed serialization and normalize deserialize\n\n- Add {compress} option and propagate to subclasses\n- Emit base-form keys with undefined for uncompressed\n- Implement compression vs baseSerializedTypes\n- Introduce normalizeSerializedData and integrate into DungeonObject.deserialize ([4f16ad7](https://github.com/jackindisguise/mud3/commit/4f16ad7407e87bd27f9eeea0d9536f1a432e61c6))
+
 ## [1.7.0](https://github.com/jackindisguise/mud3/compare/v1.6.0...v1.7.0) (2025-11-15)
 
 

@@ -87,8 +87,6 @@ suite("deserialize normalization", () => {
 
 		const uncompressed = eq.serialize();
 		const compressed = eq.serialize({ compress: true });
-		console.log(uncompressed);
-		console.log(compressed);
 
 		const fromUncompressed = DungeonObject.deserialize(uncompressed);
 		const fromCompressed = DungeonObject.deserialize(compressed);

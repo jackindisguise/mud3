@@ -3067,12 +3067,13 @@ export class Room extends DungeonObject {
 	 * Deserialize a SerializedRoom into a Room instance.
 	 */
 	public static deserialize(data: SerializedRoom): Room {
+		const norm = normalizeSerializedData(data) as SerializedRoom;
 		const room = new Room({
-			...data,
-			allowedExits: data.allowedExits,
+			...norm,
+			allowedExits: norm.allowedExits,
 		});
-		if (data.contents && Array.isArray(data.contents)) {
-			for (const contentData of data.contents) {
+		if (norm.contents && Array.isArray(norm.contents)) {
+			for (const contentData of norm.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
 				room.add(contentObj);
 			}
@@ -3487,9 +3488,10 @@ export class Movable extends DungeonObject {
 	 * Deserialize a SerializedMovable into a Movable instance.
 	 */
 	public static deserialize(data: AnySerializedDungeonObject): Movable {
-		const movable = new Movable(data as SerializedMovable);
-		if (data.contents && Array.isArray(data.contents)) {
-			for (const contentData of data.contents) {
+		const norm = normalizeSerializedData(data) as unknown as SerializedMovable;
+		const movable = new Movable(norm as SerializedMovable);
+		if (norm.contents && Array.isArray(norm.contents)) {
+			for (const contentData of norm.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
 				movable.add(contentObj);
 			}
@@ -3736,9 +3738,10 @@ export class Prop extends DungeonObject {
 	 * Deserialize a SerializedProp into a Prop instance.
 	 */
 	public static deserialize(data: SerializedProp): Prop {
-		const prop = new Prop(data);
-		if (data.contents && Array.isArray(data.contents)) {
-			for (const contentData of data.contents) {
+		const norm = normalizeSerializedData(data) as SerializedProp;
+		const prop = new Prop(norm);
+		if (norm.contents && Array.isArray(norm.contents)) {
+			for (const contentData of norm.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
 				prop.add(contentObj);
 			}
@@ -3755,9 +3758,10 @@ export class Item extends Movable {
 	 * Deserialize a SerializedItem into an Item instance.
 	 */
 	public static deserialize(data: AnySerializedDungeonObject): Item {
-		const item = new Item(data as SerializedItem);
-		if (data.contents && Array.isArray(data.contents)) {
-			for (const contentData of data.contents) {
+		const norm = normalizeSerializedData(data) as unknown as SerializedItem;
+		const item = new Item(norm as SerializedItem);
+		if (norm.contents && Array.isArray(norm.contents)) {
+			for (const contentData of norm.contents) {
 				const contentObj = DungeonObject.deserialize(contentData);
 				item.add(contentObj);
 			}
@@ -4212,7 +4216,9 @@ export class Equipment extends Item {
 	 * ```
 	 */
 	public static deserialize(data: SerializedEquipment): Equipment {
-		const { type, ...equipmentData } = data;
+		const { type, ...equipmentData } = normalizeSerializedData(
+			data
+		) as SerializedEquipment;
 		const equipment = new Equipment({
 			...equipmentData,
 			slot: equipmentData.slot,
@@ -4381,7 +4387,7 @@ export class Armor extends Equipment {
 	 * ```
 	 */
 	public static deserialize(data: SerializedArmor): Armor {
-		const armorData = data;
+		const armorData = normalizeSerializedData(data) as SerializedArmor;
 		const armor = new Armor({
 			...armorData,
 			slot: armorData.slot,
@@ -4526,7 +4532,9 @@ export class Weapon extends Equipment {
 	 * ```
 	 */
 	public static deserialize(data: SerializedWeapon): Weapon {
-		const weaponData = data as unknown as SerializedWeapon;
+		const weaponData = normalizeSerializedData(
+			data
+		) as unknown as SerializedWeapon;
 		const weapon = new Weapon({
 			...weaponData,
 			slot: weaponData.slot,
@@ -6088,7 +6096,12 @@ export class Mob extends Movable {
 	 * Deserialize a SerializedMob into a Mob instance.
 	 */
 	public static deserialize(data: SerializedMob): Mob {
-		const { race: raceId, class: classId, equipped, ...rest } = data;
+		const {
+			race: raceId,
+			class: classId,
+			equipped,
+			...rest
+		} = normalizeSerializedData(data) as SerializedMob;
 		const race = getRaceById(raceId);
 		const _class = getClassById(classId);
 		const mob = new Mob({

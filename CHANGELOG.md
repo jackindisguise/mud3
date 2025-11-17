@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.11.0](https://github.com/jackindisguise/mud3/compare/v1.10.0...v1.11.0) (2025-11-17)
+
+
+### Features
+
+* **combat:** add damageMessage function with HP percentage display ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **combat:** add experience gain on mob death ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **combat:** added experience gain to handleDeath function ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **combat:** added HP percentage suffix to user and target messages (not room messages) ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **combat:** created damageMessage function that wraps act() to inject HP percentage ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **combat:** experience messages sent to killer ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **combat:** only players gain experience from kills ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **commands:** add levelup command ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **commands:** created levelup command that grants one level's worth of experience (100 XP) ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* **commands:** shows level up message if threshold reached ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+* refactor combat system and add experience/leveling features ([b8b96e6](https://github.com/jackindisguise/mud3/commit/b8b96e64e1a3841bbf0daec292196fee03f419bc))
+
+
+### Bug Fixes
+
+* **attribute:** updated createPrimaryAttributesView to handle non-finite values ([105a371](https://github.com/jackindisguise/mud3/commit/105a371e9a5e35847048841ebc53d8bb4883f056))
+* **attribute:** updated createResourceCapsView to handle non-finite values ([105a371](https://github.com/jackindisguise/mud3/commit/105a371e9a5e35847048841ebc53d8bb4883f056))
+* **attribute:** updated createSecondaryAttributesView to handle non-finite values ([105a371](https://github.com/jackindisguise/mud3/commit/105a371e9a5e35847048841ebc53d8bb4883f056))
+
 ## [1.10.0](https://github.com/jackindisguise/mud3/compare/v1.9.0...v1.10.0) (2025-11-16)
 
 

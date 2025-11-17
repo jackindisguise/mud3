@@ -74,7 +74,8 @@ import {
 import { Character, MESSAGE_GROUP } from "./character.js";
 import { act } from "./act.js";
 import { Game } from "./game.js";
-import { removeFromCombatQueue, handleDeath, damageMessage } from "./combat.js";
+import { removeFromCombatQueue, handleDeath } from "./combat.js";
+import { damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
 import {
 	HitType,
@@ -87,6 +88,32 @@ import {
 	DamageTypeRelationships,
 	getThirdPersonVerb,
 } from "./damage-types.js";
+import {
+	PrimaryAttributeSet,
+	SecondaryAttributeSet,
+	ResourceCapacities,
+	ResourceSnapshot,
+	SECONDARY_ATTRIBUTE_FACTORS,
+	SECONDARY_ATTRIBUTE_BASE,
+	HEALTH_PER_VITALITY,
+	MANA_PER_WISDOM,
+	ATTRIBUTE_ROUND_DECIMALS,
+	clampNumber,
+	roundTo,
+	sumPrimaryAttributes,
+	sumSecondaryAttributes,
+	multiplyPrimaryAttributes,
+	sumResourceCaps,
+	multiplyResourceCaps,
+	normalizePrimaryBonuses,
+	normalizeResourceBonuses,
+	prunePrimaryBonuses,
+	pruneResourceBonuses,
+	computeSecondaryAttributes,
+	createPrimaryAttributesView,
+	createSecondaryAttributesView,
+	createResourceCapsView,
+} from "./attribute.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -3872,132 +3899,6 @@ export class Item extends Movable {
 }
 
 /**
- * Primary attribute set representing the three core attributes for mobs.
- * These attributes directly influence secondary attributes and resource capacities.
- *
- * @property strength - Physical power, affects attack power, vitality, and defense
- * @property agility - Dexterity and speed, affects crit rate, avoidance, accuracy, and endurance
- * @property intelligence - Mental acuity, affects spell power, wisdom, and resilience
- *
- * @example
- * ```typescript
- * import { Mob, PrimaryAttributeSet } from "./dungeon.js";
- *
- * const warrior = new Mob({
- *   attributeBonuses: {
- *     strength: 10,
- *     agility: 5,
- *     intelligence: 2
- *   } as Partial<PrimaryAttributeSet>
- * });
- *
- * console.log(warrior.strength); // Shows total strength including bonuses
- * ```
- */
-export interface PrimaryAttributeSet {
-	strength: number;
-	agility: number;
-	intelligence: number;
-}
-
-/**
- * Secondary attribute set representing derived combat and utility stats for mobs.
- * These attributes are calculated from primary attributes and can be modified by equipment.
- *
- * @property attackPower - Physical damage output (derived from strength, base value only - weapons add their attack power when used)
- * @property vitality - Health capacity modifier (derived from strength, affects max health)
- * @property defense - Damage reduction (derived from strength, modified by armor defense)
- * @property critRate - Critical hit chance (derived from agility)
- * @property avoidance - Dodge chance (derived from agility)
- * @property accuracy - Hit chance (derived from agility)
- * @property endurance - Stamina/energy capacity (derived from agility)
- * @property spellPower - Magical damage output (derived from intelligence)
- * @property wisdom - Mana capacity modifier (derived from intelligence, affects max mana)
- * @property resilience - Magical resistance (derived from intelligence)
- *
- * @example
- * ```typescript
- * import { Mob, Armor, Weapon } from "./dungeon.js";
- * import { EQUIPMENT_SLOT } from "./dungeon.js";
- *
- * const fighter = new Mob();
- * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 10 });
- * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
- *
- * fighter.equip(sword);
- * fighter.equip(helmet);
- *
- * console.log(fighter.attackPower); // Base attack power from strength (weapons add their power when used)
- * console.log(fighter.defense); // Includes armor bonus
- * ```
- */
-export interface SecondaryAttributeSet {
-	attackPower: number;
-	vitality: number;
-	defense: number;
-	critRate: number;
-	avoidance: number;
-	accuracy: number;
-	endurance: number;
-	spellPower: number;
-	wisdom: number;
-	resilience: number;
-}
-
-/**
- * Resource capacity values representing the maximum amounts of health and mana a mob can have.
- * These values are calculated from race/job starting values, level growth, bonuses, and
- * secondary attributes (vitality for health, wisdom for mana).
- *
- * @property maxHealth - Maximum health points (affected by vitality and resource bonuses)
- * @property maxMana - Maximum mana points (affected by wisdom and resource bonuses)
- *
- * @example
- * ```typescript
- * import { Mob, ResourceCapacities } from "./dungeon.js";
- *
- * const mage = new Mob({
- *   resourceBonuses: {
- *     maxMana: 50
- *   } as Partial<ResourceCapacities>
- * });
- *
- * console.log(mage.maxHealth); // Base health + vitality bonus
- * console.log(mage.maxMana); // Base mana + wisdom bonus + equipment bonus
- * ```
- */
-export interface ResourceCapacities {
-	maxHealth: number;
-	maxMana: number;
-}
-
-/**
- * Snapshot of current mutable resource values for a mob.
- * Used for persistence and UI display. Values are clamped between 0 and their maximums.
- *
- * @property health - Current health points (0 to maxHealth)
- * @property mana - Current mana points (0 to maxMana)
- * @property exhaustion - Current exhaustion level (0 to 100)
- *
- * @example
- * ```typescript
- * import { Mob } from "./dungeon.js";
- *
- * const player = new Mob();
- * const resources = player.resources;
- *
- * console.log(`HP: ${resources.health}/${player.maxHealth}`);
- * console.log(`MP: ${resources.mana}/${player.maxMana}`);
- * console.log(`Exhaustion: ${resources.exhaustion}%`);
- * ```
- */
-export interface ResourceSnapshot {
-	health: number;
-	mana: number;
-	exhaustion: number;
-}
-
-/**
  * Equipment slot types that items can be equipped to on a mob.
  * Each slot can hold one piece of equipment. Weapons can only be equipped in mainHand/offHand,
  * Armor cannot be equipped in mainHand/offHand, and base Equipment can be equipped in offHand
@@ -4739,250 +4640,8 @@ export interface MobOptions extends DungeonObjectOptions {
 	exhaustion?: number;
 }
 
-const SECONDARY_ATTRIBUTE_FACTORS: Readonly<
-	Record<keyof SecondaryAttributeSet, Partial<PrimaryAttributeSet>>
-> = Object.freeze({
-	attackPower: { strength: 0.5 },
-	vitality: { strength: 0.5 },
-	defense: { strength: 0.5 },
-	critRate: { agility: 0.2 },
-	avoidance: { agility: 0.2 },
-	accuracy: { agility: 0.2 },
-	endurance: { agility: 1 },
-	spellPower: { intelligence: 0.5 },
-	wisdom: { intelligence: 0.5 },
-	resilience: { intelligence: 0.5 },
-});
-
-const SECONDARY_ATTRIBUTE_BASE: Readonly<
-	Record<keyof SecondaryAttributeSet, number>
-> = Object.freeze({
-	attackPower: 0,
-	vitality: 0,
-	defense: 0,
-	critRate: 0,
-	avoidance: 0,
-	accuracy: 0,
-	endurance: 0,
-	spellPower: 0,
-	wisdom: 0,
-	resilience: 0,
-});
-
-const HEALTH_PER_VITALITY = 2;
-const MANA_PER_WISDOM = 2;
 const MAX_EXHAUSTION = 100;
 const EXPERIENCE_THRESHOLD = 100;
-const ATTRIBUTE_ROUND_DECIMALS = 2;
-const EXPERIENCE_ROUND_DECIMALS = 4;
-
-function sumPrimaryAttributes(
-	...components: Array<Partial<PrimaryAttributeSet> | undefined>
-): PrimaryAttributeSet {
-	let strength = 0;
-	let agility = 0;
-	let intelligence = 0;
-	for (const part of components) {
-		if (!part) continue;
-		strength += Number(part.strength ?? 0);
-		agility += Number(part.agility ?? 0);
-		intelligence += Number(part.intelligence ?? 0);
-	}
-	return {
-		strength,
-		agility,
-		intelligence,
-	};
-}
-
-function sumSecondaryAttributes(
-	...components: Array<Partial<SecondaryAttributeSet> | undefined>
-): SecondaryAttributeSet {
-	const result: SecondaryAttributeSet = {
-		attackPower: 0,
-		vitality: 0,
-		defense: 0,
-		critRate: 0,
-		avoidance: 0,
-		accuracy: 0,
-		endurance: 0,
-		spellPower: 0,
-		wisdom: 0,
-		resilience: 0,
-	};
-	for (const part of components) {
-		if (!part) continue;
-		result.attackPower += Number(part.attackPower ?? 0);
-		result.vitality += Number(part.vitality ?? 0);
-		result.defense += Number(part.defense ?? 0);
-		result.critRate += Number(part.critRate ?? 0);
-		result.avoidance += Number(part.avoidance ?? 0);
-		result.accuracy += Number(part.accuracy ?? 0);
-		result.endurance += Number(part.endurance ?? 0);
-		result.spellPower += Number(part.spellPower ?? 0);
-		result.wisdom += Number(part.wisdom ?? 0);
-		result.resilience += Number(part.resilience ?? 0);
-	}
-	return result;
-}
-
-function multiplyPrimaryAttributes(
-	source: PrimaryAttributeSet,
-	factor: number
-): PrimaryAttributeSet {
-	return {
-		strength: source.strength * factor,
-		agility: source.agility * factor,
-		intelligence: source.intelligence * factor,
-	};
-}
-
-function sumResourceCaps(
-	...components: Array<Partial<ResourceCapacities> | undefined>
-): ResourceCapacities {
-	let maxHealth = 0;
-	let maxMana = 0;
-	for (const part of components) {
-		if (!part) continue;
-		maxHealth += Number(part.maxHealth ?? 0);
-		maxMana += Number(part.maxMana ?? 0);
-	}
-	return {
-		maxHealth,
-		maxMana,
-	};
-}
-
-function multiplyResourceCaps(
-	source: ResourceCapacities,
-	factor: number
-): ResourceCapacities {
-	return {
-		maxHealth: source.maxHealth * factor,
-		maxMana: source.maxMana * factor,
-	};
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-	if (!Number.isFinite(value)) return min;
-	return Math.min(Math.max(value, min), max);
-}
-
-function roundTo(value: number, decimals: number): number {
-	const factor = 10 ** decimals;
-	return Math.round((value + Number.EPSILON) * factor) / factor;
-}
-
-function normalizePrimaryBonuses(
-	bonuses?: Partial<PrimaryAttributeSet>
-): PrimaryAttributeSet {
-	return sumPrimaryAttributes(bonuses);
-}
-
-function normalizeResourceBonuses(
-	bonuses?: Partial<ResourceCapacities>
-): ResourceCapacities {
-	return sumResourceCaps(bonuses);
-}
-
-function prunePrimaryBonuses(
-	bonuses: PrimaryAttributeSet
-): Partial<PrimaryAttributeSet> | undefined {
-	const result: Partial<PrimaryAttributeSet> = {};
-	if (bonuses.strength !== 0)
-		result.strength = roundTo(bonuses.strength, ATTRIBUTE_ROUND_DECIMALS);
-	if (bonuses.agility !== 0)
-		result.agility = roundTo(bonuses.agility, ATTRIBUTE_ROUND_DECIMALS);
-	if (bonuses.intelligence !== 0)
-		result.intelligence = roundTo(
-			bonuses.intelligence,
-			ATTRIBUTE_ROUND_DECIMALS
-		);
-	return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function pruneResourceBonuses(
-	bonuses: ResourceCapacities
-): Partial<ResourceCapacities> | undefined {
-	const result: Partial<ResourceCapacities> = {};
-	if (bonuses.maxHealth !== 0)
-		result.maxHealth = roundTo(bonuses.maxHealth, ATTRIBUTE_ROUND_DECIMALS);
-	if (bonuses.maxMana !== 0)
-		result.maxMana = roundTo(bonuses.maxMana, ATTRIBUTE_ROUND_DECIMALS);
-	return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function computeSecondaryAttributes(
-	primary: PrimaryAttributeSet
-): SecondaryAttributeSet {
-	const result: SecondaryAttributeSet = {
-		attackPower: 0,
-		vitality: 0,
-		defense: 0,
-		critRate: 0,
-		avoidance: 0,
-		accuracy: 0,
-		endurance: 0,
-		spellPower: 0,
-		wisdom: 0,
-		resilience: 0,
-	};
-
-	(
-		Object.keys(SECONDARY_ATTRIBUTE_FACTORS) as Array<
-			keyof SecondaryAttributeSet
-		>
-	).forEach((key) => {
-		const base = SECONDARY_ATTRIBUTE_BASE[key];
-		const weights = SECONDARY_ATTRIBUTE_FACTORS[key];
-		let value = base;
-		if (weights.strength)
-			value += primary.strength * Number(weights.strength ?? 0);
-		if (weights.agility)
-			value += primary.agility * Number(weights.agility ?? 0);
-		if (weights.intelligence)
-			value += primary.intelligence * Number(weights.intelligence ?? 0);
-		result[key] = roundTo(value, ATTRIBUTE_ROUND_DECIMALS);
-	});
-
-	return result;
-}
-
-function createPrimaryAttributesView(
-	source: PrimaryAttributeSet
-): Readonly<PrimaryAttributeSet> {
-	return Object.freeze({
-		strength: Math.floor(Number(source.strength) || 0),
-		agility: Math.floor(Number(source.agility) || 0),
-		intelligence: Math.floor(Number(source.intelligence) || 0),
-	});
-}
-
-function createSecondaryAttributesView(
-	source: SecondaryAttributeSet
-): Readonly<SecondaryAttributeSet> {
-	return Object.freeze({
-		attackPower: Math.floor(Number(source.attackPower) || 0),
-		vitality: Math.floor(Number(source.vitality) || 0),
-		defense: Math.floor(Number(source.defense) || 0),
-		critRate: Math.floor(Number(source.critRate) || 0),
-		avoidance: Math.floor(Number(source.avoidance) || 0),
-		accuracy: Math.floor(Number(source.accuracy) || 0),
-		endurance: Math.floor(Number(source.endurance) || 0),
-		spellPower: Math.floor(Number(source.spellPower) || 0),
-		wisdom: Math.floor(Number(source.wisdom) || 0),
-		resilience: Math.floor(Number(source.resilience) || 0),
-	});
-}
-
-function createResourceCapsView(
-	source: ResourceCapacities
-): Readonly<ResourceCapacities> {
-	return Object.freeze({
-		maxHealth: Math.floor(Number(source.maxHealth) || 0),
-		maxMana: Math.floor(Number(source.maxMana) || 0),
-	});
-}
 
 /**
  * Serialized form for Mob objects.
@@ -7209,6 +6868,7 @@ export function serializedToOptions(
 					type: "Equipment",
 				}) as EquipmentOptions),
 				attackPower: w.attackPower,
+				hitType: w.hitType,
 			});
 			return opts;
 		}

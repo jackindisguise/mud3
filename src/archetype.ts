@@ -1,4 +1,4 @@
-import { PrimaryAttributeSet, ResourceCapacities } from "./dungeon.js";
+import { PrimaryAttributeSet, ResourceCapacities } from "./attribute.js";
 import { DamageTypeRelationships } from "./damage-types.js";
 
 export interface GrowthModifierCurve {

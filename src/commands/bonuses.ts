@@ -20,91 +20,18 @@ import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
 	ResourceCapacities,
-} from "../dungeon.js";
+	sumPrimaryAttributes,
+	multiplyPrimaryAttributes,
+	sumResourceCaps,
+	multiplyResourceCaps,
+	sumSecondaryAttributes,
+	SECONDARY_ATTRIBUTE_FACTORS,
+	HEALTH_PER_VITALITY,
+	MANA_PER_WISDOM,
+} from "../attribute.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../telnet.js";
 import { COLOR, color } from "../color.js";
-
-// Helper functions to sum bonuses (duplicated from dungeon.ts since they're not exported)
-function sumPrimaryAttributes(
-	...components: Array<Partial<PrimaryAttributeSet> | undefined>
-): PrimaryAttributeSet {
-	let strength = 0;
-	let agility = 0;
-	let intelligence = 0;
-	for (const part of components) {
-		if (!part) continue;
-		strength += Number(part.strength ?? 0);
-		agility += Number(part.agility ?? 0);
-		intelligence += Number(part.intelligence ?? 0);
-	}
-	return { strength, agility, intelligence };
-}
-
-function multiplyPrimaryAttributes(
-	source: PrimaryAttributeSet,
-	factor: number
-): PrimaryAttributeSet {
-	return {
-		strength: source.strength * factor,
-		agility: source.agility * factor,
-		intelligence: source.intelligence * factor,
-	};
-}
-
-function sumResourceCaps(
-	...components: Array<Partial<ResourceCapacities> | undefined>
-): ResourceCapacities {
-	let maxHealth = 0;
-	let maxMana = 0;
-	for (const part of components) {
-		if (!part) continue;
-		maxHealth += Number(part.maxHealth ?? 0);
-		maxMana += Number(part.maxMana ?? 0);
-	}
-	return { maxHealth, maxMana };
-}
-
-function multiplyResourceCaps(
-	source: ResourceCapacities,
-	factor: number
-): ResourceCapacities {
-	return {
-		maxHealth: source.maxHealth * factor,
-		maxMana: source.maxMana * factor,
-	};
-}
-
-function sumSecondaryAttributes(
-	...components: Array<Partial<SecondaryAttributeSet> | undefined>
-): SecondaryAttributeSet {
-	const result: SecondaryAttributeSet = {
-		attackPower: 0,
-		vitality: 0,
-		defense: 0,
-		critRate: 0,
-		avoidance: 0,
-		accuracy: 0,
-		endurance: 0,
-		spellPower: 0,
-		wisdom: 0,
-		resilience: 0,
-	};
-	for (const part of components) {
-		if (!part) continue;
-		result.attackPower += Number(part.attackPower ?? 0);
-		result.vitality += Number(part.vitality ?? 0);
-		result.defense += Number(part.defense ?? 0);
-		result.critRate += Number(part.critRate ?? 0);
-		result.avoidance += Number(part.avoidance ?? 0);
-		result.accuracy += Number(part.accuracy ?? 0);
-		result.endurance += Number(part.endurance ?? 0);
-		result.spellPower += Number(part.spellPower ?? 0);
-		result.wisdom += Number(part.wisdom ?? 0);
-		result.resilience += Number(part.resilience ?? 0);
-	}
-	return result;
-}
 
 /**
  * Format a number with a sign prefix for display.
@@ -204,22 +131,6 @@ export default {
 		);
 
 		// Calculate secondary attribute contributions from primary attributes
-		const SECONDARY_ATTRIBUTE_FACTORS: Record<
-			keyof SecondaryAttributeSet,
-			Partial<PrimaryAttributeSet>
-		> = {
-			attackPower: { strength: 0.5 },
-			vitality: { strength: 0.5 },
-			defense: { strength: 0.5 },
-			critRate: { agility: 0.2 },
-			avoidance: { agility: 0.2 },
-			accuracy: { agility: 0.2 },
-			endurance: { agility: 1 },
-			spellPower: { intelligence: 0.5 },
-			wisdom: { intelligence: 0.5 },
-			resilience: { intelligence: 0.5 },
-		};
-
 		function calculateSecondaryFromPrimary(
 			attr: keyof SecondaryAttributeSet
 		): number {
@@ -235,8 +146,6 @@ export default {
 		}
 
 		// Calculate resource contributions from secondary attributes
-		const HEALTH_PER_VITALITY = 2;
-		const MANA_PER_WISDOM = 2;
 		const vitalityFromPrimary = calculateSecondaryFromPrimary("vitality");
 		const wisdomFromPrimary = calculateSecondaryFromPrimary("wisdom");
 		const healthFromVitality = vitalityFromPrimary * HEALTH_PER_VITALITY;

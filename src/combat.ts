@@ -16,7 +16,13 @@ import { Character, MESSAGE_GROUP } from "./character.js";
 import { color, COLOR } from "./color.js";
 import { LINEBREAK } from "./telnet.js";
 import logger from "./logger.js";
-import { act, ActMessageTemplates, ActContext, ActOptions } from "./act.js";
+import {
+	act,
+	damageMessage,
+	ActMessageTemplates,
+	ActContext,
+	ActOptions,
+} from "./act.js";
 import {
 	getDamageMultiplier,
 	DAMAGE_TYPE,
@@ -149,39 +155,6 @@ function calculateDamage(
 	damage *= damageMultiplier;
 
 	return Math.floor(damage);
-}
-
-/**
- * Wraps act() to automatically inject HP percentage into user and target messages.
- * Calculates the target's HP percentage after damage and appends it to user and target messages.
- *
- * @param templates Message templates for different perspectives
- * @param context The act context containing user, target, and room
- * @param target The mob receiving damage (used to calculate HP percentage)
- * @param damage The damage amount that will be dealt
- * @param options Optional configuration for message behavior
- */
-export function damageMessage(
-	templates: ActMessageTemplates,
-	context: ActContext,
-	target: Mob,
-	damage: number,
-	options?: ActOptions
-): void {
-	// Calculate HP percentage after damage
-	const healthAfterDamage = Math.max(0, target.health - damage);
-	const hpPercentage = Math.round((healthAfterDamage / target.maxHealth) * 100);
-	const hpSuffix = ` [${hpPercentage}%]`;
-
-	// Create modified templates with HP suffix added to user and target messages
-	const modifiedTemplates: ActMessageTemplates = {
-		user: templates.user ? `${templates.user}${hpSuffix}` : undefined,
-		target: templates.target ? `${templates.target}${hpSuffix}` : undefined,
-		room: templates.room, // Room message doesn't get HP suffix
-	};
-
-	// Call act() with modified templates
-	act(modifiedTemplates, context, options);
 }
 
 /**

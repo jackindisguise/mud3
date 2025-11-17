@@ -249,3 +249,61 @@ export function act(
 		obj.character.sendMessage(roomMessage, opts.messageGroup);
 	}
 }
+
+/**
+ * Wraps act() to automatically inject HP percentage into user and target messages.
+ * This is used for combat damage messages to show the target's remaining health.
+ *
+ * The HP percentage is calculated after the damage is dealt and appended to the
+ * user and target messages (but not the room message).
+ *
+ * @param templates Message templates for different perspectives
+ * @param context The act context containing user, target, and room
+ * @param target The target mob that received damage
+ * @param damage The amount of damage dealt
+ * @param options Optional configuration for message behavior
+ *
+ * @example
+ * ```typescript
+ * import { damageMessage } from "./act.js";
+ * import { MESSAGE_GROUP } from "./character.js";
+ *
+ * damageMessage(
+ *   {
+ *     user: "You hit {target} for {damage} damage.",
+ *     target: "{User} hits you for {damage} damage.",
+ *     room: "{User} hits {target} for {damage} damage."
+ *   },
+ *   {
+ *     user: attacker,
+ *     target: defender,
+ *     room: currentRoom
+ *   },
+ *   defender,
+ *   25,
+ *   { messageGroup: MESSAGE_GROUP.COMBAT }
+ * );
+ * ```
+ */
+export function damageMessage(
+	templates: ActMessageTemplates,
+	context: ActContext,
+	target: Mob,
+	damage: number,
+	options?: ActOptions
+): void {
+	// Calculate HP percentage after damage
+	const healthAfterDamage = Math.max(0, target.health - damage);
+	const hpPercentage = Math.round((healthAfterDamage / target.maxHealth) * 100);
+	const hpSuffix = ` [${hpPercentage}%]`;
+
+	// Create modified templates with HP suffix added to user and target messages
+	const modifiedTemplates: ActMessageTemplates = {
+		user: templates.user ? `${templates.user}${hpSuffix}` : undefined,
+		target: templates.target ? `${templates.target}${hpSuffix}` : undefined,
+		room: templates.room, // Room message doesn't get HP suffix
+	};
+
+	// Call act() with modified templates
+	act(modifiedTemplates, context, options);
+}

@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * Script to post recent changelog entries to the changes board.
  *
@@ -12,64 +14,27 @@
  * @module scripts/post-changelog-to-board
  */
 
-import { readFile } from "fs/promises";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
-import { loadBoard } from "../package/board.js";
-import logger from "../logger.js";
+import { loadBoard } from "../dist/src/package/board.js";
+import logger from "../dist/src/logger.js";
 import { string } from "mud-ext";
-import { COLOR, color, SIZER, TEXT_STYLE, textStyleToTag } from "../color.js";
-import { LINEBREAK } from "../telnet.js";
+import { COLOR, color, SIZER } from "../dist/src/color.js";
+import { LINEBREAK } from "../dist/src/telnet.js";
 
 const CHANGELOG_PATH = join(process.cwd(), "CHANGELOG.md");
 const CHANGES_BOARD_NAME = "changes";
 const SYSTEM_AUTHOR = "SYSTEM";
 
 /**
- * Parsed commit message body data.
- */
-interface ParsedCommitBody {
-	body: string;
-	bulletPoints: ParsedBulletPoint[];
-}
-
-/**
- * Parsed bullet point data from a changelog entry.
- */
-interface ParsedBulletPoint {
-	text: string;
-	prefixTag: string | null;
-	commitType: string | null; // Conventional commit type (feat, fix, chore, etc.)
-	commitHash: string | null;
-	commitUrl: string | null;
-	commitBody: ParsedCommitBody | null;
-	issueNumber: string | null;
-	issueUrl: string | null;
-	urls: string[];
-}
-
-/**
- * Parsed version section from changelog.
- */
-interface ParsedVersion {
-	version: string;
-	content: string;
-	fullSection: string;
-	features: ParsedBulletPoint[];
-	bugFixes: ParsedBulletPoint[];
-	breakingChanges: ParsedBulletPoint[];
-	miscellaneous: ParsedBulletPoint[];
-}
-
-/**
  * Fetches the full commit message body for a given commit hash.
  *
- * @param commitHash - The commit hash to fetch
- * @returns Parsed commit body or null if fetch fails
+ * @param {string} commitHash - The commit hash to fetch
+ * @returns {Object|null} Parsed commit body or null if fetch fails
  */
-function fetchCommitBody(commitHash: string): ParsedCommitBody | null {
+function fetchCommitBody(commitHash) {
 	try {
 		// Get the full commit message body (everything after the subject)
 		const commitBody = execSync(`git show --format=%B -s ${commitHash}`, {
@@ -85,7 +50,7 @@ function fetchCommitBody(commitHash: string): ParsedCommitBody | null {
 		// Treat every non-empty line as a bullet point (remove leading "- " if present)
 		// Skip the first line (commit subject) as it's already in the changelog
 		const lines = commitBody.split(/\r?\n/);
-		const bulletPoints: ParsedBulletPoint[] = [];
+		const bulletPoints = [];
 
 		// Skip the first line (commit subject) - start from index 1
 		for (let i = 0; i < lines.length; i++) {
@@ -118,11 +83,11 @@ function fetchCommitBody(commitHash: string): ParsedCommitBody | null {
  * Parses a bullet point line to extract prefix tag, commit hash, URLs, and issue numbers.
  * Also fetches and parses the commit message body if a commit hash is found.
  *
- * @param bulletText - The bullet point text (without the leading `* `)
- * @returns Parsed bullet point data
+ * @param {string} bulletText - The bullet point text (without the leading `* `)
+ * @returns {Object} Parsed bullet point data
  */
-function parseBulletPoint(bulletText: string): ParsedBulletPoint {
-	const result: ParsedBulletPoint = {
+function parseBulletPoint(bulletText) {
+	const result = {
 		text: bulletText,
 		prefixTag: null,
 		commitType: null,
@@ -158,7 +123,7 @@ function parseBulletPoint(bulletText: string): ParsedBulletPoint {
 
 	// Extract all markdown links: [text](url)
 	const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-	let linkMatch: RegExpExecArray | null;
+	let linkMatch;
 
 	while ((linkMatch = linkPattern.exec(bulletText)) !== null) {
 		const linkText = linkMatch[1];
@@ -203,12 +168,10 @@ function parseBulletPoint(bulletText: string): ParsedBulletPoint {
 /**
  * Categorizes a bullet point based on its commit type.
  *
- * @param bullet - Parsed bullet point
- * @returns Category name: "feature", "bugfix", "breaking", "misc", or null
+ * @param {Object} bullet - Parsed bullet point
+ * @returns {string|null} Category name: "feature", "bugfix", "breaking", "misc", or null
  */
-function categorizeBulletPoint(
-	bullet: ParsedBulletPoint
-): "feature" | "bugfix" | "breaking" | "misc" | null {
+function categorizeBulletPoint(bullet) {
 	if (!bullet.commitType) {
 		return null;
 	}
@@ -236,15 +199,15 @@ function categorizeBulletPoint(
 /**
  * Extracts all commit hashes from a version section.
  *
- * @param contentLines - All content lines for this version
- * @returns Set of commit hashes found in the version
+ * @param {string[]} contentLines - All content lines for this version
+ * @returns {Set<string>} Set of commit hashes found in the version
  */
-function extractCommitHashes(contentLines: string[]): Set<string> {
-	const commitHashes = new Set<string>();
+function extractCommitHashes(contentLines) {
+	const commitHashes = new Set();
 	const commitHashPattern = /\[([a-f0-9]{7,})\]/gi;
 
 	for (const line of contentLines) {
-		let match: RegExpExecArray | null;
+		let match;
 		while ((match = commitHashPattern.exec(line)) !== null) {
 			commitHashes.add(match[1]);
 		}
@@ -257,23 +220,19 @@ function extractCommitHashes(contentLines: string[]): Set<string> {
  * Parses version content by extracting all commit hashes, fetching their bodies,
  * and compiling all bullet points into categorized lists.
  *
- * @param contentLines - All content lines for this version
- * @param sectionLines - All lines including header
- * @param version - Version number
- * @returns Parsed version data
+ * @param {string[]} contentLines - All content lines for this version
+ * @param {string[]} sectionLines - All lines including header
+ * @param {string} version - Version number
+ * @returns {Object} Parsed version data
  */
-function parseVersionContent(
-	contentLines: string[],
-	sectionLines: string[],
-	version: string
-): ParsedVersion {
+function parseVersionContent(contentLines, sectionLines, version) {
 	const contentText = contentLines.join("\n");
 	const sectionText = sectionLines.join("\n");
 
-	const features: ParsedBulletPoint[] = [];
-	const bugFixes: ParsedBulletPoint[] = [];
-	const breakingChanges: ParsedBulletPoint[] = [];
-	const miscellaneous: ParsedBulletPoint[] = [];
+	const features = [];
+	const bugFixes = [];
+	const breakingChanges = [];
+	const miscellaneous = [];
 
 	// Extract all commit hashes from the version section
 	const commitHashes = extractCommitHashes(contentLines);
@@ -323,17 +282,17 @@ function parseVersionContent(
 /**
  * Parses a changelog file and returns structured version sections.
  *
- * @param filePath - Path to the changelog file
- * @returns Array of parsed version sections
+ * @param {string} filePath - Path to the changelog file
+ * @returns {Object[]} Array of parsed version sections
  */
-function parseChangelog(filePath: string): ParsedVersion[] {
+function parseChangelog(filePath) {
 	const content = readFileSync(filePath, "utf-8");
 	const lines = content.split(/\r?\n/);
 
-	const versions: ParsedVersion[] = [];
-	let currentVersion: string | null = null;
-	let currentContent: string[] = [];
-	let currentSection: string[] = [];
+	const versions = [];
+	let currentVersion = null;
+	let currentContent = [];
+	let currentSection = [];
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
@@ -380,20 +339,20 @@ function parseChangelog(filePath: string): ParsedVersion[] {
 /**
  * Replaces non-ASCII characters with a pound symbol.
  *
- * @param text - Text to sanitize
- * @returns Text with non-ASCII characters replaced with #
+ * @param {string} text - Text to sanitize
+ * @returns {string} Text with non-ASCII characters replaced with #
  */
-function replaceNonAscii(text: string): string {
+function replaceNonAscii(text) {
 	return text.replace(/[^\x00-\x7F]/g, "#");
 }
 
 /**
  * Formats a parsed bullet point for display in the board message.
  *
- * @param bullet - Parsed bullet point
- * @returns Formatted string
+ * @param {Object} bullet - Parsed bullet point
+ * @returns {string} Formatted string
  */
-function formatBulletPoint(bullet: ParsedBulletPoint): string {
+function formatBulletPoint(bullet) {
 	let formatted = replaceNonAscii(bullet.text);
 
 	// Add prefix tag if present
@@ -401,30 +360,17 @@ function formatBulletPoint(bullet: ParsedBulletPoint): string {
 		formatted = `[${bullet.prefixTag}] ${formatted}`;
 	}
 
-	// Add commit hash if present (shortened to 7 chars)
-	/**
-	if (bullet.commitHash) {
-		const shortHash = bullet.commitHash.substring(0, 7);
-		formatted += ` (${shortHash})`;
-	}
-
-	// Add issue number if present
-	if (bullet.issueNumber) {
-		formatted += ` ${bullet.issueNumber}`;
-	}
-	*/
-
 	return formatted;
 }
 
 /**
  * Formats a parsed version into a board message content string.
  *
- * @param version - Parsed version data
- * @returns Formatted content string
+ * @param {Object} version - Parsed version data
+ * @returns {string[]} Formatted content string
  */
-function formatVersionContent(version: ParsedVersion): string[] {
-	const lines: string[] = [];
+function formatVersionContent(version) {
+	const lines = [];
 
 	// Add breaking changes first (if any)
 	if (version.breakingChanges.length > 0) {
@@ -464,11 +410,15 @@ function formatVersionContent(version: ParsedVersion): string[] {
 	return lines;
 }
 
-function myformat(
-	point: ParsedBulletPoint,
-	bulletColor: COLOR,
-	textColor: COLOR
-): string[] {
+/**
+ * Formats a bullet point with wrapping.
+ *
+ * @param {Object} point - Parsed bullet point
+ * @param {number} bulletColor - Color for the bullet
+ * @param {number} textColor - Color for the text
+ * @returns {string[]} Formatted lines
+ */
+function myformat(point, bulletColor, textColor) {
 	return string.wrap({
 		string: `${color(" *", bulletColor)} ${color(
 			formatBulletPoint(point),
@@ -484,9 +434,9 @@ function myformat(
 /**
  * Parses the CHANGELOG.md file to extract all versions.
  *
- * @returns Array of parsed version entries, ordered from newest to oldest
+ * @returns {Promise<Object[]>} Array of parsed version entries, ordered from newest to oldest
  */
-async function parseAllChangelogVersions(): Promise<ParsedVersion[]> {
+async function parseAllChangelogVersions() {
 	try {
 		const versions = parseChangelog(CHANGELOG_PATH);
 		if (versions.length === 0) {
@@ -504,7 +454,7 @@ async function parseAllChangelogVersions(): Promise<ParsedVersion[]> {
  * Posts all unposted changelog entries to the changes board.
  * Posts versions from oldest to newest, stopping when it finds a version that's already posted.
  */
-async function postChangelogToBoard(): Promise<void> {
+async function postChangelogToBoard() {
 	try {
 		const versions = await parseAllChangelogVersions();
 		if (versions.length === 0) {
@@ -527,7 +477,7 @@ async function postChangelogToBoard(): Promise<void> {
 					const match = msg.subject.match(/^Version (.+)$/);
 					return match ? match[1] : null;
 				})
-				.filter((v): v is string => v !== null)
+				.filter((v) => v !== null)
 		);
 
 		// Post all unposted versions, starting from oldest (reverse order)
@@ -589,7 +539,4 @@ export {
 	parseBulletPoint,
 	fetchCommitBody,
 	formatVersionContent,
-	type ParsedVersion,
-	type ParsedBulletPoint,
-	type ParsedCommitBody,
 };

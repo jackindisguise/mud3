@@ -20,91 +20,18 @@ import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
 	ResourceCapacities,
-} from "../dungeon.js";
+	sumPrimaryAttributes,
+	multiplyPrimaryAttributes,
+	sumResourceCaps,
+	multiplyResourceCaps,
+	sumSecondaryAttributes,
+	SECONDARY_ATTRIBUTE_FACTORS,
+	HEALTH_PER_VITALITY,
+	MANA_PER_WISDOM,
+} from "../attribute.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../telnet.js";
 import { COLOR, color } from "../color.js";
-
-// Helper functions to sum bonuses (duplicated from dungeon.ts since they're not exported)
-function sumPrimaryAttributes(
-	...components: Array<Partial<PrimaryAttributeSet> | undefined>
-): PrimaryAttributeSet {
-	let strength = 0;
-	let agility = 0;
-	let intelligence = 0;
-	for (const part of components) {
-		if (!part) continue;
-		strength += Number(part.strength ?? 0);
-		agility += Number(part.agility ?? 0);
-		intelligence += Number(part.intelligence ?? 0);
-	}
-	return { strength, agility, intelligence };
-}
-
-function multiplyPrimaryAttributes(
-	source: PrimaryAttributeSet,
-	factor: number
-): PrimaryAttributeSet {
-	return {
-		strength: source.strength * factor,
-		agility: source.agility * factor,
-		intelligence: source.intelligence * factor,
-	};
-}
-
-function sumResourceCaps(
-	...components: Array<Partial<ResourceCapacities> | undefined>
-): ResourceCapacities {
-	let maxHealth = 0;
-	let maxMana = 0;
-	for (const part of components) {
-		if (!part) continue;
-		maxHealth += Number(part.maxHealth ?? 0);
-		maxMana += Number(part.maxMana ?? 0);
-	}
-	return { maxHealth, maxMana };
-}
-
-function multiplyResourceCaps(
-	source: ResourceCapacities,
-	factor: number
-): ResourceCapacities {
-	return {
-		maxHealth: source.maxHealth * factor,
-		maxMana: source.maxMana * factor,
-	};
-}
-
-function sumSecondaryAttributes(
-	...components: Array<Partial<SecondaryAttributeSet> | undefined>
-): SecondaryAttributeSet {
-	const result: SecondaryAttributeSet = {
-		attackPower: 0,
-		vitality: 0,
-		defense: 0,
-		critRate: 0,
-		avoidance: 0,
-		accuracy: 0,
-		endurance: 0,
-		spellPower: 0,
-		wisdom: 0,
-		resilience: 0,
-	};
-	for (const part of components) {
-		if (!part) continue;
-		result.attackPower += Number(part.attackPower ?? 0);
-		result.vitality += Number(part.vitality ?? 0);
-		result.defense += Number(part.defense ?? 0);
-		result.critRate += Number(part.critRate ?? 0);
-		result.avoidance += Number(part.avoidance ?? 0);
-		result.accuracy += Number(part.accuracy ?? 0);
-		result.endurance += Number(part.endurance ?? 0);
-		result.spellPower += Number(part.spellPower ?? 0);
-		result.wisdom += Number(part.wisdom ?? 0);
-		result.resilience += Number(part.resilience ?? 0);
-	}
-	return result;
-}
 
 /**
  * Format a number with a sign prefix for display.
@@ -131,7 +58,7 @@ export default {
 		const { actor } = context;
 		const mob = actor;
 		const race = mob.race;
-		const clazz = mob.class;
+		const job = mob.job;
 		const level = mob.level;
 		const levelStages = Math.max(0, level - 1);
 
@@ -147,14 +74,14 @@ export default {
 			multiplyResourceCaps(race.resourceGrowthPerLevel, levelStages)
 		);
 
-		// Calculate class bonuses
-		const classAttributeBonuses = sumPrimaryAttributes(
-			clazz.startingAttributes,
-			multiplyPrimaryAttributes(clazz.attributeGrowthPerLevel, levelStages)
+		// Calculate job bonuses
+		const jobAttributeBonuses = sumPrimaryAttributes(
+			job.startingAttributes,
+			multiplyPrimaryAttributes(job.attributeGrowthPerLevel, levelStages)
 		);
-		const classResourceBonuses = sumResourceCaps(
-			clazz.startingResourceCaps,
-			multiplyResourceCaps(clazz.resourceGrowthPerLevel, levelStages)
+		const jobResourceBonuses = sumResourceCaps(
+			job.startingResourceCaps,
+			multiplyResourceCaps(job.resourceGrowthPerLevel, levelStages)
 		);
 
 		// Calculate equipment bonuses
@@ -198,28 +125,12 @@ export default {
 		// Calculate total primary attributes (for deriving secondary attributes)
 		const totalPrimaryAttributes = sumPrimaryAttributes(
 			raceAttributeBonuses,
-			classAttributeBonuses,
+			jobAttributeBonuses,
 			totalEquipmentAttributeBonuses,
 			mobAttributeBonuses
 		);
 
 		// Calculate secondary attribute contributions from primary attributes
-		const SECONDARY_ATTRIBUTE_FACTORS: Record<
-			keyof SecondaryAttributeSet,
-			Partial<PrimaryAttributeSet>
-		> = {
-			attackPower: { strength: 0.5 },
-			vitality: { strength: 0.5 },
-			defense: { strength: 0.5 },
-			critRate: { agility: 0.2 },
-			avoidance: { agility: 0.2 },
-			accuracy: { agility: 0.2 },
-			endurance: { agility: 1 },
-			spellPower: { intelligence: 0.5 },
-			wisdom: { intelligence: 0.5 },
-			resilience: { intelligence: 0.5 },
-		};
-
 		function calculateSecondaryFromPrimary(
 			attr: keyof SecondaryAttributeSet
 		): number {
@@ -235,8 +146,6 @@ export default {
 		}
 
 		// Calculate resource contributions from secondary attributes
-		const HEALTH_PER_VITALITY = 2;
-		const MANA_PER_WISDOM = 2;
 		const vitalityFromPrimary = calculateSecondaryFromPrimary("vitality");
 		const wisdomFromPrimary = calculateSecondaryFromPrimary("wisdom");
 		const healthFromVitality = vitalityFromPrimary * HEALTH_PER_VITALITY;
@@ -256,22 +165,22 @@ export default {
 
 		for (const attr of primaryAttrs) {
 			const raceBonus = raceAttributeBonuses[attr] || 0;
-			const classBonus = classAttributeBonuses[attr] || 0;
+			const jobBonus = jobAttributeBonuses[attr] || 0;
 			const equipmentBonus = totalEquipmentAttributeBonuses[attr] || 0;
 			const mobBonus = mobAttributeBonuses[attr] || 0;
-			const total = raceBonus + classBonus + equipmentBonus + mobBonus;
+			const total = raceBonus + jobBonus + equipmentBonus + mobBonus;
 
 			if (
 				total !== 0 ||
 				raceBonus !== 0 ||
-				classBonus !== 0 ||
+				jobBonus !== 0 ||
 				equipmentBonus !== 0 ||
 				mobBonus !== 0
 			) {
 				const attrName = formatAttributeName(attr);
 				const parts: string[] = [];
 				if (raceBonus !== 0) parts.push(`Race: ${formatBonus(raceBonus)}`);
-				if (classBonus !== 0) parts.push(`Class: ${formatBonus(classBonus)}`);
+				if (jobBonus !== 0) parts.push(`Job: ${formatBonus(jobBonus)}`);
 				if (equipmentBonus !== 0)
 					parts.push(`Equipment: ${formatBonus(equipmentBonus)}`);
 				if (mobBonus !== 0) parts.push(`Other: ${formatBonus(mobBonus)}`);
@@ -349,18 +258,18 @@ export default {
 
 		for (const attr of resourceAttrs) {
 			const raceBonus = raceResourceBonuses[attr] || 0;
-			const classBonus = classResourceBonuses[attr] || 0;
+			const jobBonus = jobResourceBonuses[attr] || 0;
 			const equipmentBonus = totalEquipmentResourceBonuses[attr] || 0;
 			const mobBonus = mobResourceBonuses[attr] || 0;
 			const fromAttributes =
 				attr === "maxHealth" ? healthFromVitality : manaFromWisdom;
 			const total =
-				raceBonus + classBonus + equipmentBonus + mobBonus + fromAttributes;
+				raceBonus + jobBonus + equipmentBonus + mobBonus + fromAttributes;
 
 			if (
 				total !== 0 ||
 				raceBonus !== 0 ||
-				classBonus !== 0 ||
+				jobBonus !== 0 ||
 				equipmentBonus !== 0 ||
 				mobBonus !== 0 ||
 				fromAttributes !== 0
@@ -370,7 +279,7 @@ export default {
 				if (fromAttributes !== 0)
 					parts.push(`From Attributes: ${formatBonus(fromAttributes)}`);
 				if (raceBonus !== 0) parts.push(`Race: ${formatBonus(raceBonus)}`);
-				if (classBonus !== 0) parts.push(`Class: ${formatBonus(classBonus)}`);
+				if (jobBonus !== 0) parts.push(`Job: ${formatBonus(jobBonus)}`);
 				if (equipmentBonus !== 0)
 					parts.push(`Equipment: ${formatBonus(equipmentBonus)}`);
 				if (mobBonus !== 0) parts.push(`Other: ${formatBonus(mobBonus)}`);

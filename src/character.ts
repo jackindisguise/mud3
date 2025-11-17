@@ -58,7 +58,6 @@ import { createHash } from "crypto";
 import { CONFIG } from "./package/config.js";
 import type { MudClient } from "./io.js";
 import { CHANNEL, formatChannelMessage } from "./channel.js";
-import { isLocalhost } from "./io.js";
 import { LINEBREAK } from "./telnet.js";
 import { formatPlaytime } from "./time.js";
 import { color, COLOR, stickyColor } from "./color.js";
@@ -75,6 +74,7 @@ export enum MESSAGE_GROUP {
 	COMMAND_RESPONSE = "COMMAND_RESPONSE",
 	SYSTEM = "SYSTEM",
 	CHANNELS = "CHANNELS",
+	ACTION = "ACTION",
 	PROMPT = "PROMPT",
 }
 

@@ -62,18 +62,58 @@
  */
 
 import { string } from "mud-ext";
-import { COLOR } from "./color.js";
+import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
-import { Race, Class, evaluateGrowthModifier } from "./archetype.js";
+import { Race, Job, evaluateGrowthModifier } from "./archetype.js";
 import {
 	getDefaultRace,
-	getDefaultClass,
+	getDefaultJob,
 	getRaceById,
-	getClassById,
+	getJobById,
 } from "./package/archetype.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
+import { act } from "./act.js";
 import { Game } from "./game.js";
+import { removeFromCombatQueue, handleDeath } from "./combat.js";
+import { damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
+import {
+	HitType,
+	DEFAULT_HIT_TYPE,
+	COMMON_HIT_TYPES,
+	DAMAGE_TYPE,
+	PHYSICAL_DAMAGE_TYPE,
+	getDamageMultiplier,
+	mergeDamageRelationships,
+	DamageTypeRelationships,
+	getThirdPersonVerb,
+} from "./damage-types.js";
+import {
+	PrimaryAttributeSet,
+	SecondaryAttributeSet,
+	ResourceCapacities,
+	ResourceSnapshot,
+	SECONDARY_ATTRIBUTE_FACTORS,
+	SECONDARY_ATTRIBUTE_BASE,
+	HEALTH_PER_VITALITY,
+	MANA_PER_WISDOM,
+	ATTRIBUTE_ROUND_DECIMALS,
+	clampNumber,
+	roundTo,
+	sumPrimaryAttributes,
+	sumSecondaryAttributes,
+	multiplyPrimaryAttributes,
+	sumResourceCaps,
+	multiplyResourceCaps,
+	normalizePrimaryBonuses,
+	normalizeResourceBonuses,
+	prunePrimaryBonuses,
+	pruneResourceBonuses,
+	computeSecondaryAttributes,
+	createPrimaryAttributesView,
+	createSecondaryAttributesView,
+	createResourceCapsView,
+} from "./attribute.js";
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -1686,7 +1726,7 @@ export interface SerializedMob extends SerializedDungeonObject {
 	level: number;
 	experience: number;
 	race: string;
-	class: string;
+	job: string;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
 	resourceBonuses?: Partial<ResourceCapacities>;
 	health: number;
@@ -1751,6 +1791,7 @@ export interface SerializedWeapon extends SerializedDungeonObject {
 	type: "Weapon";
 	slot: EQUIPMENT_SLOT;
 	attackPower: number;
+	hitType?: HitType;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
 	resourceBonuses?: Partial<ResourceCapacities>;
 	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
@@ -3858,132 +3899,6 @@ export class Item extends Movable {
 }
 
 /**
- * Primary attribute set representing the three core attributes for mobs.
- * These attributes directly influence secondary attributes and resource capacities.
- *
- * @property strength - Physical power, affects attack power, vitality, and defense
- * @property agility - Dexterity and speed, affects crit rate, avoidance, accuracy, and endurance
- * @property intelligence - Mental acuity, affects spell power, wisdom, and resilience
- *
- * @example
- * ```typescript
- * import { Mob, PrimaryAttributeSet } from "./dungeon.js";
- *
- * const warrior = new Mob({
- *   attributeBonuses: {
- *     strength: 10,
- *     agility: 5,
- *     intelligence: 2
- *   } as Partial<PrimaryAttributeSet>
- * });
- *
- * console.log(warrior.strength); // Shows total strength including bonuses
- * ```
- */
-export interface PrimaryAttributeSet {
-	strength: number;
-	agility: number;
-	intelligence: number;
-}
-
-/**
- * Secondary attribute set representing derived combat and utility stats for mobs.
- * These attributes are calculated from primary attributes and can be modified by equipment.
- *
- * @property attackPower - Physical damage output (derived from strength, modified by weapons)
- * @property vitality - Health capacity modifier (derived from strength, affects max health)
- * @property defense - Damage reduction (derived from strength, modified by armor defense)
- * @property critRate - Critical hit chance (derived from agility)
- * @property avoidance - Dodge chance (derived from agility)
- * @property accuracy - Hit chance (derived from agility)
- * @property endurance - Stamina/energy capacity (derived from agility)
- * @property spellPower - Magical damage output (derived from intelligence)
- * @property wisdom - Mana capacity modifier (derived from intelligence, affects max mana)
- * @property resilience - Magical resistance (derived from intelligence)
- *
- * @example
- * ```typescript
- * import { Mob, Armor, Weapon } from "./dungeon.js";
- * import { EQUIPMENT_SLOT } from "./dungeon.js";
- *
- * const fighter = new Mob();
- * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 10 });
- * const helmet = new Armor({ slot: EQUIPMENT_SLOT.HEAD, defense: 5 });
- *
- * fighter.equip(sword);
- * fighter.equip(helmet);
- *
- * console.log(fighter.attackPower); // Includes weapon bonus
- * console.log(fighter.defense); // Includes armor bonus
- * ```
- */
-export interface SecondaryAttributeSet {
-	attackPower: number;
-	vitality: number;
-	defense: number;
-	critRate: number;
-	avoidance: number;
-	accuracy: number;
-	endurance: number;
-	spellPower: number;
-	wisdom: number;
-	resilience: number;
-}
-
-/**
- * Resource capacity values representing the maximum amounts of health and mana a mob can have.
- * These values are calculated from race/class starting values, level growth, bonuses, and
- * secondary attributes (vitality for health, wisdom for mana).
- *
- * @property maxHealth - Maximum health points (affected by vitality and resource bonuses)
- * @property maxMana - Maximum mana points (affected by wisdom and resource bonuses)
- *
- * @example
- * ```typescript
- * import { Mob, ResourceCapacities } from "./dungeon.js";
- *
- * const mage = new Mob({
- *   resourceBonuses: {
- *     maxMana: 50
- *   } as Partial<ResourceCapacities>
- * });
- *
- * console.log(mage.maxHealth); // Base health + vitality bonus
- * console.log(mage.maxMana); // Base mana + wisdom bonus + equipment bonus
- * ```
- */
-export interface ResourceCapacities {
-	maxHealth: number;
-	maxMana: number;
-}
-
-/**
- * Snapshot of current mutable resource values for a mob.
- * Used for persistence and UI display. Values are clamped between 0 and their maximums.
- *
- * @property health - Current health points (0 to maxHealth)
- * @property mana - Current mana points (0 to maxMana)
- * @property exhaustion - Current exhaustion level (0 to 100)
- *
- * @example
- * ```typescript
- * import { Mob } from "./dungeon.js";
- *
- * const player = new Mob();
- * const resources = player.resources;
- *
- * console.log(`HP: ${resources.health}/${player.maxHealth}`);
- * console.log(`MP: ${resources.mana}/${player.maxMana}`);
- * console.log(`Exhaustion: ${resources.exhaustion}%`);
- * ```
- */
-export interface ResourceSnapshot {
-	health: number;
-	mana: number;
-	exhaustion: number;
-}
-
-/**
  * Equipment slot types that items can be equipped to on a mob.
  * Each slot can hold one piece of equipment. Weapons can only be equipped in mainHand/offHand,
  * Armor cannot be equipped in mainHand/offHand, and base Equipment can be equipped in offHand
@@ -4515,12 +4430,15 @@ export class Armor extends Equipment {
 export interface WeaponOptions extends EquipmentOptions {
 	/** Attack power value provided by this weapon. */
 	attackPower: number;
+	/** Hit type for this weapon (verb and damage type). If not provided, uses default hit type. */
+	hitType?: HitType | string;
 }
 
 /**
  * Weapon is a type of Equipment that provides attack power.
  * Weapons can only be equipped in mainHand or offHand slots. Attack power from weapons
- * is added directly to the mob's secondary attackPower attribute.
+ * is NOT added to the mob's base attackPower attribute. Instead, the weapon's attack power
+ * is only used when that specific weapon is used in an attack (via oneHit()).
  *
  * @example
  * ```typescript
@@ -4537,16 +4455,33 @@ export interface WeaponOptions extends EquipmentOptions {
  * const mob = new Mob();
  * mob.equip(sword);
  *
- * console.log(mob.attackPower); // Includes +15 from sword
- * console.log(sword.attackPower); // 15
+ * console.log(mob.attackPower); // Base attack power from strength (doesn't include weapon)
+ * console.log(sword.attackPower); // 15 (only used when sword is used in an attack)
  * ```
  */
 export class Weapon extends Equipment {
 	private _attackPower: number;
+	private _hitType: HitType;
 
 	constructor(options?: WeaponOptions) {
 		super(options);
 		this._attackPower = options?.attackPower ?? 0;
+
+		// Resolve hit type
+		if (options?.hitType) {
+			if (typeof options.hitType === "string") {
+				// Look up in common hit types
+				const common = COMMON_HIT_TYPES.get(options.hitType.toLowerCase());
+				this._hitType = common ?? {
+					verb: options.hitType,
+					damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+				};
+			} else {
+				this._hitType = options.hitType;
+			}
+		} else {
+			this._hitType = DEFAULT_HIT_TYPE;
+		}
 	}
 
 	/**
@@ -4566,6 +4501,16 @@ export class Weapon extends Equipment {
 	}
 
 	/**
+	 * Gets the hit type for this weapon.
+	 * Returns the verb and damage type used when this weapon deals damage.
+	 *
+	 * @returns The hit type for this weapon
+	 */
+	public get hitType(): Readonly<HitType> {
+		return this._hitType;
+	}
+
+	/**
 	 * Serialize this Weapon instance to a serializable format.
 	 * Returns SerializedWeapon with type "Weapon" and attackPower.
 	 * Defense is explicitly set to 0.
@@ -4582,6 +4527,7 @@ export class Weapon extends Equipment {
 			type: "Weapon",
 			slot: this._slot,
 			attackPower: this._attackPower,
+			hitType: this._hitType,
 		};
 		return options?.compress
 			? (compressSerializedObject(
@@ -4621,6 +4567,7 @@ export class Weapon extends Equipment {
 			...weaponData,
 			slot: weaponData.slot,
 			attackPower: weaponData.attackPower ?? 0,
+			hitType: weaponData.hitType,
 			attributeBonuses: weaponData.attributeBonuses,
 			resourceBonuses: weaponData.resourceBonuses,
 			secondaryAttributeBonuses: weaponData.secondaryAttributeBonuses,
@@ -4654,7 +4601,7 @@ export class Weapon extends Equipment {
  * Mobs represent characters and NPCs in the game world with attributes, equipment, and resources.
  *
  * @property race - Resolved race definition (defaults to default race if not provided)
- * @property class - Resolved class definition (defaults to default class if not provided)
+ * @property job - Resolved job definition (defaults to default job if not provided)
  * @property level - Starting level (defaults to 1)
  * @property experience - Starting experience points (defaults to 0)
  * @property attributeBonuses - Additional primary attribute bonuses
@@ -4665,25 +4612,25 @@ export class Weapon extends Equipment {
  *
  * @example
  * ```typescript
- * import { Mob, Race, Class } from "./dungeon.js";
- * import { getRaceById, getClassById } from "./package/archetype.js";
+ * import { Mob, Race, Job } from "./dungeon.js";
+ * import { getRaceById, getJobById } from "./package/archetype.js";
  *
  * const warrior = new Mob({
  *   race: getRaceById("human"),
- *   class: getClassById("warrior"),
+ *   job: getJobById("warrior"),
  *   level: 5,
  *   attributeBonuses: { strength: 5 }
  * });
  *
  * console.log(warrior.level); // 5
- * console.log(warrior.strength); // Includes race/class/level bonuses + 5
+ * console.log(warrior.strength); // Includes race/job/level bonuses + 5
  * ```
  */
 export interface MobOptions extends DungeonObjectOptions {
 	/** Resolved race definition to use for this mob. */
 	race?: Race;
-	/** Resolved class definition to use for this mob. */
-	class?: Class;
+	/** Resolved job definition to use for this mob. */
+	job?: Job;
 	level?: number;
 	experience?: number;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
@@ -4693,261 +4640,19 @@ export interface MobOptions extends DungeonObjectOptions {
 	exhaustion?: number;
 }
 
-const SECONDARY_ATTRIBUTE_FACTORS: Readonly<
-	Record<keyof SecondaryAttributeSet, Partial<PrimaryAttributeSet>>
-> = Object.freeze({
-	attackPower: { strength: 0.5 },
-	vitality: { strength: 0.5 },
-	defense: { strength: 0.5 },
-	critRate: { agility: 0.2 },
-	avoidance: { agility: 0.2 },
-	accuracy: { agility: 0.2 },
-	endurance: { agility: 1 },
-	spellPower: { intelligence: 0.5 },
-	wisdom: { intelligence: 0.5 },
-	resilience: { intelligence: 0.5 },
-});
-
-const SECONDARY_ATTRIBUTE_BASE: Readonly<
-	Record<keyof SecondaryAttributeSet, number>
-> = Object.freeze({
-	attackPower: 0,
-	vitality: 0,
-	defense: 0,
-	critRate: 0,
-	avoidance: 0,
-	accuracy: 0,
-	endurance: 0,
-	spellPower: 0,
-	wisdom: 0,
-	resilience: 0,
-});
-
-const HEALTH_PER_VITALITY = 2;
-const MANA_PER_WISDOM = 2;
 const MAX_EXHAUSTION = 100;
 const EXPERIENCE_THRESHOLD = 100;
-const ATTRIBUTE_ROUND_DECIMALS = 2;
-const EXPERIENCE_ROUND_DECIMALS = 4;
-
-function sumPrimaryAttributes(
-	...components: Array<Partial<PrimaryAttributeSet> | undefined>
-): PrimaryAttributeSet {
-	let strength = 0;
-	let agility = 0;
-	let intelligence = 0;
-	for (const part of components) {
-		if (!part) continue;
-		strength += Number(part.strength ?? 0);
-		agility += Number(part.agility ?? 0);
-		intelligence += Number(part.intelligence ?? 0);
-	}
-	return {
-		strength,
-		agility,
-		intelligence,
-	};
-}
-
-function sumSecondaryAttributes(
-	...components: Array<Partial<SecondaryAttributeSet> | undefined>
-): SecondaryAttributeSet {
-	const result: SecondaryAttributeSet = {
-		attackPower: 0,
-		vitality: 0,
-		defense: 0,
-		critRate: 0,
-		avoidance: 0,
-		accuracy: 0,
-		endurance: 0,
-		spellPower: 0,
-		wisdom: 0,
-		resilience: 0,
-	};
-	for (const part of components) {
-		if (!part) continue;
-		result.attackPower += Number(part.attackPower ?? 0);
-		result.vitality += Number(part.vitality ?? 0);
-		result.defense += Number(part.defense ?? 0);
-		result.critRate += Number(part.critRate ?? 0);
-		result.avoidance += Number(part.avoidance ?? 0);
-		result.accuracy += Number(part.accuracy ?? 0);
-		result.endurance += Number(part.endurance ?? 0);
-		result.spellPower += Number(part.spellPower ?? 0);
-		result.wisdom += Number(part.wisdom ?? 0);
-		result.resilience += Number(part.resilience ?? 0);
-	}
-	return result;
-}
-
-function multiplyPrimaryAttributes(
-	source: PrimaryAttributeSet,
-	factor: number
-): PrimaryAttributeSet {
-	return {
-		strength: source.strength * factor,
-		agility: source.agility * factor,
-		intelligence: source.intelligence * factor,
-	};
-}
-
-function sumResourceCaps(
-	...components: Array<Partial<ResourceCapacities> | undefined>
-): ResourceCapacities {
-	let maxHealth = 0;
-	let maxMana = 0;
-	for (const part of components) {
-		if (!part) continue;
-		maxHealth += Number(part.maxHealth ?? 0);
-		maxMana += Number(part.maxMana ?? 0);
-	}
-	return {
-		maxHealth,
-		maxMana,
-	};
-}
-
-function multiplyResourceCaps(
-	source: ResourceCapacities,
-	factor: number
-): ResourceCapacities {
-	return {
-		maxHealth: source.maxHealth * factor,
-		maxMana: source.maxMana * factor,
-	};
-}
-
-function clampNumber(value: number, min: number, max: number): number {
-	if (!Number.isFinite(value)) return min;
-	return Math.min(Math.max(value, min), max);
-}
-
-function roundTo(value: number, decimals: number): number {
-	const factor = 10 ** decimals;
-	return Math.round((value + Number.EPSILON) * factor) / factor;
-}
-
-function normalizePrimaryBonuses(
-	bonuses?: Partial<PrimaryAttributeSet>
-): PrimaryAttributeSet {
-	return sumPrimaryAttributes(bonuses);
-}
-
-function normalizeResourceBonuses(
-	bonuses?: Partial<ResourceCapacities>
-): ResourceCapacities {
-	return sumResourceCaps(bonuses);
-}
-
-function prunePrimaryBonuses(
-	bonuses: PrimaryAttributeSet
-): Partial<PrimaryAttributeSet> | undefined {
-	const result: Partial<PrimaryAttributeSet> = {};
-	if (bonuses.strength !== 0)
-		result.strength = roundTo(bonuses.strength, ATTRIBUTE_ROUND_DECIMALS);
-	if (bonuses.agility !== 0)
-		result.agility = roundTo(bonuses.agility, ATTRIBUTE_ROUND_DECIMALS);
-	if (bonuses.intelligence !== 0)
-		result.intelligence = roundTo(
-			bonuses.intelligence,
-			ATTRIBUTE_ROUND_DECIMALS
-		);
-	return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function pruneResourceBonuses(
-	bonuses: ResourceCapacities
-): Partial<ResourceCapacities> | undefined {
-	const result: Partial<ResourceCapacities> = {};
-	if (bonuses.maxHealth !== 0)
-		result.maxHealth = roundTo(bonuses.maxHealth, ATTRIBUTE_ROUND_DECIMALS);
-	if (bonuses.maxMana !== 0)
-		result.maxMana = roundTo(bonuses.maxMana, ATTRIBUTE_ROUND_DECIMALS);
-	return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function computeSecondaryAttributes(
-	primary: PrimaryAttributeSet
-): SecondaryAttributeSet {
-	const result: SecondaryAttributeSet = {
-		attackPower: 0,
-		vitality: 0,
-		defense: 0,
-		critRate: 0,
-		avoidance: 0,
-		accuracy: 0,
-		endurance: 0,
-		spellPower: 0,
-		wisdom: 0,
-		resilience: 0,
-	};
-
-	(
-		Object.keys(SECONDARY_ATTRIBUTE_FACTORS) as Array<
-			keyof SecondaryAttributeSet
-		>
-	).forEach((key) => {
-		const base = SECONDARY_ATTRIBUTE_BASE[key];
-		const weights = SECONDARY_ATTRIBUTE_FACTORS[key];
-		let value = base;
-		if (weights.strength)
-			value += primary.strength * Number(weights.strength ?? 0);
-		if (weights.agility)
-			value += primary.agility * Number(weights.agility ?? 0);
-		if (weights.intelligence)
-			value += primary.intelligence * Number(weights.intelligence ?? 0);
-		result[key] = roundTo(value, ATTRIBUTE_ROUND_DECIMALS);
-	});
-
-	return result;
-}
-
-function createPrimaryAttributesView(
-	source: PrimaryAttributeSet
-): Readonly<PrimaryAttributeSet> {
-	return Object.freeze({
-		strength: Math.floor(Number(source.strength) || 0),
-		agility: Math.floor(Number(source.agility) || 0),
-		intelligence: Math.floor(Number(source.intelligence) || 0),
-	});
-}
-
-function createSecondaryAttributesView(
-	source: SecondaryAttributeSet
-): Readonly<SecondaryAttributeSet> {
-	return Object.freeze({
-		attackPower: Math.floor(Number(source.attackPower) || 0),
-		vitality: Math.floor(Number(source.vitality) || 0),
-		defense: Math.floor(Number(source.defense) || 0),
-		critRate: Math.floor(Number(source.critRate) || 0),
-		avoidance: Math.floor(Number(source.avoidance) || 0),
-		accuracy: Math.floor(Number(source.accuracy) || 0),
-		endurance: Math.floor(Number(source.endurance) || 0),
-		spellPower: Math.floor(Number(source.spellPower) || 0),
-		wisdom: Math.floor(Number(source.wisdom) || 0),
-		resilience: Math.floor(Number(source.resilience) || 0),
-	});
-}
-
-function createResourceCapsView(
-	source: ResourceCapacities
-): Readonly<ResourceCapacities> {
-	return Object.freeze({
-		maxHealth: Math.floor(Number(source.maxHealth) || 0),
-		maxMana: Math.floor(Number(source.maxMana) || 0),
-	});
-}
 
 /**
  * Serialized form for Mob objects.
  * Used for persistence and template storage. Includes all mob-specific properties including
- * level, experience, race/class IDs, bonuses, resources, and equipped items.
+ * level, experience, race/job IDs, bonuses, resources, and equipped items.
  *
  * @property type - Always "Mob"
  * @property level - Current level
  * @property experience - Current experience points
  * @property race - Race ID string
- * @property class - Class ID string
+ * @property job - Job ID string
  * @property attributeBonuses - Optional primary attribute bonuses
  * @property resourceBonuses - Optional resource capacity bonuses
  * @property health - Current health points
@@ -4960,7 +4665,7 @@ export interface SerializedMob extends SerializedDungeonObject {
 	level: number;
 	experience: number;
 	race: string;
-	class: string;
+	job: string;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
 	resourceBonuses?: Partial<ResourceCapacities>;
 	health: number;
@@ -4975,7 +4680,7 @@ export interface SerializedMob extends SerializedDungeonObject {
 /**
  * Mob class representing characters and NPCs in the game world.
  * Mobs extend Movable and can move between rooms. They have:
- * - Primary attributes (strength, agility, intelligence) derived from race/class/level
+ * - Primary attributes (strength, agility, intelligence) derived from race/job/level
  * - Secondary attributes (attackPower, defense, etc.) calculated from primary attributes
  * - Resource capacities (maxHealth, maxMana) affected by attributes and bonuses
  * - Current resources (health, mana, exhaustion) that can change during gameplay
@@ -4988,12 +4693,12 @@ export interface SerializedMob extends SerializedDungeonObject {
  * @example
  * ```typescript
  * import { Mob, Armor, Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
- * import { getRaceById, getClassById } from "./package/archetype.js";
+ * import { getRaceById, getJobById } from "./package/archetype.js";
  *
  * // Create a warrior mob
  * const warrior = new Mob({
  *   race: getRaceById("human"),
- *   class: getClassById("warrior"),
+ *   job: getJobById("warrior"),
  *   level: 10
  * });
  *
@@ -5006,7 +4711,7 @@ export interface SerializedMob extends SerializedDungeonObject {
  * // Check stats
  * console.log(warrior.attackPower); // Includes weapon bonus
  * console.log(warrior.defense); // Includes armor bonus
- * console.log(warrior.maxHealth); // Calculated from race/class/level/vitality
+ * console.log(warrior.maxHealth); // Calculated from race/job/level/vitality
  *
  * // Gain experience
  * warrior.gainExperience(150);
@@ -5017,7 +4722,7 @@ export class Mob extends Movable {
 	/** Private storage for the Character reference */
 	private _character?: Character;
 	private _race: Race;
-	private _class: Class;
+	private _job: Job;
 	private _level: number;
 	private _experience: number;
 	private _attributeBonuses: PrimaryAttributeSet;
@@ -5032,6 +4737,8 @@ export class Mob extends Movable {
 	private _mana!: number;
 	private _exhaustion!: number;
 	private _equipped: Map<EQUIPMENT_SLOT, Equipment>;
+	private _combatTarget?: Mob;
+	private _threatTable?: Map<Mob, number>;
 	constructor(options?: MobOptions) {
 		super(options);
 
@@ -5052,7 +4759,7 @@ export class Mob extends Movable {
 		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
 
 		this._race = options?.race ?? getDefaultRace();
-		this._class = options?.class ?? getDefaultClass();
+		this._job = options?.job ?? getDefaultJob();
 
 		const providedLevel = Math.floor(Number(options?.level ?? 1));
 		this._level = providedLevel > 0 ? providedLevel : 1;
@@ -5067,6 +4774,10 @@ export class Mob extends Movable {
 		this.health = options?.health ?? this.maxHealth;
 		this.mana = options?.mana ?? this.maxMana;
 		this.exhaustion = options?.exhaustion ?? 0;
+
+		// Initialize combat properties
+		// Only NPCs (mobs without a character) have threat tables
+		// Threat table will be initialized when character is set/cleared
 	}
 	/**
 	 * Gets the Character that controls this mob (if any).
@@ -5120,7 +4831,140 @@ export class Mob extends Movable {
 		if (char && char.mob !== this) {
 			char.mob = this;
 		}
+
+		// Manage threat table based on character presence
+		// Only NPCs (mobs without a character) have threat tables
+		if (char) {
+			// Player-controlled mob: clear threat table
+			if (this._threatTable) {
+				this._threatTable.clear();
+				this._threatTable = undefined;
+			}
+		} else {
+			// NPC: initialize threat table if not already present
+			if (!this._threatTable) {
+				this._threatTable = new Map<Mob, number>();
+			}
+		}
 	}
+
+	/**
+	 * Gets the current combat target of this mob.
+	 * Returns undefined if the mob is not in combat.
+	 *
+	 * @returns The target Mob or undefined
+	 */
+	public get combatTarget(): Mob | undefined {
+		return this._combatTarget;
+	}
+
+	/**
+	 * Sets the combat target of this mob.
+	 * Setting a target puts the mob in combat; setting to undefined removes it from combat.
+	 *
+	 * @param target The target Mob to engage, or undefined to disengage
+	 */
+	public set combatTarget(target: Mob | undefined) {
+		this._combatTarget = target;
+	}
+
+	/**
+	 * Gets the threat table for this mob.
+	 * Only NPCs (mobs without a character) have threat tables.
+	 * Returns undefined for player-controlled mobs.
+	 *
+	 * @returns The threat table Map or undefined
+	 */
+	public get threatTable(): ReadonlyMap<Mob, number> | undefined {
+		return this._threatTable;
+	}
+
+	/**
+	 * Adds threat to the threat table for a specific attacker.
+	 * Only works for NPCs (mobs without a character).
+	 * The threat amount is added to any existing threat for that attacker.
+	 *
+	 * @param attacker The mob that generated the threat
+	 * @param amount The amount of threat to add (typically damage dealt)
+	 */
+	public addThreat(attacker: Mob, amount: number): void {
+		if (!this._threatTable || this.character) {
+			return;
+		}
+
+		const current = this._threatTable.get(attacker) ?? 0;
+		this._threatTable.set(attacker, current + amount);
+	}
+
+	/**
+	 * Gets the threat value for a specific attacker.
+	 * Returns 0 if the attacker has no threat or this mob doesn't have a threat table.
+	 *
+	 * @param attacker The mob to check threat for
+	 * @returns The threat value
+	 */
+	public getThreat(attacker: Mob): number {
+		if (!this._threatTable) {
+			return 0;
+		}
+		return this._threatTable.get(attacker) ?? 0;
+	}
+
+	/**
+	 * Gets the mob with the highest threat in the threat table.
+	 * Returns undefined if there are no threats or this mob doesn't have a threat table.
+	 *
+	 * @returns The mob with highest threat or undefined
+	 */
+	public getHighestThreatTarget(): Mob | undefined {
+		if (!this._threatTable || this._threatTable.size === 0) {
+			return undefined;
+		}
+
+		let maxThreat = -1;
+		let maxThreatMob: Mob | undefined;
+
+		for (const [mob, threat] of this._threatTable.entries()) {
+			if (threat > maxThreat) {
+				maxThreat = threat;
+				maxThreatMob = mob;
+			}
+		}
+
+		return maxThreatMob;
+	}
+
+	/**
+	 * Checks if this mob is in combat (has a target).
+	 *
+	 * @returns True if the mob has a combat target
+	 */
+	public isInCombat(): boolean {
+		return this._combatTarget !== undefined;
+	}
+
+	/**
+	 * Clears the threat table for this mob.
+	 * Only works for NPCs (mobs without a character).
+	 */
+	public clearThreatTable(): void {
+		if (this._threatTable) {
+			this._threatTable.clear();
+		}
+	}
+
+	/**
+	 * Removes a mob from this mob's threat table.
+	 * Only works for NPCs (mobs without a character).
+	 *
+	 * @param mob The mob to remove from the threat table
+	 */
+	public removeThreat(mob: Mob): void {
+		if (this._threatTable) {
+			this._threatTable.delete(mob);
+		}
+	}
+
 	private captureResourceRatios(): {
 		healthRatio?: number;
 		manaRatio?: number;
@@ -5141,7 +4985,7 @@ export class Mob extends Movable {
 		opts: { bootstrap?: boolean; healthRatio?: number; manaRatio?: number } = {}
 	): void {
 		const race = this._race;
-		const clazz = this._class;
+		const job = this._job;
 		const levelStages = Math.max(0, this._level - 1);
 
 		// Collect equipment bonuses
@@ -5150,7 +4994,8 @@ export class Mob extends Movable {
 		const equipmentSecondaryAttributeBonuses: Partial<SecondaryAttributeSet>[] =
 			[];
 		let totalArmorDefense = 0;
-		let totalWeaponAttackPower = 0;
+		// Note: Weapon attack power is NOT added to base attackPower attribute
+		// Weapons only contribute attack power when that specific weapon is used in an attack
 		for (const equipment of this._equipped.values()) {
 			if (equipment.attributeBonuses)
 				equipmentAttributeBonuses.push(equipment.attributeBonuses);
@@ -5160,19 +5005,18 @@ export class Mob extends Movable {
 				equipmentSecondaryAttributeBonuses.push(
 					equipment.secondaryAttributeBonuses
 				);
-			// Sum armor defense and weapon attack power separately
+			// Sum armor defense separately
 			if (equipment instanceof Armor) {
 				totalArmorDefense += equipment.defense;
-			} else if (equipment instanceof Weapon) {
-				totalWeaponAttackPower += equipment.attackPower;
 			}
+			// Weapons are handled separately - their attack power is only used when that weapon is used
 		}
 
 		const rawPrimary = sumPrimaryAttributes(
 			race.startingAttributes,
-			clazz.startingAttributes,
+			job.startingAttributes,
 			multiplyPrimaryAttributes(race.attributeGrowthPerLevel, levelStages),
-			multiplyPrimaryAttributes(clazz.attributeGrowthPerLevel, levelStages),
+			multiplyPrimaryAttributes(job.attributeGrowthPerLevel, levelStages),
 			this._attributeBonuses,
 			...equipmentAttributeBonuses
 		);
@@ -5197,13 +5041,9 @@ export class Mob extends Movable {
 			);
 		}
 
-		// Add weapon attack power directly to secondary attackPower attribute
-		if (totalWeaponAttackPower > 0) {
-			this._secondaryAttributes.attackPower = roundTo(
-				this._secondaryAttributes.attackPower + totalWeaponAttackPower,
-				ATTRIBUTE_ROUND_DECIMALS
-			);
-		}
+		// Note: Weapon attack power is NOT added to base attackPower attribute
+		// The base attackPower only comes from strength-derived calculation
+		// Weapons contribute their attack power only when that specific weapon is used in an attack
 
 		// Apply equipment secondary attribute bonuses
 		if (equipmentSecondaryAttributeBonuses.length > 0) {
@@ -5232,9 +5072,9 @@ export class Mob extends Movable {
 
 		const rawCaps = sumResourceCaps(
 			race.startingResourceCaps,
-			clazz.startingResourceCaps,
+			job.startingResourceCaps,
 			multiplyResourceCaps(race.resourceGrowthPerLevel, levelStages),
-			multiplyResourceCaps(clazz.resourceGrowthPerLevel, levelStages),
+			multiplyResourceCaps(job.resourceGrowthPerLevel, levelStages),
 			this._resourceBonuses,
 			...equipmentResourceBonuses
 		);
@@ -5294,11 +5134,11 @@ export class Mob extends Movable {
 			this._race.growthModifier,
 			this._level
 		);
-		const classModifier = evaluateGrowthModifier(
-			this._class.growthModifier,
+		const jobModifier = evaluateGrowthModifier(
+			this._job.growthModifier,
 			this._level
 		);
-		const combined = raceModifier * classModifier;
+		const combined = raceModifier * jobModifier;
 		return combined > 0 ? combined : 1;
 	}
 
@@ -5350,7 +5190,8 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public get experience(): number {
-		return roundTo(this._experience, EXPERIENCE_ROUND_DECIMALS);
+		// Experience is always stored as an integer
+		return Math.floor(this._experience);
 	}
 
 	/**
@@ -5372,6 +5213,9 @@ export class Mob extends Movable {
 			return;
 		}
 
+		// Only store experience as whole numbers
+		numeric = Math.floor(numeric);
+
 		let delta = 0;
 		while (numeric >= EXPERIENCE_THRESHOLD) {
 			numeric -= EXPERIENCE_THRESHOLD;
@@ -5382,7 +5226,8 @@ export class Mob extends Movable {
 			this.applyLevelDelta(delta);
 		}
 
-		this._experience = roundTo(numeric, EXPERIENCE_ROUND_DECIMALS);
+		// Store experience as integer
+		this._experience = Math.floor(numeric);
 	}
 
 	/**
@@ -5398,10 +5243,8 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public get experienceToLevel(): number {
-		return roundTo(
-			Math.max(0, EXPERIENCE_THRESHOLD - this._experience),
-			EXPERIENCE_ROUND_DECIMALS
-		);
+		// Experience is always stored as an integer
+		return Math.max(0, EXPERIENCE_THRESHOLD - Math.floor(this._experience));
 	}
 
 	/**
@@ -5420,20 +5263,23 @@ export class Mob extends Movable {
 
 		const modifier = this.resolveGrowthModifier();
 		const adjusted = numeric / (modifier > 0 ? modifier : 1);
+		// Only gain experience in whole numbers
+		const adjustedInt = Math.floor(adjusted);
 
-		let total = this._experience + adjusted;
+		let total = this._experience + adjustedInt;
 		let levels = 0;
 		while (total >= EXPERIENCE_THRESHOLD) {
 			total -= EXPERIENCE_THRESHOLD;
 			levels += 1;
 		}
 
-		this._experience = roundTo(total, EXPERIENCE_ROUND_DECIMALS);
+		// Store experience as integer
+		this._experience = Math.floor(total);
 		if (levels > 0) {
 			this.applyLevelDelta(levels);
 		}
 
-		return adjusted;
+		return adjustedInt;
 	}
 
 	/**
@@ -5462,7 +5308,7 @@ export class Mob extends Movable {
 
 	/**
 	 * Gets the primary attributes (strength, agility, intelligence) of this mob.
-	 * These are calculated from race/class starting values, level growth, bonuses, and equipment.
+	 * These are calculated from race/job starting values, level growth, bonuses, and equipment.
 	 *
 	 * @returns Readonly object containing primary attributes
 	 *
@@ -5487,12 +5333,12 @@ export class Mob extends Movable {
 	}
 
 	/**
-	 * Gets the class definition for this mob.
+	 * Gets the job definition for this mob.
 	 *
-	 * @returns Class object
+	 * @returns Job object
 	 */
-	public get class(): Class {
-		return this._class;
+	public get job(): Job {
+		return this._job;
 	}
 
 	/**
@@ -5707,7 +5553,7 @@ export class Mob extends Movable {
 
 	/**
 	 * Gets the maximum health capacity for this mob.
-	 * Calculated from race/class starting values, level growth, resource bonuses,
+	 * Calculated from race/job starting values, level growth, resource bonuses,
 	 * equipment bonuses, and vitality (2 health per vitality point).
 	 *
 	 * @returns Maximum health points
@@ -5724,7 +5570,7 @@ export class Mob extends Movable {
 
 	/**
 	 * Gets the maximum mana capacity for this mob.
-	 * Calculated from race/class starting values, level growth, resource bonuses,
+	 * Calculated from race/job starting values, level growth, resource bonuses,
 	 * equipment bonuses, and wisdom (2 mana per wisdom point).
 	 *
 	 * @returns Maximum mana points
@@ -5915,18 +5761,47 @@ export class Mob extends Movable {
 	}
 
 	public override step(direction: DIRECTION): boolean {
+		const sourceRoom =
+			this.location instanceof Room ? this.location : undefined;
+		const directionText = dir2text(direction);
+		const reverseDirection = dir2reverse(direction);
+		const reverseDirectionText = dir2text(reverseDirection);
+
 		const moved = super.step(direction);
 		if (!moved) {
 			return false;
 		}
 
-		if (!this.character) return true;
 		if (!(this.location instanceof Room)) return true;
-		this.sendMessage(
-			`You move ${dir2text(direction)}.`,
-			MESSAGE_GROUP.COMMAND_RESPONSE
+
+		const destinationRoom = this.location;
+
+		// Send messages to rooms using act()
+		if (sourceRoom) {
+			act(
+				{
+					user: `You leave to the ${directionText}.`,
+					room: `{User} leaves to the ${directionText}.`,
+				},
+				{
+					user: this,
+					room: sourceRoom,
+				}
+			);
+		}
+
+		act(
+			{
+				room: `{User} arrives from the ${reverseDirectionText}.`,
+			},
+			{
+				user: this,
+				room: destinationRoom,
+			},
+			{ excludeUser: true }
 		);
-		if (this.character.settings.autoLook) showRoom(this, this.location);
+
+		if (this.character?.settings?.autoLook) showRoom(this, this.location);
 		return true;
 	}
 
@@ -6116,8 +5991,245 @@ export class Mob extends Movable {
 	}
 
 	/**
+	 * Gets the primary weapon's hit type for combat messages.
+	 * Checks main hand first, then off hand. Returns default hit type if no weapon is equipped.
+	 *
+	 * @returns The hit type to use for combat messages
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * const sword = new Weapon({
+	 *   slot: EQUIPMENT_SLOT.MAIN_HAND,
+	 *   attackPower: 15,
+	 *   hitType: "slash"
+	 * });
+	 * mob.equip(sword);
+	 * const hitType = mob.getPrimaryHitType();
+	 * console.log(hitType.verb); // "slash"
+	 * ```
+	 */
+	public getPrimaryHitType(): Readonly<HitType> {
+		const mainHand = this.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
+		if (mainHand instanceof Weapon) {
+			return mainHand.hitType;
+		}
+		const offHand = this.getEquipped(EQUIPMENT_SLOT.OFF_HAND);
+		if (offHand instanceof Weapon) {
+			return offHand.hitType;
+		}
+		return DEFAULT_HIT_TYPE;
+	}
+
+	/**
+	 * Gets the merged damage type relationships for this mob.
+	 * Merges damage relationships from race and job with priority:
+	 * IMMUNE > RESIST > VULNERABLE
+	 *
+	 * @returns Merged damage type relationships
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob({
+	 *   race: fireImmuneRace,
+	 *   job: fireVulnerableJob
+	 * });
+	 * const relationships = mob.getDamageRelationships();
+	 * // Fire will be IMMUNE (race takes priority)
+	 * ```
+	 */
+	public getDamageRelationships(): DamageTypeRelationships {
+		return mergeDamageRelationships(
+			this._race.damageRelationships,
+			this._job.damageRelationships
+		);
+	}
+
+	/**
+	 * Takes damage from an attacker, reducing health and handling death if necessary.
+	 * Generates threat for NPCs and handles all death-related cleanup.
+	 *
+	 * @param attacker The mob dealing the damage
+	 * @param amount The amount of damage to take
+	 *
+	 * @example
+	 * ```typescript
+	 * const attacker = new Mob();
+	 * const defender = new Mob();
+	 * defender.damage(attacker, 25);
+	 * // Defender's health is reduced, threat is generated, death is handled if needed
+	 * ```
+	 */
+	public damage(attacker: Mob, amount: number): void {
+		if (amount <= 0) {
+			return;
+		}
+
+		// Reduce health
+		this.health = Math.max(0, this.health - amount);
+
+		// Generate threat for NPCs
+		if (!this.character && this.threatTable) {
+			this.addThreat(attacker, amount);
+		}
+
+		// Handle death
+		if (this.health <= 0) {
+			handleDeath(this, attacker);
+		}
+	}
+
+	/**
+	 * Performs a hit attempt against a target, checking accuracy and dealing damage if successful.
+	 * This is the main method for combat hits. It checks accuracy vs avoidance, and if the hit
+	 * succeeds, calculates damage based on attack power, defense, critical hits, and damage type
+	 * relationships. It also handles threat generation and death if the target's health reaches 0.
+	 *
+	 * @param target The mob being hit
+	 * @param weapon Optional weapon to use for the attack. If not provided, uses unarmed/default hit type
+	 * @returns The damage amount that was dealt (0 if missed, otherwise >= 0)
+	 *
+	 * @example
+	 * ```typescript
+	 * const attacker = new Mob();
+	 * const defender = new Mob();
+	 * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
+	 *
+	 * // oneHit handles accuracy checks internally
+	 * const damage = attacker.oneHit(defender, sword);
+	 * // Damage has already been dealt and messages sent (or miss message if missed)
+	 * ```
+	 */
+	public oneHit(target: Mob, weapon?: Weapon): number {
+		// Get the room where combat is occurring
+		const room = this.location;
+		if (!room || !(room instanceof Room)) {
+			return 0; // Can't hit if not in a room
+		}
+
+		// Verify target is in the same room
+		if (target.location !== room) {
+			return 0; // Target not in same room
+		}
+
+		// Check if attack hits (accuracy vs avoidance)
+		// Base hit chance is 50%, modified by the difference between accuracy and avoidance
+		// accuracy 10 vs avoidance 10 = 50% hit chance
+		const hitChance = 50 + (this.accuracy - target.avoidance);
+		// Clamp hit chance to reasonable bounds (5% to 95%)
+		const clampedHitChance = Math.max(5, Math.min(95, hitChance));
+		const roll = Math.random() * 100;
+
+		if (roll > clampedHitChance) {
+			// Miss - send miss message
+			act(
+				{
+					user: "You miss {target}!",
+					target: "{User} misses you!",
+					room: "{User} misses {target}!",
+				},
+				{
+					user: this,
+					target: target,
+					room: room,
+				},
+				{ messageGroup: MESSAGE_GROUP.COMBAT }
+			);
+			return 0;
+		}
+
+		// Attack hits - proceed with damage calculation
+		// Get hit type from weapon or use default
+		const hitType = weapon ? weapon.hitType : DEFAULT_HIT_TYPE;
+
+		// Calculate base damage
+		// Base attack power comes from strength (without weapon bonuses)
+		// When using a weapon, add the weapon's attack power to the base
+		// When unarmed, use only the base attack power
+		const baseAttackPower = this.attackPower; // Base attack power (strength-derived, no weapon bonuses)
+		let damage = weapon
+			? baseAttackPower + weapon.attackPower
+			: baseAttackPower;
+
+		// Apply defense reduction
+		const defenseReduction = target.defense * 0.1; // 10% damage reduction per defense point
+		damage = Math.max(1, damage - defenseReduction);
+
+		// Check for critical hit
+		if (Math.random() * 100 < this.critRate) {
+			damage *= 2;
+		}
+
+		// Apply damage type relationships (resist, immune, vulnerable)
+		const targetRelationships = target.getDamageRelationships();
+		const damageMultiplier = getDamageMultiplier(
+			hitType.damageType,
+			targetRelationships
+		);
+		damage *= damageMultiplier;
+
+		const finalDamage = Math.floor(damage);
+
+		// Don't deal damage if it's 0 or less
+		if (finalDamage <= 0) {
+			return 0;
+		}
+
+		// Send combat messages
+		const damageStr = color(String(finalDamage), COLOR.CRIMSON);
+		const damageStrPlain = String(finalDamage);
+
+		// Get verb forms for different perspectives
+		const verb = hitType.verb; // First person: "You punch"
+		const verbThirdPerson = getThirdPersonVerb(hitType); // Third person: "punches"
+
+		// Get weapon name if provided
+		const weaponName = weapon ? weapon.display : undefined;
+
+		// Build message templates based on whether weapon is used
+		let userMsg: string;
+		let targetMsg: string;
+		let roomMsg: string;
+
+		if (weaponName) {
+			// With weapon: weapon is the subject, so always use third person
+			userMsg = `Your ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+			targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} you for ${damageStr} damage!`;
+			roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
+		} else {
+			// Without weapon: user is the subject
+			// First person (user sees): "You punch"
+			userMsg = `You ${verb} {target} for ${damageStr} damage!`;
+			// Third person (target/room see): "{User} punches"
+			targetMsg = `{User} ${verbThirdPerson} you for ${damageStr} damage!`;
+			roomMsg = `{User} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
+		}
+
+		damageMessage(
+			{
+				user: userMsg,
+				target: targetMsg,
+				room: roomMsg,
+			},
+			{
+				user: this,
+				target: target,
+				room: room,
+			},
+			target,
+			finalDamage,
+			{ messageGroup: MESSAGE_GROUP.COMBAT }
+		);
+
+		// Deal the damage (this handles threat generation and death)
+		target.damage(this, finalDamage);
+
+		return finalDamage;
+	}
+
+	/**
 	 * Serialize this Mob instance to a serializable format.
-	 * Includes all mob-specific properties: level, experience, race/class IDs,
+	 * Includes all mob-specific properties: level, experience, race/job IDs,
 	 * bonuses, resources, and equipped items. Used for persistence and network transfer.
 	 *
 	 * @returns Serialized mob object suitable for JSON/YAML persistence
@@ -6163,7 +6275,7 @@ export class Mob extends Movable {
 			level: this._level,
 			experience: this._experience,
 			race: this._race.id,
-			class: this._class.id,
+			job: this._job.id,
 			...(this._attributeBonuses &&
 			Object.keys(this._attributeBonuses).length > 0
 				? { attributeBonuses: prunePrimaryBonuses(this._attributeBonuses) }
@@ -6193,15 +6305,15 @@ export class Mob extends Movable {
 	public static deserialize(data: SerializedMob): Mob {
 		const {
 			race: raceId,
-			class: classId,
+			job: jobId,
 			equipped,
 			...rest
 		} = normalizeSerializedData(data) as SerializedMob;
 		const race = getRaceById(raceId);
-		const _class = getClassById(classId);
+		const job = getJobById(jobId);
 		const mob = new Mob({
 			race,
-			class: _class,
+			job,
 			...rest,
 		});
 		if (data.contents && Array.isArray(data.contents)) {
@@ -6251,6 +6363,12 @@ export class Mob extends Movable {
 
 		// Clear equipped items map
 		this._equipped.clear();
+
+		// Clear combat state
+		this._combatTarget = undefined;
+		if (this._threatTable) {
+			this._threatTable.clear();
+		}
 
 		// Call parent destroy
 		super.destroy(destroyContents);
@@ -6750,6 +6868,7 @@ export function serializedToOptions(
 					type: "Equipment",
 				}) as EquipmentOptions),
 				attackPower: w.attackPower,
+				hitType: w.hitType,
 			});
 			return opts;
 		}
@@ -6760,7 +6879,7 @@ export function serializedToOptions(
 				level: m.level,
 				experience: m.experience,
 				race: getRaceById(m.race),
-				class: getClassById(m.class),
+				job: getJobById(m.job),
 				attributeBonuses: m.attributeBonuses,
 				resourceBonuses: m.resourceBonuses,
 				health: m.health,

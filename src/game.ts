@@ -33,7 +33,7 @@ import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
 import { Mob } from "./dungeon.js";
-import { Race, Class } from "./archetype.js";
+import { Race, Job } from "./archetype.js";
 import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./package/config.js";
 import {
@@ -53,13 +53,15 @@ import { executeAllDungeonResets } from "./package/dungeon.js";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
-import { getStarterRaces, getStarterClasses } from "./package/archetype.js";
+import { getStarterRaces, getStarterJobs } from "./package/archetype.js";
 import { getHelpfile, searchHelpfiles } from "./package/help.js";
 import { LINEBREAK } from "./telnet.js";
+import { processCombatRound } from "./combat.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 3 * 1000; // 3 seconds
 
 /**
  * Game state and configuration
@@ -119,6 +121,7 @@ export class Game {
 	private boardCleanupTimer?: number;
 	private gameStateSaveTimer?: number;
 	private dungeonResetTimer?: number;
+	private combatTimer?: number;
 	private nextConnectionId = 1;
 
 	/** Static singleton instance of the Game */
@@ -211,6 +214,11 @@ export class Game {
 		this.dungeonResetTimer = setAbsoluteInterval(() => {
 			executeAllDungeonResets();
 		}, DEFAULT_DUNGEON_RESET_INTERVAL_MS);
+
+		// Set up combat round timer (every 3 seconds)
+		this.combatTimer = setAbsoluteInterval(() => {
+			processCombatRound();
+		}, DEFAULT_COMBAT_ROUND_INTERVAL_MS);
 	}
 
 	/**
@@ -245,6 +253,13 @@ export class Game {
 			clearCustomInterval(this.dungeonResetTimer);
 			this.dungeonResetTimer = undefined;
 			logger.debug("Dungeon reset timer cleared");
+		}
+
+		// Clear combat timer
+		if (this.combatTimer !== undefined) {
+			clearCustomInterval(this.combatTimer);
+			this.combatTimer = undefined;
+			logger.debug("Combat timer cleared");
 		}
 
 		// Save game state before shutdown
@@ -350,10 +365,10 @@ export class Game {
 		let password = "";
 		let colorEnabled = true;
 		let selectedRace: Race | undefined;
-		let selectedClass: Class | undefined;
+		let selectedJob: Job | undefined;
 
 		const starterRaces = getStarterRaces();
-		const starterClasses = getStarterClasses();
+		const starterJobs = getStarterJobs();
 
 		const formatDescription = (text?: string): string => {
 			const normalized = text?.replace(/\s+/g, " ").trim();
@@ -389,7 +404,7 @@ export class Game {
 			}
 		};
 
-		const showHelpfile = (topic: string, category: "race" | "class") => {
+		const showHelpfile = (topic: string, category: "race" | "job") => {
 			const normalized = topic.trim().toLowerCase();
 			if (!normalized) {
 				sendLine(`Usage: !info <${category} name>`);
@@ -409,7 +424,7 @@ export class Game {
 
 		const maybeHandleInfoCommand = (
 			rawInput: string | undefined,
-			category: "race" | "class"
+			category: "race" | "job"
 		): boolean => {
 			const trimmed = rawInput?.trim();
 			if (!trimmed || !trimmed.toLowerCase().startsWith("!info")) {
@@ -444,39 +459,39 @@ export class Game {
 			);
 		};
 
-		const chooseClass = (showList: boolean = false) => {
-			if (starterClasses.length === 0) {
+		const chooseJob = (showList: boolean = false) => {
+			if (starterJobs.length === 0) {
 				sendLine(
-					"No classes are currently available. A default class will be assigned."
+					"No jobs are currently available. A default job will be assigned."
 				);
-				selectedClass = undefined;
+				selectedJob = undefined;
 				MOTD();
 				return;
 			}
 
 			if (showList) {
 				listOptions(
-					"Available classes:",
-					starterClasses,
-					"Type !info <class name> to read its helpfile."
+					"Available jobs:",
+					starterJobs,
+					"Type !info <job name> to read its helpfile."
 				);
 			}
 
-			ask("Choose your class (name or number):", (input) => {
-				if (maybeHandleInfoCommand(input, "class")) {
-					return chooseClass(false);
+			ask("Choose your job (name or number):", (input) => {
+				if (maybeHandleInfoCommand(input, "job")) {
+					return chooseJob(false);
 				}
 				const trimmed = input?.trim().toLowerCase();
 				if (trimmed === "!list") {
-					return chooseClass(true);
+					return chooseJob(true);
 				}
-				const choice = resolveSelection(input, starterClasses);
+				const choice = resolveSelection(input, starterJobs);
 				if (!choice) {
-					sendLine("That class wasn't recognized. Please pick again.");
-					return chooseClass(false);
+					sendLine("That job wasn't recognized. Please pick again.");
+					return chooseJob(false);
 				}
-				selectedClass = choice as Class;
-				sendLine(`Class locked in: ${choice.name}.`);
+				selectedJob = choice as Job;
+				sendLine(`Job locked in: ${choice.name}.`);
 				MOTD();
 			});
 		};
@@ -487,7 +502,7 @@ export class Game {
 					"No races are currently available. A default race will be assigned."
 				);
 				selectedRace = undefined;
-				chooseClass();
+				chooseJob();
 				return;
 			}
 
@@ -514,7 +529,7 @@ export class Game {
 				}
 				selectedRace = choice as Race;
 				sendLine(`Race locked in: ${choice.name}.`);
-				chooseClass(true);
+				chooseJob(true);
 			});
 		};
 
@@ -630,7 +645,7 @@ export class Game {
 						display: username,
 						keywords: username,
 						race: selectedRace,
-						class: selectedClass,
+						job: selectedJob,
 					});
 					character = new Character({
 						credentials: { username, characterId },

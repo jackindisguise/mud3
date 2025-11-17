@@ -2172,7 +2172,7 @@ suite("dungeon.ts", () => {
 					level: 1,
 					experience: 0,
 					race: "orc",
-					class: "warrior",
+					job: "warrior",
 					attributeBonuses: {},
 					resourceBonuses: {},
 					health: 100,

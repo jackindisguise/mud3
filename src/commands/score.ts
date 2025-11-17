@@ -88,8 +88,8 @@ export default {
 				`${color("Race:      ", COLOR.CYAN)} ${(
 					mob.race.name ?? "(unknown)"
 				).padEnd(10)}`,
-				`${color("Class:     ", COLOR.CYAN)} ${(
-					mob.class.name ?? "(unknown)"
+				`${color("Job:       ", COLOR.CYAN)} ${(
+					mob.job.name ?? "(unknown)"
 				).padEnd(10)}`,
 				`${color("Level:     ", COLOR.CYAN)} ${mob.level
 					.toString()

@@ -1,4 +1,5 @@
 import { PrimaryAttributeSet, ResourceCapacities } from "./dungeon.js";
+import { DamageTypeRelationships } from "./damage-types.js";
 
 export interface GrowthModifierCurve {
 	base: number;
@@ -22,11 +23,12 @@ export interface BaseArchetypeDefinition {
 	readonly skills: ReadonlyArray<ArchetypeSkillDefinition>;
 	readonly passives: ReadonlyArray<string>;
 	readonly growthModifier: GrowthModifierCurve;
+	readonly damageRelationships?: DamageTypeRelationships;
 }
 
 export type ReadonlyArchetype = Readonly<BaseArchetypeDefinition>;
 export type Race = ReadonlyArchetype;
-export type Class = ReadonlyArchetype;
+export type Job = ReadonlyArchetype;
 
 function freezeAttributes(set: PrimaryAttributeSet): PrimaryAttributeSet {
 	return Object.freeze({ ...set });
@@ -58,6 +60,15 @@ function freezePassives(passives: ReadonlyArray<string>) {
 	return Object.freeze(passives.map((value) => value.trim()));
 }
 
+function freezeDamageRelationships(
+	relationships?: DamageTypeRelationships
+): DamageTypeRelationships | undefined {
+	if (!relationships) {
+		return undefined;
+	}
+	return Object.freeze({ ...relationships });
+}
+
 export function freezeArchetype(
 	def: BaseArchetypeDefinition
 ): ReadonlyArchetype {
@@ -73,6 +84,7 @@ export function freezeArchetype(
 		skills: freezeSkills(def.skills),
 		passives: freezePassives(def.passives),
 		growthModifier: freezeGrowth(def.growthModifier),
+		damageRelationships: freezeDamageRelationships(def.damageRelationships),
 	});
 }
 

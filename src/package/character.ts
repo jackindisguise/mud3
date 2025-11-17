@@ -50,10 +50,7 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
 import { Character, SerializedCharacter } from "../character.js";
-import archetypePkg, {
-	getRaceById,
-	getClassById,
-} from "../package/archetype.js";
+import archetypePkg, { getRaceById, getJobById } from "../package/archetype.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 

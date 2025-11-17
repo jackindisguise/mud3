@@ -1,7 +1,7 @@
 /**
- * Package: archetype - YAML loader for race and class archetypes.
+ * Package: archetype - YAML loader for race and job archetypes.
  *
- * Loads archetype definitions from `data/races` and `data/classes`, normalizes
+ * Loads archetype definitions from `data/races` and `data/jobs`, normalizes
  * them into immutable archetype definitions, and registers them in runtime
  * registries with default fallbacks.
  *
@@ -17,20 +17,27 @@ import { Package } from "package-loader";
 import logger from "../logger.js";
 import {
 	BaseArchetypeDefinition,
-	Class,
+	Job,
 	GrowthModifierCurve,
 	Race,
 	ArchetypeSkillDefinition,
 	freezeArchetype,
 } from "../archetype.js";
 import { PrimaryAttributeSet, ResourceCapacities } from "../dungeon.js";
+import {
+	DamageTypeRelationships,
+	DAMAGE_RELATIONSHIP,
+	PHYSICAL_DAMAGE_TYPE,
+	MAGICAL_DAMAGE_TYPE,
+	DAMAGE_TYPE,
+} from "../damage-types.js";
 
 const DATA_DIRECTORY = join(process.cwd(), "data");
 const RACES_DIRECTORY = join(DATA_DIRECTORY, "races");
-const CLASSES_DIRECTORY = join(DATA_DIRECTORY, "classes");
+const JOBS_DIRECTORY = join(DATA_DIRECTORY, "jobs");
 const VALID_EXTENSIONS = new Set([".yaml", ".yml"]);
 
-type ArchetypeType = "race" | "class";
+type ArchetypeType = "race" | "job";
 
 interface RawArchetypeSkill {
 	id: string;
@@ -57,12 +64,13 @@ type RawArchetypeFile = {
 		skills?: Array<unknown>;
 		passives?: Array<unknown>;
 		growthModifier?: Partial<Record<keyof GrowthModifierCurve, unknown>>;
+		damageRelationships?: Record<keyof DAMAGE_TYPE, unknown>;
 		isStarter?: unknown;
 	};
 };
 
 const raceRegistry: Map<string, Race> = new Map();
-const classRegistry: Map<string, Class> = new Map();
+const jobRegistry: Map<string, Job> = new Map();
 
 const FALLBACK_RACE: Race = freezeArchetype({
 	id: "__fallback_race__",
@@ -78,11 +86,11 @@ const FALLBACK_RACE: Race = freezeArchetype({
 	growthModifier: { base: 1 },
 });
 
-const FALLBACK_CLASS: Class = freezeArchetype({
-	id: "__fallback_class__",
-	name: "Fallback Class",
+const FALLBACK_JOB: Job = freezeArchetype({
+	id: "__fallback_job__",
+	name: "Fallback Job",
 	description:
-		"Internal fallback class used when no class archetypes have been loaded.",
+		"Internal fallback job used when no job archetypes have been loaded.",
 	startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
 	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 	startingResourceCaps: { maxHealth: 1, maxMana: 1 },
@@ -161,6 +169,43 @@ function normalizePassives(raw?: Array<unknown>): string[] {
 		.filter((value) => value.length > 0);
 }
 
+function normalizeDamageRelationships(
+	raw?: Record<string, unknown>
+): DamageTypeRelationships | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+
+	const result: DamageTypeRelationships = {};
+	const validTypes = new Set<DAMAGE_TYPE>([
+		...Object.values(PHYSICAL_DAMAGE_TYPE),
+		...Object.values(MAGICAL_DAMAGE_TYPE),
+	]);
+	const validRelationships = new Set<DAMAGE_RELATIONSHIP>(
+		Object.values(DAMAGE_RELATIONSHIP)
+	);
+
+	for (const [key, value] of Object.entries(raw)) {
+		const upperKey = key.toUpperCase();
+		if (!validTypes.has(upperKey as DAMAGE_TYPE)) {
+			logger.warn(
+				`Unknown damage type in damageRelationships: ${key}. Skipping.`
+			);
+			continue;
+		}
+
+		const upperValue = String(value ?? "").toUpperCase();
+		if (!validRelationships.has(upperValue as DAMAGE_RELATIONSHIP)) {
+			logger.warn(
+				`Invalid damage relationship for ${key}: ${value}. Must be RESIST, IMMUNE, or VULNERABLE. Skipping.`
+			);
+			continue;
+		}
+
+		result[upperKey as DAMAGE_TYPE] = upperValue as DAMAGE_RELATIONSHIP;
+	}
+
+	return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function parseArchetypeFile(
 	raw: string,
 	filePath: string,
@@ -217,6 +262,9 @@ function parseArchetypeFile(
 			growthModifier: normalizeGrowthModifier(
 				(archetype.growthModifier ?? {}) as Partial<GrowthModifierCurve>
 			),
+			damageRelationships: normalizeDamageRelationships(
+				archetype.damageRelationships as Record<string, unknown> | undefined
+			),
 		};
 
 		return { type, definition };
@@ -236,7 +284,7 @@ function registerArchetype(
 	definition: BaseArchetypeDefinition
 ): Readonly<BaseArchetypeDefinition> {
 	const frozen = freezeArchetype(definition);
-	const registry = type === "race" ? raceRegistry : classRegistry;
+	const registry = type === "race" ? raceRegistry : jobRegistry;
 	const previous = registry.get(frozen.id);
 	if (previous) {
 		logger.warn(`Overriding existing ${type} archetype with id "${frozen.id}"`);
@@ -248,7 +296,7 @@ function registerArchetype(
 function getRegistry(
 	type: ArchetypeType
 ): Map<string, Readonly<BaseArchetypeDefinition>> {
-	return type === "race" ? raceRegistry : classRegistry;
+	return type === "race" ? raceRegistry : jobRegistry;
 }
 
 async function loadDirectory(
@@ -280,16 +328,16 @@ async function loadDirectory(
 
 function logSummary(): void {
 	const raceCount = raceRegistry.size;
-	const classCount = classRegistry.size;
+	const jobCount = jobRegistry.size;
 	logger.info(
-		`Loaded ${raceCount} race archetype(s) and ${classCount} class archetype(s).`
+		`Loaded ${raceCount} race archetype(s) and ${jobCount} job archetype(s).`
 	);
 }
 
 function resolveArchetype(
 	type: ArchetypeType,
 	id: string
-): Race | Class | undefined {
+): Race | Job | undefined {
 	const registry = getRegistry(type);
 	const archetype = registry.get(id);
 	if (!archetype) {
@@ -305,8 +353,8 @@ export function getRaceById(id: string): Race | undefined {
 	return resolveArchetype("race", id);
 }
 
-export function getClassById(id: string): Class | undefined {
-	return resolveArchetype("class", id);
+export function getJobById(id: string): Job | undefined {
+	return resolveArchetype("job", id);
 }
 
 export function getAllRaces(): ReadonlyArray<Race> {
@@ -318,13 +366,13 @@ export function getStarterRaces(): ReadonlyArray<Race> {
 	return starters.length > 0 ? starters : getAllRaces();
 }
 
-export function getAllClasses(): ReadonlyArray<Class> {
-	return Array.from(classRegistry.values());
+export function getAllJobs(): ReadonlyArray<Job> {
+	return Array.from(jobRegistry.values());
 }
 
-export function getStarterClasses(): ReadonlyArray<Class> {
-	const starters = getAllClasses().filter((classDef) => classDef.isStarter);
-	return starters.length > 0 ? starters : getAllClasses();
+export function getStarterJobs(): ReadonlyArray<Job> {
+	const starters = getAllJobs().filter((job) => job.isStarter);
+	return starters.length > 0 ? starters : getAllJobs();
 }
 
 export function getDefaultRace(): Race {
@@ -333,10 +381,10 @@ export function getDefaultRace(): Race {
 	return firstRace ?? FALLBACK_RACE;
 }
 
-export function getDefaultClass(): Class {
-	const starters = getStarterClasses();
-	const firstClass = starters[0] ?? getAllClasses()[0];
-	return firstClass ?? FALLBACK_CLASS;
+export function getDefaultJob(): Job {
+	const starters = getStarterJobs();
+	const firstJob = starters[0] ?? getAllJobs()[0];
+	return firstJob ?? FALLBACK_JOB;
 }
 
 export function registerRace(
@@ -347,12 +395,12 @@ export function registerRace(
 	return result as Race;
 }
 
-export function registerClass(
+export function registerJob(
 	definition: BaseArchetypeDefinition,
 	options: { isDefault?: boolean } = {}
-): Class {
-	const result = registerArchetype("class", definition);
-	return result as Class;
+): Job {
+	const result = registerArchetype("job", definition);
+	return result as Job;
 }
 
 export default {
@@ -372,17 +420,17 @@ export default {
 					throw new Error("No race archetypes found");
 				}
 			});
-			logger.debug("Loading classes...");
-			await logger.block("classes", async () => {
-				const classCount = await loadDirectory(CLASSES_DIRECTORY, "class");
-				if (classCount === 0) {
+			logger.debug("Loading jobs...");
+			await logger.block("jobs", async () => {
+				const jobCount = await loadDirectory(JOBS_DIRECTORY, "job");
+				if (jobCount === 0) {
 					logger.warn(
-						`No class archetypes found in ${relative(
+						`No job archetypes found in ${relative(
 							process.cwd(),
-							CLASSES_DIRECTORY
+							JOBS_DIRECTORY
 						)}`
 					);
-					throw new Error("No class archetypes found");
+					throw new Error("No job archetypes found");
 				}
 			});
 

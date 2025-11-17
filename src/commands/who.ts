@@ -44,18 +44,18 @@ export default {
 		const players: Array<{
 			name: string;
 			race: string;
-			className: string;
+			jobName: string;
 			level: number;
 		}> = [];
 
 		// Collect all active player names
 		game.forEachCharacter((character) => {
 			const raceName = character.mob?.race?.name ?? "Unknown";
-			const className = character.mob?.class?.name ?? "Unknown";
+			const jobName = character.mob?.job?.name ?? "Unknown";
 			players.push({
 				name: character.credentials.username,
 				race: raceName,
-				className,
+				jobName,
 				level: character.mob?.level ?? 0,
 			});
 		});
@@ -68,22 +68,22 @@ export default {
 			"Race",
 			15,
 			string.ALIGN.CENTER
-		)}] [${string.pad("Class", 15, string.ALIGN.CENTER)}] Name`;
+		)}] [${string.pad("Job", 15, string.ALIGN.CENTER)}] Name`;
 		const bodyLines = [title];
 		bodyLines.push(
 			...(players.length === 0
 				? [color("No players currently online.", COLOR.SILVER)]
-				: players.map(({ name, race, className, level }) => {
+				: players.map(({ name, race, jobName, level }) => {
 						const _level = color(level.toString().padStart(3, "0"), COLOR.CYAN);
 						const _race = color(
 							string.pad(race, 15, string.ALIGN.CENTER),
 							COLOR.OLIVE
 						);
-						const _class = color(
-							string.pad(className, 15, string.ALIGN.CENTER),
+						const _job = color(
+							string.pad(jobName, 15, string.ALIGN.CENTER),
 							COLOR.TEAL
 						);
-						const tag = color(`${_level} [${_race}] [${_class}]`, COLOR.GREY);
+						const tag = color(`${_level} [${_race}] [${_job}]`, COLOR.GREY);
 						return `${tag} ${color(name, COLOR.LIME)}`;
 				  }))
 		);

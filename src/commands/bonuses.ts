@@ -131,7 +131,7 @@ export default {
 		const { actor } = context;
 		const mob = actor;
 		const race = mob.race;
-		const clazz = mob.class;
+		const job = mob.job;
 		const level = mob.level;
 		const levelStages = Math.max(0, level - 1);
 
@@ -147,14 +147,14 @@ export default {
 			multiplyResourceCaps(race.resourceGrowthPerLevel, levelStages)
 		);
 
-		// Calculate class bonuses
-		const classAttributeBonuses = sumPrimaryAttributes(
-			clazz.startingAttributes,
-			multiplyPrimaryAttributes(clazz.attributeGrowthPerLevel, levelStages)
+		// Calculate job bonuses
+		const jobAttributeBonuses = sumPrimaryAttributes(
+			job.startingAttributes,
+			multiplyPrimaryAttributes(job.attributeGrowthPerLevel, levelStages)
 		);
-		const classResourceBonuses = sumResourceCaps(
-			clazz.startingResourceCaps,
-			multiplyResourceCaps(clazz.resourceGrowthPerLevel, levelStages)
+		const jobResourceBonuses = sumResourceCaps(
+			job.startingResourceCaps,
+			multiplyResourceCaps(job.resourceGrowthPerLevel, levelStages)
 		);
 
 		// Calculate equipment bonuses
@@ -198,7 +198,7 @@ export default {
 		// Calculate total primary attributes (for deriving secondary attributes)
 		const totalPrimaryAttributes = sumPrimaryAttributes(
 			raceAttributeBonuses,
-			classAttributeBonuses,
+			jobAttributeBonuses,
 			totalEquipmentAttributeBonuses,
 			mobAttributeBonuses
 		);
@@ -256,22 +256,22 @@ export default {
 
 		for (const attr of primaryAttrs) {
 			const raceBonus = raceAttributeBonuses[attr] || 0;
-			const classBonus = classAttributeBonuses[attr] || 0;
+			const jobBonus = jobAttributeBonuses[attr] || 0;
 			const equipmentBonus = totalEquipmentAttributeBonuses[attr] || 0;
 			const mobBonus = mobAttributeBonuses[attr] || 0;
-			const total = raceBonus + classBonus + equipmentBonus + mobBonus;
+			const total = raceBonus + jobBonus + equipmentBonus + mobBonus;
 
 			if (
 				total !== 0 ||
 				raceBonus !== 0 ||
-				classBonus !== 0 ||
+				jobBonus !== 0 ||
 				equipmentBonus !== 0 ||
 				mobBonus !== 0
 			) {
 				const attrName = formatAttributeName(attr);
 				const parts: string[] = [];
 				if (raceBonus !== 0) parts.push(`Race: ${formatBonus(raceBonus)}`);
-				if (classBonus !== 0) parts.push(`Class: ${formatBonus(classBonus)}`);
+				if (jobBonus !== 0) parts.push(`Job: ${formatBonus(jobBonus)}`);
 				if (equipmentBonus !== 0)
 					parts.push(`Equipment: ${formatBonus(equipmentBonus)}`);
 				if (mobBonus !== 0) parts.push(`Other: ${formatBonus(mobBonus)}`);
@@ -349,18 +349,18 @@ export default {
 
 		for (const attr of resourceAttrs) {
 			const raceBonus = raceResourceBonuses[attr] || 0;
-			const classBonus = classResourceBonuses[attr] || 0;
+			const jobBonus = jobResourceBonuses[attr] || 0;
 			const equipmentBonus = totalEquipmentResourceBonuses[attr] || 0;
 			const mobBonus = mobResourceBonuses[attr] || 0;
 			const fromAttributes =
 				attr === "maxHealth" ? healthFromVitality : manaFromWisdom;
 			const total =
-				raceBonus + classBonus + equipmentBonus + mobBonus + fromAttributes;
+				raceBonus + jobBonus + equipmentBonus + mobBonus + fromAttributes;
 
 			if (
 				total !== 0 ||
 				raceBonus !== 0 ||
-				classBonus !== 0 ||
+				jobBonus !== 0 ||
 				equipmentBonus !== 0 ||
 				mobBonus !== 0 ||
 				fromAttributes !== 0
@@ -370,7 +370,7 @@ export default {
 				if (fromAttributes !== 0)
 					parts.push(`From Attributes: ${formatBonus(fromAttributes)}`);
 				if (raceBonus !== 0) parts.push(`Race: ${formatBonus(raceBonus)}`);
-				if (classBonus !== 0) parts.push(`Class: ${formatBonus(classBonus)}`);
+				if (jobBonus !== 0) parts.push(`Job: ${formatBonus(jobBonus)}`);
 				if (equipmentBonus !== 0)
 					parts.push(`Equipment: ${formatBonus(equipmentBonus)}`);
 				if (mobBonus !== 0) parts.push(`Other: ${formatBonus(mobBonus)}`);

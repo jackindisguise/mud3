@@ -550,9 +550,9 @@ export function findDirectionsViaRefs(
 	return findDirectionsBetweenRooms(start, goal, options);
 }
 
-// ---------- Path cache (directions only, default options) ----------
+// ---------- Path cache (full PathResult, default options) ----------
 
-const PATH_CACHE: Map<string, Map<string, DIRECTION[]>> = new Map();
+const PATH_CACHE: Map<string, Map<string, PathResult>> = new Map();
 
 function makeRoomRef(room: Room): string {
 	const did = room.dungeon?.id ?? "unknown";
@@ -561,7 +561,7 @@ function makeRoomRef(room: Room): string {
 
 /**
  * Caches all suffix paths along a result so that any room along the path
- * has a cached set of directions to the final goal. Only stores when
+ * has a cached full path result to the final goal. Only stores when
  * no custom cost/passable functions are involved.
  */
 export function cachePathResult(result: PathResult): void {
@@ -569,30 +569,47 @@ export function cachePathResult(result: PathResult): void {
 	const dirs = result.directions;
 	if (rooms.length === 0) return;
 	const goalRef = makeRoomRef(rooms[rooms.length - 1]);
-	// For each i, cache path from rooms[i] to goal as dirs[i..end]
-	// Compute suffix slices of directions
-	let suffixStart = 0;
-	for (let i = 0; i < rooms.length - 1; i++) {
+	// For each i, cache full path result from rooms[i] to goal
+	for (let i = 0; i < rooms.length; i++) {
 		const fromRef = makeRoomRef(rooms[i]);
-		const suffixDirections = dirs.slice(i, dirs.length);
+		const suffixRooms = rooms.slice(i);
+		const suffixDirections = dirs.slice(i);
+		// Calculate cost for the suffix path
+		// Since we only cache when using default cost function (1 per step),
+		// the cost equals the number of steps (directions)
+		const suffixCost = suffixDirections.length;
+		// Create suffix path result
+		const suffixResult: PathResult = {
+			rooms: suffixRooms,
+			directions: suffixDirections,
+			cost: suffixCost,
+			expanded: 0, // We don't track expanded for cached paths
+		};
 		let inner = PATH_CACHE.get(fromRef);
 		if (!inner) {
 			inner = new Map();
 			PATH_CACHE.set(fromRef, inner);
 		}
-		inner.set(goalRef, suffixDirections);
-		suffixStart++;
+		inner.set(goalRef, suffixResult);
 	}
+}
+
+export function getCachedPathResult(
+	start: Room,
+	goal: Room
+): PathResult | undefined {
+	const fromRef = makeRoomRef(start);
+	const toRef = makeRoomRef(goal);
+	const inner = PATH_CACHE.get(fromRef);
+	return inner?.get(toRef);
 }
 
 export function getCachedDirections(
 	start: Room,
 	goal: Room
 ): DIRECTION[] | undefined {
-	const fromRef = makeRoomRef(start);
-	const toRef = makeRoomRef(goal);
-	const inner = PATH_CACHE.get(fromRef);
-	return inner?.get(toRef);
+	const cached = getCachedPathResult(start, goal);
+	return cached?.directions;
 }
 
 export function clearPathCache(): void {

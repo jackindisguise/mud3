@@ -235,7 +235,7 @@ suite("combat.ts", () => {
 
 			const initialHealth = defender.health;
 			// Use oneHit - it checks accuracy internally
-			highAgilityAttacker.oneHit(defender, fireSword);
+			highAgilityAttacker.oneHit({ target: defender, weapon: fireSword });
 
 			// Damage should be reduced by 50% (RESIST)
 			const damageDealt = initialHealth - defender.health;
@@ -299,7 +299,7 @@ suite("combat.ts", () => {
 
 			const initialHealth = defender.health;
 			// Use oneHit - it checks accuracy internally
-			highAgilityAttacker.oneHit(defender, fireSword);
+			highAgilityAttacker.oneHit({ target: defender, weapon: fireSword });
 
 			// Damage should be 0 (IMMUNE)
 			const damageDealt = initialHealth - defender.health;
@@ -362,7 +362,7 @@ suite("combat.ts", () => {
 
 			const initialHealth = defender.health;
 			// Use oneHit - it checks accuracy internally
-			highAgilityAttacker.oneHit(defender, fireSword);
+			highAgilityAttacker.oneHit({ target: defender, weapon: fireSword });
 
 			// Damage should be increased by 100% (VULNERABLE = 2x)
 			const damageDealt = initialHealth - defender.health;

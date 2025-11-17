@@ -4718,6 +4718,19 @@ export interface SerializedMob extends SerializedDungeonObject {
  * console.log(warrior.level); // May have leveled up
  * ```
  */
+
+/**
+ * Options for the oneHit method.
+ */
+export interface OneHitOptions {
+	/** The mob being hit */
+	target: Mob;
+	/** Optional weapon to use for the attack. If not provided, uses unarmed/default hit type */
+	weapon?: Weapon;
+	/** If true, the attack will never miss (guaranteed hit) */
+	guaranteedHit?: boolean;
+}
+
 export class Mob extends Movable {
 	/** Private storage for the Character reference */
 	private _character?: Character;
@@ -6085,8 +6098,7 @@ export class Mob extends Movable {
 	 * succeeds, calculates damage based on attack power, defense, critical hits, and damage type
 	 * relationships. It also handles threat generation and death if the target's health reaches 0.
 	 *
-	 * @param target The mob being hit
-	 * @param weapon Optional weapon to use for the attack. If not provided, uses unarmed/default hit type
+	 * @param options Options for the hit, including target, weapon, and guaranteedHit flag
 	 * @returns The damage amount that was dealt (0 if missed, otherwise >= 0)
 	 *
 	 * @example
@@ -6096,11 +6108,16 @@ export class Mob extends Movable {
 	 * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
 	 *
 	 * // oneHit handles accuracy checks internally
-	 * const damage = attacker.oneHit(defender, sword);
+	 * const damage = attacker.oneHit({ target: defender, weapon: sword });
 	 * // Damage has already been dealt and messages sent (or miss message if missed)
+	 *
+	 * // Guaranteed hit (never misses)
+	 * const guaranteedDamage = attacker.oneHit({ target: defender, weapon: sword, guaranteedHit: true });
 	 * ```
 	 */
-	public oneHit(target: Mob, weapon?: Weapon): number {
+	public oneHit(options: OneHitOptions): number {
+		const { target, weapon, guaranteedHit = false } = options;
+
 		// Get the room where combat is occurring
 		const room = this.location;
 		if (!room || !(room instanceof Room)) {
@@ -6113,29 +6130,32 @@ export class Mob extends Movable {
 		}
 
 		// Check if attack hits (accuracy vs avoidance)
-		// Base hit chance is 50%, modified by the difference between accuracy and avoidance
-		// accuracy 10 vs avoidance 10 = 50% hit chance
-		const hitChance = 50 + (this.accuracy - target.avoidance);
-		// Clamp hit chance to reasonable bounds (5% to 95%)
-		const clampedHitChance = Math.max(5, Math.min(95, hitChance));
-		const roll = Math.random() * 100;
+		// Skip miss check if guaranteedHit is true
+		if (!guaranteedHit) {
+			// Base hit chance is 50%, modified by the difference between accuracy and avoidance
+			// accuracy 10 vs avoidance 10 = 50% hit chance
+			const hitChance = 50 + (this.accuracy - target.avoidance);
+			// Clamp hit chance to reasonable bounds (5% to 95%)
+			const clampedHitChance = Math.max(5, Math.min(95, hitChance));
+			const roll = Math.random() * 100;
 
-		if (roll > clampedHitChance) {
-			// Miss - send miss message
-			act(
-				{
-					user: "You miss {target}!",
-					target: "{User} misses you!",
-					room: "{User} misses {target}!",
-				},
-				{
-					user: this,
-					target: target,
-					room: room,
-				},
-				{ messageGroup: MESSAGE_GROUP.COMBAT }
-			);
-			return 0;
+			if (roll > clampedHitChance) {
+				// Miss - send miss message
+				act(
+					{
+						user: "You miss {target}!",
+						target: "{User} misses you!",
+						room: "{User} misses {target}!",
+					},
+					{
+						user: this,
+						target: target,
+						room: room,
+					},
+					{ messageGroup: MESSAGE_GROUP.COMBAT }
+				);
+				return 0;
+			}
 		}
 
 		// Attack hits - proceed with damage calculation

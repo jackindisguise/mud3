@@ -268,7 +268,7 @@ function processMobCombatRound(mob: Mob): void {
 	// Perform the hit (oneHit handles accuracy checks, damage calculation, messages, and damage dealing)
 	const mainHand = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
 	const weapon = mainHand instanceof Weapon ? mainHand : undefined;
-	mob.oneHit(target, weapon);
+	mob.oneHit({ target, weapon });
 }
 
 /**

@@ -519,6 +519,7 @@ async function postChangelogToBoard() {
 const scriptPath = fileURLToPath(import.meta.url);
 const isMainModule =
 	process.argv[1] === scriptPath ||
+	process.argv[1]?.endsWith("post-changelog-to-board") ||
 	process.argv[1]?.endsWith("post-changelog-to-board.js");
 
 if (isMainModule) {

@@ -191,7 +191,9 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 				if (templateIndex === undefined) {
 					// Create template from room (without id/type)
 					const fullTemplate = room.toTemplate("") as RoomTemplate; // We'll strip id/type
-					const template: Omit<RoomTemplate, "id" | "type"> = {};
+					const template: Omit<RoomTemplate, "id" | "type"> = {
+						allowedExits: fullTemplate.allowedExits, // Mandatory field
+					};
 					if (fullTemplate.keywords !== undefined) {
 						template.keywords = fullTemplate.keywords;
 					}
@@ -200,9 +202,6 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 					}
 					if (fullTemplate.description !== undefined) {
 						template.description = fullTemplate.description;
-					}
-					if (fullTemplate.allowedExits !== undefined) {
-						template.allowedExits = fullTemplate.allowedExits;
 					}
 					// Note: baseWeight is not included for rooms
 
@@ -474,11 +473,17 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 						);
 					}
 
-					// Create full template with type (required by Room.createFromTemplate)
 					const fullTemplate: RoomTemplate = {
 						id: "", // Not used, but required by interface
 						type: "Room",
 						...roomTemplate,
+						allowedExits:
+							roomTemplate.allowedExits !== undefined
+								? roomTemplate.allowedExits
+								: DIRECTION.NORTH |
+								  DIRECTION.SOUTH |
+								  DIRECTION.EAST |
+								  DIRECTION.WEST,
 					};
 
 					// Map YAML row index (top-first) to internal y coordinate (bottom-first)
@@ -733,12 +738,14 @@ export async function loadDungeons(): Promise<Dungeon[]> {
 	const dungeons: Dungeon[] = [];
 
 	for (const id of ids) {
-		const dungeon = await loadDungeon(id);
-		if (dungeon) {
-			dungeons.push(dungeon);
-		} else {
-			logger.warn(`Failed to load dungeon with id: ${id}`);
-		}
+		await logger.block(id, async () => {
+			const dungeon = await loadDungeon(id);
+			if (dungeon) {
+				dungeons.push(dungeon);
+			} else {
+				logger.warn(`Failed to load dungeon with id: ${id}`);
+			}
+		});
 	}
 
 	// Process all pending room links after all dungeons are loaded

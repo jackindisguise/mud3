@@ -753,6 +753,8 @@ suite("dungeon.ts", () => {
 					id: "room",
 					type: "Room",
 					display: "Test Room",
+					allowedExits:
+						DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST,
 				};
 
 				assert.throws(() => {
@@ -767,6 +769,8 @@ suite("dungeon.ts", () => {
 					keywords: "start room entrance",
 					display: "Starting Room",
 					description: "You are in the starting room.",
+					allowedExits:
+						DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST,
 					baseWeight: 0,
 				};
 
@@ -2097,6 +2101,8 @@ suite("dungeon.ts", () => {
 					description: "A room filled with treasure.",
 					contents: [],
 					coordinates: { x: 5, y: 3, z: 1 },
+					allowedExits:
+						DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST,
 				};
 
 				const room = DungeonObject.deserialize(data);
@@ -2118,6 +2124,8 @@ suite("dungeon.ts", () => {
 					display: "Starting Room",
 					description: "Where the adventure begins.",
 					coordinates: { x: 0, y: 0, z: 0 },
+					allowedExits:
+						DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST,
 					contents: [
 						{
 							type: "DungeonObject",

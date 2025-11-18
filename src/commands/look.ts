@@ -18,7 +18,7 @@
  * @module commands/look
  */
 
-import { CommandContext, ParseResult } from "../command.js";
+import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Room, DIRECTION, dir2text, DIRECTIONS } from "../dungeon.js";
 import { Mob } from "../dungeon.js";
@@ -26,82 +26,7 @@ import { CommandObject } from "../package/commands.js";
 import { COLOR, color, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { string } from "mud-ext";
-
-const ALTERNATING_MINIMAP_CHARS = [",", "'"];
-const ALTERNATING_MINIMAP_COLORS = [COLOR.DARK_GREEN, COLOR.TEAL];
-
-/**
- * Generates a minimap showing rooms around the current room.
- * Displays a grid of rooms with the current room marked.
- *
- * @param room The center room for the minimap
- * @param mob The mob viewing the minimap (for checking exits)
- * @param size The number of tiles to show in each direction (size 1 = 3x3, size 2 = 5x5)
- * @returns A string representation of the minimap, or undefined if no dungeon
- */
-function generateMinimap(
-	room: Room,
-	mob: Mob,
-	size: number
-): string[] | undefined {
-	const dungeon = room.dungeon;
-	if (!dungeon) return undefined;
-
-	const coords = room.coordinates;
-	const gridSize = size * 2 + 1;
-	const lines: string[] = [];
-
-	// Build the grid from top to bottom (north to south)
-	for (let y = coords.y - size; y <= coords.y + size; y++) {
-		const row: string[] = [];
-		for (let x = coords.x - size; x <= coords.x + size; x++) {
-			let mapText = " ";
-			let mapColor = COLOR.DARK_GREEN;
-			const targetRoom = dungeon.getRoom({ x, y, z: coords.z });
-			if (targetRoom) {
-				mapText =
-					targetRoom.mapText ??
-					ALTERNATING_MINIMAP_CHARS[
-						(targetRoom.x * targetRoom.y + targetRoom.z) % 2
-					];
-				mapColor =
-					targetRoom.mapColor ??
-					ALTERNATING_MINIMAP_COLORS[
-						(targetRoom.x * targetRoom.y + targetRoom.z) % 2
-					];
-				if (targetRoom === room) {
-					mapText = "@";
-					mapColor = COLOR.PINK;
-				} else {
-					// Check if room has a mob
-					const mobInRoom = targetRoom.contents.find(
-						(obj) => obj instanceof Mob
-					) as Mob | undefined;
-					if (mobInRoom) {
-						// Room with mob - use mob's mapText/mapColor or default to !
-						mapText = mobInRoom.mapText ?? "!";
-						mapColor = mobInRoom.mapColor ?? COLOR.YELLOW;
-					}
-				}
-			}
-			row.push(color(mapText, mapColor));
-		}
-		lines.push(row.join(""));
-	}
-
-	const box = string.box({
-		input: lines,
-		width: gridSize + 2,
-		sizer: SIZER,
-		style: {
-			...string.BOX_STYLES.PLAIN,
-			hPadding: 0,
-			titleHAlign: string.ALIGN.CENTER,
-		},
-		title: "Minimap",
-	});
-	return box;
-}
+import { generateMinimap } from "../minimap.js";
 
 /**
  * Displays a room description to a player.

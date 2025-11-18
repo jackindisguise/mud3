@@ -343,9 +343,22 @@ class MapEditor {
 		item.className = "template-item";
 		item.dataset.type = type;
 		item.dataset.id = id;
+		const isDeleteTemplate = id === "__DELETE__";
 		item.innerHTML = `
-			<h3>${display}</h3>
-			<p>${description}</p>
+			<div class="template-item-content">
+				<h3>${display}</h3>
+				<p>${description}</p>
+			</div>
+			${
+				!isDeleteTemplate
+					? `
+			<div class="template-item-actions">
+				<button class="template-edit-btn" title="Edit template">✏️</button>
+				<button class="template-delete-btn" title="Delete template">🗑️</button>
+			</div>
+			`
+					: ""
+			}
 		`;
 		item.addEventListener("click", () => {
 			// If there's an active selection, place template in all selected cells
@@ -365,9 +378,33 @@ class MapEditor {
 			this.selectedTemplateType = type;
 			this.updatePlacementIndicator(type, id, display);
 		});
-		item.addEventListener("dblclick", () => {
-			this.editTemplate(type, id);
+		item.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			if (!isDeleteTemplate) {
+				this.editTemplate(type, id);
+			}
 		});
+
+		// Add edit and delete button handlers
+		if (!isDeleteTemplate) {
+			const editBtn = item.querySelector(".template-edit-btn");
+			const deleteBtn = item.querySelector(".template-delete-btn");
+
+			if (editBtn) {
+				editBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.editTemplate(type, id);
+				});
+			}
+
+			if (deleteBtn) {
+				deleteBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					this.deleteTemplate(type, id);
+				});
+			}
+		}
+
 		return item;
 	}
 
@@ -1114,6 +1151,57 @@ class MapEditor {
 		const isMob = type !== "room" && template.type === "Mob";
 
 		if (type === "room") {
+			// DIRECTION bitmap values
+			const DIRECTION = {
+				NORTH: 1 << 0, // 1
+				SOUTH: 1 << 1, // 2
+				EAST: 1 << 2, // 4
+				WEST: 1 << 3, // 8
+				NORTHEAST: (1 << 0) | (1 << 2), // 5
+				NORTHWEST: (1 << 0) | (1 << 3), // 9
+				SOUTHEAST: (1 << 1) | (1 << 2), // 6
+				SOUTHWEST: (1 << 1) | (1 << 3), // 10
+				UP: 1 << 8, // 256
+				DOWN: 1 << 9, // 512
+			};
+
+			// Default allowedExits: all horizontal directions (not UP/DOWN)
+			const DEFAULT_ALLOWED_EXITS =
+				DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
+
+			// Text to DIRECTION mapping
+			const TEXT2DIR = {
+				north: DIRECTION.NORTH,
+				south: DIRECTION.SOUTH,
+				east: DIRECTION.EAST,
+				west: DIRECTION.WEST,
+				northeast: DIRECTION.NORTHEAST,
+				northwest: DIRECTION.NORTHWEST,
+				southeast: DIRECTION.SOUTHEAST,
+				southwest: DIRECTION.SOUTHWEST,
+				up: DIRECTION.UP,
+				down: DIRECTION.DOWN,
+			};
+
+			// Get allowedExits bitmap (default to horizontal only)
+			const allowedExits =
+				template.allowedExits !== undefined
+					? template.allowedExits
+					: DEFAULT_ALLOWED_EXITS;
+
+			// Helper function to check if a direction is allowed
+			const isAllowed = (dirText) => {
+				const dir = TEXT2DIR[dirText];
+				return dir && (allowedExits & dir) !== 0;
+			};
+
 			// Build room links HTML
 			const roomLinks = template.roomLinks || {};
 			const allDirections = ["north", "south", "east", "west", "up", "down"];
@@ -1147,6 +1235,53 @@ class MapEditor {
 
 			const canAddMore = usedDirections.length < allDirections.length;
 
+			// Build exits HTML
+			const cardinalDirections = [
+				"north",
+				"south",
+				"east",
+				"west",
+				"up",
+				"down",
+			];
+			const diagonalDirections = [
+				"northwest",
+				"northeast",
+				"southwest",
+				"southeast",
+			];
+
+			const cardinalExitsHtml = cardinalDirections
+				.map((dir) => {
+					const isAllowedDir = isAllowed(dir);
+					return `<button type="button" class="exit-btn ${
+						isAllowedDir ? "enabled" : "disabled"
+					}" data-direction="${dir}">${
+						dir.charAt(0).toUpperCase() + dir.slice(1)
+					}</button>`;
+				})
+				.join("");
+
+			const diagonalExitsHtml = diagonalDirections
+				.map((dir) => {
+					const isAllowedDir = isAllowed(dir);
+					const label = dir.replace(
+						/(north|south)(east|west)/,
+						(match, n, e) => {
+							return (
+								n.charAt(0).toUpperCase() +
+								n.slice(1) +
+								e.charAt(0).toUpperCase() +
+								e.slice(1)
+							);
+						}
+					);
+					return `<button type="button" class="exit-btn ${
+						isAllowedDir ? "enabled" : "disabled"
+					}" data-direction="${dir}">${label}</button>`;
+				})
+				.join("");
+
 			html = `
 				<div class="form-group">
 					<label>Display Name</label>
@@ -1165,6 +1300,23 @@ class MapEditor {
 				<div class="form-group">
 					<label>Map Color</label>
 					${this.generateColorSelector("template-map-color", template.mapColor)}
+				</div>
+				<div class="form-group">
+					<label>Allowed Exits</label>
+					<div class="exits-container">
+						<div class="exits-group">
+							<label class="exits-group-label">Cardinal Directions</label>
+							<div class="exits-buttons">
+								${cardinalExitsHtml}
+							</div>
+						</div>
+						<div class="exits-group">
+							<label class="exits-group-label">Diagonal Directions</label>
+							<div class="exits-buttons">
+								${diagonalExitsHtml}
+							</div>
+						</div>
+					</div>
 				</div>
 				<div class="form-group">
 					<label>Room Links</label>
@@ -1275,8 +1427,102 @@ class MapEditor {
 		body.innerHTML = html;
 		modal.classList.add("active");
 
+		// Initialize allowedExits data attribute for room templates
+		if (type === "room") {
+			const DIRECTION = {
+				NORTH: 1 << 0,
+				SOUTH: 1 << 1,
+				EAST: 1 << 2,
+				WEST: 1 << 3,
+				NORTHEAST: (1 << 0) | (1 << 2),
+				NORTHWEST: (1 << 0) | (1 << 3),
+				SOUTHEAST: (1 << 1) | (1 << 2),
+				SOUTHWEST: (1 << 1) | (1 << 3),
+				UP: 1 << 8,
+				DOWN: 1 << 9,
+			};
+			const DEFAULT_ALLOWED_EXITS =
+				DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
+			const allowedExits =
+				template.allowedExits !== undefined
+					? template.allowedExits
+					: DEFAULT_ALLOWED_EXITS;
+			modal.dataset.allowedExits = allowedExits;
+		}
+
 		// Set up room link handlers if this is a room template
 		if (type === "room") {
+			// DIRECTION bitmap values (same as above, needed in this scope)
+			const DIRECTION = {
+				NORTH: 1 << 0,
+				SOUTH: 1 << 1,
+				EAST: 1 << 2,
+				WEST: 1 << 3,
+				NORTHEAST: (1 << 0) | (1 << 2),
+				NORTHWEST: (1 << 0) | (1 << 3),
+				SOUTHEAST: (1 << 1) | (1 << 2),
+				SOUTHWEST: (1 << 1) | (1 << 3),
+				UP: 1 << 8,
+				DOWN: 1 << 9,
+			};
+
+			const TEXT2DIR = {
+				north: DIRECTION.NORTH,
+				south: DIRECTION.SOUTH,
+				east: DIRECTION.EAST,
+				west: DIRECTION.WEST,
+				northeast: DIRECTION.NORTHEAST,
+				northwest: DIRECTION.NORTHWEST,
+				southeast: DIRECTION.SOUTHEAST,
+				southwest: DIRECTION.SOUTHWEST,
+				up: DIRECTION.UP,
+				down: DIRECTION.DOWN,
+			};
+
+			// Exit button handlers - store current allowedExits bitmap
+			let currentAllowedExits =
+				template.allowedExits !== undefined
+					? template.allowedExits
+					: DIRECTION.NORTH |
+					  DIRECTION.SOUTH |
+					  DIRECTION.EAST |
+					  DIRECTION.WEST |
+					  DIRECTION.NORTHEAST |
+					  DIRECTION.NORTHWEST |
+					  DIRECTION.SOUTHEAST |
+					  DIRECTION.SOUTHWEST;
+
+			document.querySelectorAll(".exit-btn").forEach((btn) => {
+				btn.onclick = (e) => {
+					const direction = e.target.dataset.direction;
+					const dirFlag = TEXT2DIR[direction];
+					if (!dirFlag) return;
+
+					const isEnabled = e.target.classList.contains("enabled");
+					if (isEnabled) {
+						// Disable: remove flag from bitmap
+						currentAllowedExits = currentAllowedExits & ~dirFlag;
+						e.target.classList.remove("enabled");
+						e.target.classList.add("disabled");
+					} else {
+						// Enable: add flag to bitmap
+						currentAllowedExits = currentAllowedExits | dirFlag;
+						e.target.classList.remove("disabled");
+						e.target.classList.add("enabled");
+					}
+					// Store in data attribute for later retrieval
+					document.getElementById("template-modal").dataset.allowedExits =
+						currentAllowedExits;
+				};
+			});
+
 			// Add room link button
 			const addBtn = document.getElementById("add-room-link-btn");
 			if (addBtn) {
@@ -1340,18 +1586,27 @@ class MapEditor {
 		}
 
 		// Save handler
-		document.getElementById("modal-save").onclick = () => {
-			this.saveTemplate(type, id, template);
-		};
+		const saveBtn = document.getElementById("modal-save");
+		if (saveBtn) {
+			saveBtn.onclick = () => {
+				this.saveTemplate(type, id, template);
+			};
+		}
 
 		// Cancel handler
-		document.getElementById("modal-cancel").onclick = () => {
-			modal.classList.remove("active");
-		};
+		const cancelBtn = document.getElementById("modal-cancel");
+		if (cancelBtn) {
+			cancelBtn.onclick = () => {
+				modal.classList.remove("active");
+			};
+		}
 
-		document.querySelector(".close").onclick = () => {
-			modal.classList.remove("active");
-		};
+		const closeBtn = modal.querySelector(".close");
+		if (closeBtn) {
+			closeBtn.onclick = () => {
+				modal.classList.remove("active");
+			};
+		}
 	}
 
 	saveTemplate(type, id, oldTemplate) {
@@ -1372,6 +1627,16 @@ class MapEditor {
 			const mapColor = mapColorSelect.value
 				? parseInt(mapColorSelect.value)
 				: undefined;
+
+			// Collect enabled exits
+			const enabledExits = {};
+			document.querySelectorAll(".exit-btn").forEach((btn) => {
+				const direction = btn.dataset.direction;
+				const isEnabled = btn.classList.contains("enabled");
+				if (!isEnabled) {
+					enabledExits[direction] = false;
+				}
+			});
 
 			// Collect room links
 			const roomLinks = {};
@@ -1394,6 +1659,21 @@ class MapEditor {
 					...(mapText && { mapText }),
 					...(mapColor !== undefined && { mapColor }),
 				};
+				// Set allowedExits bitmap
+				const DEFAULT_ALLOWED_EXITS =
+					(1 << 0) |
+					(1 << 1) |
+					(1 << 2) |
+					(1 << 3) |
+					((1 << 0) | (1 << 2)) |
+					((1 << 0) | (1 << 3)) |
+					((1 << 1) | (1 << 2)) |
+					((1 << 1) | (1 << 3));
+				if (allowedExits !== DEFAULT_ALLOWED_EXITS) {
+					updated.allowedExits = allowedExits;
+				} else if (updated.allowedExits !== undefined) {
+					delete updated.allowedExits;
+				}
 				if (Object.keys(roomLinks).length > 0) {
 					updated.roomLinks = roomLinks;
 				} else if (updated.roomLinks) {
@@ -1408,6 +1688,19 @@ class MapEditor {
 				const newRoom = { display, description };
 				if (mapText) newRoom.mapText = mapText;
 				if (mapColor !== undefined) newRoom.mapColor = mapColor;
+				// Set allowedExits bitmap
+				const DEFAULT_ALLOWED_EXITS =
+					(1 << 0) |
+					(1 << 1) |
+					(1 << 2) |
+					(1 << 3) |
+					((1 << 0) | (1 << 2)) |
+					((1 << 0) | (1 << 3)) |
+					((1 << 1) | (1 << 2)) |
+					((1 << 1) | (1 << 3));
+				if (allowedExits !== DEFAULT_ALLOWED_EXITS) {
+					newRoom.allowedExits = allowedExits;
+				}
 				if (Object.keys(roomLinks).length > 0) {
 					newRoom.roomLinks = roomLinks;
 				}
@@ -1477,6 +1770,107 @@ class MapEditor {
 		document.getElementById("template-modal").classList.remove("active");
 		this.loadTemplates(dungeon);
 		// Re-render map to reflect any changes to mapText/mapColor
+		this.renderMap(dungeon);
+	}
+
+	deleteTemplate(type, id) {
+		if (!this.yamlData) return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		// Auto-save to localStorage
+		this.saveToLocalStorage();
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+
+		if (type === "room") {
+			const roomIndex = parseInt(id);
+			if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return;
+
+			const room = dungeon.rooms[roomIndex];
+			const roomName = room?.display || `Room ${roomIndex + 1}`;
+			let deletedCount = 0;
+
+			// Find and clear all grid cells using this room template
+			for (let layerIndex = 0; layerIndex < dungeon.grid.length; layerIndex++) {
+				const layer = dungeon.grid[layerIndex] || [];
+				for (let y = 0; y < layer.length; y++) {
+					const row = layer[y] || [];
+					for (let x = 0; x < row.length; x++) {
+						// Room index in grid is 1-based, template index is 0-based
+						if (row[x] === roomIndex + 1) {
+							row[x] = 0;
+							deletedCount++;
+
+							// Calculate z coordinate (reverse layer index)
+							const z = dungeon.dimensions.layers - 1 - layerIndex;
+
+							// Remove resets for this room
+							const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+							if (dungeon.resets) {
+								dungeon.resets = dungeon.resets.filter(
+									(r) => r.roomRef !== roomRef
+								);
+							}
+						}
+					}
+				}
+			}
+
+			// Remove the room template
+			dungeon.rooms.splice(roomIndex, 1);
+
+			// Adjust all grid references (decrement room indices > deleted index)
+			for (let layerIndex = 0; layerIndex < dungeon.grid.length; layerIndex++) {
+				const layer = dungeon.grid[layerIndex] || [];
+				for (let y = 0; y < layer.length; y++) {
+					const row = layer[y] || [];
+					for (let x = 0; x < row.length; x++) {
+						if (row[x] > roomIndex + 1) {
+							row[x]--;
+						}
+					}
+				}
+			}
+
+			this.showToast(
+				`Deleted ${roomName}`,
+				`Removed ${deletedCount} room${deletedCount !== 1 ? "s" : ""} from grid`
+			);
+		} else {
+			// Mob or Object template
+			const template = dungeon.templates?.find((t) => t.id === id);
+			if (!template) return;
+
+			const templateName = template.display || id;
+			let deletedResetCount = 0;
+
+			// Remove all resets using this template
+			if (dungeon.resets) {
+				const initialCount = dungeon.resets.length;
+				dungeon.resets = dungeon.resets.filter((r) => r.templateId !== id);
+				deletedResetCount = initialCount - dungeon.resets.length;
+			}
+
+			// Remove the template
+			const templateIndex = dungeon.templates.findIndex((t) => t.id === id);
+			if (templateIndex >= 0) {
+				dungeon.templates.splice(templateIndex, 1);
+			}
+
+			this.showToast(
+				`Deleted ${templateName}`,
+				`Removed ${deletedResetCount} reset${
+					deletedResetCount !== 1 ? "s" : ""
+				}`
+			);
+		}
+
+		// Reload templates and resets, re-render map
+		this.loadTemplates(dungeon);
+		this.loadResets(dungeon);
 		this.renderMap(dungeon);
 	}
 
@@ -2301,16 +2695,35 @@ class MapEditor {
 					);
 				}
 			} else if (e.key === "Escape") {
-				// Cancel selection if currently selecting, otherwise deselect everything
+				e.preventDefault();
+				// First, close any open modals
+				const templateModal = document.getElementById("template-modal");
+				const resetEditModal = document.getElementById("reset-edit-modal");
+				const confirmModal = document.getElementById("confirm-modal");
+
+				if (templateModal && templateModal.classList.contains("active")) {
+					templateModal.classList.remove("active");
+					return;
+				}
+				if (resetEditModal && resetEditModal.classList.contains("active")) {
+					resetEditModal.classList.remove("active");
+					return;
+				}
+				if (confirmModal && confirmModal.classList.contains("active")) {
+					confirmModal.classList.remove("active");
+					return;
+				}
+
+				// If no modals are open, handle selection/deselection
 				if (this.isSelecting) {
-					e.preventDefault();
+					// Cancel selection if currently selecting
 					this.isSelecting = false;
 					this.selectedCells.clear();
 					this.updateSelectionVisuals();
 					this.selectionStart = null;
 					this.selectionEnd = null;
 				} else {
-					e.preventDefault();
+					// Deselect everything
 					this.deselectAll();
 				}
 			} else if (e.ctrlKey && e.key === "z" && !e.shiftKey) {

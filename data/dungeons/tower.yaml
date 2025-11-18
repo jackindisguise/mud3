@@ -7606,30 +7606,30 @@ dungeon:
         - 0
         - 0
         - 0
-    - - - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
+    - - - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
         - 0
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-      - - 4
-        - 4
-        - 4
-        - 4
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+      - - 3
+        - 3
+        - 3
+        - 3
         - 0
         - 0
         - 0
@@ -7641,36 +7641,15 @@ dungeon:
         - 0
         - 0
         - 0
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-      - - 4
-        - 4
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+      - - 3
+        - 3
         - 0
         - 0
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 1
-        - 0
-        - 0
-        - 4
-        - 4
-        - 4
-      - - 4
-        - 4
-        - 0
-        - 1
-        - 1
         - 1
         - 1
         - 1
@@ -7683,10 +7662,12 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-        - 4
-      - - 4
+        - 0
+        - 3
+        - 3
+        - 3
+      - - 3
+        - 3
         - 0
         - 1
         - 1
@@ -7701,12 +7682,11 @@ dungeon:
         - 1
         - 1
         - 1
-        - 1
-        - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7724,9 +7704,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7744,9 +7724,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7764,9 +7744,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7784,9 +7764,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7804,9 +7784,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7824,9 +7804,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7844,9 +7824,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7864,9 +7844,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7884,9 +7864,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7904,9 +7884,9 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
+        - 3
+        - 3
+      - - 3
         - 0
         - 1
         - 1
@@ -7924,10 +7904,30 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-      - - 4
-        - 4
+        - 3
+        - 3
+      - - 3
+        - 0
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 0
+        - 3
+        - 3
+      - - 3
+        - 3
         - 0
         - 1
         - 1
@@ -7943,11 +7943,11 @@ dungeon:
         - 1
         - 1
         - 0
-        - 4
-        - 4
-        - 4
-      - - 4
-        - 4
+        - 3
+        - 3
+        - 3
+      - - 3
+        - 3
         - 0
         - 0
         - 1
@@ -7963,13 +7963,13 @@ dungeon:
         - 1
         - 0
         - 0
-        - 4
-        - 4
-        - 4
-      - - 4
-        - 4
-        - 4
-        - 4
+        - 3
+        - 3
+        - 3
+      - - 3
+        - 3
+        - 3
+        - 3
         - 0
         - 0
         - 0
@@ -7981,59 +7981,49 @@ dungeon:
         - 0
         - 0
         - 0
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-      - - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 0
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
-        - 4
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+      - - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
+        - 3
   rooms:
     - display: Tower Room
       description: A simple room in the tower with stone walls.
       mapText: '#'
       mapColor: 8
-    - display: Staircase Up & Down
-      mapText: '|'
-      description: A spiral staircase connects the floors of the tower.
-      allowedExits: 783
     - display: Staircase Up
       mapText: ^
-      description: A room on the ground floor of the tower. A staircase leads up to the higher floors.
+      description: A staircase leads up to the higher floors.
       allowedExits: 271
-    - display: Grass
+    - display: Before the Tower
       keywords: grass field ground
       description: You stand on a patch of grass surrounding the tower. The ground is soft beneath your feet.
       mapText: ','
       mapColor: 2
     - display: Staircase Down
       mapText: v
-      description: A room on the top floor of the tower. A staircase leads down to the lower floors.
+      description: A staircase leads down to the lower floors.
       allowedExits: 527
-    - display: To Tiny B
-      description: We're goin' to Midgar
-      roomLinks:
-        west: '@tiny-b{10,10,0}'
-      mapText: x
-      mapColor: 8
   templates:
     - id: tower-guardian
       type: Mob
@@ -8058,11 +8048,4 @@ dungeon:
       description: A sturdy steel helmet that provides protection for the head.
       slot: head
       defense: 3
-    - id: tower-chest
-      type: Armor
-      keywords: chest armor breastplate
-      display: Leather Chest Guard
-      description: A leather chest guard that offers moderate protection for the torso.
-      slot: chest
-      defense: 4
   resets: []

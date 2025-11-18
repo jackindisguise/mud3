@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.12.0](https://github.com/jackindisguise/mud3/compare/v1.11.0...v1.12.0) (2025-11-18)
+
+
+### Features
+
+* add pure JavaScript version of post-changelog-to-board script ([7ee30fd](https://github.com/jackindisguise/mud3/commit/7ee30fd7a205f0812f33f6ce342bc1adbf3fce13))
+* arguably feature complete ([dd2a1a3](https://github.com/jackindisguise/mud3/commit/dd2a1a359252c4dbfc074888ef1c3decfce9cf67))
+* **combat:** added guaranteedHit option to disable miss chance in oneHit method ([6c1bfc3](https://github.com/jackindisguise/mud3/commit/6c1bfc389941222494a3de7d647431baea19e457))
+* **combat:** added OneHitOptions interface with target, weapon, and guaranteedHit options ([6c1bfc3](https://github.com/jackindisguise/mud3/commit/6c1bfc389941222494a3de7d647431baea19e457))
+* initial map editor commit ([cdb98ac](https://github.com/jackindisguise/mud3/commit/cdb98ac50989749c061e9502e7b6c7657b80c8cf))
+* **map-editor:** added delete room template option with bulldozer icon indicator ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added keyboard shortcuts for layer navigation (PageUp/PageDown, Home/End) ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added localStorage auto-save to prevent data loss on page refresh ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added map editor with placement tools, undo/redo, and auto-save ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added map text and map color fields to templates with visual color selector ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added placement indicator showing selected template and placement mode ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added reset management system for placing mobs and objects in rooms ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added room, mob, and object template editors with full CRUD operations ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added toast notification system for user feedback on actions ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** added visual indicator on save button for unsaved changes ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** created selection toolbox with rectangle, circle, and squircle selection tools ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** created template modal system for editing room, mob, and object properties ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented drag-to-place functionality for drawing across multiple cells ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented grid-based dungeon layout with multi-layer support ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented initial map editor with dungeon grid visualization and template management ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented insert and paint placement modes for rooms ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented multi-cell selection with delete key support ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented restore functionality for unsaved work with user prompt ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented room description field for rooms ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** implemented undo/redo system with Ctrl+Z and Ctrl+Y shortcuts ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* more features ([ca61d3f](https://github.com/jackindisguise/mud3/commit/ca61d3faafbc1e0e570cc7c5107523ad67592c24))
+* **pathfinding:** added getCachedPathResult function to retrieve full cached path results ([6c1bfc3](https://github.com/jackindisguise/mud3/commit/6c1bfc389941222494a3de7d647431baea19e457))
+* **scripts:** created pure JavaScript version of post-changelog-to-board in scripts directory ([7ee30fd](https://github.com/jackindisguise/mud3/commit/7ee30fd7a205f0812f33f6ce342bc1adbf3fce13))
+
+
+### Bug Fixes
+
+* **map-editor:** added proper event listener cleanup for reset edit modal ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** corrected template index 0 selection bug ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** corrected toast message positioning and stacking behavior ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** fixed PageUp/PageDown layer navigation direction ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** fixed reset tab edit and delete button functionality ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** prevented duplicate cell processing during drag operations ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** replaced all alert() calls with toast notifications ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+* **map-editor:** resolved mob template editor close issue when opened first ([e5d83fb](https://github.com/jackindisguise/mud3/commit/e5d83fb4934b4b3322d911bdb8ce10522a11507c))
+
 ## [1.11.0](https://github.com/jackindisguise/mud3/compare/v1.10.0...v1.11.0) (2025-11-17)
 
 

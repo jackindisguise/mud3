@@ -17,6 +17,7 @@
 		"deploy": "npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
 		"rerun": "npm run build && npm run start",
+		"map-editor": "npm run build && node dist/src/start-map-editor.js",
 		"post-changelog": "node scripts/post-changelog-to-board.js"
 	},
 	"devDependencies": {

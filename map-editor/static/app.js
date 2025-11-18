@@ -1,6 +1,26 @@
 // Map Editor Application
 // Uses js-yaml for parsing (loaded via CDN in HTML)
 
+// Color constants matching the game's COLOR enum
+const COLORS = [
+	{ id: 0, name: "Black", hex: "#000000", tag: "k" },
+	{ id: 1, name: "Maroon", hex: "#800000", tag: "r" },
+	{ id: 2, name: "Dark Green", hex: "#008000", tag: "g" },
+	{ id: 3, name: "Olive", hex: "#808000", tag: "y" },
+	{ id: 4, name: "Dark Blue", hex: "#000080", tag: "b" },
+	{ id: 5, name: "Purple", hex: "#800080", tag: "m" },
+	{ id: 6, name: "Teal", hex: "#008080", tag: "c" },
+	{ id: 7, name: "Silver", hex: "#c0c0c0", tag: "w" },
+	{ id: 8, name: "Grey", hex: "#808080", tag: "K" },
+	{ id: 9, name: "Crimson", hex: "#ff0000", tag: "R" },
+	{ id: 10, name: "Lime", hex: "#00ff00", tag: "G" },
+	{ id: 11, name: "Yellow", hex: "#ffff00", tag: "Y" },
+	{ id: 12, name: "Light Blue", hex: "#0000ff", tag: "B" },
+	{ id: 13, name: "Pink", hex: "#ff00ff", tag: "M" },
+	{ id: 14, name: "Cyan", hex: "#00ffff", tag: "C" },
+	{ id: 15, name: "White", hex: "#ffffff", tag: "W" },
+];
+
 class MapEditor {
 	constructor() {
 		this.currentDungeon = null;
@@ -12,6 +32,9 @@ class MapEditor {
 		this.yamlData = null;
 		this.races = [];
 		this.jobs = [];
+		this.isDragging = false;
+		this.lastPlacedCell = null;
+		this.toastIdCounter = 0;
 
 		this.init();
 	}
@@ -20,6 +43,75 @@ class MapEditor {
 		await this.loadDungeonList();
 		await this.loadRacesAndJobs();
 		this.setupEventListeners();
+	}
+
+	generateColorSelector(id, selectedColor) {
+		const options = COLORS.map(
+			(color) =>
+				`<option value="${color.id}" ${
+					selectedColor === color.id ? "selected" : ""
+				} style="background-color: ${color.hex}; color: ${
+					color.id <= 7 ? "#fff" : "#000"
+				};">${color.name}</option>`
+		).join("");
+		return `<select id="${id}" class="color-selector">
+			<option value="">None (default)</option>
+			${options}
+		</select>`;
+	}
+
+	getMapDisplayForCell(dungeon, x, y, z) {
+		const dungeonId = this.currentDungeonId;
+		const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+
+		// Get resets for this room
+		const resets = dungeon.resets?.filter((r) => r.roomRef === roomRef) || [];
+
+		// Priority: mob > object > room
+		let mapText = null;
+		let mapColor = null;
+
+		// Check for mobs first
+		for (const reset of resets) {
+			const template = dungeon.templates?.find(
+				(t) => t.id === reset.templateId
+			);
+			if (template && template.type === "Mob") {
+				mapText = template.mapText !== undefined ? template.mapText : "!";
+				mapColor = template.mapColor !== undefined ? template.mapColor : 11; // Yellow
+				return { mapText, mapColor };
+			}
+		}
+
+		// Check for objects
+		for (const reset of resets) {
+			const template = dungeon.templates?.find(
+				(t) => t.id === reset.templateId
+			);
+			if (template && template.type !== "Mob") {
+				if (template.mapText !== undefined) mapText = template.mapText;
+				if (template.mapColor !== undefined) mapColor = template.mapColor;
+				if (mapText !== null || mapColor !== null) {
+					return { mapText, mapColor };
+				}
+			}
+		}
+
+		// Use room defaults
+		const layerIndex = dungeon.dimensions.layers - 1 - z;
+		const layer = dungeon.grid[layerIndex] || [];
+		const row = layer[y] || [];
+		const roomIndex = row[x] || 0;
+
+		if (roomIndex > 0) {
+			const room = dungeon.rooms[roomIndex - 1];
+			if (room) {
+				mapText = room.mapText !== undefined ? room.mapText : ".";
+				mapColor = room.mapColor !== undefined ? room.mapColor : null;
+			}
+		}
+
+		return { mapText: mapText || ".", mapColor };
 	}
 
 	async loadRacesAndJobs() {
@@ -63,6 +155,14 @@ class MapEditor {
 				dimensions: data.dimensions,
 				resetMessage: data.resetMessage || "",
 			};
+
+			// Clear selection and indicator
+			this.selectedTemplate = null;
+			this.selectedTemplateType = null;
+			document
+				.querySelectorAll(".template-item")
+				.forEach((i) => i.classList.remove("selected"));
+			this.updatePlacementIndicator(null, null, null);
 
 			// Parse YAML
 			this.yamlData = jsyaml.load(data.yaml);
@@ -159,6 +259,7 @@ class MapEditor {
 			item.classList.add("selected");
 			this.selectedTemplate = id;
 			this.selectedTemplateType = type;
+			this.updatePlacementIndicator(type, id, display);
 		});
 		item.addEventListener("dblclick", () => {
 			this.editTemplate(type, id);
@@ -228,8 +329,56 @@ class MapEditor {
 					}
 				}
 
-				cell.addEventListener("click", () => {
-					this.handleCellClick(x, y, this.currentLayer, roomIndex);
+				// Get map display (text and color) with priority: mob > object > room
+				const { mapText, mapColor } = this.getMapDisplayForCell(
+					dungeon,
+					x,
+					y,
+					this.currentLayer
+				);
+
+				// Set text content
+				cell.textContent = mapText || ".";
+
+				// Set color if specified
+				if (mapColor !== null && mapColor !== undefined) {
+					const color = COLORS.find((c) => c.id === mapColor);
+					if (color) {
+						cell.style.color = color.hex;
+					}
+				}
+
+				// Prevent text selection on cells
+				cell.style.userSelect = "none";
+				cell.style.webkitUserSelect = "none";
+
+				cell.addEventListener("mousedown", (e) => {
+					e.preventDefault();
+					if (this.selectedTemplate !== null) {
+						this.isDragging = true;
+						this.lastPlacedCell = null;
+						this.handleCellClick(x, y, this.currentLayer, roomIndex, true);
+					}
+				});
+
+				cell.addEventListener("mouseenter", (e) => {
+					if (this.isDragging && this.selectedTemplate !== null) {
+						e.preventDefault();
+						// Only place if this is a different cell
+						const cellKey = `${x},${y},${this.currentLayer}`;
+						if (this.lastPlacedCell !== cellKey) {
+							this.lastPlacedCell = cellKey;
+							this.handleCellClick(x, y, this.currentLayer, roomIndex, true);
+						}
+					}
+				});
+
+				cell.addEventListener("click", (e) => {
+					if (!this.isDragging) {
+						this.handleCellClick(x, y, this.currentLayer, roomIndex);
+					} else {
+						e.preventDefault();
+					}
 				});
 
 				container.appendChild(cell);
@@ -239,7 +388,7 @@ class MapEditor {
 		gridContainer.appendChild(container);
 	}
 
-	handleCellClick(x, y, z, currentRoomIndex) {
+	handleCellClick(x, y, z, currentRoomIndex, skipInfo = false) {
 		// Update selected cell
 		document
 			.querySelectorAll(".grid-cell")
@@ -266,8 +415,11 @@ class MapEditor {
 			this.addReset(x, y, z);
 		}
 
-		// Show room info
-		this.showRoomInfo(x, y, z);
+		// Show room info (skip during drag to avoid flickering)
+		// Always show when no template is selected, or after placement
+		if (!skipInfo && !this.isDragging) {
+			this.showRoomInfo(x, y, z);
+		}
 	}
 
 	placeRoomTemplate(x, y, z) {
@@ -285,6 +437,13 @@ class MapEditor {
 		// Place template (1-based index)
 		const templateIndex = parseInt(this.selectedTemplate) + 1;
 		layer[y][x] = templateIndex;
+
+		// Get room template name for toast
+		const room = dungeon.rooms[this.selectedTemplate];
+		const roomName = room?.display || `Room ${templateIndex}`;
+
+		// Show toast notification
+		this.showToast(`Placed ${roomName}`, `At coordinates (${x}, ${y}, ${z})`);
 
 		// Re-render map
 		this.renderMap(dungeon);
@@ -310,6 +469,13 @@ class MapEditor {
 			return;
 		}
 
+		// Get template name for toast
+		const template = dungeon.templates?.find(
+			(t) => t.id === this.selectedTemplate
+		);
+		const templateName = template?.display || this.selectedTemplate;
+		const templateType = this.selectedTemplateType === "mob" ? "Mob" : "Object";
+
 		// Add reset
 		dungeon.resets.push({
 			templateId: this.selectedTemplate,
@@ -317,6 +483,12 @@ class MapEditor {
 			minCount: 1,
 			maxCount: 1,
 		});
+
+		// Show toast notification
+		this.showToast(
+			`Added ${templateType} Reset: ${templateName}`,
+			`At coordinates (${x}, ${y}, ${z})`
+		);
 
 		// Reload resets display
 		this.loadResets(dungeon);
@@ -411,6 +583,8 @@ class MapEditor {
 				: "Edit Object Template";
 
 		let html = "";
+		const isMob = type !== "room" && template.type === "Mob";
+
 		if (type === "room") {
 			// Build room links HTML
 			const roomLinks = template.roomLinks || {};
@@ -455,8 +629,14 @@ class MapEditor {
 					<textarea id="template-description">${template.description || ""}</textarea>
 				</div>
 				<div class="form-group">
-					<label>Keywords (comma-separated)</label>
-					<input type="text" id="template-keywords" value="${template.keywords || ""}">
+					<label>Map Text (1 letter)</label>
+					<input type="text" id="template-map-text" value="${
+						template.mapText || ""
+					}" placeholder="Single character" maxlength="1" style="width: 80px;">
+				</div>
+				<div class="form-group">
+					<label>Map Color</label>
+					${this.generateColorSelector("template-map-color", template.mapColor)}
 				</div>
 				<div class="form-group">
 					<label>Room Links</label>
@@ -474,7 +654,6 @@ class MapEditor {
 				</div>
 			`;
 		} else {
-			const isMob = template.type === "Mob";
 			const raceOptions = this.races
 				.map(
 					(r) =>
@@ -512,6 +691,18 @@ class MapEditor {
 						<option value="Prop" ${template.type === "Prop" ? "selected" : ""}>Prop</option>
 					</select>
 				</div>
+				<div class="form-group">
+					<label>Display Name</label>
+					<input type="text" id="template-display" value="${template.display || ""}">
+				</div>
+				<div class="form-group">
+					<label>Description</label>
+					<textarea id="template-description">${template.description || ""}</textarea>
+				</div>
+				<div class="form-group">
+					<label>Keywords (comma-separated)</label>
+					<input type="text" id="template-keywords" value="${template.keywords || ""}">
+				</div>
 				<div id="mob-fields" style="display: ${isMob ? "block" : "none"};">
 				<div class="form-group">
 					<label>Race</label>
@@ -541,16 +732,14 @@ class MapEditor {
 				</div>
 				</div>
 				<div class="form-group">
-					<label>Display Name</label>
-					<input type="text" id="template-display" value="${template.display || ""}">
+					<label>Map Text (1 letter)</label>
+					<input type="text" id="template-map-text" value="${
+						template.mapText || ""
+					}" placeholder="Single character" maxlength="1" style="width: 80px;">
 				</div>
 				<div class="form-group">
-					<label>Description</label>
-					<textarea id="template-description">${template.description || ""}</textarea>
-				</div>
-				<div class="form-group">
-					<label>Keywords (comma-separated)</label>
-					<input type="text" id="template-keywords" value="${template.keywords || ""}">
+					<label>Map Color</label>
+					${this.generateColorSelector("template-map-color", template.mapColor)}
 				</div>
 			`;
 		}
@@ -644,7 +833,11 @@ class MapEditor {
 			const index = parseInt(id);
 			const display = document.getElementById("template-display").value;
 			const description = document.getElementById("template-description").value;
-			const keywords = document.getElementById("template-keywords").value;
+			const mapText = document.getElementById("template-map-text").value;
+			const mapColorSelect = document.getElementById("template-map-color");
+			const mapColor = mapColorSelect.value
+				? parseInt(mapColorSelect.value)
+				: undefined;
 
 			// Collect room links
 			const roomLinks = {};
@@ -658,23 +851,29 @@ class MapEditor {
 			});
 
 			if (index >= 0 && index < dungeon.rooms.length) {
-				// Update existing
+				// Update existing - preserve roomDescription and keywords if they exist
+				const oldRoom = dungeon.rooms[index];
 				const updated = {
-					...dungeon.rooms[index],
+					...oldRoom,
 					display,
 					description,
-					...(keywords && { keywords }),
+					...(mapText && { mapText }),
+					...(mapColor !== undefined && { mapColor }),
 				};
 				if (Object.keys(roomLinks).length > 0) {
 					updated.roomLinks = roomLinks;
 				} else if (updated.roomLinks) {
 					delete updated.roomLinks;
 				}
+				// Remove map fields if they're empty
+				if (!mapText) delete updated.mapText;
+				if (mapColor === undefined) delete updated.mapColor;
 				dungeon.rooms[index] = updated;
 			} else {
 				// Add new
 				const newRoom = { display, description };
-				if (keywords) newRoom.keywords = keywords;
+				if (mapText) newRoom.mapText = mapText;
+				if (mapColor !== undefined) newRoom.mapColor = mapColor;
 				if (Object.keys(roomLinks).length > 0) {
 					newRoom.roomLinks = roomLinks;
 				}
@@ -686,6 +885,11 @@ class MapEditor {
 			const display = document.getElementById("template-display").value;
 			const description = document.getElementById("template-description").value;
 			const keywords = document.getElementById("template-keywords").value;
+			const mapText = document.getElementById("template-map-text").value;
+			const mapColorSelect = document.getElementById("template-map-color");
+			const mapColor = mapColorSelect.value
+				? parseInt(mapColorSelect.value)
+				: undefined;
 
 			if (!dungeon.templates) {
 				dungeon.templates = [];
@@ -699,6 +903,8 @@ class MapEditor {
 				description,
 			};
 			if (keywords) newTemplate.keywords = keywords;
+			if (mapText) newTemplate.mapText = mapText;
+			if (mapColor !== undefined) newTemplate.mapColor = mapColor;
 
 			// Add mob-specific fields
 			if (templateType === "Mob") {
@@ -725,6 +931,9 @@ class MapEditor {
 					delete updated.job;
 					delete updated.level;
 				}
+				// Remove map fields if they're empty
+				if (!mapText) delete updated.mapText;
+				if (mapColor === undefined) delete updated.mapColor;
 				dungeon.templates[existing] = updated;
 			} else {
 				dungeon.templates.push(newTemplate);
@@ -1161,7 +1370,106 @@ class MapEditor {
 		}
 	}
 
+	updatePlacementIndicator(type, id, display) {
+		const indicator = document.getElementById("placement-indicator");
+		if (!indicator) return;
+
+		if (!type || !id) {
+			indicator.style.display = "none";
+			return;
+		}
+
+		const actionText =
+			type === "room"
+				? "Place Room"
+				: type === "mob"
+				? "Add Mob Reset"
+				: "Add Object Reset";
+
+		indicator.setAttribute("data-type", type);
+		indicator.querySelector(".placement-action").textContent = actionText;
+		indicator.querySelector(".placement-template").textContent = display || id;
+		indicator.style.display = "block";
+
+		// Set up cancel button if not already set up
+		const cancelBtn = document.getElementById("placement-cancel-btn");
+		if (cancelBtn && !cancelBtn.dataset.listenerAdded) {
+			cancelBtn.dataset.listenerAdded = "true";
+			cancelBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this.cancelPlacement();
+			});
+		}
+	}
+
+	cancelPlacement() {
+		// Clear selection
+		this.selectedTemplate = null;
+		this.selectedTemplateType = null;
+
+		// Remove selected class from template items
+		document
+			.querySelectorAll(".template-item")
+			.forEach((i) => i.classList.remove("selected"));
+
+		// Hide placement indicator
+		const indicator = document.getElementById("placement-indicator");
+		if (indicator) {
+			indicator.style.display = "none";
+		}
+	}
+
+	showToast(message, details) {
+		const container = document.getElementById("toast-container");
+		if (!container) return;
+
+		const toastId = `toast-${this.toastIdCounter++}`;
+		const toast = document.createElement("div");
+		toast.className = "toast";
+		toast.id = toastId;
+		toast.innerHTML = `
+			<div class="toast-content">
+				<div class="toast-title">${message}</div>
+				${details ? `<div class="toast-details">${details}</div>` : ""}
+			</div>
+		`;
+
+		// Add to container (will appear at bottom due to flex-direction: column-reverse)
+		container.appendChild(toast);
+
+		// Remove after animation completes
+		setTimeout(() => {
+			if (toast.parentNode) {
+				toast.parentNode.removeChild(toast);
+			}
+		}, 3000);
+	}
+
 	setupEventListeners() {
+		// Prevent text selection during drag
+		document.addEventListener("mouseup", () => {
+			if (this.isDragging && this.selectedCell) {
+				// Show room info for the last selected cell when drag ends
+				const { x, y, z } = this.selectedCell;
+				if (this.yamlData) {
+					const dungeon = this.yamlData.dungeon;
+					const layerIndex = dungeon.dimensions.layers - 1 - z;
+					const layer = dungeon.grid[layerIndex] || [];
+					const row = layer[y] || [];
+					const roomIndex = row[x] || 0;
+					this.showRoomInfo(x, y, z);
+				}
+			}
+			this.isDragging = false;
+			this.lastPlacedCell = null;
+		});
+
+		document.addEventListener("selectstart", (e) => {
+			if (this.isDragging) {
+				e.preventDefault();
+			}
+		});
+
 		// Dungeon selector
 		document
 			.getElementById("dungeon-select")

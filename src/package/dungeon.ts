@@ -733,12 +733,14 @@ export async function loadDungeons(): Promise<Dungeon[]> {
 	const dungeons: Dungeon[] = [];
 
 	for (const id of ids) {
-		const dungeon = await loadDungeon(id);
-		if (dungeon) {
-			dungeons.push(dungeon);
-		} else {
-			logger.warn(`Failed to load dungeon with id: ${id}`);
-		}
+		await logger.block(id, async () => {
+			const dungeon = await loadDungeon(id);
+			if (dungeon) {
+				dungeons.push(dungeon);
+			} else {
+				logger.warn(`Failed to load dungeon with id: ${id}`);
+			}
+		});
 	}
 
 	// Process all pending room links after all dungeons are loaded

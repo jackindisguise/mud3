@@ -327,11 +327,11 @@ header h1 {
 }
 
 .grid-cell.has-room {
-	background: #3a5a3a;
+	background: #2a4a2a;
 }
 
 .grid-cell.has-room:hover {
-	background: #4a6a4a;
+	background: #3a5a3a;
 }
 
 .grid-cell.selected {
@@ -340,7 +340,7 @@ header h1 {
 }
 
 .grid-cell.selected.has-room {
-	background: #3a6a5a;
+	background: #1a4a2a;
 }
 
 .reset-list {

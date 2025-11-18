@@ -47,6 +47,7 @@ class MapEditor {
 		this.maxHistorySize = 50; // Maximum number of undo states to keep
 		this.autoSaveTimeout = null; // Timeout for debounced auto-save
 		this.hasUnsavedChanges = false; // Track if there are unsaved changes
+		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
 
 		this.init();
 	}
@@ -347,6 +348,15 @@ class MapEditor {
 			<p>${description}</p>
 		`;
 		item.addEventListener("click", () => {
+			// If there's an active selection, place template in all selected cells
+			if (this.selectedCells.size > 0) {
+				this.placeTemplateInSelection(type, id);
+				// Clear selection after placement
+				this.selectedCells.clear();
+				this.updateSelectionVisuals();
+				this.setSelectionMode(null);
+			}
+
 			document
 				.querySelectorAll(".template-item")
 				.forEach((i) => i.classList.remove("selected"));
@@ -361,13 +371,116 @@ class MapEditor {
 		return item;
 	}
 
+	placeTemplateInSelection(type, id) {
+		if (!this.yamlData || this.selectedCells.size === 0) return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		// Auto-save to localStorage
+		this.saveToLocalStorage();
+
+		const dungeon = this.yamlData.dungeon;
+		let placedCount = 0;
+
+		// Process each selected cell
+		this.selectedCells.forEach((cellKey) => {
+			const [x, y, z] = cellKey.split(",").map(Number);
+
+			if (type === "room") {
+				// Place room template
+				const layerIndex = dungeon.dimensions.layers - 1 - z;
+				const layer = dungeon.grid[layerIndex] || [];
+
+				// Ensure row exists
+				if (!layer[y]) {
+					layer[y] = new Array(dungeon.dimensions.width).fill(0);
+				}
+
+				const templateIndex = parseInt(id) + 1;
+				layer[y][x] = templateIndex;
+				placedCount++;
+			} else if (type === "mob" || type === "object") {
+				// Add reset for mob or object - only if there's a room at this location
+				const layerIndex = dungeon.dimensions.layers - 1 - z;
+				const layer = dungeon.grid[layerIndex] || [];
+				const row = layer[y] || [];
+				const roomIndex = row[x] || 0;
+
+				// Only add reset if there's a room at this location
+				if (roomIndex > 0) {
+					const dungeonId = this.currentDungeonId;
+					const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+
+					// Check if reset already exists
+					const existingReset = dungeon.resets?.find(
+						(r) => r.roomRef === roomRef && r.templateId === id
+					);
+
+					if (existingReset) {
+						// Increment maxCount if it exists
+						existingReset.maxCount = (existingReset.maxCount || 1) + 1;
+					} else {
+						// Add new reset
+						if (!dungeon.resets) {
+							dungeon.resets = [];
+						}
+						dungeon.resets.push({
+							templateId: id,
+							roomRef: roomRef,
+							minCount: 1,
+							maxCount: 1,
+						});
+					}
+					placedCount++;
+				}
+			}
+		});
+
+		// Get template name for toast
+		const template =
+			type === "room"
+				? dungeon.rooms[parseInt(id)]
+				: dungeon.templates?.find((t) => t.id === id);
+		const templateName =
+			template?.display || (type === "room" ? `Room ${parseInt(id) + 1}` : id);
+
+		// Show toast notification
+		this.showToast(
+			`Placed ${templateName} in selection`,
+			`${placedCount} cell${placedCount !== 1 ? "s" : ""}`
+		);
+
+		// Reload resets and re-render map
+		this.loadResets(dungeon);
+		this.renderMap(dungeon);
+	}
+
 	loadResets(dungeon) {
 		const resetList = document.getElementById("reset-list");
 		resetList.innerHTML = "";
 
 		if (!dungeon.resets) return;
 
-		dungeon.resets.forEach((reset, index) => {
+		// Filter resets to only show those on the current layer
+		const filteredResets = dungeon.resets.filter((reset) => {
+			// Parse roomRef format: @dungeonId{x,y,z}
+			const match = reset.roomRef.match(/\{(\d+),(\d+),(\d+)\}/);
+			if (match) {
+				const z = parseInt(match[3]);
+				return z === this.currentLayer;
+			}
+			return false;
+		});
+
+		// Create a map of original indices to filtered indices for edit/delete operations
+		const originalIndices = new Map();
+		filteredResets.forEach((reset, filteredIndex) => {
+			const originalIndex = dungeon.resets.indexOf(reset);
+			originalIndices.set(filteredIndex, originalIndex);
+		});
+
+		filteredResets.forEach((reset, filteredIndex) => {
 			const template = dungeon.templates?.find(
 				(t) => t.id === reset.templateId
 			);
@@ -384,8 +497,8 @@ class MapEditor {
 					Count: ${reset.minCount || 1} - ${reset.maxCount || 1}
 				</div>
 				<div class="reset-actions">
-					<button class="edit-reset-btn" data-index="${index}">Edit</button>
-					<button class="delete-reset-btn" data-index="${index}">Delete</button>
+					<button class="edit-reset-btn" data-index="${filteredIndex}">Edit</button>
+					<button class="delete-reset-btn" data-index="${filteredIndex}">Delete</button>
 				</div>
 			`;
 
@@ -394,11 +507,15 @@ class MapEditor {
 			const deleteBtn = item.querySelector(".delete-reset-btn");
 
 			editBtn.addEventListener("click", () => {
-				this.editReset(index);
+				// Use original index for the actual reset operation
+				const originalIndex = originalIndices.get(filteredIndex);
+				this.editReset(originalIndex);
 			});
 
 			deleteBtn.addEventListener("click", () => {
-				this.deleteReset(index);
+				// Use original index for the actual reset operation
+				const originalIndex = originalIndices.get(filteredIndex);
+				this.deleteReset(originalIndex);
 			});
 
 			resetList.appendChild(item);
@@ -527,16 +644,19 @@ class MapEditor {
 	}
 
 	handleCellClick(x, y, z, currentRoomIndex, skipInfo = false) {
-		// Update selected cell
-		document
-			.querySelectorAll(".grid-cell")
-			.forEach((c) => c.classList.remove("selected"));
-		const cell = document.querySelector(
-			`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`
-		);
-		if (cell) {
-			cell.classList.add("selected");
-			this.selectedCell = { x, y, z };
+		// Only update single cell selection if no selection tool is active
+		if (this.selectionMode === null) {
+			// Update selected cell
+			document
+				.querySelectorAll(".grid-cell")
+				.forEach((c) => c.classList.remove("selected"));
+			const cell = document.querySelector(
+				`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`
+			);
+			if (cell) {
+				cell.classList.add("selected");
+				this.selectedCell = { x, y, z };
+			}
 		}
 
 		// If a template is selected, place it
@@ -609,31 +729,76 @@ class MapEditor {
 		// Check if this is a delete operation
 		if (this.selectedTemplate === "__DELETE__") {
 			if (this.placementMode === "paint") {
-				// Paint delete: delete all rooms matching the clicked room
-				const targetRoomIndex = layer[y][x] > 0 ? layer[y][x] - 1 : -1;
-				if (targetRoomIndex >= 0) {
+				// Paint delete: flood fill delete connected matching rooms
+				const targetValue = layer[y][x]; // The value we're matching
+				if (targetValue > 0) {
+					const targetRoomIndex = targetValue - 1;
 					const targetRoom = dungeon.rooms[targetRoomIndex];
 					const roomName = targetRoom?.display || `Room ${targetRoomIndex + 1}`;
 					let deletedCount = 0;
 					const dungeonId = this.currentDungeonId;
 
-					// Delete all matching rooms across all layers
-					for (let lz = 0; lz < dungeon.dimensions.layers; lz++) {
-						const lLayerIndex = dungeon.dimensions.layers - 1 - lz;
-						const lLayer = dungeon.grid[lLayerIndex] || [];
-						for (let ly = 0; ly < dungeon.dimensions.height; ly++) {
-							const lRow = lLayer[ly] || [];
-							for (let lx = 0; lx < dungeon.dimensions.width; lx++) {
-								if (lRow[lx] === targetRoomIndex + 1) {
-									lRow[lx] = 0;
-									deletedCount++;
+					// Flood fill algorithm: delete connected matching cells
+					const visited = new Set();
+					const queue = [{ x, y, z }];
 
-									// Remove resets for this room
-									const lRoomRef = `@${dungeonId}{${lx},${ly},${lz}}`;
-									if (dungeon.resets) {
-										dungeon.resets = dungeon.resets.filter(
-											(r) => r.roomRef !== lRoomRef
-										);
+					while (queue.length > 0) {
+						const cell = queue.shift();
+						const cellKey = `${cell.x},${cell.y},${cell.z}`;
+
+						// Skip if already visited
+						if (visited.has(cellKey)) continue;
+						visited.add(cellKey);
+
+						// Get the layer for this cell
+						const cellLayerIndex = dungeon.dimensions.layers - 1 - cell.z;
+						const cellLayer = dungeon.grid[cellLayerIndex] || [];
+
+						// Ensure row exists
+						if (!cellLayer[cell.y]) {
+							cellLayer[cell.y] = new Array(dungeon.dimensions.width).fill(0);
+						}
+						const cellRow = cellLayer[cell.y];
+
+						// Check if this cell matches the target value
+						if (cellRow[cell.x] === targetValue) {
+							// Delete this cell
+							cellRow[cell.x] = 0;
+							deletedCount++;
+
+							// Remove resets for this room
+							const cellRoomRef = `@${dungeonId}{${cell.x},${cell.y},${cell.z}}`;
+							if (dungeon.resets) {
+								dungeon.resets = dungeon.resets.filter(
+									(r) => r.roomRef !== cellRoomRef
+								);
+							}
+
+							// Check adjacent cells (up, down, left, right)
+							const directions = [
+								{ x: 0, y: -1, z: 0 }, // up
+								{ x: 0, y: 1, z: 0 }, // down
+								{ x: -1, y: 0, z: 0 }, // left
+								{ x: 1, y: 0, z: 0 }, // right
+							];
+
+							for (const dir of directions) {
+								const nextX = cell.x + dir.x;
+								const nextY = cell.y + dir.y;
+								const nextZ = cell.z + dir.z;
+
+								// Check bounds
+								if (
+									nextX >= 0 &&
+									nextX < dungeon.dimensions.width &&
+									nextY >= 0 &&
+									nextY < dungeon.dimensions.height &&
+									nextZ >= 0 &&
+									nextZ < dungeon.dimensions.layers
+								) {
+									const nextKey = `${nextX},${nextY},${nextZ}`;
+									if (!visited.has(nextKey)) {
+										queue.push({ x: nextX, y: nextY, z: nextZ });
 									}
 								}
 							}
@@ -692,30 +857,68 @@ class MapEditor {
 
 		// Regular room placement
 		if (this.placementMode === "paint") {
-			// Paint mode: replace all rooms matching the clicked room
+			// Paint mode: flood fill connected matching cells
 			const targetRoomIndex = layer[y][x] > 0 ? layer[y][x] - 1 : -1;
+			const targetValue = layer[y][x]; // The value we're matching (0 for empty, or room index + 1)
 			const templateIndex = parseInt(this.selectedTemplate) + 1;
 			const newRoom = dungeon.rooms[this.selectedTemplate];
 			const newRoomName = newRoom?.display || `Room ${templateIndex}`;
-			let replacedCount = 0;
+			let filledCount = 0;
 
-			// Replace all matching rooms across all layers
-			for (let lz = 0; lz < dungeon.dimensions.layers; lz++) {
-				const lLayerIndex = dungeon.dimensions.layers - 1 - lz;
-				const lLayer = dungeon.grid[lLayerIndex] || [];
-				for (let ly = 0; ly < dungeon.dimensions.height; ly++) {
-					if (!lLayer[ly]) {
-						lLayer[ly] = new Array(dungeon.dimensions.width).fill(0);
-					}
-					const lRow = lLayer[ly];
-					for (let lx = 0; lx < dungeon.dimensions.width; lx++) {
-						if (targetRoomIndex >= 0 && lRow[lx] === targetRoomIndex + 1) {
-							lRow[lx] = templateIndex;
-							replacedCount++;
-						} else if (targetRoomIndex < 0 && lRow[lx] === 0) {
-							// If clicking empty space, replace all empty spaces
-							lRow[lx] = templateIndex;
-							replacedCount++;
+			// Flood fill algorithm: fill connected matching cells
+			const visited = new Set();
+			const queue = [{ x, y, z }];
+
+			while (queue.length > 0) {
+				const cell = queue.shift();
+				const cellKey = `${cell.x},${cell.y},${cell.z}`;
+
+				// Skip if already visited
+				if (visited.has(cellKey)) continue;
+				visited.add(cellKey);
+
+				// Get the layer for this cell
+				const cellLayerIndex = dungeon.dimensions.layers - 1 - cell.z;
+				const cellLayer = dungeon.grid[cellLayerIndex] || [];
+
+				// Ensure row exists
+				if (!cellLayer[cell.y]) {
+					cellLayer[cell.y] = new Array(dungeon.dimensions.width).fill(0);
+				}
+				const cellRow = cellLayer[cell.y];
+
+				// Check if this cell matches the target value
+				if (cellRow[cell.x] === targetValue) {
+					// Fill this cell
+					cellRow[cell.x] = templateIndex;
+					filledCount++;
+
+					// Check adjacent cells (up, down, left, right)
+					const directions = [
+						{ x: 0, y: -1, z: 0 }, // up
+						{ x: 0, y: 1, z: 0 }, // down
+						{ x: -1, y: 0, z: 0 }, // left
+						{ x: 1, y: 0, z: 0 }, // right
+					];
+
+					for (const dir of directions) {
+						const nextX = cell.x + dir.x;
+						const nextY = cell.y + dir.y;
+						const nextZ = cell.z + dir.z;
+
+						// Check bounds
+						if (
+							nextX >= 0 &&
+							nextX < dungeon.dimensions.width &&
+							nextY >= 0 &&
+							nextY < dungeon.dimensions.height &&
+							nextZ >= 0 &&
+							nextZ < dungeon.dimensions.layers
+						) {
+							const nextKey = `${nextX},${nextY},${nextZ}`;
+							if (!visited.has(nextKey)) {
+								queue.push({ x: nextX, y: nextY, z: nextZ });
+							}
 						}
 					}
 				}
@@ -723,7 +926,7 @@ class MapEditor {
 
 			this.showToast(
 				`Painted: ${newRoomName}`,
-				`Replaced ${replacedCount} room${replacedCount !== 1 ? "s" : ""}`
+				`Filled ${filledCount} cell${filledCount !== 1 ? "s" : ""}`
 			);
 		} else {
 			// Insert mode: place single room
@@ -1935,6 +2138,18 @@ class MapEditor {
 			if (this.isSelecting) {
 				// End selection
 				this.isSelecting = false;
+
+				// If template is selected, place it in all selected cells
+				if (this.selectedTemplate !== null && this.selectedCells.size > 0) {
+					// Use placeTemplateInSelection which handles history properly
+					this.placeTemplateInSelection(
+						this.selectedTemplateType,
+						this.selectedTemplate
+					);
+					// Clear selection after placement (but keep selection tool active)
+					this.selectedCells.clear();
+					this.updateSelectionVisuals();
+				}
 			} else if (this.isDragging) {
 				// Cancel drag on mouseup anywhere
 				if (this.selectedCell) {
@@ -2018,6 +2233,8 @@ class MapEditor {
 		document.getElementById("layer-select").addEventListener("change", (e) => {
 			this.currentLayer = parseInt(e.target.value);
 			if (this.yamlData) {
+				// Reload resets to show only current layer
+				this.loadResets(this.yamlData.dungeon);
 				this.renderMap(this.yamlData.dungeon);
 			}
 		});
@@ -2067,10 +2284,35 @@ class MapEditor {
 
 				// Re-render map
 				this.renderMap(dungeon);
-			} else if (e.key === "Delete" && this.selectedCells.size > 0) {
+				// Reload resets to show only current layer
+				this.loadResets(dungeon);
+			} else if (e.key === "Delete") {
 				// Delete selected rooms
-				e.preventDefault();
-				this.deleteSelectedRooms();
+				if (this.selectedCells.size > 0) {
+					e.preventDefault();
+					this.deleteSelectedRooms();
+				} else if (this.selectedCell) {
+					// Single cell selection - delete the room at that cell
+					e.preventDefault();
+					this.deleteRoomAtCell(
+						this.selectedCell.x,
+						this.selectedCell.y,
+						this.selectedCell.z
+					);
+				}
+			} else if (e.key === "Escape") {
+				// Cancel selection if currently selecting, otherwise deselect everything
+				if (this.isSelecting) {
+					e.preventDefault();
+					this.isSelecting = false;
+					this.selectedCells.clear();
+					this.updateSelectionVisuals();
+					this.selectionStart = null;
+					this.selectionEnd = null;
+				} else {
+					e.preventDefault();
+					this.deselectAll();
+				}
 			} else if (e.ctrlKey && e.key === "z" && !e.shiftKey) {
 				// Undo (Ctrl+Z)
 				e.preventDefault();
@@ -2082,6 +2324,22 @@ class MapEditor {
 				// Redo (Ctrl+Y or Ctrl+Shift+Z)
 				e.preventDefault();
 				this.redo();
+			} else if (e.ctrlKey && e.key === "c" && !e.shiftKey) {
+				// Copy (Ctrl+C)
+				if (this.selectedCells.size > 0) {
+					e.preventDefault();
+					this.copySelection();
+				}
+			} else if (e.ctrlKey && e.key === "v" && !e.shiftKey) {
+				// Paste (Ctrl+V)
+				if (this.clipboard) {
+					e.preventDefault();
+					this.pasteSelection();
+				}
+			} else if (e.ctrlKey && e.key === "a" && !e.shiftKey) {
+				// Select all (Ctrl+A)
+				e.preventDefault();
+				this.selectAllCurrentLayer();
 			}
 		});
 
@@ -2109,6 +2367,12 @@ class MapEditor {
 			this.selectedTemplate = null;
 			this.selectedTemplateType = null;
 			this.updatePlacementIndicator(null, null, null);
+			// Clear single cell selection when using a selection tool
+			this.selectedCell = null;
+			// Remove selected class from grid cells
+			document.querySelectorAll(".grid-cell").forEach((cell) => {
+				cell.classList.remove("selected");
+			});
 		}
 
 		// Update button highlights
@@ -2193,6 +2457,114 @@ class MapEditor {
 			const cellKey = `${x},${y},${z}`;
 			cell.classList.toggle("selected-cell", this.selectedCells.has(cellKey));
 		});
+	}
+
+	deleteRoomAtCell(x, y, z) {
+		if (!this.yamlData) return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		// Auto-save to localStorage
+		this.saveToLocalStorage();
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+		const layerIndex = dungeon.dimensions.layers - 1 - z;
+		const layer = dungeon.grid[layerIndex] || [];
+
+		if (!layer[y]) {
+			layer[y] = new Array(dungeon.dimensions.width).fill(0);
+		}
+
+		if (layer[y][x] > 0) {
+			// Get room info before deleting
+			const roomIndex = layer[y][x] - 1;
+			const room = dungeon.rooms[roomIndex];
+			const roomName = room?.display || `Room ${roomIndex + 1}`;
+
+			// Delete the room (set to 0)
+			layer[y][x] = 0;
+
+			// Remove resets for this room
+			const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+			if (dungeon.resets) {
+				dungeon.resets = dungeon.resets.filter((r) => r.roomRef !== roomRef);
+			}
+
+			this.showToast(
+				`Deleted ${roomName}`,
+				`At coordinates (${x}, ${y}, ${z})`
+			);
+			this.loadResets(dungeon);
+			this.renderMap(dungeon);
+		} else {
+			this.showToast("No room to delete", `At coordinates (${x}, ${y}, ${z})`);
+		}
+	}
+
+	deselectAll() {
+		// Clear multi-cell selection
+		this.selectedCells.clear();
+
+		// Clear single cell selection
+		this.selectedCell = null;
+
+		// Clear template selection
+		this.selectedTemplate = null;
+		this.selectedTemplateType = null;
+
+		// Don't clear selection mode - keep tool active
+		// this.selectionMode = null;
+
+		// Update visual indicators
+		this.updateSelectionVisuals();
+
+		// Don't clear tool button highlights - keep selection tool active
+		// document.querySelectorAll(".tool-btn").forEach((btn) => {
+		// 	btn.classList.remove("active");
+		// });
+
+		// Remove selected class from grid cells
+		document.querySelectorAll(".grid-cell").forEach((cell) => {
+			cell.classList.remove("selected");
+			cell.classList.remove("selected-cell");
+		});
+
+		// Remove selected class from template items
+		document.querySelectorAll(".template-item").forEach((item) => {
+			item.classList.remove("selected");
+		});
+
+		// Hide placement indicator
+		this.updatePlacementIndicator(null, null, null);
+	}
+
+	selectAllCurrentLayer() {
+		if (!this.yamlData) return;
+
+		const dungeon = this.yamlData.dungeon;
+
+		// Clear current selection
+		this.selectedCells.clear();
+
+		// Select all cells on the current layer
+		for (let y = 0; y < dungeon.dimensions.height; y++) {
+			for (let x = 0; x < dungeon.dimensions.width; x++) {
+				const cellKey = `${x},${y},${this.currentLayer}`;
+				this.selectedCells.add(cellKey);
+			}
+		}
+
+		// Update visuals
+		this.updateSelectionVisuals();
+
+		// Show toast notification
+		const totalCells = dungeon.dimensions.width * dungeon.dimensions.height;
+		this.showToast(
+			"Selected all",
+			`${totalCells} cells on layer ${this.currentLayer}`
+		);
 	}
 
 	deleteSelectedRooms() {
@@ -2422,6 +2794,188 @@ class MapEditor {
 				saveBtn.title = "Save dungeon";
 			}
 		}
+	}
+
+	copySelection() {
+		if (!this.yamlData || this.selectedCells.size === 0) return;
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+		const cells = [];
+		const resets = [];
+
+		// Find the minimum x, y, z to calculate relative positions
+		let minX = Infinity,
+			minY = Infinity,
+			minZ = Infinity;
+		this.selectedCells.forEach((cellKey) => {
+			const [x, y, z] = cellKey.split(",").map(Number);
+			minX = Math.min(minX, x);
+			minY = Math.min(minY, y);
+			minZ = Math.min(minZ, z);
+		});
+
+		// Copy cells with relative positions (including empty cells)
+		this.selectedCells.forEach((cellKey) => {
+			const [x, y, z] = cellKey.split(",").map(Number);
+			const layerIndex = dungeon.dimensions.layers - 1 - z;
+			const layer = dungeon.grid[layerIndex] || [];
+			const row = layer[y] || [];
+			const roomIndex = row[x] || 0;
+
+			// Copy all cells, including empty ones (roomIndex === 0)
+			cells.push({
+				relX: x - minX,
+				relY: y - minY,
+				relZ: z - minZ,
+				roomIndex: roomIndex > 0 ? roomIndex - 1 : -1, // -1 indicates empty cell
+			});
+
+			// Copy resets for this room (only if there's a room)
+			if (roomIndex > 0) {
+				const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+				const cellResets =
+					dungeon.resets?.filter((r) => r.roomRef === roomRef) || [];
+				cellResets.forEach((reset) => {
+					resets.push({
+						relX: x - minX,
+						relY: y - minY,
+						relZ: z - minZ,
+						reset: JSON.parse(JSON.stringify(reset)), // Deep copy
+					});
+				});
+			}
+		});
+
+		this.clipboard = {
+			cells: cells,
+			resets: resets,
+			minX: minX,
+			minY: minY,
+			minZ: minZ,
+		};
+
+		// Clear selection
+		this.selectedCells.clear();
+		this.updateSelectionVisuals();
+		this.setSelectionMode(null);
+
+		this.showToast(
+			"Copied selection",
+			`${cells.length} cell${cells.length !== 1 ? "s" : ""}`
+		);
+	}
+
+	pasteSelection() {
+		if (!this.yamlData || !this.clipboard || this.clipboard.cells.length === 0)
+			return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		// Auto-save to localStorage
+		this.saveToLocalStorage();
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+
+		// Determine paste position
+		let pasteX = 0,
+			pasteY = 0,
+			pasteZ = this.currentLayer;
+		if (this.selectedCell) {
+			// Paste at selected cell position
+			pasteX = this.selectedCell.x;
+			pasteY = this.selectedCell.y;
+			pasteZ = this.selectedCell.z;
+		}
+		// Otherwise paste at (0, 0, currentLayer)
+
+		let pastedCount = 0;
+		let skippedCount = 0;
+
+		// Paste cells
+		this.clipboard.cells.forEach((cell) => {
+			const targetX = pasteX + cell.relX;
+			const targetY = pasteY + cell.relY;
+			const targetZ = pasteZ + cell.relZ;
+
+			// Check bounds
+			if (
+				targetX >= 0 &&
+				targetX < dungeon.dimensions.width &&
+				targetY >= 0 &&
+				targetY < dungeon.dimensions.height &&
+				targetZ >= 0 &&
+				targetZ < dungeon.dimensions.layers
+			) {
+				const layerIndex = dungeon.dimensions.layers - 1 - targetZ;
+				const layer = dungeon.grid[layerIndex] || [];
+
+				// Ensure row exists
+				if (!layer[targetY]) {
+					layer[targetY] = new Array(dungeon.dimensions.width).fill(0);
+				}
+
+				if (cell.roomIndex === -1) {
+					// Empty cell: delete room if present
+					if (layer[targetY][targetX] > 0) {
+						layer[targetY][targetX] = 0;
+
+						// Remove resets for this room
+						const roomRef = `@${dungeonId}{${targetX},${targetY},${targetZ}}`;
+						if (dungeon.resets) {
+							dungeon.resets = dungeon.resets.filter(
+								(r) => r.roomRef !== roomRef
+							);
+						}
+					}
+				} else {
+					// Place room (convert back to 1-based index)
+					layer[targetY][targetX] = cell.roomIndex + 1;
+				}
+				pastedCount++;
+			} else {
+				skippedCount++;
+			}
+		});
+
+		// Paste resets
+		if (!dungeon.resets) {
+			dungeon.resets = [];
+		}
+
+		this.clipboard.resets.forEach((resetData) => {
+			const targetX = pasteX + resetData.relX;
+			const targetY = pasteY + resetData.relY;
+			const targetZ = pasteZ + resetData.relZ;
+
+			// Check bounds
+			if (
+				targetX >= 0 &&
+				targetX < dungeon.dimensions.width &&
+				targetY >= 0 &&
+				targetY < dungeon.dimensions.height &&
+				targetZ >= 0 &&
+				targetZ < dungeon.dimensions.layers
+			) {
+				const newRoomRef = `@${dungeonId}{${targetX},${targetY},${targetZ}}`;
+				const newReset = JSON.parse(JSON.stringify(resetData.reset));
+				newReset.roomRef = newRoomRef;
+				dungeon.resets.push(newReset);
+			}
+		});
+
+		// Show toast notification
+		let message = `Pasted ${pastedCount} cell${pastedCount !== 1 ? "s" : ""}`;
+		if (skippedCount > 0) {
+			message += ` (${skippedCount} out of bounds)`;
+		}
+		this.showToast("Pasted selection", message);
+
+		// Reload resets and re-render map
+		this.loadResets(dungeon);
+		this.renderMap(dungeon);
 	}
 }
 

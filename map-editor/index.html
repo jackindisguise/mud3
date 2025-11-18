@@ -70,12 +70,18 @@
 				<!-- Placement Indicator -->
 				<div id="placement-indicator" class="placement-indicator" style="display: none;">
 					<div class="placement-indicator-content">
-						<div class="placement-icon"></div>
-						<div class="placement-text">
-							<div class="placement-action"></div>
-							<div class="placement-template"></div>
+						<div class="placement-main-row">
+							<div class="placement-icon"></div>
+							<div class="placement-text">
+								<div class="placement-action"></div>
+								<div class="placement-template"></div>
+							</div>
+							<button class="placement-cancel" id="placement-cancel-btn" title="Cancel placement">×</button>
 						</div>
-						<button class="placement-cancel" id="placement-cancel-btn" title="Cancel placement">×</button>
+						<div class="placement-modes">
+							<button class="placement-mode-btn" id="placement-mode-insert" data-mode="insert" title="Insert mode (click to place, drag to draw)">✏️</button>
+							<button class="placement-mode-btn" id="placement-mode-paint" data-mode="paint" title="Paint mode (click to replace all identical templates)">🪣</button>
+						</div>
 					</div>
 				</div>
 			</main>
@@ -122,6 +128,26 @@
 				<div class="modal-actions">
 					<button id="confirm-yes">Yes, Continue</button>
 					<button id="confirm-no">Cancel</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Modal for editing resets -->
+		<div id="reset-edit-modal" class="modal">
+			<div class="modal-content">
+				<span class="close" id="reset-edit-close">&times;</span>
+				<h2>Edit Reset</h2>
+				<div class="form-group">
+					<label>Minimum Count:</label>
+					<input type="number" id="reset-min-count" min="1" value="1">
+				</div>
+				<div class="form-group">
+					<label>Maximum Count:</label>
+					<input type="number" id="reset-max-count" min="1" value="1">
+				</div>
+				<div class="modal-actions">
+					<button id="reset-edit-save">Save</button>
+					<button id="reset-edit-cancel">Cancel</button>
 				</div>
 			</div>
 		</div>

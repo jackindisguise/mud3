@@ -597,9 +597,15 @@ header h1 {
 
 .placement-indicator-content {
 	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	position: relative;
+}
+
+.placement-main-row {
+	display: flex;
 	align-items: center;
 	gap: 0.75rem;
-	position: relative;
 }
 
 .placement-cancel {
@@ -671,9 +677,52 @@ header h1 {
 	content: "📦";
 }
 
+.placement-indicator[data-type="delete"] .placement-icon {
+	background: #4a2a2a;
+	border-color: #6a4a4a;
+}
+
+.placement-indicator[data-type="delete"] .placement-icon::before {
+	content: "🚜";
+}
+
 .placement-text {
 	flex: 1;
 	min-width: 0;
+}
+
+.placement-modes {
+	display: flex;
+	gap: 0.25rem;
+	justify-content: center;
+	width: 100%;
+}
+
+.placement-mode-btn {
+	width: 32px;
+	height: 32px;
+	border-radius: 4px;
+	background: #3a3a3a;
+	border: 2px solid #555;
+	color: #fff;
+	font-size: 1.2rem;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	transition: all 0.2s;
+}
+
+.placement-mode-btn:hover {
+	background: #4a4a4a;
+	border-color: #666;
+}
+
+.placement-mode-btn.active {
+	background: #4a6a4a;
+	border-color: #6a8a6a;
+	box-shadow: 0 0 8px rgba(74, 106, 74, 0.5);
 }
 
 .placement-action {
@@ -697,13 +746,17 @@ header h1 {
 	position: absolute;
 	bottom: 140px;
 	right: 20px;
+	top: 60px;
 	display: flex;
-	flex-direction: column-reverse;
+	flex-direction: column;
 	gap: 0.5rem;
 	z-index: 1001;
 	pointer-events: none;
-	max-height: 300px;
 	overflow: hidden;
+	align-items: flex-end;
+	justify-content: flex-end;
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 10%, rgba(0, 0, 0, 1) 20%);
+	mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 10%, rgba(0, 0, 0, 1) 20%);
 }
 
 .toast {
@@ -712,12 +765,27 @@ header h1 {
 	border-radius: 8px;
 	padding: 1rem 1.5rem;
 	min-width: 250px;
+	width: 250px;
+	flex-shrink: 0;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-	animation: slideInUp 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards;
+	animation: slideInUp 0.3s ease-out, fadeOutGradient 0.3s ease-in 2.7s forwards;
 	pointer-events: none;
+	position: relative;
+	overflow: hidden;
 }
 
 @keyframes fadeOut {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+}
+
+@keyframes fadeOutGradient {
 	from {
 		opacity: 1;
 		transform: translateY(0);

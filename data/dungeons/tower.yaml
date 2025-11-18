@@ -8010,7 +8010,7 @@ dungeon:
     - display: Tower Room
       description: A simple room in the tower with stone walls.
     - display: Staircase Up & Down
-      mapText: '|'
+      mapText: "|"
       description: A spiral staircase connects the floors of the tower.
       allowedExits: 783
     - display: Staircase Up
@@ -8027,7 +8027,9 @@ dungeon:
     - display: To Tiny B
       description: We're goin' to Midgar
       roomLinks:
-        west: '@tiny-b{10,10,0}'
+        west: "@tiny-b{10,10,0}"
+      mapText: x
+      mapColor: 8
   templates:
     - id: tower-guardian
       type: Mob
@@ -8061,50 +8063,50 @@ dungeon:
       defense: 4
   resets:
     - templateId: tower-guardian
-      roomRef: '@tower{0,0,1}'
+      roomRef: "@tower{0,0,1}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{2,2,2}'
+      roomRef: "@tower{2,2,2}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{7,3,3}'
+      roomRef: "@tower{7,3,3}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{1,8,4}'
+      roomRef: "@tower{1,8,4}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{9,1,5}'
+      roomRef: "@tower{9,1,5}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{3,6,6}'
+      roomRef: "@tower{3,6,6}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{6,9,7}'
+      roomRef: "@tower{6,9,7}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{4,4,8}'
+      roomRef: "@tower{4,4,8}"
       minCount: 1
       maxCount: 1
     - templateId: tower-guardian
-      roomRef: '@tower{8,7,9}'
+      roomRef: "@tower{8,7,9}"
       minCount: 1
       maxCount: 1
     - templateId: tower-sword
-      roomRef: '@tower{4,4,0}'
+      roomRef: "@tower{4,4,0}"
       minCount: 1
       maxCount: 1
     - templateId: tower-helmet
-      roomRef: '@tower{4,4,0}'
+      roomRef: "@tower{4,4,0}"
       minCount: 1
       maxCount: 1
     - templateId: tower-chest
-      roomRef: '@tower{4,4,0}'
+      roomRef: "@tower{4,4,0}"
       minCount: 1
       maxCount: 1

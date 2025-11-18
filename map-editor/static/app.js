@@ -678,6 +678,20 @@ class MapEditor {
 		// Restore selection visuals after rendering
 		this.selectedCells = previousSelection;
 		this.updateSelectionVisuals();
+
+		// Restore single cell selection visual if selectedCell is set and on current layer
+		if (this.selectedCell && this.selectedCell.z === this.currentLayer) {
+			const { x, y, z } = this.selectedCell;
+			const cell = document.querySelector(
+				`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`
+			);
+			if (cell) {
+				cell.classList.add("selected");
+			}
+		} else if (this.selectedCell && this.selectedCell.z !== this.currentLayer) {
+			// Clear selectedCell if it's on a different layer
+			this.selectedCell = null;
+		}
 	}
 
 	handleCellClick(x, y, z, currentRoomIndex, skipInfo = false) {
@@ -1165,16 +1179,9 @@ class MapEditor {
 				DOWN: 1 << 9, // 512
 			};
 
-			// Default allowedExits: all horizontal directions (not UP/DOWN)
+			// Default allowedExits: NSEW only (not UP/DOWN, no diagonals)
 			const DEFAULT_ALLOWED_EXITS =
-				DIRECTION.NORTH |
-				DIRECTION.SOUTH |
-				DIRECTION.EAST |
-				DIRECTION.WEST |
-				DIRECTION.NORTHEAST |
-				DIRECTION.NORTHWEST |
-				DIRECTION.SOUTHEAST |
-				DIRECTION.SOUTHWEST;
+				DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
 
 			// Text to DIRECTION mapping
 			const TEXT2DIR = {
@@ -1190,7 +1197,7 @@ class MapEditor {
 				down: DIRECTION.DOWN,
 			};
 
-			// Get allowedExits bitmap (default to horizontal only)
+			// Get allowedExits bitmap (mandatory field, default to NSEW)
 			const allowedExits =
 				template.allowedExits !== undefined
 					? template.allowedExits
@@ -1236,46 +1243,12 @@ class MapEditor {
 			const canAddMore = usedDirections.length < allDirections.length;
 
 			// Build exits HTML
-			const cardinalDirections = [
-				"north",
-				"south",
-				"east",
-				"west",
-				"up",
-				"down",
-			];
-			const diagonalDirections = [
-				"northwest",
-				"northeast",
-				"southwest",
-				"southeast",
-			];
+			const exitDirections = ["north", "south", "east", "west", "up", "down"];
 
-			const cardinalExitsHtml = cardinalDirections
+			const exitsHtml = exitDirections
 				.map((dir) => {
 					const isAllowedDir = isAllowed(dir);
-					return `<button type="button" class="exit-btn ${
-						isAllowedDir ? "enabled" : "disabled"
-					}" data-direction="${dir}">${
-						dir.charAt(0).toUpperCase() + dir.slice(1)
-					}</button>`;
-				})
-				.join("");
-
-			const diagonalExitsHtml = diagonalDirections
-				.map((dir) => {
-					const isAllowedDir = isAllowed(dir);
-					const label = dir.replace(
-						/(north|south)(east|west)/,
-						(match, n, e) => {
-							return (
-								n.charAt(0).toUpperCase() +
-								n.slice(1) +
-								e.charAt(0).toUpperCase() +
-								e.slice(1)
-							);
-						}
-					);
+					const label = dir.toUpperCase();
 					return `<button type="button" class="exit-btn ${
 						isAllowedDir ? "enabled" : "disabled"
 					}" data-direction="${dir}">${label}</button>`;
@@ -1302,19 +1275,22 @@ class MapEditor {
 					${this.generateColorSelector("template-map-color", template.mapColor)}
 				</div>
 				<div class="form-group">
+					<label>Dense</label>
+					<div class="exits-container">
+						<div class="exits-buttons">
+							<button type="button" class="exit-btn ${
+								template.dense ? "enabled" : "disabled"
+							}" id="template-dense-btn" data-dense="${
+				template.dense ? "true" : "false"
+			}">DENSE</button>
+						</div>
+					</div>
+				</div>
+				<div class="form-group">
 					<label>Allowed Exits</label>
 					<div class="exits-container">
-						<div class="exits-group">
-							<label class="exits-group-label">Cardinal Directions</label>
-							<div class="exits-buttons">
-								${cardinalExitsHtml}
-							</div>
-						</div>
-						<div class="exits-group">
-							<label class="exits-group-label">Diagonal Directions</label>
-							<div class="exits-buttons">
-								${diagonalExitsHtml}
-							</div>
+						<div class="exits-buttons">
+							${exitsHtml}
 						</div>
 					</div>
 				</div>
@@ -1442,16 +1418,10 @@ class MapEditor {
 				DOWN: 1 << 9,
 			};
 			const DEFAULT_ALLOWED_EXITS =
-				DIRECTION.NORTH |
-				DIRECTION.SOUTH |
-				DIRECTION.EAST |
-				DIRECTION.WEST |
-				DIRECTION.NORTHEAST |
-				DIRECTION.NORTHWEST |
-				DIRECTION.SOUTHEAST |
-				DIRECTION.SOUTHWEST;
+				DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+			// allowedExits is mandatory - default to NSEW if not set
 			const allowedExits =
-				template.allowedExits !== undefined
+				template.allowedExits !== undefined && template.allowedExits !== null
 					? template.allowedExits
 					: DEFAULT_ALLOWED_EXITS;
 			modal.dataset.allowedExits = allowedExits;
@@ -1486,18 +1456,30 @@ class MapEditor {
 				down: DIRECTION.DOWN,
 			};
 
-			// Exit button handlers - store current allowedExits bitmap
+			// Exit button handlers - store current allowedExits bitmap (mandatory field)
 			let currentAllowedExits =
-				template.allowedExits !== undefined
+				template.allowedExits !== undefined && template.allowedExits !== null
 					? template.allowedExits
-					: DIRECTION.NORTH |
-					  DIRECTION.SOUTH |
-					  DIRECTION.EAST |
-					  DIRECTION.WEST |
-					  DIRECTION.NORTHEAST |
-					  DIRECTION.NORTHWEST |
-					  DIRECTION.SOUTHEAST |
-					  DIRECTION.SOUTHWEST;
+					: DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+
+			// Refresh all button states based on the current bitmap
+			const refreshExitButtons = () => {
+				document.querySelectorAll(".exit-btn").forEach((btn) => {
+					const direction = btn.dataset.direction;
+					const dirFlag = TEXT2DIR[direction];
+					if (!dirFlag) return;
+
+					const isEnabled = (currentAllowedExits & dirFlag) !== 0;
+
+					if (isEnabled) {
+						btn.classList.remove("disabled");
+						btn.classList.add("enabled");
+					} else {
+						btn.classList.remove("enabled");
+						btn.classList.add("disabled");
+					}
+				});
+			};
 
 			document.querySelectorAll(".exit-btn").forEach((btn) => {
 				btn.onclick = (e) => {
@@ -1509,14 +1491,14 @@ class MapEditor {
 					if (isEnabled) {
 						// Disable: remove flag from bitmap
 						currentAllowedExits = currentAllowedExits & ~dirFlag;
-						e.target.classList.remove("enabled");
-						e.target.classList.add("disabled");
 					} else {
 						// Enable: add flag to bitmap
 						currentAllowedExits = currentAllowedExits | dirFlag;
-						e.target.classList.remove("disabled");
-						e.target.classList.add("enabled");
 					}
+
+					// Refresh all button states
+					refreshExitButtons();
+
 					// Store in data attribute for later retrieval
 					document.getElementById("template-modal").dataset.allowedExits =
 						currentAllowedExits;
@@ -1538,6 +1520,23 @@ class MapEditor {
 					this.deleteRoomLink(index);
 				};
 			});
+
+			// Dense button handler
+			const denseBtn = document.getElementById("template-dense-btn");
+			if (denseBtn) {
+				denseBtn.onclick = () => {
+					const isEnabled = denseBtn.classList.contains("enabled");
+					if (isEnabled) {
+						denseBtn.classList.remove("enabled");
+						denseBtn.classList.add("disabled");
+						denseBtn.dataset.dense = "false";
+					} else {
+						denseBtn.classList.remove("disabled");
+						denseBtn.classList.add("enabled");
+						denseBtn.dataset.dense = "true";
+					}
+				};
+			}
 
 			// Direction change handlers - update other dropdowns when a direction changes
 			document.querySelectorAll(".room-link-direction").forEach((select) => {
@@ -1619,7 +1618,7 @@ class MapEditor {
 		const dungeon = this.yamlData.dungeon;
 
 		if (type === "room") {
-			const index = parseInt(id);
+			const index = id !== null && id !== undefined ? parseInt(id) : -1;
 			const display = document.getElementById("template-display").value;
 			const description = document.getElementById("template-description").value;
 			const mapText = document.getElementById("template-map-text").value;
@@ -1628,15 +1627,55 @@ class MapEditor {
 				? parseInt(mapColorSelect.value)
 				: undefined;
 
-			// Collect enabled exits
-			const enabledExits = {};
-			document.querySelectorAll(".exit-btn").forEach((btn) => {
-				const direction = btn.dataset.direction;
-				const isEnabled = btn.classList.contains("enabled");
-				if (!isEnabled) {
-					enabledExits[direction] = false;
-				}
-			});
+			// Get dense button value (only for rooms)
+			const denseBtn = document.getElementById("template-dense-btn");
+			const dense = denseBtn ? denseBtn.classList.contains("enabled") : false;
+
+			// Get allowedExits bitmap from modal data attribute
+			const modal = document.getElementById("template-modal");
+			let allowedExits = modal.dataset.allowedExits;
+			if (allowedExits === undefined) {
+				// If not set, calculate from button states
+				const DIRECTION = {
+					NORTH: 1 << 0,
+					SOUTH: 1 << 1,
+					EAST: 1 << 2,
+					WEST: 1 << 3,
+					NORTHEAST: (1 << 0) | (1 << 2),
+					NORTHWEST: (1 << 0) | (1 << 3),
+					SOUTHEAST: (1 << 1) | (1 << 2),
+					SOUTHWEST: (1 << 1) | (1 << 3),
+					UP: 1 << 8,
+					DOWN: 1 << 9,
+				};
+				const TEXT2DIR = {
+					north: DIRECTION.NORTH,
+					south: DIRECTION.SOUTH,
+					east: DIRECTION.EAST,
+					west: DIRECTION.WEST,
+					northeast: DIRECTION.NORTHEAST,
+					northwest: DIRECTION.NORTHWEST,
+					southeast: DIRECTION.SOUTHEAST,
+					southwest: DIRECTION.SOUTHWEST,
+					up: DIRECTION.UP,
+					down: DIRECTION.DOWN,
+				};
+				const DEFAULT_ALLOWED_EXITS =
+					DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+
+				allowedExits = DEFAULT_ALLOWED_EXITS;
+				document.querySelectorAll(".exit-btn").forEach((btn) => {
+					const direction = btn.dataset.direction;
+					const dirFlag = TEXT2DIR[direction];
+					if (dirFlag && btn.classList.contains("enabled")) {
+						allowedExits = allowedExits | dirFlag;
+					} else if (dirFlag && btn.classList.contains("disabled")) {
+						allowedExits = allowedExits & ~dirFlag;
+					}
+				});
+			} else {
+				allowedExits = parseInt(allowedExits);
+			}
 
 			// Collect room links
 			const roomLinks = {};
@@ -1659,20 +1698,13 @@ class MapEditor {
 					...(mapText && { mapText }),
 					...(mapColor !== undefined && { mapColor }),
 				};
-				// Set allowedExits bitmap
-				const DEFAULT_ALLOWED_EXITS =
-					(1 << 0) |
-					(1 << 1) |
-					(1 << 2) |
-					(1 << 3) |
-					((1 << 0) | (1 << 2)) |
-					((1 << 0) | (1 << 3)) |
-					((1 << 1) | (1 << 2)) |
-					((1 << 1) | (1 << 3));
-				if (allowedExits !== DEFAULT_ALLOWED_EXITS) {
-					updated.allowedExits = allowedExits;
-				} else if (updated.allowedExits !== undefined) {
-					delete updated.allowedExits;
+				// Set allowedExits bitmap (mandatory field)
+				updated.allowedExits = allowedExits;
+				// Set dense property (only include if true)
+				if (dense) {
+					updated.dense = true;
+				} else if (updated.dense !== undefined) {
+					delete updated.dense;
 				}
 				if (Object.keys(roomLinks).length > 0) {
 					updated.roomLinks = roomLinks;
@@ -1688,23 +1720,20 @@ class MapEditor {
 				const newRoom = { display, description };
 				if (mapText) newRoom.mapText = mapText;
 				if (mapColor !== undefined) newRoom.mapColor = mapColor;
-				// Set allowedExits bitmap
-				const DEFAULT_ALLOWED_EXITS =
-					(1 << 0) |
-					(1 << 1) |
-					(1 << 2) |
-					(1 << 3) |
-					((1 << 0) | (1 << 2)) |
-					((1 << 0) | (1 << 3)) |
-					((1 << 1) | (1 << 2)) |
-					((1 << 1) | (1 << 3));
-				if (allowedExits !== DEFAULT_ALLOWED_EXITS) {
-					newRoom.allowedExits = allowedExits;
+				// Set allowedExits bitmap (mandatory field, defaults to NSEW)
+				newRoom.allowedExits = allowedExits;
+				// Set dense property (only include if true)
+				if (dense) {
+					newRoom.dense = true;
 				}
 				if (Object.keys(roomLinks).length > 0) {
 					newRoom.roomLinks = roomLinks;
 				}
 				dungeon.rooms.push(newRoom);
+				this.showToast(
+					"Room template created",
+					`Created "${display || "New Room"}"`
+				);
 			}
 		} else {
 			const templateId = document.getElementById("template-id").value;
@@ -2719,7 +2748,13 @@ class MapEditor {
 					// Cancel selection if currently selecting
 					this.isSelecting = false;
 					this.selectedCells.clear();
+					this.selectedCell = null; // Also clear single cell selection
 					this.updateSelectionVisuals();
+					// Remove selected class from grid cells
+					document.querySelectorAll(".grid-cell").forEach((cell) => {
+						cell.classList.remove("selected");
+						cell.classList.remove("selected-cell");
+					});
 					this.selectionStart = null;
 					this.selectionEnd = null;
 				} else {
@@ -2819,6 +2854,16 @@ class MapEditor {
 					cells.add(`${x},${y},${z}`);
 				}
 			}
+		} else if (this.selectionMode === "edge-rectangle") {
+			// Rectangle edge: only border cells
+			for (let y = minY; y <= maxY; y++) {
+				for (let x = minX; x <= maxX; x++) {
+					// Include cells on the border
+					if (x === minX || x === maxX || y === minY || y === maxY) {
+						cells.add(`${x},${y},${z}`);
+					}
+				}
+			}
 		} else if (this.selectionMode === "circle") {
 			// Circle: cells within the circle
 			const centerX = (minX + maxX) / 2;
@@ -2837,6 +2882,36 @@ class MapEditor {
 					}
 				}
 			}
+		} else if (this.selectionMode === "edge-circle") {
+			// Circle edge: only cells on the circumference
+			const centerX = (minX + maxX) / 2;
+			const centerY = (minY + maxY) / 2;
+			const radiusX = (maxX - minX) / 2;
+			const radiusY = (maxY - minY) / 2;
+			const tolerance = 0.15; // Tolerance for edge detection
+
+			// Handle very small selections (fallback to rectangle edge)
+			if (radiusX === 0 || radiusY === 0) {
+				for (let y = minY; y <= maxY; y++) {
+					for (let x = minX; x <= maxX; x++) {
+						if (x === minX || x === maxX || y === minY || y === maxY) {
+							cells.add(`${x},${y},${z}`);
+						}
+					}
+				}
+			} else {
+				for (let y = minY; y <= maxY; y++) {
+					for (let x = minX; x <= maxX; x++) {
+						const dx = (x - centerX) / radiusX;
+						const dy = (y - centerY) / radiusY;
+						const distance = Math.sqrt(dx * dx + dy * dy);
+						// Include cells close to the edge (distance ≈ 1.0)
+						if (Math.abs(distance - 1.0) <= tolerance) {
+							cells.add(`${x},${y},${z}`);
+						}
+					}
+				}
+			}
 		} else if (this.selectionMode === "squircle") {
 			// Squircle: rounded rectangle (superellipse)
 			const centerX = (minX + maxX) / 2;
@@ -2852,6 +2927,37 @@ class MapEditor {
 					const value = Math.pow(dx, n) + Math.pow(dy, n);
 					if (value <= 1.0) {
 						cells.add(`${x},${y},${z}`);
+					}
+				}
+			}
+		} else if (this.selectionMode === "edge-squircle") {
+			// Squircle edge: only cells on the boundary
+			const centerX = (minX + maxX) / 2;
+			const centerY = (minY + maxY) / 2;
+			const radiusX = (maxX - minX) / 2;
+			const radiusY = (maxY - minY) / 2;
+			const n = 3; // Superellipse power (3 gives a nice rounded square)
+			const tolerance = 0.15; // Tolerance for edge detection
+
+			// Handle very small selections (fallback to rectangle edge)
+			if (radiusX === 0 || radiusY === 0) {
+				for (let y = minY; y <= maxY; y++) {
+					for (let x = minX; x <= maxX; x++) {
+						if (x === minX || x === maxX || y === minY || y === maxY) {
+							cells.add(`${x},${y},${z}`);
+						}
+					}
+				}
+			} else {
+				for (let y = minY; y <= maxY; y++) {
+					for (let x = minX; x <= maxX; x++) {
+						const dx = Math.abs((x - centerX) / radiusX);
+						const dy = Math.abs((y - centerY) / radiusY);
+						const value = Math.pow(dx, n) + Math.pow(dy, n);
+						// Include cells close to the boundary (value ≈ 1.0)
+						if (Math.abs(value - 1.0) <= tolerance) {
+							cells.add(`${x},${y},${z}`);
+						}
 					}
 				}
 			}
@@ -3295,14 +3401,18 @@ class MapEditor {
 		// Determine paste position
 		let pasteX = 0,
 			pasteY = 0,
-			pasteZ = this.currentLayer;
+			pasteZ = this.currentLayer; // Always use current layer
 		if (this.selectedCell) {
-			// Paste at selected cell position
+			// Paste at selected cell position (but use current layer for Z)
 			pasteX = this.selectedCell.x;
 			pasteY = this.selectedCell.y;
-			pasteZ = this.selectedCell.z;
+			pasteZ = this.currentLayer; // Always paste on current layer
+		} else {
+			// If no cell is selected, paste at (0, 0, currentLayer)
+			pasteX = 0;
+			pasteY = 0;
+			pasteZ = this.currentLayer;
 		}
-		// Otherwise paste at (0, 0, currentLayer)
 
 		let pastedCount = 0;
 		let skippedCount = 0;

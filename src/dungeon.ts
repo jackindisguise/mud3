@@ -1466,7 +1466,10 @@ export class Dungeon {
 		if (isWestward(direction)) coordinates.x--;
 		if (direction === DIRECTION.UP) coordinates.z++;
 		if (direction === DIRECTION.DOWN) coordinates.z--;
-		return this.getRoom(coordinates);
+		const room = this.getRoom(coordinates);
+		// Don't return dense rooms
+		if (room?.dense) return undefined;
+		return room;
 	}
 
 	/**
@@ -1672,7 +1675,8 @@ export interface DungeonObjectOptions {
  */
 export interface RoomOptions extends DungeonObjectOptions {
 	coordinates: Coordinates;
-	allowedExits?: DIRECTION; // Bitmask of allowed exit directions
+	allowedExits?: DIRECTION; // Bitmask of allowed exit directions (defaults to NSEW if not provided)
+	dense?: boolean; // Whether this room is dense (solid/impassable)
 }
 
 /**
@@ -1710,7 +1714,8 @@ export interface SerializedDungeonObject {
 export interface SerializedRoom extends SerializedDungeonObject {
 	type: "Room";
 	coordinates: Coordinates;
-	allowedExits?: DIRECTION;
+	allowedExits: DIRECTION; // Mandatory field - always present
+	dense?: boolean; // Whether this room is dense (solid/impassable)
 }
 
 /**
@@ -1876,7 +1881,8 @@ export interface DungeonObjectTemplate {
  */
 export interface RoomTemplate extends DungeonObjectTemplate {
 	type: "Room";
-	allowedExits?: DIRECTION;
+	allowedExits: DIRECTION; // Mandatory field - always present
+	dense?: boolean; // Whether this room is dense (solid/impassable)
 	/**
 	 * Room links defined on this template.
 	 * Keys are direction names (e.g., "north", "up") and values are room references (e.g., "@tower{0,0,1}").
@@ -3073,10 +3079,17 @@ export class Room extends DungeonObject {
 
 	/**
 	 * Bitmask of allowed exit directions from this room.
-	 * By default, only horizontal directions are allowed (NORTH, SOUTH, EAST, WEST,
-	 * NORTHEAST, NORTHWEST, SOUTHEAST, SOUTHWEST). UP and DOWN must be explicitly enabled.
+	 * By default, only NSEW are allowed. UP and DOWN must be explicitly enabled.
+	 * This is a mandatory field - when set to 0, no exits are allowed.
 	 */
 	allowedExits: DIRECTION;
+
+	/**
+	 * Whether this room is "dense" (solid/impassable).
+	 * Dense rooms cannot be entered, are treated as if they don't exist,
+	 * and cannot be looked into. Used for solid walls and barriers.
+	 */
+	dense: boolean;
 
 	/**
 	 * Returns a shallow copy of the room's coordinates.
@@ -3135,17 +3148,12 @@ export class Room extends DungeonObject {
 	constructor(options: RoomOptions) {
 		super(options);
 		this._coordinates = options.coordinates;
-		// Default allowedExits: all horizontal directions (not UP/DOWN)
+		// Default allowedExits: NSEW only (not UP/DOWN, no diagonals)
 		this.allowedExits =
 			options.allowedExits ??
-			DIRECTION.NORTH |
-				DIRECTION.SOUTH |
-				DIRECTION.EAST |
-				DIRECTION.WEST |
-				DIRECTION.NORTHEAST |
-				DIRECTION.NORTHWEST |
-				DIRECTION.SOUTHEAST |
-				DIRECTION.SOUTHWEST;
+			DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+		// Default dense to false
+		this.dense = options.dense ?? false;
 	}
 
 	/**
@@ -3153,9 +3161,12 @@ export class Room extends DungeonObject {
 	 */
 	public static deserialize(data: SerializedRoom): Room {
 		const norm = normalizeSerializedData(data) as SerializedRoom;
+		// allowedExits is mandatory, but handle legacy data that might not have it
+		const defaultExits =
+			DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
 		const room = new Room({
 			...norm,
-			allowedExits: norm.allowedExits,
+			allowedExits: norm.allowedExits ?? defaultExits,
 		});
 		if (norm.contents && Array.isArray(norm.contents)) {
 			for (const contentData of norm.contents) {
@@ -3186,8 +3197,11 @@ export class Room extends DungeonObject {
 	 */
 	applyTemplate(template: RoomTemplate): void {
 		super.applyTemplate(template);
-		if (template.allowedExits !== undefined) {
-			this.allowedExits = template.allowedExits;
+		// allowedExits is mandatory in RoomTemplate
+		this.allowedExits = template.allowedExits;
+		// dense is optional, only set if present in template
+		if (template.dense !== undefined) {
+			this.dense = template.dense;
 		}
 	}
 
@@ -3296,6 +3310,8 @@ export class Room extends DungeonObject {
 			for (const link of this._links) {
 				const destination = link.getDestination(this, dir);
 				if (destination) {
+					// Don't return dense rooms
+					if (destination.dense) return undefined;
 					return destination;
 				}
 			}
@@ -3306,7 +3322,10 @@ export class Room extends DungeonObject {
 			return undefined;
 		}
 		// Direction is allowed, use normal spatial navigation
-		return this.dungeon?.getStep(this, dir);
+		const targetRoom = this.dungeon?.getStep(this, dir);
+		// Don't return dense rooms
+		if (targetRoom?.dense) return undefined;
+		return targetRoom;
 	}
 
 	/**
@@ -3327,6 +3346,8 @@ export class Room extends DungeonObject {
 	 * ```
 	 */
 	canEnter(movable: Movable, direction?: DIRECTION) {
+		// Dense rooms cannot be entered
+		if (this.dense) return false;
 		return true;
 	}
 
@@ -3463,20 +3484,9 @@ export class Room extends DungeonObject {
 			...baseData,
 			type: "Room" as const,
 			coordinates: this.coordinates,
+			allowedExits: this.allowedExits, // Mandatory field
+			...(this.dense && { dense: this.dense }), // Only include if true
 		};
-		// Only include allowedExits if it differs from default (all horizontal)
-		const defaultExits =
-			DIRECTION.NORTH |
-			DIRECTION.SOUTH |
-			DIRECTION.EAST |
-			DIRECTION.WEST |
-			DIRECTION.NORTHEAST |
-			DIRECTION.NORTHWEST |
-			DIRECTION.SOUTHEAST |
-			DIRECTION.SOUTHWEST;
-		if (this.allowedExits !== defaultExits) {
-			result.allowedExits = this.allowedExits;
-		}
 		return result;
 	}
 
@@ -6659,7 +6669,7 @@ const baseSerializedTypes: Partial<
 	Weapon: new Weapon().serialize(),
 	Item: new Item().serialize(),
 	Prop: new Prop().serialize(),
-	Room: new DungeonObject().serialize(),
+	Room: new Room({ coordinates: { x: 0, y: 0, z: 0 } }).serialize(),
 	DungeonObject: new DungeonObject().serialize(),
 };
 
@@ -6855,6 +6865,7 @@ export function serializedToOptions(
 				...base,
 				coordinates: r.coordinates,
 				allowedExits: r.allowedExits,
+				dense: r.dense,
 			});
 			return opts;
 		}

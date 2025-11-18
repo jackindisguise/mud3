@@ -20,7 +20,13 @@
 
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Room, DIRECTION, dir2text, DIRECTIONS } from "../dungeon.js";
+import {
+	Room,
+	DIRECTION,
+	dir2text,
+	DIRECTIONS,
+	DungeonObject,
+} from "../dungeon.js";
 import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { COLOR, color, SIZER } from "../color.js";
@@ -59,21 +65,12 @@ function generateMinimap(
 			let mapColor = COLOR.DARK_GREEN;
 			const targetRoom = dungeon.getRoom({ x, y, z: coords.z });
 			if (targetRoom) {
-				mapText =
-					targetRoom.mapText ??
-					ALTERNATING_MINIMAP_CHARS[
-						(targetRoom.x * targetRoom.y + targetRoom.z) % 2
-					];
-				mapColor =
-					targetRoom.mapColor ??
-					ALTERNATING_MINIMAP_COLORS[
-						(targetRoom.x * targetRoom.y + targetRoom.z) % 2
-					];
+				// Priority: current room marker > mob > object > room (including dense rooms)
 				if (targetRoom === room) {
 					mapText = "@";
 					mapColor = COLOR.PINK;
 				} else {
-					// Check if room has a mob
+					// Check if room has a mob (highest priority after current room)
 					const mobInRoom = targetRoom.contents.find(
 						(obj) => obj instanceof Mob
 					) as Mob | undefined;
@@ -81,6 +78,28 @@ function generateMinimap(
 						// Room with mob - use mob's mapText/mapColor or default to !
 						mapText = mobInRoom.mapText ?? "!";
 						mapColor = mobInRoom.mapColor ?? COLOR.YELLOW;
+					} else {
+						// Check if room has an object
+						const objectInRoom = targetRoom.contents.find(
+							(obj) => !(obj instanceof Mob)
+						) as DungeonObject | undefined;
+						if (objectInRoom && objectInRoom.mapText !== undefined) {
+							// Room with object that has mapText - use object's mapText/mapColor
+							mapText = objectInRoom.mapText;
+							mapColor = objectInRoom.mapColor ?? COLOR.DARK_GREEN;
+						} else {
+							// Use room's mapText/mapColor (works for dense rooms too)
+							mapText =
+								targetRoom.mapText ??
+								ALTERNATING_MINIMAP_CHARS[
+									(targetRoom.x * targetRoom.y + targetRoom.z) % 2
+								];
+							mapColor =
+								targetRoom.mapColor ??
+								ALTERNATING_MINIMAP_COLORS[
+									(targetRoom.x * targetRoom.y + targetRoom.z) % 2
+								];
+						}
 					}
 				}
 			}

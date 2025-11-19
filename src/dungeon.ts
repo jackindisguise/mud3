@@ -6340,49 +6340,6 @@ export class Mob extends Movable {
 	}
 
 	/**
-	 * Override onStep to handle aggressive behavior for wandering mobs.
-	 * When an aggressive mob steps into a room, it checks for character mobs to attack.
-	 *
-	 * @param direction The direction that was moved
-	 * @param destinationRoom The room that was entered
-	 */
-	override onStep(direction: DIRECTION, destinationRoom: Room): void {
-		// Only NPCs can be aggressive
-		if (this.character) {
-			return;
-		}
-
-		// Check if mob has aggressive behavior
-		if (!this.hasBehavior(BEHAVIOR.AGGRESSIVE)) {
-			return;
-		}
-
-		// Don't attack if already in combat
-		if (this.isInCombat()) {
-			return;
-		}
-
-		// Don't attack if dead
-		if (this.health <= 0) {
-			return;
-		}
-
-		// Look for character mobs in the room to attack
-		for (const obj of destinationRoom.contents) {
-			if (!(obj instanceof Mob)) continue;
-			const target = obj as Mob;
-			if (target === this) continue; // Don't attack self
-			if (!target.character) continue; // Only attack character mobs
-			if (target.health <= 0) continue; // Don't attack dead mobs
-
-			// Found a character mob to attack - initiate combat
-			initiateCombat(this, target, destinationRoom);
-			// Only attack the first valid target
-			break;
-		}
-	}
-
-	/**
 	 * Equip an item to the appropriate slot.
 	 * The equipment is moved to the mob's inventory if not already there, and all
 	 * attributes are automatically recalculated to include the equipment's bonuses.

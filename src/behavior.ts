@@ -71,6 +71,49 @@ export function processAggressiveBehavior(
 }
 
 /**
+ * Check for aggressive behavior in a room after wandering.
+ * If the mob is aggressive, it will attack any character mobs in the room.
+ *
+ * @param aggressiveMob The aggressive mob that should check for targets
+ * @param room The room to check for targets
+ */
+function checkAggressiveBehaviorInRoom(aggressiveMob: Mob, room: Room): void {
+	// Only NPCs can be aggressive
+	if (aggressiveMob.character) {
+		return;
+	}
+
+	// Check if mob has aggressive behavior
+	if (!aggressiveMob.hasBehavior(BEHAVIOR.AGGRESSIVE)) {
+		return;
+	}
+
+	// Don't attack if already in combat
+	if (aggressiveMob.isInCombat()) {
+		return;
+	}
+
+	// Don't attack if dead
+	if (aggressiveMob.health <= 0) {
+		return;
+	}
+
+	// Look for character mobs in the room to attack
+	for (const obj of room.contents) {
+		if (!(obj instanceof Mob)) continue;
+		const target = obj as Mob;
+		if (target === aggressiveMob) continue; // Don't attack self
+		if (!target.character) continue; // Only attack character mobs
+		if (target.health <= 0) continue; // Don't attack dead mobs
+
+		// Found a character mob to attack - initiate combat
+		initiateCombat(aggressiveMob, target, room);
+		// Only attack the first valid target
+		break;
+	}
+}
+
+/**
  * Process wimpy behavior: randomly flee combat when health reaches 25%.
  * Called during combat processing.
  *
@@ -245,6 +288,7 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 		);
 
 		// Walk up to 5 steps
+		let moved = false;
 		for (let i = 0; i < stepsToTake; i++) {
 			const direction = path.directions[i];
 			if (!wanderingMob.step(direction)) {
@@ -253,10 +297,18 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 						i + 1
 					}/${stepsToTake}, stopping`
 				);
-				return i > 0; // Return true if we took at least one step
+				moved = i > 0; // Return true if we took at least one step
+				break;
 			}
+			moved = true;
 		}
-		return true;
+
+		// Check for aggressive behavior in the final room
+		if (moved && wanderingMob.location instanceof Room) {
+			checkAggressiveBehaviorInRoom(wanderingMob, wanderingMob.location);
+		}
+
+		return moved;
 	}
 
 	// If no path found, fall back to adjacent rooms
@@ -287,7 +339,14 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 	logger.debug(
 		`Wander: ${wanderingMob.display} moving to adjacent room (fallback)`
 	);
-	return wanderingMob.step(randomDir);
+	const moved = wanderingMob.step(randomDir);
+
+	// Check for aggressive behavior in the final room
+	if (moved && wanderingMob.location instanceof Room) {
+		checkAggressiveBehaviorInRoom(wanderingMob, wanderingMob.location);
+	}
+
+	return moved;
 }
 
 /**

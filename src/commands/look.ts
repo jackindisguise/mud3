@@ -1,9 +1,10 @@
 /**
- * Look command for viewing the current room or adjacent rooms.
+ * Look command for viewing the current room, adjacent rooms, or objects.
  *
- * Allows players to view their current room description, or look in a specific
- * direction to see an adjacent room. Looking in a direction requires that the
- * player can move in that direction.
+ * Allows players to view their current room description, look in a specific
+ * direction to see an adjacent room, or look at objects in the room or inventory.
+ * When looking at a mob, shows their equipped items. When looking at other objects,
+ * shows their long description.
  *
  * @example
  * ```
@@ -11,16 +12,25 @@
  * l
  * look north
  * look n
+ * look sword
+ * look goblin
  * ```
  *
  * **Aliases:** `l`
- * **Pattern:** `look~ [<direction:direction>]`
+ * **Pattern:** `look~ [<target:object@all>] [<direction:direction>]`
  * @module commands/look
  */
 
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
-import { Room, DIRECTION, dir2text, DIRECTIONS } from "../dungeon.js";
+import {
+	Room,
+	DIRECTION,
+	dir2text,
+	DIRECTIONS,
+	DungeonObject,
+} from "../dungeon.js";
+import { getEquipmentList } from "../equipment.js";
 import { Mob } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { COLOR, color, SIZER } from "../color.js";
@@ -139,8 +149,45 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 	character.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
+/**
+ * Displays information about an object.
+ * For mobs, shows equipped items. For other objects, shows their long description.
+ *
+ * @param actor The mob viewing the object
+ * @param obj The object to look at
+ */
+function showObject(actor: Mob, obj: DungeonObject): void {
+	const character = actor.character;
+	if (!character) return;
+
+	const lines: string[] = [];
+
+	// Display name
+	if (obj.display) {
+		lines.push(`${color(obj.display, COLOR.CYAN)}:`);
+	}
+
+	// For mobs, show equipment
+	// For non-mobs, show long description
+	if (obj.description) {
+		lines.push(`> ${obj.description}`);
+	} else {
+		lines.push("> You see nothing special.");
+	}
+
+	if (obj instanceof Mob) {
+		lines.push("");
+		lines.push(`${color(`${obj.display} is wearing...`, COLOR.YELLOW)}`);
+		const formatted = getEquipmentList(obj).map((line) => `> ${line}`);
+		lines.push(...formatted);
+	}
+
+	character.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+}
+
 export default {
-	pattern: "look~ <direction:direction?>",
+	pattern: "look~",
+	aliases: ["look~ <target:object@all>", "look~ <direction:direction>"],
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor, room } = context;
 
@@ -152,38 +199,46 @@ export default {
 			return;
 		}
 
+		const target = args.get("target") as DungeonObject | undefined;
 		const direction = args.get("direction") as DIRECTION | undefined;
 
-		// If no direction specified, show current room
-		if (!direction) {
-			showRoom(actor, room);
+		// If target object is specified, show that object
+		if (target) {
+			showObject(actor, target);
 			return;
 		}
 
-		// Check if we can move in that direction
-		if (!actor.canStep(direction)) {
+		// If direction specified, show that room
+		if (direction) {
+			// Check if we can move in that direction
+			if (!actor.canStep(direction)) {
+				actor.sendMessage(
+					`You cannot look ${dir2text(direction)}.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			// Get the adjacent room
+			const targetRoom = actor.getStep(direction);
+			if (!targetRoom || !(targetRoom instanceof Room)) {
+				actor.sendMessage(
+					`You cannot look ${dir2text(direction)}.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			// Show the adjacent room
 			actor.sendMessage(
-				`You cannot look ${dir2text(direction)}.`,
+				`Looking ${dir2text(direction)}...`,
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
+			showRoom(actor, targetRoom);
 			return;
 		}
 
-		// Get the adjacent room
-		const targetRoom = actor.getStep(direction);
-		if (!targetRoom || !(targetRoom instanceof Room)) {
-			actor.sendMessage(
-				`You cannot look ${dir2text(direction)}.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Show the adjacent room
-		actor.sendMessage(
-			`Looking ${dir2text(direction)}...`,
-			MESSAGE_GROUP.COMMAND_RESPONSE
-		);
-		showRoom(actor, targetRoom);
+		// If nothing specified, show current room
+		showRoom(actor, room);
 	},
 } satisfies CommandObject;

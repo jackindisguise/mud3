@@ -2095,8 +2095,10 @@ export class Reset {
 			return [];
 		}
 
-		// Get the template
-		const template = templateRegistry.get(this.templateId);
+		// Get the template (try local registry first, then cross-dungeon lookup)
+		const template =
+			templateRegistry.get(this.templateId) ||
+			resolveTemplateById(this.templateId);
 		if (!template) {
 			logger.warn(
 				`Reset for template "${this.templateId}" failed: template not found`
@@ -2136,7 +2138,9 @@ export class Reset {
 				// Spawn and equip equipment templates
 				if (this.equipped) {
 					for (const equipmentTemplateId of this.equipped) {
-						const equipmentTemplate = templateRegistry.get(equipmentTemplateId);
+						const equipmentTemplate =
+							templateRegistry.get(equipmentTemplateId) ||
+							resolveTemplateById(equipmentTemplateId);
 						if (!equipmentTemplate) {
 							logger.warn(
 								`Reset for template "${this.templateId}" failed: equipment template "${equipmentTemplateId}" not found`
@@ -2166,7 +2170,9 @@ export class Reset {
 				// Spawn and add inventory item templates
 				if (this.inventory) {
 					for (const itemTemplateId of this.inventory) {
-						const itemTemplate = templateRegistry.get(itemTemplateId);
+						const itemTemplate =
+							templateRegistry.get(itemTemplateId) ||
+							resolveTemplateById(itemTemplateId);
 						if (!itemTemplate) {
 							logger.warn(
 								`Reset for template "${this.templateId}" failed: inventory template "${itemTemplateId}" not found`
@@ -6927,7 +6933,9 @@ function resolveTemplateById(id: string): DungeonObjectTemplate | undefined {
 		const dungeonId = m[1];
 		const templateId = m[2];
 		const dungeon = getDungeonById(dungeonId);
-		return dungeon?.templates.get(templateId);
+		if (!dungeon) return undefined;
+		// Templates are stored with globalized IDs, so use the full id
+		return dungeon.templates.get(id);
 	}
 
 	// Fallback: scan all registered dungeons for a matching template id

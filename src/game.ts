@@ -229,6 +229,9 @@ export class Game {
 			processCombatRound();
 		}, DEFAULT_COMBAT_ROUND_INTERVAL_MS);
 
+		// Run initial wander cycle after dungeons are loaded
+		processWanderBehaviors();
+
 		// Set up wander behavior timer (every 30 seconds)
 		this.wanderTimer = setAbsoluteInterval(() => {
 			processWanderBehaviors();

@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.13.0](https://github.com/jackindisguise/mud3/compare/v1.12.0...v1.13.0) (2025-11-19)
+
+
+### Features
+
+* added cross-dungeon template reference in tower reset to neo-tokyo bubblegum-cannon ([6a5ec61](https://github.com/jackindisguise/mud3/commit/6a5ec6171485e1fcf204a9884d4b40e99d7f107d))
+* added EquipmentTemplate, ArmorTemplate, and WeaponTemplate interfaces ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* added equipped and inventory arrays to Reset class for mob spawning ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* added equipped and inventory fields to mob resets ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* added neo-tokyo dungeon and cross-dungeon template reference in tower ([6a5ec61](https://github.com/jackindisguise/mud3/commit/6a5ec6171485e1fcf204a9884d4b40e99d7f107d))
+* added neo-tokyo dungeon with bubblegum-cannon weapon template ([6a5ec61](https://github.com/jackindisguise/mud3/commit/6a5ec6171485e1fcf204a9884d4b40e99d7f107d))
+* added unit tests for reset equipped and inventory functionality ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* **character:** added default prompt showing health, mana, exhaustion, xp, and tnl with light colors ([1d8f6eb](https://github.com/jackindisguise/mud3/commit/1d8f6eb2de47ddb9193cd085128b5dd8b8e9ac32))
+* **character:** set default prompt with colored stats display ([1d8f6eb](https://github.com/jackindisguise/mud3/commit/1d8f6eb2de47ddb9193cd085128b5dd8b8e9ac32))
+* updated applyTemplate methods to accept specific template types ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* updated createFromTemplate to use template-specific properties for equipment ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* updated reset deserialization to restore equipped and inventory arrays ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* updated reset serialization to include equipped and inventory template IDs ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+
+
+### Bug Fixes
+
+* corrected resolveTemplateById() to use globalized template IDs for lookups ([2de0287](https://github.com/jackindisguise/mud3/commit/2de0287e290a3c93ec6428d62dea48cddf33ac55))
+* **dungeon:** added null, undefined, and NaN checks for template indices ([acc1047](https://github.com/jackindisguise/mud3/commit/acc104793b4c6fba2863ff73d9ef13bdc9a59522))
+* **dungeon:** convert template index to number before arithmetic operations ([acc1047](https://github.com/jackindisguise/mud3/commit/acc104793b4c6fba2863ff73d9ef13bdc9a59522))
+* **game:** replaced UTF-8 bullet character with asterisk in board message notifications ([55bcda4](https://github.com/jackindisguise/mud3/commit/55bcda49cdca1e320564e3fe44d8182bb3505884))
+* **game:** use asterisk instead of UTF-8 bullet for telnet compatibility ([55bcda4](https://github.com/jackindisguise/mud3/commit/55bcda49cdca1e320564e3fe44d8182bb3505884))
+* handle null/undefined values in dungeon grid during load ([211f66a](https://github.com/jackindisguise/mud3/commit/211f66a7b391011cd66d694bb095f8e76a7b29b6))
+* **package:** improve template index validation in dungeon loading ([acc1047](https://github.com/jackindisguise/mud3/commit/acc104793b4c6fba2863ff73d9ef13bdc9a59522))
+* updated character.spec.ts test for DEFAULT_PLAYER_SETTINGS prompt value ([eba8338](https://github.com/jackindisguise/mud3/commit/eba8338a07fa0017fb79fc84fd25ca2e01019d4b))
+* updated cross-dungeon template resolution in Reset.execute() to use resolveTemplateById() ([2de0287](https://github.com/jackindisguise/mud3/commit/2de0287e290a3c93ec6428d62dea48cddf33ac55))
+
 ## [1.12.0](https://github.com/jackindisguise/mud3/compare/v1.11.0...v1.12.0) (2025-11-18)
 
 

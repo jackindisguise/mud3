@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.14.0](https://github.com/jackindisguise/mud3/compare/v1.13.0...v1.14.0) (2025-11-19)
+
+
+### Features
+
+* added BEHAVIOR enum and behavior dictionary to Mob class ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* added BEHAVIOR_SYSTEM.md documentation for map editor integration ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* added behavior.ts module with processAggressiveBehavior, processWimpyBehavior, and processWanderBehavior functions ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* added checkAggressiveBehaviorInRoom function to check for targets after wandering ([c969167](https://github.com/jackindisguise/mud3/commit/c969167b6fee6b6a33114cbd4351e093699ab7c6))
+* added getNextObjectIdSync() function for synchronous OID generation ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* added getNextObjectIdSync() function for synchronous OID generation ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+* added GOCIAL channel for global social communication ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* added gocial command for global social messages ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* added initial wander cycle after dungeon load before starting timer ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* added mob behavior system with aggressive, wimpy, and wander behaviors ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* added nextObjectId counter to gamestate package ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* added nextObjectId counter to gamestate package ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+* added object ID (OID) system for dungeon objects ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* added object ID (OID) system for dungeon objects ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+* added oid property to DungeonObject class ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* added oid property to DungeonObject class ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+* added onStep event hook to Movable class for post-movement behavior ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* added recall command to teleport players to recall location ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* added wander behavior timer in game.ts (30 second interval) ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* added WANDERING_MOBS cache for efficient wander behavior processing ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* centralized social commands in social.ts module with auto-generation ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* created locations package with YAML config for game locations ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* created reserved names package for blocking inappropriate/IP names ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* implemented aggressive behavior processing in room.onEnter and mob.onStep ([377374e](https://github.com/jackindisguise/mud3/commit/377374eb5afb2012d860e371ca5b325cba7cc99d))
+* implemented name blocking system during character creation ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* made oid optional in SerializedDungeonObject (present for instances, absent for templates) ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* made oid optional in SerializedDungeonObject (present for instances, absent for templates) ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+* updated compression logic to handle optional oid ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* updated compression logic to handle optional oid ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+* updated toTemplate() to exclude oid from templates ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* updated toTemplate() to exclude oid from templates ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+
+
+### Bug Fixes
+
+* fixed location validation to re-throw errors instead of treating them as file read errors ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* fixed locations.spec.ts to use Room class directly in instanceof checks ([c162c29](https://github.com/jackindisguise/mud3/commit/c162c2901a8fbc8ef11e8a6c3fc53f5fefdae7b3))
+* updated all manually created serialized objects in tests to include oid ([f2e0f1e](https://github.com/jackindisguise/mud3/commit/f2e0f1e22deb2935c42d566ec38c66c9c96279c1))
+* updated all manually created serialized objects in tests to include oid ([87da35c](https://github.com/jackindisguise/mud3/commit/87da35c713905c1e1a037f08847385c8c3769d2a))
+
 ## [1.13.0](https://github.com/jackindisguise/mud3/compare/v1.12.0...v1.13.0) (2025-11-19)
 
 

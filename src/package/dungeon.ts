@@ -85,6 +85,8 @@ export interface SerializedReset {
 	roomRef: string;
 	minCount?: number;
 	maxCount?: number;
+	equipped?: string[];
+	inventory?: string[];
 }
 
 /**
@@ -300,6 +302,17 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 		if (reset.maxCount !== 1) {
 			serialized.maxCount = reset.maxCount;
 		}
+		// Include equipped and inventory if present
+		if (reset.equipped && reset.equipped.length > 0) {
+			serialized.equipped = reset.equipped.map((id) =>
+				localizeTemplateId(id, dungeon.id!)
+			);
+		}
+		if (reset.inventory && reset.inventory.length > 0) {
+			serialized.inventory = reset.inventory.map((id) =>
+				localizeTemplateId(id, dungeon.id!)
+			);
+		}
 		resets.push(serialized);
 	}
 
@@ -308,6 +321,17 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 	const templateIds = new Set<string>();
 	for (const reset of dungeon.resets) {
 		templateIds.add(reset.templateId);
+		// Also include templates referenced in equipped and inventory
+		if (reset.equipped) {
+			for (const id of reset.equipped) {
+				templateIds.add(id);
+			}
+		}
+		if (reset.inventory) {
+			for (const id of reset.inventory) {
+				templateIds.add(id);
+			}
+		}
 	}
 	for (const templateId of templateIds) {
 		const template = dungeon.templates.get(templateId);
@@ -453,7 +477,6 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 
 				for (let x = 0; x < row.length; x++) {
 					const templateIndex = row[x];
-					// Handle null, undefined, or invalid values as empty cells (0)
 					if (
 						templateIndex === 0 ||
 						templateIndex === null ||
@@ -557,6 +580,16 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					roomRef: resetData.roomRef,
 					minCount: resetData.minCount ?? 1,
 					maxCount: resetData.maxCount ?? 1,
+					equipped: resetData.equipped
+						? resetData.equipped.map((id) =>
+								globalizeTemplateId(id, dungeon.id!)
+						  )
+						: undefined,
+					inventory: resetData.inventory
+						? resetData.inventory.map((id) =>
+								globalizeTemplateId(id, dungeon.id!)
+						  )
+						: undefined,
 				});
 				dungeon.addReset(reset);
 			}

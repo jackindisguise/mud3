@@ -1891,6 +1891,65 @@ export interface RoomTemplate extends DungeonObjectTemplate {
 	roomLinks?: Record<DirectionText, string>;
 }
 
+export type ItemType = "Item" | equipmentType;
+
+export interface ItemTemplate extends DungeonObjectTemplate {
+	type: ItemType;
+}
+
+/**
+ * Template definition specifically for Equipment objects.
+ * Extends DungeonObjectTemplate with equipment-specific properties.
+ *
+ * @property slot - The equipment slot this item occupies when equipped (required)
+ * @property attributeBonuses - Optional primary attribute bonuses
+ * @property resourceBonuses - Optional resource capacity bonuses
+ * @property secondaryAttributeBonuses - Optional secondary attribute bonuses
+ */
+export interface EquipmentTemplate extends ItemTemplate {
+	type: equipmentType;
+	slot: EQUIPMENT_SLOT;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
+}
+
+/**
+ * Template definition specifically for Armor objects.
+ * Extends DungeonObjectTemplate with armor-specific properties.
+ *
+ * @property slot - The equipment slot this armor occupies when equipped (required)
+ * @property defense - Defense value provided by this armor (required)
+ * @property attributeBonuses - Optional primary attribute bonuses
+ * @property resourceBonuses - Optional resource capacity bonuses
+ * @property secondaryAttributeBonuses - Optional secondary attribute bonuses
+ */
+export interface ArmorTemplate extends EquipmentTemplate {
+	type: "Armor";
+	slot: EQUIPMENT_SLOT;
+	defense: number;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
+}
+
+/**
+ * Template definition specifically for Weapon objects.
+ * Extends DungeonObjectTemplate with weapon-specific properties.
+ *
+ * @property slot - The equipment slot this weapon occupies when equipped (required)
+ * @property attackPower - Attack power value provided by this weapon (required)
+ * @property hitType - Optional hit type (verb and damage type)
+ * @property attributeBonuses - Optional primary attribute bonuses
+ * @property resourceBonuses - Optional resource capacity bonuses
+ * @property secondaryAttributeBonuses - Optional secondary attribute bonuses
+ */
+export interface WeaponTemplate extends EquipmentTemplate {
+	type: "Weapon";
+	attackPower: number;
+	hitType?: HitType | string;
+}
+
 /**
  * Options for creating a Reset.
  *
@@ -1898,18 +1957,28 @@ export interface RoomTemplate extends DungeonObjectTemplate {
  * @property roomRef - Room reference string in format "@dungeon-id{x,y,z}"
  * @property minCount - Minimum number of objects that should exist (default: 1)
  * @property maxCount - Maximum number of objects that can exist (default: 1)
+ * @property equipped - Optional array of template IDs for equipment to spawn and equip on Mobs
+ * @property inventory - Optional array of template IDs for items to spawn and add to Mob inventory
  */
 export interface ResetOptions {
 	templateId: string;
 	roomRef: string;
 	minCount?: number;
 	maxCount?: number;
+	equipped?: string[];
+	inventory?: string[];
 }
 
 /**
  * A Reset defines an object that should spawn in a dungeon room.
  * Resets track minimum and maximum counts, and automatically spawn
  * objects when the count falls below the minimum.
+ *
+ * For Mob resets, you can specify `equipped` and `inventory` arrays:
+ * - `equipped`: Template IDs for Equipment/Armor/Weapon that are spawned
+ *   and automatically equipped on the mob.
+ * - `inventory`: Template IDs for any items that are spawned and added
+ *   to the mob's inventory.
  *
  * @example
  * ```typescript
@@ -1919,6 +1988,14 @@ export interface ResetOptions {
  *   roomRef: "@tower{0,0,0}",
  *   minCount: 2,
  *   maxCount: 5
+ * });
+ *
+ * // Create a mob reset with equipment and inventory
+ * const mobReset = new Reset({
+ *   templateId: "goblin-warrior",
+ *   roomRef: "@dungeon{1,2,0}",
+ *   equipped: ["sword-basic", "helmet-iron"],
+ *   inventory: ["potion-healing", "coin-gold"]
  * });
  *
  * // Execute the reset (spawns objects if needed)
@@ -1951,6 +2028,18 @@ export class Reset {
 	readonly maxCount: number;
 
 	/**
+	 * Array of template IDs for equipment to spawn and equip on the mob.
+	 * Only applies when spawning Mob objects.
+	 */
+	readonly equipped?: string[];
+
+	/**
+	 * Array of template IDs for items to spawn and add to the mob's inventory.
+	 * Only applies when spawning Mob objects.
+	 */
+	readonly inventory?: string[];
+
+	/**
 	 * Array of objects that this reset has spawned.
 	 * Objects notify the reset when they're destroyed so they can be removed from this array.
 	 * @private
@@ -1967,6 +2056,8 @@ export class Reset {
 		this.roomRef = options.roomRef;
 		this.minCount = options.minCount ?? 1;
 		this.maxCount = options.maxCount ?? 1;
+		this.equipped = options.equipped;
+		this.inventory = options.inventory;
 	}
 
 	/**
@@ -2039,6 +2130,55 @@ export class Reset {
 			targetRoom.add(obj);
 			spawned.push(obj);
 			this.addSpawned(obj);
+
+			// If this is a Mob, handle equipped and inventory items
+			if (obj instanceof Mob) {
+				// Spawn and equip equipment templates
+				if (this.equipped) {
+					for (const equipmentTemplateId of this.equipped) {
+						const equipmentTemplate = templateRegistry.get(equipmentTemplateId);
+						if (!equipmentTemplate) {
+							logger.warn(
+								`Reset for template "${this.templateId}" failed: equipment template "${equipmentTemplateId}" not found`
+							);
+							continue;
+						}
+
+						// Verify template is Equipment, Armor, or Weapon
+						if (
+							equipmentTemplate.type !== "Equipment" &&
+							equipmentTemplate.type !== "Armor" &&
+							equipmentTemplate.type !== "Weapon"
+						) {
+							logger.warn(
+								`Reset for template "${this.templateId}" failed: equipment template "${equipmentTemplateId}" is not an Equipment, Armor, or Weapon type (got "${equipmentTemplate.type}")`
+							);
+							continue;
+						}
+
+						const equipment = createFromTemplate(
+							equipmentTemplate
+						) as Equipment;
+						obj.equip(equipment);
+					}
+				}
+
+				// Spawn and add inventory item templates
+				if (this.inventory) {
+					for (const itemTemplateId of this.inventory) {
+						const itemTemplate = templateRegistry.get(itemTemplateId);
+						if (!itemTemplate) {
+							logger.warn(
+								`Reset for template "${this.templateId}" failed: inventory template "${itemTemplateId}" not found`
+							);
+							continue;
+						}
+
+						const item = createFromTemplate(itemTemplate);
+						obj.add(item);
+					}
+				}
+			}
 		}
 
 		return spawned;
@@ -2945,26 +3085,42 @@ export function createFromTemplate(
 		case "Mob":
 			obj = new Mob({ templateId: template.id });
 			break;
-		case "Equipment":
+		case "Equipment": {
+			const equipmentTemplate = template as EquipmentTemplate;
 			obj = new Equipment({
 				templateId: template.id,
-				slot: EQUIPMENT_SLOT.HEAD,
+				slot: equipmentTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
+				attributeBonuses: equipmentTemplate.attributeBonuses,
+				resourceBonuses: equipmentTemplate.resourceBonuses,
+				secondaryAttributeBonuses: equipmentTemplate.secondaryAttributeBonuses,
 			});
 			break;
-		case "Armor":
+		}
+		case "Armor": {
+			const armorTemplate = template as ArmorTemplate;
 			obj = new Armor({
 				templateId: template.id,
-				slot: EQUIPMENT_SLOT.HEAD,
-				defense: 0,
+				slot: armorTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
+				defense: armorTemplate.defense ?? 0,
+				attributeBonuses: armorTemplate.attributeBonuses,
+				resourceBonuses: armorTemplate.resourceBonuses,
+				secondaryAttributeBonuses: armorTemplate.secondaryAttributeBonuses,
 			});
 			break;
-		case "Weapon":
+		}
+		case "Weapon": {
+			const weaponTemplate = template as WeaponTemplate;
 			obj = new Weapon({
 				templateId: template.id,
-				slot: EQUIPMENT_SLOT.MAIN_HAND,
-				attackPower: 0,
+				slot: weaponTemplate.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: weaponTemplate.attackPower ?? 0,
+				hitType: weaponTemplate.hitType,
+				attributeBonuses: weaponTemplate.attributeBonuses,
+				resourceBonuses: weaponTemplate.resourceBonuses,
+				secondaryAttributeBonuses: weaponTemplate.secondaryAttributeBonuses,
 			});
 			break;
+		}
 		case "Movable":
 			obj = new Movable({ templateId: template.id });
 			break;
@@ -4229,32 +4385,32 @@ export class Equipment extends Item {
 	/**
 	 * Override applyTemplate to handle Equipment-specific properties.
 	 * Applies slot, attributeBonuses, resourceBonuses, and secondaryAttributeBonuses
-	 * from the template (even though they're not in the base DungeonObjectTemplate interface,
-	 * they can be present when loading from YAML).
+	 * from the template.
 	 *
-	 * @param template - Template object potentially containing equipment properties
+	 * @param template - Template object containing equipment properties
 	 *
 	 * @example
 	 * ```typescript
 	 * const equipment = new Equipment();
-	 * equipment.applyTemplate({
+	 * const template: EquipmentTemplate = {
 	 *   id: "ring-rare",
 	 *   type: "Equipment",
 	 *   slot: EQUIPMENT_SLOT.FINGER,
 	 *   attributeBonuses: { strength: 10 }
-	 * } as any);
+	 * };
+	 * equipment.applyTemplate(template);
 	 * ```
 	 */
-	override applyTemplate(template: DungeonObjectTemplate): void {
+	override applyTemplate(
+		template: DungeonObjectTemplate | EquipmentTemplate
+	): void {
 		// Call parent to apply base properties
 		super.applyTemplate(template);
 
-		// Handle Equipment-specific properties that may be in the template
-		// (even though they're not in the DungeonObjectTemplate interface,
-		// they can be present when loading from YAML)
-		const equipmentTemplate = template as any;
+		// Handle Equipment-specific properties
+		const equipmentTemplate = template as EquipmentTemplate;
 		if (equipmentTemplate.slot !== undefined) {
-			this._slot = equipmentTemplate.slot as EQUIPMENT_SLOT;
+			this._slot = equipmentTemplate.slot;
 		}
 		if (equipmentTemplate.attributeBonuses !== undefined) {
 			this._attributeBonuses = equipmentTemplate.attributeBonuses;
@@ -4408,11 +4564,13 @@ export class Armor extends Equipment {
 	 * Override applyTemplate to handle Armor-specific properties.
 	 * Applies the defense value from the template if present.
 	 *
-	 * @param template - Template object potentially containing defense property
+	 * @param template - Template object containing armor properties
 	 */
-	override applyTemplate(template: DungeonObjectTemplate): void {
+	override applyTemplate(
+		template: DungeonObjectTemplate | ArmorTemplate
+	): void {
 		super.applyTemplate(template);
-		const armorTemplate = template as any;
+		const armorTemplate = template as ArmorTemplate;
 		if (armorTemplate.defense !== undefined) {
 			this._defense = armorTemplate.defense;
 		}
@@ -4593,15 +4751,31 @@ export class Weapon extends Equipment {
 
 	/**
 	 * Override applyTemplate to handle Weapon-specific properties.
-	 * Applies the attackPower value from the template if present.
+	 * Applies the attackPower and hitType values from the template if present.
 	 *
-	 * @param template - Template object potentially containing attackPower property
+	 * @param template - Template object containing weapon properties
 	 */
-	override applyTemplate(template: DungeonObjectTemplate): void {
+	override applyTemplate(
+		template: DungeonObjectTemplate | WeaponTemplate
+	): void {
 		super.applyTemplate(template);
-		const weaponTemplate = template as any;
+		const weaponTemplate = template as WeaponTemplate;
 		if (weaponTemplate.attackPower !== undefined) {
 			this._attackPower = weaponTemplate.attackPower;
+		}
+		if (weaponTemplate.hitType !== undefined) {
+			if (typeof weaponTemplate.hitType === "string") {
+				// Look up in common hit types
+				const common = COMMON_HIT_TYPES.get(
+					weaponTemplate.hitType.toLowerCase()
+				);
+				this._hitType = common ?? {
+					verb: weaponTemplate.hitType,
+					damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+				};
+			} else {
+				this._hitType = weaponTemplate.hitType;
+			}
 		}
 	}
 }

@@ -138,7 +138,7 @@ export const DEFAULT_CHANNELS: readonly CHANNEL[] = [
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	receiveOOC: true,
 	verboseMode: true,
-	prompt: "> ",
+	prompt: "{R%hh/%HH{rhp {C%mm/%MM{cmana {Y%ee{yexh {C%xp{cxp {B%XX{btnl{x > ",
 	colorEnabled: true,
 	autoLook: true,
 	briefMode: false,

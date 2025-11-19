@@ -26,8 +26,17 @@ import {
 	type SerializedProp,
 	type DungeonObjectTemplate,
 	type RoomTemplate,
+	ArmorTemplate,
+	WeaponTemplate,
 } from "./dungeon.js";
-import { Mob, type SerializedMob } from "./dungeon.js";
+import {
+	Mob,
+	type SerializedMob,
+	Equipment,
+	Armor,
+	Weapon,
+	EQUIPMENT_SLOT,
+} from "./dungeon.js";
 
 suite("dungeon.ts", () => {
 	suite("DIRECTION", () => {
@@ -2963,6 +2972,417 @@ suite("dungeon.ts", () => {
 			mob.location = room2;
 			assert.strictEqual(mob.spawnedByReset, reset);
 			assert.strictEqual(reset.countExisting(), 1);
+		});
+	});
+
+	suite("Reset equipped and inventory for Mobs", () => {
+		test("should create reset with equipped and inventory arrays", () => {
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: "@test{0,0,0}",
+				equipped: ["sword-iron", "helmet-steel"],
+				inventory: ["potion-healing", "coin-gold"],
+			});
+
+			assert.strictEqual(reset.equipped?.length, 2);
+			assert.strictEqual(reset.equipped?.[0], "sword-iron");
+			assert.strictEqual(reset.equipped?.[1], "helmet-steel");
+			assert.strictEqual(reset.inventory?.length, 2);
+			assert.strictEqual(reset.inventory?.[0], "potion-healing");
+			assert.strictEqual(reset.inventory?.[1], "coin-gold");
+		});
+
+		test("should spawn mob with equipped equipment", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-equipped",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+				keywords: "goblin",
+			};
+
+			const weaponTemplate: WeaponTemplate = {
+				id: "sword-iron",
+				type: "Weapon",
+				display: "Iron Sword",
+				keywords: "sword iron",
+				slot: EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: 10,
+			};
+
+			const armorTemplate: ArmorTemplate = {
+				id: "helmet-steel",
+				type: "Armor",
+				display: "Steel Helmet",
+				keywords: "helmet steel",
+				slot: EQUIPMENT_SLOT.HEAD,
+				defense: 5,
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", mobTemplate],
+				["sword-iron", weaponTemplate],
+				["helmet-steel", armorTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room.getRoomRef()!,
+				equipped: ["sword-iron", "helmet-steel"],
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+
+			// Verify equipment is equipped
+			const weapon = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
+			const helmet = mob.getEquipped(EQUIPMENT_SLOT.HEAD);
+
+			assert(weapon instanceof Weapon);
+			assert(helmet instanceof Armor);
+			assert.strictEqual(weapon.templateId, "sword-iron");
+			assert.strictEqual(helmet.templateId, "helmet-steel");
+			assert.strictEqual(weapon.attackPower, 10);
+			assert.strictEqual(helmet.defense, 5);
+
+			// Verify equipment is in mob's inventory
+			assert(mob.contains(weapon));
+			assert(mob.contains(helmet));
+		});
+
+		test("should spawn mob with inventory items", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-inventory",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+				keywords: "goblin",
+			};
+
+			const potionTemplate: DungeonObjectTemplate = {
+				id: "potion-healing",
+				type: "Item",
+				display: "Healing Potion",
+				keywords: "potion healing",
+			};
+
+			const coinTemplate: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+				keywords: "coin gold",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", mobTemplate],
+				["potion-healing", potionTemplate],
+				["coin-gold", coinTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room.getRoomRef()!,
+				inventory: ["potion-healing", "coin-gold"],
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+
+			// Verify items are in mob's inventory
+			const potion = mob.contents.find(
+				(obj) => obj.templateId === "potion-healing"
+			);
+			const coin = mob.contents.find((obj) => obj.templateId === "coin-gold");
+
+			assert(potion instanceof Item);
+			assert(coin instanceof Item);
+			assert.strictEqual(potion.templateId, "potion-healing");
+			assert.strictEqual(coin.templateId, "coin-gold");
+			assert.strictEqual(mob.contents.length, 2);
+		});
+
+		test("should spawn mob with both equipped and inventory", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-both",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin-warrior",
+				type: "Mob",
+				display: "Goblin Warrior",
+				keywords: "goblin warrior",
+			};
+
+			const weaponTemplate: WeaponTemplate = {
+				id: "sword-iron",
+				type: "Weapon",
+				display: "Iron Sword",
+				keywords: "sword iron",
+				slot: EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: 10,
+			};
+
+			const potionTemplate: DungeonObjectTemplate = {
+				id: "potion-healing",
+				type: "Item",
+				display: "Healing Potion",
+				keywords: "potion healing",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin-warrior", mobTemplate],
+				["sword-iron", weaponTemplate],
+				["potion-healing", potionTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin-warrior",
+				roomRef: room.getRoomRef()!,
+				equipped: ["sword-iron"],
+				inventory: ["potion-healing"],
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+
+			// Verify equipment is equipped
+			const weapon = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
+			assert(weapon instanceof Weapon);
+			assert.strictEqual(weapon.templateId, "sword-iron");
+
+			// Verify inventory item exists
+			const potion = mob.contents.find(
+				(obj) => obj.templateId === "potion-healing"
+			);
+			assert(potion instanceof Item);
+			assert.strictEqual(potion.templateId, "potion-healing");
+
+			// Both weapon and potion should be in mob's contents
+			// (equipped items are also in contents)
+			assert(mob.contains(weapon));
+			assert(mob.contains(potion));
+		});
+
+		test("should not equip items on non-mob objects", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-non-mob",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const itemTemplate: DungeonObjectTemplate = {
+				id: "coin-gold",
+				type: "Item",
+				display: "Gold Coin",
+				keywords: "coin gold",
+			};
+
+			const weaponTemplate: WeaponTemplate = {
+				id: "sword-iron",
+				type: "Weapon",
+				display: "Iron Sword",
+				keywords: "sword iron",
+				slot: EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: 10,
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["coin-gold", itemTemplate],
+				["sword-iron", weaponTemplate],
+			]);
+
+			// Reset for a non-mob with equipped/inventory should not error
+			// but should also not do anything
+			const reset = new Reset({
+				templateId: "coin-gold",
+				roomRef: room.getRoomRef()!,
+				equipped: ["sword-iron"],
+				inventory: ["sword-iron"],
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const item = spawned[0];
+			assert(item instanceof Item);
+			assert.strictEqual(item.contents.length, 0);
+		});
+
+		test("should handle missing equipment template gracefully", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-missing-equip",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+				keywords: "goblin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", mobTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room.getRoomRef()!,
+				equipped: ["nonexistent-weapon"],
+			});
+
+			// Should still spawn the mob, just without the missing equipment
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+			assert.strictEqual(mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND), undefined);
+		});
+
+		test("should handle wrong type in equipped array gracefully", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-wrong-type",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+				keywords: "goblin",
+			};
+
+			const itemTemplate: DungeonObjectTemplate = {
+				id: "potion-healing",
+				type: "Item",
+				display: "Healing Potion",
+				keywords: "potion healing",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", mobTemplate],
+				["potion-healing", itemTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room.getRoomRef()!,
+				equipped: ["potion-healing"], // Item type, not Equipment/Armor/Weapon
+			});
+
+			// Should still spawn the mob, just without equipping the invalid item
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+			// Should not have equipped anything since potion is not Equipment
+		});
+
+		test("should handle missing inventory template gracefully", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-missing-inv",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+				keywords: "goblin",
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", mobTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room.getRoomRef()!,
+				inventory: ["nonexistent-item"],
+			});
+
+			// Should still spawn the mob, just without the missing inventory
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 1);
+
+			const mob = spawned[0];
+			assert(mob instanceof Mob);
+			assert.strictEqual(mob.contents.length, 0);
+		});
+
+		test("should handle multiple mobs with same reset correctly", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id: "test-reset-multiple-mobs",
+				dimensions: { width: 5, height: 5, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
+
+			const mobTemplate: DungeonObjectTemplate = {
+				id: "goblin",
+				type: "Mob",
+				display: "Goblin",
+				keywords: "goblin",
+			};
+
+			const weaponTemplate: WeaponTemplate = {
+				id: "sword-iron",
+				type: "Weapon",
+				display: "Iron Sword",
+				keywords: "sword iron",
+				slot: EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: 10,
+			};
+
+			const templateRegistry = new Map<string, DungeonObjectTemplate>([
+				["goblin", mobTemplate],
+				["sword-iron", weaponTemplate],
+			]);
+
+			const reset = new Reset({
+				templateId: "goblin",
+				roomRef: room.getRoomRef()!,
+				minCount: 2,
+				maxCount: 2,
+				equipped: ["sword-iron"],
+			});
+
+			const spawned = reset.execute(templateRegistry);
+			assert.strictEqual(spawned.length, 2);
+
+			// Both mobs should have the weapon equipped
+			for (const obj of spawned) {
+				assert(obj instanceof Mob);
+				const mob = obj as Mob;
+				const weapon = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
+				assert(weapon instanceof Weapon);
+				assert.strictEqual(weapon.templateId, "sword-iron");
+			}
 		});
 	});
 });

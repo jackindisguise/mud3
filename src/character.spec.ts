@@ -532,7 +532,10 @@ suite("character.ts", () => {
 		test("DEFAULT_PLAYER_SETTINGS should have correct values", () => {
 			assert.strictEqual(DEFAULT_PLAYER_SETTINGS.receiveOOC, true);
 			assert.strictEqual(DEFAULT_PLAYER_SETTINGS.verboseMode, true);
-			assert.strictEqual(DEFAULT_PLAYER_SETTINGS.prompt, "> ");
+			assert.strictEqual(
+				DEFAULT_PLAYER_SETTINGS.prompt,
+				"{R%hh/%HH{rhp {C%mm/%MM{cmana {Y%ee{yexh {C%xp{cxp {B%XX{btnl{x > "
+			);
 			assert.strictEqual(DEFAULT_PLAYER_SETTINGS.colorEnabled, true);
 			assert.strictEqual(DEFAULT_PLAYER_SETTINGS.autoLook, true);
 			assert.strictEqual(DEFAULT_PLAYER_SETTINGS.briefMode, false);

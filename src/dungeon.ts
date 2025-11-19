@@ -82,6 +82,7 @@ import {
 import { processAggressiveBehavior } from "./behavior.js";
 import { damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
+import { getNextObjectIdSync } from "./package/gamestate.js";
 import {
 	HitType,
 	DEFAULT_HIT_TYPE,
@@ -1668,6 +1669,7 @@ export class Dungeon {
  * ```
  */
 export interface DungeonObjectOptions {
+	oid?: number;
 	keywords?: string;
 	display?: string;
 	description?: string;
@@ -1716,6 +1718,7 @@ export interface RoomOptions extends DungeonObjectOptions {
  */
 export interface SerializedDungeonObject {
 	type: SerializedDungeonObjectType;
+	oid?: number; // Optional: present for instances, absent for templates
 	keywords: string;
 	display: string;
 	templateId?: string;
@@ -2337,6 +2340,12 @@ export class Reset {
  */
 export class DungeonObject {
 	/**
+	 * Unique object identifier (OID) assigned to every dungeon object.
+	 * This ID persists across game instances and is tracked in gamestate.
+	 */
+	readonly oid: number;
+
+	/**
 	 * Space-separated list of words that can be used to identify this object.
 	 * Used by the match() method for object identification and targeting.
 	 */
@@ -2475,6 +2484,9 @@ export class DungeonObject {
 	 * ```
 	 */
 	constructor(options?: DungeonObjectOptions) {
+		// Assign unique object ID (OID) - use provided oid if deserializing, otherwise generate new one
+		this.oid = options?.oid ?? getNextObjectIdSync();
+
 		if (!options) return;
 		if (options.dungeon) this.dungeon = options.dungeon;
 		if (options.keywords) this.keywords = options.keywords;
@@ -2855,6 +2867,7 @@ export class DungeonObject {
 		// Uncompressed/base form includes selected keys even when undefined
 		const uncompressed: SerializedDungeonObject = {
 			type: this.constructor.name as SerializedDungeonObjectType,
+			oid: this.oid, // Always include oid for instances
 			keywords: this.keywords,
 			display: this.display,
 			...(this.templateId !== undefined && { templateId: this.templateId }),
@@ -3018,8 +3031,8 @@ export class DungeonObject {
 
 		// Only include fields that differ from the base
 		for (const field in serialized) {
-			// Skip contents and location - they are runtime state, not template data
-			if (field === "contents" || field === "location") {
+			// Skip contents, location, and oid - they are runtime state, not template data
+			if (field === "contents" || field === "location" || field === "oid") {
 				continue;
 			}
 
@@ -4238,7 +4251,7 @@ export enum EQUIPMENT_SLOT {
  */
 export interface EquipmentOptions extends DungeonObjectOptions {
 	/** The equipment slot this item occupies when equipped. */
-	slot: EQUIPMENT_SLOT;
+	slot?: EQUIPMENT_SLOT;
 	/** Defense value provided by this equipment. */
 	defense?: number;
 	/** Attribute bonuses provided by this equipment (for rare equipment). */
@@ -4558,7 +4571,7 @@ export class Equipment extends Item {
  */
 export interface ArmorOptions extends EquipmentOptions {
 	/** Defense value provided by this armor. */
-	defense: number;
+	defense?: number;
 }
 
 /**
@@ -4710,7 +4723,7 @@ export class Armor extends Equipment {
  */
 export interface WeaponOptions extends EquipmentOptions {
 	/** Attack power value provided by this weapon. */
-	attackPower: number;
+	attackPower?: number;
 	/** Hit type for this weapon (verb and damage type). If not provided, uses default hit type. */
 	hitType?: HitType | string;
 }
@@ -7216,15 +7229,15 @@ export class RoomLink {
 const baseSerializedTypes: Partial<
 	Record<SerializedDungeonObjectType, SerializedDungeonObject>
 > = {
-	Movable: new Movable().serialize(),
-	Mob: new Mob().serialize(),
-	Equipment: new Equipment().serialize(),
-	Armor: new Armor().serialize(),
-	Weapon: new Weapon().serialize(),
-	Item: new Item().serialize(),
-	Prop: new Prop().serialize(),
-	Room: new Room({ coordinates: { x: 0, y: 0, z: 0 } }).serialize(),
-	DungeonObject: new DungeonObject().serialize(),
+	Movable: new Movable({ oid: -1 }).serialize(),
+	Mob: new Mob({ oid: -1 }).serialize(),
+	Equipment: new Equipment({ oid: -1 }).serialize(),
+	Armor: new Armor({ oid: -1 }).serialize(),
+	Weapon: new Weapon({ oid: -1 }).serialize(),
+	Item: new Item({ oid: -1 }).serialize(),
+	Prop: new Prop({ oid: -1 }).serialize(),
+	Room: new Room({ oid: -1, coordinates: { x: 0, y: 0, z: 0 } }).serialize(),
+	DungeonObject: new DungeonObject({ oid: -1 }).serialize(),
 };
 
 /**
@@ -7269,7 +7282,7 @@ function getCompressionBaseline(
 
 /**
  * Produces a compressed serialized object by removing keys equal to baseline.
- * Always preserves 'type' and includes 'templateId' when provided.
+ * Always preserves 'type', 'oid' (if present), and includes 'templateId' when provided.
  */
 function compressSerializedObject<T extends SerializedDungeonObject>(
 	uncompressed: T,
@@ -7279,6 +7292,7 @@ function compressSerializedObject<T extends SerializedDungeonObject>(
 	const base = getCompressionBaseline(type, templateId);
 	const compressed: Partial<SerializedDungeonObject> = {
 		type,
+		...(uncompressed.oid !== undefined && { oid: uncompressed.oid }), // Include oid if present (instances only)
 		...(templateId ? { templateId } : {}),
 	};
 	for (const [key, value] of Object.entries(uncompressed) as Array<
@@ -7286,6 +7300,7 @@ function compressSerializedObject<T extends SerializedDungeonObject>(
 	>) {
 		if (key === "type") continue;
 		if (key === "templateId") continue;
+		if (key === "oid") continue; // Already handled above
 		const baseValue = (base as any)?.[key];
 		if (value !== baseValue) {
 			(compressed as any)[key] = value;

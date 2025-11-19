@@ -6,8 +6,8 @@
  * to the console (console output is disabled during tests).
  *
  * Transports
- * - File (errors): `logs/error-YYYY-MM-DD-HHMMSS[.test].log` at level `error`
- * - File (app):    `logs/app-YYYY-MM-DD-HHMMSS[.test].log` at level `debug`
+ * - File (errors): `logs/YYYY-MM-DD/error-HHMMSS[.test].log` at level `error`
+ * - File (app):    `logs/YYYY-MM-DD/app-HHMMSS[.test].log` at level `debug`
  * - Console: colorized output at `LOG_LEVEL` (default `info`), disabled when
  *   `process.env.NODE_TEST_CONTEXT` is set
  *
@@ -36,6 +36,7 @@
 import winston from "winston";
 import path from "path";
 import { fileURLToPath } from "url";
+import { mkdirSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,13 +45,18 @@ const __dirname = path.dirname(__filename);
 // Check for node:test runner or jest/mocha
 const isTestMode = process.env.NODE_TEST_CONTEXT;
 
-// Generate timestamp for log filenames (YYYY-MM-DD)
+// Generate timestamp for log filenames
 const timestamp = new Date().toISOString().split("T");
-const date = timestamp[0];
+const date = timestamp[0]; // YYYY-MM-DD
 const hmsTimestamp = timestamp[1];
 const zTimestamp = hmsTimestamp.split(".")[0];
-const HMS = zTimestamp.split(":").join("");
+const HMS = zTimestamp.split(":").join(""); // HHMMSS
 const testSuffix = isTestMode ? ".test" : "";
+
+// Create date-based folder for logs
+const logsBaseDir = path.join(__dirname, "..", "..", "logs");
+const logsDateDir = path.join(logsBaseDir, date);
+mkdirSync(logsDateDir, { recursive: true });
 
 /**
  * Application logger using Winston.
@@ -105,13 +111,7 @@ const logger = winston.createLogger({
 	transports: [
 		// File transport - plain text without colors
 		new winston.transports.File({
-			filename: path.join(
-				__dirname,
-				"..",
-				"..",
-				"logs",
-				`error-${date}-${HMS}${testSuffix}.log`
-			),
+			filename: path.join(logsDateDir, `error-${HMS}${testSuffix}.log`),
 			level: "error",
 			format: winston.format.combine(
 				winston.format.uncolorize(),
@@ -125,13 +125,7 @@ const logger = winston.createLogger({
 			),
 		}),
 		new winston.transports.File({
-			filename: path.join(
-				__dirname,
-				"..",
-				"..",
-				"logs",
-				`app-${date}-${HMS}${testSuffix}.log`
-			),
+			filename: path.join(logsDateDir, `app-${HMS}${testSuffix}.log`),
 			level: "debug", // File gets all logs including debug
 			format: winston.format.combine(
 				winston.format.uncolorize(),

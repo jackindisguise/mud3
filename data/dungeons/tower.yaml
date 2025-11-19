@@ -8052,6 +8052,8 @@ dungeon:
       race: dunpeal
       job: gravesinger
       level: 20
+      behaviors:
+        wander: true
     - id: tower-sword
       type: Weapon
       keywords: guardian force maul golden radiant

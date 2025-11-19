@@ -247,28 +247,31 @@ suite("dungeon.ts", () => {
 			});
 
 			// Try to add a room outside the x bounds
-			const roomX = new Room({ coordinates: { x: 5, y: 0, z: 0 } });
+			const roomX = new Room({ oid: -1, coordinates: { x: 5, y: 0, z: 0 } });
 			const resultX = dungeon.addRoom(roomX);
 			assert.strictEqual(resultX, false);
 			assert.strictEqual(roomX.dungeon, undefined);
 
 			// Try to add a room outside the y bounds
-			const roomY = new Room({ coordinates: { x: 0, y: 5, z: 0 } });
+			const roomY = new Room({ oid: -1, coordinates: { x: 0, y: 5, z: 0 } });
 			const resultY = dungeon.addRoom(roomY);
 			assert.strictEqual(resultY, false);
 
 			// Try to add a room outside the z bounds
-			const roomZ = new Room({ coordinates: { x: 0, y: 0, z: 5 } });
+			const roomZ = new Room({ oid: -1, coordinates: { x: 0, y: 0, z: 5 } });
 			const resultZ = dungeon.addRoom(roomZ);
 			assert.strictEqual(resultZ, false);
 
 			// Try to add a room with negative coordinates
-			const roomNeg = new Room({ coordinates: { x: -1, y: 0, z: 0 } });
+			const roomNeg = new Room({ oid: -1, coordinates: { x: -1, y: 0, z: 0 } });
 			const resultNeg = dungeon.addRoom(roomNeg);
 			assert.strictEqual(resultNeg, false);
 
 			// Verify a valid room can still be added
-			const validRoom = new Room({ coordinates: { x: 1, y: 1, z: 0 } });
+			const validRoom = new Room({
+				oid: -1,
+				coordinates: { x: 1, y: 1, z: 0 },
+			});
 			const resultValid = dungeon.addRoom(validRoom);
 			assert.strictEqual(resultValid, true);
 			assert.strictEqual(validRoom.dungeon, dungeon);
@@ -277,7 +280,7 @@ suite("dungeon.ts", () => {
 
 	suite("DungeonObject", () => {
 		test("should initialize with default values", () => {
-			const obj = new DungeonObject();
+			const obj = new DungeonObject({ oid: -1 });
 			assert.strictEqual(obj.keywords, "dungeon object");
 			assert.strictEqual(obj.display, "Dungeon Object");
 			assert.strictEqual(obj.description, undefined);
@@ -303,10 +306,12 @@ suite("dungeon.ts", () => {
 
 		test("should manage contents correctly", () => {
 			const container = new DungeonObject({
+				oid: -1,
 				keywords: "leather bag",
 				display: "Leather Bag",
 			});
 			const item = new DungeonObject({
+				oid: -1,
 				keywords: "small stone",
 				description: "A smooth, gray stone.",
 			});
@@ -322,10 +327,12 @@ suite("dungeon.ts", () => {
 
 		test("should handle setting location to current location", () => {
 			const container = new DungeonObject({
+				oid: -1,
 				keywords: "wooden box",
 				display: "Wooden Box",
 			});
 			const item = new DungeonObject({
+				oid: -1,
 				keywords: "small stone",
 			});
 
@@ -345,7 +352,7 @@ suite("dungeon.ts", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
-			const obj = new DungeonObject();
+			const obj = new DungeonObject({ oid: -1 });
 
 			obj.dungeon = dungeon;
 			assert.strictEqual(obj.dungeon, dungeon);
@@ -363,7 +370,7 @@ suite("dungeon.ts", () => {
 			const room = dungeon.getRoom({ x: 1, y: 1, z: 0 });
 			assert(room);
 
-			const obj = new DungeonObject({ keywords: "test item" });
+			const obj = new DungeonObject({ oid: -1, keywords: "test item" });
 			room.add(obj);
 
 			// Verify object is in the dungeon
@@ -380,19 +387,19 @@ suite("dungeon.ts", () => {
 
 		suite("Weight System", () => {
 			test("should initialize baseWeight and currentWeight correctly", () => {
-				const obj = new DungeonObject();
+				const obj = new DungeonObject({ oid: -1 });
 				assert.strictEqual(obj.baseWeight, 0);
 				assert.strictEqual(obj.currentWeight, 0);
 
-				const heavyObj = new DungeonObject({ baseWeight: 5.5 });
+				const heavyObj = new DungeonObject({ oid: -1, baseWeight: 5.5 });
 				assert.strictEqual(heavyObj.baseWeight, 5.5);
 				assert.strictEqual(heavyObj.currentWeight, 5.5);
 			});
 
 			test("should add weight when adding objects", () => {
-				const container = new DungeonObject({ baseWeight: 1.0 });
-				const item1 = new DungeonObject({ baseWeight: 2.5 });
-				const item2 = new DungeonObject({ baseWeight: 1.5 });
+				const container = new DungeonObject({ oid: -1, baseWeight: 1.0 });
+				const item1 = new DungeonObject({ oid: -1, baseWeight: 2.5 });
+				const item2 = new DungeonObject({ oid: -1, baseWeight: 1.5 });
 
 				// Container starts with its base weight
 				assert.strictEqual(container.currentWeight, 1.0);
@@ -409,9 +416,9 @@ suite("dungeon.ts", () => {
 			});
 
 			test("should remove weight when removing objects", () => {
-				const container = new DungeonObject({ baseWeight: 1.0 });
-				const item1 = new DungeonObject({ baseWeight: 2.5 });
-				const item2 = new DungeonObject({ baseWeight: 1.5 });
+				const container = new DungeonObject({ oid: -1, baseWeight: 1.0 });
+				const item1 = new DungeonObject({ oid: -1, baseWeight: 2.5 });
+				const item2 = new DungeonObject({ oid: -1, baseWeight: 1.5 });
 
 				container.add(item1, item2);
 				assert.strictEqual(container.currentWeight, 1.0 + 2.5 + 1.5);
@@ -427,9 +434,9 @@ suite("dungeon.ts", () => {
 			});
 
 			test("should propagate weight up the containment chain", () => {
-				const outer = new DungeonObject({ baseWeight: 2.0 });
-				const middle = new DungeonObject({ baseWeight: 1.0 });
-				const inner = new DungeonObject({ baseWeight: 0.5 });
+				const outer = new DungeonObject({ oid: -1, baseWeight: 2.0 });
+				const middle = new DungeonObject({ oid: -1, baseWeight: 1.0 });
+				const inner = new DungeonObject({ oid: -1, baseWeight: 0.5 });
 
 				// Build nested structure: outer -> middle -> inner
 				outer.add(middle);
@@ -444,9 +451,9 @@ suite("dungeon.ts", () => {
 			});
 
 			test("should propagate weight removal up the containment chain", () => {
-				const outer = new DungeonObject({ baseWeight: 2.0 });
-				const middle = new DungeonObject({ baseWeight: 1.0 });
-				const inner = new DungeonObject({ baseWeight: 0.5 });
+				const outer = new DungeonObject({ oid: -1, baseWeight: 2.0 });
+				const middle = new DungeonObject({ oid: -1, baseWeight: 1.0 });
+				const inner = new DungeonObject({ oid: -1, baseWeight: 0.5 });
 
 				outer.add(middle);
 				middle.add(inner);
@@ -461,9 +468,9 @@ suite("dungeon.ts", () => {
 			});
 
 			test("should handle weight when moving objects between containers", () => {
-				const container1 = new DungeonObject({ baseWeight: 1.0 });
-				const container2 = new DungeonObject({ baseWeight: 2.0 });
-				const item = new DungeonObject({ baseWeight: 3.0 });
+				const container1 = new DungeonObject({ oid: -1, baseWeight: 1.0 });
+				const container2 = new DungeonObject({ oid: -1, baseWeight: 2.0 });
+				const item = new DungeonObject({ oid: -1, baseWeight: 3.0 });
 
 				container1.add(item);
 				assert.strictEqual(container1.currentWeight, 1.0 + 3.0);
@@ -478,9 +485,9 @@ suite("dungeon.ts", () => {
 			});
 
 			test("should handle weight with zero baseWeight objects", () => {
-				const container = new DungeonObject({ baseWeight: 1.0 });
-				const item1 = new DungeonObject({ baseWeight: 0 });
-				const item2 = new DungeonObject(); // default baseWeight is 0
+				const container = new DungeonObject({ oid: -1, baseWeight: 1.0 });
+				const item1 = new DungeonObject({ oid: -1, baseWeight: 0 });
+				const item2 = new DungeonObject({ oid: -1 }); // default baseWeight is 0
 
 				container.add(item1, item2);
 				// Container weight should only include its own base weight
@@ -488,10 +495,10 @@ suite("dungeon.ts", () => {
 			});
 
 			test("should handle weight with deeply nested structures", () => {
-				const level1 = new DungeonObject({ baseWeight: 10.0 });
-				const level2 = new DungeonObject({ baseWeight: 5.0 });
-				const level3 = new DungeonObject({ baseWeight: 2.0 });
-				const level4 = new DungeonObject({ baseWeight: 1.0 });
+				const level1 = new DungeonObject({ oid: -1, baseWeight: 10.0 });
+				const level2 = new DungeonObject({ oid: -1, baseWeight: 5.0 });
+				const level3 = new DungeonObject({ oid: -1, baseWeight: 2.0 });
+				const level4 = new DungeonObject({ oid: -1, baseWeight: 1.0 });
 
 				level1.add(level2);
 				level2.add(level3);
@@ -511,6 +518,7 @@ suite("dungeon.ts", () => {
 		suite("Template System", () => {
 			test("toTemplate() should create template with only differential fields", () => {
 				const obj = new DungeonObject({
+					oid: -1,
 					keywords: "test object",
 					display: "Test Object",
 					description: "A test object.",
@@ -531,6 +539,7 @@ suite("dungeon.ts", () => {
 
 			test("toTemplate() should exclude fields that match defaults", () => {
 				const obj = new DungeonObject({
+					oid: -1,
 					keywords: "dungeon object", // default
 					display: "Dungeon Object", // default
 					// description is undefined (default)
@@ -550,6 +559,7 @@ suite("dungeon.ts", () => {
 
 			test("toTemplate() should handle partial overrides", () => {
 				const obj = new DungeonObject({
+					oid: -1,
 					display: "Custom Display",
 					baseWeight: 2.5,
 					// keywords and description use defaults
@@ -573,6 +583,7 @@ suite("dungeon.ts", () => {
 
 			test("toTemplate() should work with Items", () => {
 				const item = new Item({
+					oid: -1,
 					keywords: "iron sword",
 					display: "Iron Sword",
 					baseWeight: 3.0,
@@ -596,10 +607,12 @@ suite("dungeon.ts", () => {
 
 			test("toTemplate() should not include contents", () => {
 				const container = new DungeonObject({
+					oid: -1,
 					keywords: "chest",
 					display: "Chest",
 				});
 				const item = new DungeonObject({
+					oid: -1,
 					keywords: "coin",
 					display: "Coin",
 				});
@@ -621,7 +634,7 @@ suite("dungeon.ts", () => {
 			});
 
 			test("applyTemplate() should apply template fields to object", () => {
-				const obj = new DungeonObject();
+				const obj = new DungeonObject({ oid: -1 });
 				const template: DungeonObjectTemplate = {
 					id: "test",
 					type: "DungeonObject",
@@ -644,6 +657,7 @@ suite("dungeon.ts", () => {
 
 			test("applyTemplate() should only apply defined fields", () => {
 				const obj = new DungeonObject({
+					oid: -1,
 					keywords: "original keywords",
 					display: "Original Display",
 					description: "Original description",
@@ -668,6 +682,7 @@ suite("dungeon.ts", () => {
 
 			test("applyTemplate() should update currentWeight when baseWeight is applied", () => {
 				const obj = new DungeonObject({
+					oid: -1,
 					baseWeight: 2.0,
 				});
 				assert.strictEqual(obj.currentWeight, 2.0);
@@ -810,6 +825,7 @@ suite("dungeon.ts", () => {
 
 			test("toTemplate() and createFromTemplate() should round-trip correctly", () => {
 				const original = new Item({
+					oid: -1,
 					keywords: "magic sword",
 					display: "Magic Sword",
 					description: "A sword imbued with magic.",
@@ -829,6 +845,7 @@ suite("dungeon.ts", () => {
 
 			test("toTemplate() should handle objects with zero weight correctly", () => {
 				const obj = new DungeonObject({
+					oid: -1,
 					keywords: "light object",
 					display: "Light Object",
 					baseWeight: 0,
@@ -857,11 +874,12 @@ suite("dungeon.ts", () => {
 			assert(roomA && roomB);
 
 			const backpack = new DungeonObject({
+				oid: -1,
 				keywords: "backpack",
 				display: "Backpack",
 			});
-			const coin = new DungeonObject({ keywords: "coin" });
-			const gem = new DungeonObject({ keywords: "gem" });
+			const coin = new DungeonObject({ oid: -1, keywords: "coin" });
+			const gem = new DungeonObject({ oid: -1, keywords: "gem" });
 
 			// Add items to container
 			backpack.add(coin);
@@ -909,20 +927,23 @@ suite("dungeon.ts", () => {
 
 			// Create various objects
 			const chest = new DungeonObject({
+				oid: -1,
 				keywords: "wooden chest",
 				display: "Wooden Chest",
 				description: "A sturdy wooden chest with iron bindings.",
 			});
 			const coin = new DungeonObject({
+				oid: -1,
 				keywords: "gold coin",
 				display: "Gold Coin",
 			});
-			const sword = new DungeonObject({ keywords: "steel sword" });
+			const sword = new DungeonObject({ oid: -1, keywords: "steel sword" });
 			const gem = new DungeonObject({
+				oid: -1,
 				keywords: "ruby gem",
 				description: "A brilliant red ruby that catches the light.",
 			});
-			const player = new Movable({ keywords: "player hero" });
+			const player = new Movable({ oid: -1, keywords: "player hero" });
 
 			// Add objects to room
 			room.add(chest);
@@ -974,8 +995,8 @@ suite("dungeon.ts", () => {
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 			assert(room);
 
-			const obj1 = new DungeonObject({ keywords: "object1" });
-			const obj2 = new DungeonObject({ keywords: "object2" });
+			const obj1 = new DungeonObject({ oid: -1, keywords: "object1" });
+			const obj2 = new DungeonObject({ oid: -1, keywords: "object2" });
 			room.add(obj1);
 			room.add(obj2);
 
@@ -984,7 +1005,9 @@ suite("dungeon.ts", () => {
 			const initialLength = initialContents.length;
 
 			// Mutate the returned array
-			initialContents.push(new DungeonObject({ keywords: "fake object" }));
+			initialContents.push(
+				new DungeonObject({ oid: -1, keywords: "fake object" })
+			);
 			initialContents.pop();
 			initialContents.shift();
 			initialContents.reverse();
@@ -1005,8 +1028,8 @@ suite("dungeon.ts", () => {
 				dimensions: { width: 2, height: 2, layers: 1 },
 			});
 
-			const obj1 = new DungeonObject({ keywords: "object1" });
-			const obj2 = new DungeonObject({ keywords: "object2" });
+			const obj1 = new DungeonObject({ oid: -1, keywords: "object1" });
+			const obj2 = new DungeonObject({ oid: -1, keywords: "object2" });
 
 			// Add object to dungeon
 			dungeon.add(obj1);
@@ -1030,8 +1053,8 @@ suite("dungeon.ts", () => {
 				dimensions: { width: 2, height: 2, layers: 1 },
 			});
 
-			const obj1 = new DungeonObject({ keywords: "object1" });
-			const obj2 = new DungeonObject({ keywords: "object2" });
+			const obj1 = new DungeonObject({ oid: -1, keywords: "object1" });
+			const obj2 = new DungeonObject({ oid: -1, keywords: "object2" });
 
 			// Add objects to dungeon
 			dungeon.add(obj1);
@@ -1047,7 +1070,7 @@ suite("dungeon.ts", () => {
 
 			// Removing an object not in the dungeon should be ignored (no error)
 			const lengthBefore = dungeon.contents.length;
-			const obj3 = new DungeonObject({ keywords: "object3" });
+			const obj3 = new DungeonObject({ oid: -1, keywords: "object3" });
 			dungeon.remove(obj3);
 			assert.strictEqual(dungeon.contents.length, lengthBefore);
 			assert(!dungeon.contains(obj3));
@@ -1174,7 +1197,7 @@ suite("dungeon.ts", () => {
 	suite("Room", () => {
 		test("should initialize with correct coordinates", () => {
 			const coordinates = { x: 1, y: 2, z: 3 };
-			const room = new Room({ coordinates });
+			const room = new Room({ oid: -1, coordinates });
 
 			assert.deepStrictEqual(room.coordinates, coordinates);
 			assert.strictEqual(room.x, coordinates.x);
@@ -1183,8 +1206,8 @@ suite("dungeon.ts", () => {
 		});
 
 		test("should have default movement permissions", () => {
-			const room = new Room({ coordinates: { x: 0, y: 0, z: 0 } });
-			const movable = new Movable();
+			const room = new Room({ oid: -1, coordinates: { x: 0, y: 0, z: 0 } });
+			const movable = new Movable({ oid: -1 });
 
 			assert(room.canEnter(movable));
 			assert(room.canExit(movable));
@@ -1196,7 +1219,7 @@ suite("dungeon.ts", () => {
 			});
 			const room = dungeon.getRoom({ x: 1, y: 1, z: 1 });
 			assert(room);
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			room.add(movable);
 
 			// UP/DOWN should be blocked by default
@@ -1218,7 +1241,7 @@ suite("dungeon.ts", () => {
 			assert(room);
 			// Enable UP/DOWN
 			room.allowedExits |= DIRECTION.UP | DIRECTION.DOWN;
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			room.add(movable);
 
 			// UP/DOWN should now be allowed
@@ -1299,7 +1322,7 @@ suite("dungeon.ts", () => {
 			const link = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB);
 
 			// Test movement between dungeons
-			const player = new Movable();
+			const player = new Movable({ oid: -1 });
 			roomA.add(player);
 
 			assert(player.canStep(DIRECTION.EAST));
@@ -1328,7 +1351,7 @@ suite("dungeon.ts", () => {
 			assert.strictEqual(roomA.getStep(DIRECTION.UP), roomB);
 			assert.strictEqual(roomB.getStep(DIRECTION.DOWN), roomA);
 
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			roomA.add(movable);
 			// canStep should work because link overrides allowedExits
 			assert.strictEqual(movable.canStep(DIRECTION.UP), true);
@@ -1379,7 +1402,7 @@ suite("dungeon.ts", () => {
 			assert.strictEqual(east.getStep(DIRECTION.EAST), center);
 
 			// But removed link doesn't work - getStep should return undefined because DOWN is blocked by allowedExits
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			center.add(movable);
 			// getStep should return undefined because DOWN is not in allowedExits by default
 			assert.strictEqual(center.getStep(DIRECTION.DOWN), undefined);
@@ -1407,7 +1430,7 @@ suite("dungeon.ts", () => {
 			assert(roomB.getStep(DIRECTION.WEST) !== roomA);
 
 			// Movable can traverse forward across the one-way link
-			const player = new Movable();
+			const player = new Movable({ oid: -1 });
 			roomA.add(player);
 			assert(player.canStep(DIRECTION.EAST));
 			player.step(DIRECTION.EAST);
@@ -1428,7 +1451,7 @@ suite("dungeon.ts", () => {
 				dimensions: { width: 3, height: 3, layers: 1 },
 			});
 			dungeon.generateRooms();
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			const room1 = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 			const room2 = dungeon.getRoom({ x: 1, y: 0, z: 0 });
 			assert(room1 && room2);
@@ -1447,7 +1470,7 @@ suite("dungeon.ts", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 5, height: 5, layers: 3 },
 			});
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			const room = dungeon.getRoom({ x: 2, y: 3, z: 1 });
 			assert(room);
 
@@ -1465,14 +1488,14 @@ suite("dungeon.ts", () => {
 		});
 
 		test("getStep() should return undefined when not in a room", () => {
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			assert.strictEqual(movable.getStep(DIRECTION.NORTH), undefined);
 			assert.strictEqual(movable.getStep(DIRECTION.EAST), undefined);
 			assert.strictEqual(movable.getStep(DIRECTION.UP), undefined);
 		});
 
 		test("canStep() should return false when not in a room", () => {
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			assert.strictEqual(movable.canStep(DIRECTION.NORTH), false);
 			assert.strictEqual(movable.canStep(DIRECTION.SOUTH), false);
 			assert.strictEqual(movable.canStep(DIRECTION.EAST), false);
@@ -1495,7 +1518,7 @@ suite("dungeon.ts", () => {
 			});
 			dungeon.addRoom(restrictedRoom);
 
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			restrictedRoom.add(movable);
 
 			// Should not be able to exit north
@@ -1524,7 +1547,7 @@ suite("dungeon.ts", () => {
 			const lockedRoom = new LockedRoom({ coordinates: { x: 1, y: 0, z: 0 } });
 			dungeon.addRoom(lockedRoom);
 
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			startRoom.add(movable);
 
 			// Should not be able to step north into the locked room
@@ -1539,7 +1562,7 @@ suite("dungeon.ts", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 3, height: 3, layers: 1 },
 			});
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			const cornerRoom = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 			assert(cornerRoom);
 			cornerRoom.add(movable);
@@ -1567,7 +1590,7 @@ suite("dungeon.ts", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 3, height: 3, layers: 1 },
 			});
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			const startRoom = dungeon.getRoom({ x: 1, y: 1, z: 0 });
 			assert(startRoom);
 			startRoom.add(movable);
@@ -1583,7 +1606,7 @@ suite("dungeon.ts", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 3, height: 3, layers: 1 },
 			});
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			const edgeRoom = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 			assert(edgeRoom);
 			edgeRoom.add(movable);
@@ -1598,7 +1621,7 @@ suite("dungeon.ts", () => {
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 3, height: 3, layers: 3 },
 			});
-			const movable = new Movable();
+			const movable = new Movable({ oid: -1 });
 			const centerRoom = dungeon.getRoom({ x: 1, y: 1, z: 1 });
 			assert(centerRoom);
 			// Enable UP/DOWN for vertical movement
@@ -1805,8 +1828,8 @@ suite("dungeon.ts", () => {
 				}
 			});
 			test("should not include location when object is not in a room", () => {
-				const obj = new DungeonObject();
-				const container = new DungeonObject();
+				const obj = new DungeonObject({ oid: -1 });
+				const container = new DungeonObject({ oid: -1 });
 				container.add(obj);
 
 				const serialized = obj.serialize();
@@ -1820,7 +1843,7 @@ suite("dungeon.ts", () => {
 				const room = dungeon.getRoom({ x: 1, y: 1, z: 0 });
 				assert(room);
 
-				const obj = new DungeonObject();
+				const obj = new DungeonObject({ oid: -1 });
 				room.add(obj);
 
 				const serialized = obj.serialize();
@@ -1829,14 +1852,17 @@ suite("dungeon.ts", () => {
 
 			test("should serialize deeply nested hierarchies", () => {
 				const backpack = new DungeonObject({
+					oid: -1,
 					keywords: "leather backpack",
 					display: "Leather Backpack",
 				});
 				const pouch = new DungeonObject({
+					oid: -1,
 					keywords: "small pouch",
 					display: "Small Pouch",
 				});
 				const coin = new DungeonObject({
+					oid: -1,
 					keywords: "gold coin",
 					display: "Gold Coin",
 				});
@@ -1860,6 +1886,7 @@ suite("dungeon.ts", () => {
 		suite("Room", () => {
 			test("should serialize with coordinates", () => {
 				const room = new Room({
+					oid: -1,
 					coordinates: { x: 5, y: 3, z: 1 },
 					keywords: "start room",
 					display: "Starting Room",
@@ -1886,10 +1913,12 @@ suite("dungeon.ts", () => {
 					display: "Treasure Room",
 				});
 				const chest = new DungeonObject({
+					oid: -1,
 					keywords: "wooden chest",
 					display: "Wooden Chest",
 				});
 				const sword = new DungeonObject({
+					oid: -1,
 					keywords: "steel sword",
 					display: "Steel Sword",
 				});
@@ -1907,6 +1936,7 @@ suite("dungeon.ts", () => {
 		suite("Subclass Serialization", () => {
 			test("should serialize Movable objects with correct type", () => {
 				const movable = new Movable({
+					oid: -1,
 					keywords: "player character",
 					display: "Player Character",
 				});
@@ -1918,6 +1948,7 @@ suite("dungeon.ts", () => {
 
 			test("should serialize Mob objects with correct type", () => {
 				const mob = new Mob({
+					oid: -1,
 					keywords: "orc warrior",
 					display: "Orc Warrior",
 				});
@@ -1929,6 +1960,7 @@ suite("dungeon.ts", () => {
 
 			test("should serialize Item objects with correct type", () => {
 				const item = new Item({
+					oid: -1,
 					keywords: "magic potion",
 					display: "Magic Potion",
 				});
@@ -1940,6 +1972,7 @@ suite("dungeon.ts", () => {
 
 			test("should serialize Prop objects with correct type", () => {
 				const prop = new Prop({
+					oid: -1,
 					keywords: "stone statue",
 					display: "Stone Statue",
 				});
@@ -1956,6 +1989,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize basic properties correctly", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "wooden chest treasure",
 					display: "Wooden Treasure Chest",
 					description: "A sturdy wooden chest bound with iron bands.",
@@ -1977,6 +2011,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize roomDescription when present", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "sword",
 					display: "Sword",
 					roomDescription: "A shining, long piece of metal is here.",
@@ -1995,6 +2030,7 @@ suite("dungeon.ts", () => {
 			test("should handle missing roomDescription in deserialization", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "sword",
 					display: "Sword",
 					contents: [],
@@ -2009,12 +2045,14 @@ suite("dungeon.ts", () => {
 			test("should deserialize nested contents recursively", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "wooden chest",
 					display: "Wooden Chest",
 					description: "A wooden chest.",
 					contents: [
 						{
 							type: "DungeonObject",
+							oid: -1,
 							keywords: "gold coin",
 							display: "Gold Coin",
 							description: "A shiny gold coin.",
@@ -2022,6 +2060,7 @@ suite("dungeon.ts", () => {
 						},
 						{
 							type: "Item",
+							oid: -1,
 							keywords: "ruby gem",
 							display: "Ruby Gem",
 							description: "A brilliant red ruby.",
@@ -2043,6 +2082,7 @@ suite("dungeon.ts", () => {
 			test("should preserve location field but not place object in dungeon", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "test object",
 					display: "Test Object",
 					description: "A test object.",
@@ -2067,18 +2107,21 @@ suite("dungeon.ts", () => {
 			test("should handle deeply nested hierarchies", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "leather backpack",
 					display: "Leather Backpack",
 					description: "A worn leather backpack.",
 					contents: [
 						{
 							type: "DungeonObject",
+							oid: -1,
 							keywords: "small pouch",
 							display: "Small Pouch",
 							description: "A small cloth pouch.",
 							contents: [
 								{
 									type: "DungeonObject",
+									oid: -1,
 									keywords: "gold coin",
 									display: "Gold Coin",
 									description: "A shiny gold coin.",
@@ -2105,6 +2148,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize rooms with coordinates", () => {
 				const data: SerializedRoom = {
 					type: "Room",
+					oid: -1,
 					keywords: "treasure room",
 					display: "Treasure Room",
 					description: "A room filled with treasure.",
@@ -2129,6 +2173,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize room contents", () => {
 				const data: SerializedRoom = {
 					type: "Room",
+					oid: -1,
 					keywords: "start room",
 					display: "Starting Room",
 					description: "Where the adventure begins.",
@@ -2138,6 +2183,7 @@ suite("dungeon.ts", () => {
 					contents: [
 						{
 							type: "DungeonObject",
+							oid: -1,
 							keywords: "wooden table",
 							display: "Wooden Table",
 							description: "A simple wooden table.",
@@ -2145,6 +2191,7 @@ suite("dungeon.ts", () => {
 						},
 						{
 							type: "Movable",
+							oid: -1,
 							keywords: "player character",
 							display: "Player Character",
 							description: "The main character.",
@@ -2167,6 +2214,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize Movable objects correctly", () => {
 				const data: SerializedMovable = {
 					type: "Movable",
+					oid: -1,
 					keywords: "player character",
 					display: "Player Character",
 					description: "The main character.",
@@ -2182,6 +2230,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize Mob objects correctly", () => {
 				const data: SerializedMob = {
 					type: "Mob",
+					oid: -1,
 					keywords: "orc warrior",
 					display: "Orc Warrior",
 					description: "A fierce orc warrior.",
@@ -2206,6 +2255,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize Item objects correctly", () => {
 				const data: SerializedItem = {
 					type: "Item",
+					oid: -1,
 					keywords: "magic sword",
 					display: "Magic Sword",
 					description: "A sword imbued with magical power.",
@@ -2221,6 +2271,7 @@ suite("dungeon.ts", () => {
 			test("should deserialize Prop objects correctly", () => {
 				const data: SerializedProp = {
 					type: "Prop",
+					oid: -1,
 					keywords: "stone altar",
 					display: "Stone Altar",
 					description: "An ancient stone altar.",
@@ -2238,12 +2289,14 @@ suite("dungeon.ts", () => {
 			test("should deserialize mixed object types in the same hierarchy", () => {
 				const data: SerializedDungeonObject = {
 					type: "DungeonObject",
+					oid: -1,
 					keywords: "treasure chest",
 					display: "Treasure Chest",
 					description: "A chest full of various treasures.",
 					contents: [
 						{
 							type: "Item",
+							oid: -1,
 							keywords: "magic sword",
 							display: "Magic Sword",
 							description: "A magical blade.",
@@ -2251,12 +2304,14 @@ suite("dungeon.ts", () => {
 						},
 						{
 							type: "DungeonObject",
+							oid: -1,
 							keywords: "coin purse",
 							display: "Coin Purse",
 							description: "A small purse.",
 							contents: [
 								{
 									type: "Item",
+									oid: -1,
 									keywords: "gold coin",
 									display: "Gold Coin",
 									description: "A shiny coin.",
@@ -2266,6 +2321,7 @@ suite("dungeon.ts", () => {
 						},
 						{
 							type: "Prop",
+							oid: -1,
 							keywords: "decorative gem",
 							display: "Decorative Gem",
 							description: "A beautiful ornamental gem.",
@@ -2299,6 +2355,7 @@ suite("dungeon.ts", () => {
 				description: "A well-worn leather backpack.",
 			});
 			const weapon = new Item({
+				oid: -1,
 				keywords: "steel dagger",
 				display: "Steel Dagger",
 				description: "A sharp steel dagger.",
@@ -2309,10 +2366,12 @@ suite("dungeon.ts", () => {
 				description: "A small leather pouch.",
 			});
 			const coin1 = new Item({
+				oid: -1,
 				keywords: "gold coin",
 				display: "Gold Coin",
 			});
 			const coin2 = new Item({
+				oid: -1,
 				keywords: "silver coin",
 				display: "Silver Coin",
 			});
@@ -2372,11 +2431,13 @@ suite("dungeon.ts", () => {
 					description: "A fierce orc warrior standing guard.",
 				});
 				const weapon = new Item({
+					oid: -1,
 					keywords: "rusty sword blade",
 					display: "Rusty Sword",
 					description: "A rusty but still dangerous sword.",
 				});
 				const potion = new Item({
+					oid: -1,
 					keywords: "healing potion bottle",
 					display: "Healing Potion",
 					description: "A small bottle containing red liquid.",
@@ -2496,6 +2557,7 @@ suite("dungeon.ts", () => {
 			});
 
 			const book = new Item({
+				oid: -1,
 				keywords: "ancient tome",
 				display: "Ancient Tome",
 			});
@@ -2532,6 +2594,7 @@ suite("dungeon.ts", () => {
 				assert(room);
 
 				const item = new Item({
+					oid: -1,
 					keywords: "magic crystal",
 					display: "Magic Crystal",
 				});
@@ -2570,6 +2633,7 @@ suite("dungeon.ts", () => {
 				display: "Storage Box",
 			});
 			const item = new Item({
+				oid: -1,
 				keywords: "small key",
 				display: "Small Key",
 			});

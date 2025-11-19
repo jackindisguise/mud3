@@ -17,6 +17,8 @@ import {
 import { initiateCombat, removeFromCombatQueue } from "./combat.js";
 import { act } from "./act.js";
 import { MESSAGE_GROUP } from "./character.js";
+import { findPathAStar } from "./pathfinding.js";
+import logger from "./logger.js";
 
 /**
  * Process aggressive behavior: attack any mobs that enter the room.
@@ -175,11 +177,13 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 
 	// Don't wander if in combat
 	if (wanderingMob.isInCombat()) {
+		logger.debug(`Wander: ${wanderingMob.display} skipping - in combat`);
 		return false;
 	}
 
 	// Don't wander if dead
 	if (wanderingMob.health <= 0) {
+		logger.debug(`Wander: ${wanderingMob.display} skipping - dead`);
 		return false;
 	}
 
@@ -188,6 +192,77 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 		return false;
 	}
 
+	const currentRoom = wanderingMob.location as Room;
+	const dungeon = currentRoom.dungeon;
+	if (!dungeon) {
+		logger.debug(`Wander: ${wanderingMob.display} skipping - no dungeon`);
+		return false;
+	}
+
+	logger.debug(
+		`Wander: ${wanderingMob.display} attempting to wander from room at ${currentRoom.x},${currentRoom.y},${currentRoom.z}`
+	);
+
+	const dimensions = dungeon.dimensions;
+	const totalRooms = dimensions.width * dimensions.height * dimensions.layers;
+
+	// Pick a random room from the dungeon
+	let attempts = 0;
+	const maxAttempts = 10; // Try up to 10 random rooms before giving up
+	let targetRoom: Room | undefined;
+	let path: { directions: DIRECTION[]; cost: number } | undefined;
+
+	while (attempts < maxAttempts && !path) {
+		attempts++;
+		// Pick random coordinates
+		const x = Math.floor(Math.random() * dimensions.width);
+		const y = Math.floor(Math.random() * dimensions.height);
+		const z = Math.floor(Math.random() * dimensions.layers);
+
+		const candidateRoom = dungeon.getRoom(x, y, z);
+		if (!candidateRoom) continue; // Skip if room doesn't exist
+		if (candidateRoom === currentRoom) continue; // Skip current room
+		if (candidateRoom.dense) continue; // Skip dense rooms
+
+		// Try to find a path to this room
+		const candidatePath = findPathAStar(currentRoom, candidateRoom, {
+			maxNodes: 100, // Limit search to avoid performance issues
+		});
+
+		if (candidatePath && candidatePath.directions.length > 0) {
+			targetRoom = candidateRoom;
+			path = candidatePath;
+			break;
+		}
+	}
+
+	// If we found a path, walk the first 5 steps (or all steps if path is shorter)
+	if (path && targetRoom) {
+		const stepsToTake = Math.min(5, path.directions.length);
+		const targetCoords = targetRoom.coordinates;
+		logger.debug(
+			`Wander: ${wanderingMob.display} found path to room at ${targetCoords.x},${targetCoords.y},${targetCoords.z} (${path.directions.length} steps), taking first ${stepsToTake} step(s)`
+		);
+
+		// Walk up to 5 steps
+		for (let i = 0; i < stepsToTake; i++) {
+			const direction = path.directions[i];
+			if (!wanderingMob.step(direction)) {
+				logger.debug(
+					`Wander: ${wanderingMob.display} failed to step ${
+						i + 1
+					}/${stepsToTake}, stopping`
+				);
+				return i > 0; // Return true if we took at least one step
+			}
+		}
+		return true;
+	}
+
+	// If no path found, fall back to adjacent rooms
+	logger.debug(
+		`Wander: ${wanderingMob.display} no path found after ${attempts} attempts, falling back to adjacent rooms`
+	);
 	// Find valid exits
 	const validDirections: DIRECTION[] = [];
 	for (const dir of DIRECTIONS) {
@@ -199,14 +274,19 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 		}
 	}
 
-	// If no valid exits, can't wander
 	if (validDirections.length === 0) {
+		logger.debug(
+			`Wander: ${wanderingMob.display} no valid adjacent exits, cannot wander`
+		);
 		return false;
 	}
 
 	// Pick a random direction and move
 	const randomDir =
 		validDirections[Math.floor(Math.random() * validDirections.length)];
+	logger.debug(
+		`Wander: ${wanderingMob.display} moving to adjacent room (fallback)`
+	);
 	return wanderingMob.step(randomDir);
 }
 

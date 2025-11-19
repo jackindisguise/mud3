@@ -40,12 +40,15 @@ export interface SerializedGameState {
 	lastSaved: string;
 	/** Next character ID to assign */
 	nextCharacterId: number;
+	/** Next object ID (OID) to assign */
+	nextObjectId: number;
 }
 
 export const GAME_STATE_DEFAULT: SerializedGameState = {
 	elapsedTime: 0,
 	lastSaved: new Date().toISOString(),
 	nextCharacterId: 1,
+	nextObjectId: 1,
 } as const;
 
 // make a copy of the default, don't reference it directly plz
@@ -85,6 +88,33 @@ export async function getNextCharacterId(): Promise<number> {
 	const id = GAME_STATE.nextCharacterId;
 	GAME_STATE.nextCharacterId++;
 	await saveGameState();
+	return id;
+}
+
+/**
+ * Get the next available object ID (OID) and increment the counter.
+ * This function is thread-safe in the sense that it atomically
+ * reads, increments, and saves the ID.
+ *
+ * @returns The next object ID to assign
+ */
+export async function getNextObjectId(): Promise<number> {
+	const id = GAME_STATE.nextObjectId;
+	GAME_STATE.nextObjectId++;
+	await saveGameState();
+	return id;
+}
+
+/**
+ * Get the next available object ID (OID) synchronously and increment the counter.
+ * This version does not save immediately, but the ID is guaranteed to be unique.
+ * The gamestate will be saved periodically or on the next async save operation.
+ *
+ * @returns The next object ID to assign
+ */
+export function getNextObjectIdSync(): number {
+	const id = GAME_STATE.nextObjectId;
+	GAME_STATE.nextObjectId++;
 	return id;
 }
 
@@ -142,6 +172,14 @@ export async function loadGameState(): Promise<void> {
 			logger.debug(`Loaded nextCharacterId = ${GAME_STATE.nextCharacterId}`);
 		} else {
 			logger.debug(`DEFAULT nextCharacterId = ${GAME_STATE.nextCharacterId}`);
+		}
+
+		// Merge nextObjectId
+		if (data.nextObjectId !== undefined) {
+			GAME_STATE.nextObjectId = data.nextObjectId;
+			logger.debug(`Loaded nextObjectId = ${GAME_STATE.nextObjectId}`);
+		} else {
+			logger.debug(`DEFAULT nextObjectId = ${GAME_STATE.nextObjectId}`);
 		}
 
 		sessionStartTime = Date.now();

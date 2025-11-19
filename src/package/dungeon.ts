@@ -27,6 +27,7 @@
  *
  * @module package/dungeon
  */
+import archetypePkg from "./archetype.js";
 import { join, relative } from "path";
 import {
 	mkdir,
@@ -815,6 +816,7 @@ export function executeAllDungeonResets(): void {
 
 export default {
 	name: "dungeon",
+	dependencies: [archetypePkg],
 	loader: async () => {
 		await logger.block("dungeon", async () => {
 			const dungeons = await loadDungeons();

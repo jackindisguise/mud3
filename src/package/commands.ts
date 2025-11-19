@@ -42,6 +42,13 @@ import { MESSAGE_GROUP } from "../character.js";
 import { Game } from "../game.js";
 import { access } from "fs/promises";
 import { constants } from "fs";
+import {
+	SOCIAL_COMMANDS,
+	getSocialCommandNames,
+	type SocialDefinition,
+} from "../social.js";
+import { executeSocial, onSocialError } from "../commands/_social.js";
+import { Mob } from "../dungeon.js";
 
 /**
  * Interface for command objects (JavaScript or TypeScript plain objects)
@@ -354,11 +361,61 @@ async function loadCommands() {
 			);
 		}
 	}
+	// Generate social commands from social.ts definitions
+	await generateSocialCommands();
+
 	logger.debug(
 		`Command loading complete. Total commands registered: ${
 			CommandRegistry.default.getCommands().length
 		}`
 	);
+}
+
+/**
+ * Generates and registers social commands from social.ts definitions.
+ */
+async function generateSocialCommands(): Promise<void> {
+	logger.info("Generating social commands from social.ts definitions");
+
+	for (const commandName of getSocialCommandNames()) {
+		const socialDef = SOCIAL_COMMANDS[commandName];
+		if (!socialDef) continue;
+
+		const requiresTarget = socialDef.requiresTarget ?? false;
+		const pattern = requiresTarget
+			? `${commandName}~ <target:mob>`
+			: `${commandName}~ <target:mob?>`;
+
+		const commandObj: CommandObject = {
+			pattern,
+			priority: PRIORITY.LOW,
+			execute(context: CommandContext, args: Map<string, any>): void {
+				const target = args.get("target") as Mob | undefined;
+				executeSocial(context, target, {
+					messages: socialDef.messages,
+				});
+			},
+			onError(context: CommandContext, result: ParseResult): void {
+				if (
+					requiresTarget &&
+					result.error?.includes("Missing required argument")
+				) {
+					context.actor.sendMessage(
+						`Who do you want to ${commandName}?`,
+						MESSAGE_GROUP.COMMAND_RESPONSE
+					);
+					return;
+				}
+				onSocialError(context, result);
+			},
+		};
+
+		const command = new JavaScriptCommandAdapter(commandObj);
+		CommandRegistry.default.register(command);
+		logger.debug(`Generated social command: ${pattern}`);
+	}
+
+	logger.info(`Generated ${getSocialCommandNames().length} social commands`);
 }
 
 export default {

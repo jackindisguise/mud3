@@ -108,12 +108,13 @@ export interface PlayerSettings {
 
 /**
  * Default channels that new characters are subscribed to.
- * Players start subscribed to OOC, GOSSIP, SAY, and WHISPER channels by default.
+ * Players start subscribed to OOC, GOSSIP, GOCIAL, SAY, and WHISPER channels by default.
  * They must opt-in to NEWBIE and TRADE channels.
  */
 export const DEFAULT_CHANNELS: readonly CHANNEL[] = [
 	CHANNEL.OOC,
 	CHANNEL.GOSSIP,
+	CHANNEL.GOCIAL,
 	CHANNEL.SAY,
 	CHANNEL.WHISPER,
 ] as const;

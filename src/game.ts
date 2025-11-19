@@ -32,6 +32,7 @@ import { MudServer, MudClient } from "./io.js";
 import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
+import { isNameBlocked } from "./package/reservedNames.js";
 import { Mob } from "./dungeon.js";
 import { Race, Job } from "./archetype.js";
 import { showRoom } from "./commands/look.js";
@@ -89,6 +90,8 @@ export interface LoginSession {
 	character?: Character;
 	lastActivity: Date;
 	inactivityTimer?: NodeJS.Timeout;
+	// in case the connection closes, we need access to the name being created somewhere on the session
+	creatingName?: string;
 }
 
 /**
@@ -116,6 +119,9 @@ export class Game {
 
 	/** Active player characters (authenticated and playing) */
 	private activeCharacters = new Set<Character>();
+
+	/** Names currently being created (to prevent simultaneous creation conflicts) */
+	private namesInCreation = new Set<string>();
 
 	private saveTimer?: number;
 	private boardCleanupTimer?: number;
@@ -296,6 +302,25 @@ export class Game {
 	}
 
 	/**
+	 * Block a name from being used during character creation.
+	 * @param name The name to block (will be normalized to lowercase)
+	 * @param session The login session creating this character
+	 */
+	private blockName(name: string): void {
+		const normalizedName = name.toLowerCase();
+		this.namesInCreation.add(normalizedName);
+	}
+
+	/**
+	 * Unblock a name that was being used during character creation.
+	 * @param session The login session that was creating the character
+	 */
+	private unblockName(name: string): void {
+		const normalizedName = name.toLowerCase();
+		this.namesInCreation.delete(normalizedName);
+	}
+
+	/**
 	 * Handle a new client connection: create a login session and begin the flow.
 	 */
 	private handleNewConnection(client: MudClient): void {
@@ -333,6 +358,9 @@ export class Game {
 			clearTimeout(session.inactivityTimer);
 			session.inactivityTimer = undefined;
 		}
+
+		// Clean up name in creation if they were creating a character
+		if (session.creatingName) this.unblockName(session.creatingName);
 
 		// remove from session tracking
 		this.loginSessions.delete(session);
@@ -431,6 +459,25 @@ export class Game {
 				return false;
 			}
 			const topic = trimmed.slice("!info".length).trim();
+
+			// Check if topic is a number - if so, look up by index
+			const numericChoice = Number.parseInt(topic, 10);
+			if (!Number.isNaN(numericChoice)) {
+				const options = category === "race" ? starterRaces : starterJobs;
+				const index = numericChoice - 1;
+				if (index >= 0 && index < options.length) {
+					const selected = options[index];
+					showHelpfile(selected.name, category);
+					return true;
+				} else {
+					sendLine(
+						`Invalid ${category} number. Please choose a number between 1 and ${options.length}.`
+					);
+					return true;
+				}
+			}
+
+			// Otherwise, treat as name/partial name
 			showHelpfile(topic, category);
 			return true;
 		};
@@ -441,7 +488,7 @@ export class Game {
 		): T | undefined => {
 			if (options.length === 0) return undefined;
 			if (!input || input.trim().length === 0) {
-				return options[0];
+				return undefined; // Empty input should not auto-select
 			}
 			const trimmed = input.trim();
 			const numericChoice = Number.parseInt(trimmed, 10);
@@ -452,11 +499,30 @@ export class Game {
 				}
 			}
 			const normalized = trimmed.toLowerCase();
-			return options.find(
+
+			// First try exact matches
+			const exactMatch = options.find(
 				(option) =>
 					option.id.toLowerCase() === normalized ||
 					option.name.toLowerCase() === normalized
 			);
+			if (exactMatch) return exactMatch;
+
+			// Then try partial matches (prefix matching)
+			const partialMatches = options.filter(
+				(option) =>
+					option.id.toLowerCase().startsWith(normalized) ||
+					option.name.toLowerCase().startsWith(normalized)
+			);
+
+			// If exactly one match, return it
+			if (partialMatches.length === 1) {
+				return partialMatches[0];
+			}
+
+			// If multiple matches, return undefined (ambiguous)
+			// If no matches, return undefined
+			return undefined;
 		};
 
 		const chooseJob = (showList: boolean = false) => {
@@ -484,6 +550,10 @@ export class Game {
 				const trimmed = input?.trim().toLowerCase();
 				if (trimmed === "!list") {
 					return chooseJob(true);
+				}
+				// Handle empty input - just re-prompt
+				if (!input || trimmed.length === 0) {
+					return chooseJob(false);
 				}
 				const choice = resolveSelection(input, starterJobs);
 				if (!choice) {
@@ -522,6 +592,10 @@ export class Game {
 				if (trimmed === "!list") {
 					return chooseRace(true);
 				}
+				// Handle empty input - just re-prompt
+				if (!input || trimmed.length === 0) {
+					return chooseRace(false);
+				}
 				const choice = resolveSelection(input, starterRaces);
 				if (!choice) {
 					sendLine("That race wasn't recognized. Please pick again.");
@@ -547,19 +621,36 @@ export class Game {
 		const askName = () => {
 			ask("What is your name?", async (input) => {
 				if (!input) return askName();
+
+				const trimmed = input.trim();
+				if (trimmed.length === 0) {
+					return askName();
+				}
+
+				// Check if name is blocked
+				if (isNameBlocked(trimmed)) {
+					sendLine("That name is not allowed. Please choose a different name.");
+					return askName();
+				}
+
 				// can't login to character that's online
-				if (isCharacterActive(input))
+				if (isCharacterActive(trimmed))
 					return sendLine("That character is already playing.");
 
-				username = input; // save username
+				// Check if name is currently being created by someone else
+				if (self.namesInCreation.has(trimmed.toLowerCase())) {
+					return sendLine(
+						"That name is currently in use. Please choose another name."
+					);
+				}
+
+				username = trimmed; // save username
 				// new name, start making a character
-				if (!(await characterExists(input))) {
+				if (!(await characterExists(trimmed))) {
 					return confirmCharacterCreation();
 				} else {
 					return confirmExistingCharacterPassword();
 				}
-
-				askName();
 			});
 		};
 
@@ -594,9 +685,17 @@ export class Game {
 			yesno(
 				`Do you wish to create a character named '${username}'?`,
 				(yesorno) => {
-					if (yesorno === true) return getNewPassword();
-					else if (yesorno === false) return askName();
-					else return confirmCharacterCreation();
+					if (yesorno === true) {
+						// Add name to in-creation set and track in session
+						self.blockName(username);
+						session.creatingName = username;
+						return getNewPassword();
+					} else if (yesorno === false) {
+						// User cancelled, clean up if name was being created
+						self.unblockName(username);
+						delete session.creatingName;
+						return askName();
+					} else return confirmCharacterCreation();
 				}
 			);
 		};
@@ -653,6 +752,9 @@ export class Game {
 					});
 					character.setPassword(password);
 					saveCharacterFile(character);
+					// Remove name from in-creation set now that character is created
+					self.unblockName(username);
+					delete session.creatingName;
 				}
 
 				self.startPlayerSession(

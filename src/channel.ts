@@ -9,6 +9,7 @@ export enum CHANNEL {
 	NEWBIE = "NEWBIE",
 	TRADE = "TRADE",
 	GOSSIP = "GOSSIP",
+	GOCIAL = "GOCIAL",
 	SAY = "SAY",
 	WHISPER = "WHISPER",
 }
@@ -76,6 +77,13 @@ export const CHANNEL_INFO: Record<CHANNEL, ChannelInfo> = {
 		highlightColor: COLOR.WHITE,
 		messagePattern:
 			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
+	},
+	[CHANNEL.GOCIAL]: {
+		channelName: "Global Social",
+		channelTag: "GOCIAL",
+		primaryColor: COLOR.PURPLE,
+		highlightColor: COLOR.WHITE,
+		messagePattern: "$primary[$tag] $highlight$message{x",
 	},
 	[CHANNEL.SAY]: {
 		channelName: "Say",

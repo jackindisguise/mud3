@@ -219,12 +219,20 @@ export function act(
 	// Send message to the target (if present and has a character)
 	if (target && templates.target) {
 		if (target.character) {
-			const targetMessage = replacePlaceholders(
-				templates.target,
-				context,
-				opts.visibility
-			);
-			target.character.sendMessage(targetMessage, opts.messageGroup);
+			// Check if target is blocking the user
+			if (
+				user.character &&
+				target.character.isBlocking(user.character.credentials.username)
+			) {
+				// Target is blocking user, skip sending message
+			} else {
+				const targetMessage = replacePlaceholders(
+					templates.target,
+					context,
+					opts.visibility
+				);
+				target.character.sendMessage(targetMessage, opts.messageGroup);
+			}
 		}
 	}
 
@@ -244,6 +252,15 @@ export function act(
 
 		// Skip target if excludeTarget is true
 		if (opts.excludeTarget && target && obj === target) continue;
+
+		// Check if observer is blocking the user
+		if (
+			user.character &&
+			obj.character.isBlocking(user.character.credentials.username)
+		) {
+			// Observer is blocking user, skip sending message
+			continue;
+		}
 
 		// Send the room message to this observer
 		obj.character.sendMessage(roomMessage, opts.messageGroup);

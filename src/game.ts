@@ -898,7 +898,7 @@ export class Game {
 				for (const activity of boardActivity) {
 					const messageText = activity.count === 1 ? "message" : "messages";
 					messageLines.push(
-						`  ${color("•", COLOR.CYAN)} ${color(
+						`  ${color("*", COLOR.CYAN)} ${color(
 							activity.board.displayName,
 							COLOR.LIME
 						)} has ${color(
@@ -917,7 +917,7 @@ export class Game {
 				);
 				for (const msg of directMessages) {
 					messageLines.push(
-						`  ${color("•", COLOR.CYAN)} New message from ${color(
+						`  ${color("*", COLOR.CYAN)} New message from ${color(
 							msg.author,
 							COLOR.LIME
 						)} on the ${color(msg.board.displayName, COLOR.YELLOW)} board.`

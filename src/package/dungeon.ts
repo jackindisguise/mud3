@@ -453,13 +453,18 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 
 				for (let x = 0; x < row.length; x++) {
 					const templateIndex = row[x];
-					if (templateIndex === 0) {
+					if (
+						templateIndex === 0 ||
+						templateIndex === null ||
+						templateIndex === undefined ||
+						isNaN(Number(templateIndex))
+					) {
 						// Empty cell - skip
 						continue;
 					}
 
 					// Convert 1-based index to 0-based
-					const templateArrayIndex = templateIndex - 1;
+					const templateArrayIndex = Number(templateIndex) - 1;
 					if (templateArrayIndex < 0 || templateArrayIndex >= rooms.length) {
 						throw new Error(
 							`Invalid dungeon format: template index ${templateIndex} is out of range (rooms array has ${rooms.length} templates)`

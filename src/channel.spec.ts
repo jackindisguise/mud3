@@ -86,11 +86,12 @@ suite("channel.ts", () => {
 
 	suite("CHANNELS array", () => {
 		test("should contain all channel values", () => {
-			assert.strictEqual(CHANNELS.length, 6);
+			assert.strictEqual(CHANNELS.length, 7);
 			assert.ok(CHANNELS.includes(CHANNEL.OOC));
 			assert.ok(CHANNELS.includes(CHANNEL.NEWBIE));
 			assert.ok(CHANNELS.includes(CHANNEL.TRADE));
 			assert.ok(CHANNELS.includes(CHANNEL.GOSSIP));
+			assert.ok(CHANNELS.includes(CHANNEL.GOCIAL));
 			assert.ok(CHANNELS.includes(CHANNEL.SAY));
 			assert.ok(CHANNELS.includes(CHANNEL.WHISPER));
 		});

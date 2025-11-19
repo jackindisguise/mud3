@@ -58,11 +58,13 @@ import { getStarterRaces, getStarterJobs } from "./package/archetype.js";
 import { getHelpfile, searchHelpfiles } from "./package/help.js";
 import { LINEBREAK } from "./telnet.js";
 import { processCombatRound } from "./combat.js";
+import { processWanderBehaviors } from "./behavior.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 3 * 1000; // 3 seconds
+export const DEFAULT_WANDER_INTERVAL_MS = 30 * 1000; // 30 seconds
 
 /**
  * Game state and configuration
@@ -128,6 +130,7 @@ export class Game {
 	private gameStateSaveTimer?: number;
 	private dungeonResetTimer?: number;
 	private combatTimer?: number;
+	private wanderTimer?: number;
 	private nextConnectionId = 1;
 
 	/** Static singleton instance of the Game */
@@ -225,6 +228,11 @@ export class Game {
 		this.combatTimer = setAbsoluteInterval(() => {
 			processCombatRound();
 		}, DEFAULT_COMBAT_ROUND_INTERVAL_MS);
+
+		// Set up wander behavior timer (every 30 seconds)
+		this.wanderTimer = setAbsoluteInterval(() => {
+			processWanderBehaviors();
+		}, DEFAULT_WANDER_INTERVAL_MS);
 	}
 
 	/**
@@ -266,6 +274,13 @@ export class Game {
 			clearCustomInterval(this.combatTimer);
 			this.combatTimer = undefined;
 			logger.debug("Combat timer cleared");
+		}
+
+		// Clear wander timer
+		if (this.wanderTimer !== undefined) {
+			clearCustomInterval(this.wanderTimer);
+			this.wanderTimer = undefined;
+			logger.debug("Wander timer cleared");
 		}
 
 		// Save game state before shutdown

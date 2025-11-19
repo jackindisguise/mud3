@@ -74,7 +74,12 @@ import {
 import { Character, MESSAGE_GROUP } from "./character.js";
 import { act } from "./act.js";
 import { Game } from "./game.js";
-import { removeFromCombatQueue, handleDeath } from "./combat.js";
+import {
+	removeFromCombatQueue,
+	handleDeath,
+	initiateCombat,
+} from "./combat.js";
+import { processAggressiveBehavior } from "./behavior.js";
 import { damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
 import {
@@ -788,6 +793,24 @@ export interface DungeonOptions {
 const SAFE_DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
 export const DUNGEON_REGISTRY: ReadonlyMap<string, Dungeon> =
 	SAFE_DUNGEON_REGISTRY;
+
+/**
+ * Global cache of mobs that have the WANDER behavior enabled.
+ * This cache is maintained automatically when behaviors are toggled.
+ * Used to efficiently find all mobs that need to wander periodically.
+ *
+ * @example
+ * ```typescript
+ * import { WANDERING_MOBS, BEHAVIOR } from "./dungeon.js";
+ *
+ * // Iterate through all wandering mobs
+ * for (const mob of WANDERING_MOBS) {
+ *   processWanderBehavior(mob);
+ * }
+ * ```
+ */
+const SAFE_WANDERING_MOBS: Set<Mob> = new Set();
+export const WANDERING_MOBS: ReadonlySet<Mob> = SAFE_WANDERING_MOBS;
 
 /**
  * Lookup a dungeon previously registered with an ID.
@@ -1741,6 +1764,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 		EQUIPMENT_SLOT,
 		SerializedEquipment | SerializedArmor | SerializedWeapon
 	>;
+	/** Behavior flags serialized as strings (enum values) */
+	behaviors?: Record<string, boolean>;
 }
 
 /**
@@ -1948,6 +1973,55 @@ export interface WeaponTemplate extends EquipmentTemplate {
 	type: "Weapon";
 	attackPower: number;
 	hitType?: HitType | string;
+}
+
+/**
+ * Template definition specifically for Mob objects.
+ * Extends DungeonObjectTemplate with mob-specific properties.
+ *
+ * @property race - Race ID string (optional, uses default if not provided)
+ * @property job - Job ID string (optional, uses default if not provided)
+ * @property level - Starting level (optional, defaults to 1)
+ * @property experience - Starting experience points (optional, defaults to 0)
+ * @property attributeBonuses - Optional primary attribute bonuses
+ * @property resourceBonuses - Optional resource capacity bonuses
+ * @property health - Starting health points (optional, defaults to maxHealth)
+ * @property mana - Starting mana points (optional, defaults to maxMana)
+ * @property exhaustion - Starting exhaustion level (optional, defaults to 0)
+ * @property behaviors - Optional behavior flags for NPCs
+ *
+ * @example
+ * ```typescript
+ * import { BEHAVIOR } from "./dungeon.js";
+ *
+ * const goblinTemplate: MobTemplate = {
+ *   id: "goblin-warrior",
+ *   type: "Mob",
+ *   keywords: "goblin warrior",
+ *   display: "A Fierce Goblin Warrior",
+ *   description: "A small but aggressive goblin armed with a rusty sword.",
+ *   race: "goblin",
+ *   job: "warrior",
+ *   level: 5,
+ *   behaviors: {
+ *     [BEHAVIOR.AGGRESSIVE]: true,
+ *     [BEHAVIOR.WANDER]: true
+ *   }
+ * };
+ * ```
+ */
+export interface MobTemplate extends DungeonObjectTemplate {
+	type: "Mob";
+	race?: string;
+	job?: string;
+	level?: number;
+	experience?: number;
+	attributeBonuses?: Partial<PrimaryAttributeSet>;
+	resourceBonuses?: Partial<ResourceCapacities>;
+	health?: number;
+	mana?: number;
+	exhaustion?: number;
+	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
 }
 
 /**
@@ -3566,7 +3640,19 @@ export class Room extends DungeonObject {
 	 * }
 	 * ```
 	 */
-	onEnter(movable: Movable, direction?: DIRECTION) {}
+	onEnter(movable: Movable, direction?: DIRECTION) {
+		// Process aggressive behavior: aggressive mobs attack character mobs that enter
+		if (movable instanceof Mob) {
+			const enterer = movable as Mob;
+			for (const obj of this.contents) {
+				if (!(obj instanceof Mob)) continue;
+				if (obj === enterer) continue;
+				const mob = obj as Mob;
+				if (mob.hasBehavior(BEHAVIOR.AGGRESSIVE))
+					processAggressiveBehavior(mob, this, enterer);
+			}
+		}
+	}
 
 	/**
 	 * Hook called when a movable object exits this room.
@@ -3959,6 +4045,24 @@ export class Movable extends DungeonObject {
 	}
 
 	/**
+	 * Hook called after a successful step.
+	 * Override this method to implement custom behavior after movement.
+	 *
+	 * @param direction The direction that was moved
+	 * @param destinationRoom The room that was entered
+	 *
+	 * @example
+	 * ```typescript
+	 * class TrackingMob extends Mob {
+	 *   onStep(direction: DIRECTION, destinationRoom: Room) {
+	 *     console.log(`Moved ${dir2text(direction)} to room at ${destinationRoom.x}, ${destinationRoom.y}`);
+	 *   }
+	 * }
+	 * ```
+	 */
+	onStep(direction: DIRECTION, destinationRoom: Room): void {}
+
+	/**
 	 * Moves this object one room in the specified direction.
 	 * The move only occurs if canStep() returns true for that direction.
 	 * Triggers appropriate exit/enter events on both rooms.
@@ -3994,8 +4098,11 @@ export class Movable extends DungeonObject {
 		const exit = this.getStep(dir);
 		if (this.location instanceof Room) this.location.onExit(this, dir);
 		this.move(exit);
-		if (this.location instanceof Room)
+		if (this.location instanceof Room) {
 			this.location.onEnter(this, dir2reverse(dir));
+			// Call onStep hook after successful movement
+			this.onStep(dir, this.location);
+		}
 		return true;
 	}
 }
@@ -4816,6 +4923,31 @@ export class Weapon extends Equipment {
  * console.log(warrior.strength); // Includes race/job/level bonuses + 5
  * ```
  */
+/**
+ * Behavior flags for NPCs (mobs without a character).
+ * These behaviors control how NPCs act in the game world.
+ *
+ * @example
+ * ```typescript
+ * import { BEHAVIOR } from "./dungeon.js";
+ *
+ * const goblin = new Mob({
+ *   behaviors: {
+ *     [BEHAVIOR.AGGRESSIVE]: true,
+ *     [BEHAVIOR.WANDER]: true
+ *   }
+ * });
+ * ```
+ */
+export enum BEHAVIOR {
+	/** Aggressive mobs attack any mobs that enter their room */
+	AGGRESSIVE = "aggressive",
+	/** Wimpy mobs randomly flee combat when health reaches 25% */
+	WIMPY = "wimpy",
+	/** Wandering mobs randomly move around their dungeon */
+	WANDER = "wander",
+}
+
 export interface MobOptions extends DungeonObjectOptions {
 	/** Resolved race definition to use for this mob. */
 	race?: Race;
@@ -4828,6 +4960,8 @@ export interface MobOptions extends DungeonObjectOptions {
 	health?: number;
 	mana?: number;
 	exhaustion?: number;
+	/** Behavior flags for NPCs (mobs without a character) */
+	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
 }
 
 const MAX_EXHAUSTION = 100;
@@ -4865,6 +4999,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 		EQUIPMENT_SLOT,
 		SerializedEquipment | SerializedArmor | SerializedWeapon
 	>;
+	/** Behavior flags serialized as strings (enum values) */
+	behaviors?: Record<string, boolean>;
 }
 
 /**
@@ -4942,6 +5078,7 @@ export class Mob extends Movable {
 	private _equipped: Map<EQUIPMENT_SLOT, Equipment>;
 	private _combatTarget?: Mob;
 	private _threatTable?: Map<Mob, number>;
+	private _behaviors: Map<BEHAVIOR, boolean>;
 	constructor(options?: MobOptions) {
 		super(options);
 
@@ -4977,6 +5114,18 @@ export class Mob extends Movable {
 		this.health = options?.health ?? this.maxHealth;
 		this.mana = options?.mana ?? this.maxMana;
 		this.exhaustion = options?.exhaustion ?? 0;
+
+		// Initialize behavior dictionary (only for NPCs)
+		this._behaviors = new Map<BEHAVIOR, boolean>();
+		if (options?.behaviors) {
+			for (const [key, value] of Object.entries(options.behaviors)) {
+				// Validate that the key is a valid BEHAVIOR enum value
+				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR)) {
+					// Use setBehavior to ensure cache is updated
+					this.setBehavior(key as BEHAVIOR, !!value);
+				}
+			}
+		}
 
 		// Initialize combat properties
 		// Only NPCs (mobs without a character) have threat tables
@@ -5043,10 +5192,16 @@ export class Mob extends Movable {
 				this._threatTable.clear();
 				this._threatTable = undefined;
 			}
+			// Remove from wandering cache when mob becomes player-controlled
+			SAFE_WANDERING_MOBS.delete(this);
 		} else {
 			// NPC: initialize threat table if not already present
 			if (!this._threatTable) {
 				this._threatTable = new Map<Mob, number>();
+			}
+			// Add back to wandering cache if mob has wander behavior
+			if (this.hasBehavior(BEHAVIOR.WANDER)) {
+				SAFE_WANDERING_MOBS.add(this);
 			}
 		}
 	}
@@ -5165,6 +5320,169 @@ export class Mob extends Movable {
 	public removeThreat(mob: Mob): void {
 		if (this._threatTable) {
 			this._threatTable.delete(mob);
+		}
+	}
+
+	/**
+	 * Gets the behavior flags for this mob.
+	 * Only NPCs (mobs without a character) have behavior flags.
+	 * Returns a readonly map of behavior enum to boolean value.
+	 *
+	 * @returns Readonly map of behavior flags
+	 *
+	 * @example
+	 * ```typescript
+	 * import { BEHAVIOR } from "./dungeon.js";
+	 *
+	 * const mob = new Mob();
+	 * mob.setBehavior(BEHAVIOR.AGGRESSIVE, true);
+	 * mob.setBehavior(BEHAVIOR.WANDER, true);
+	 *
+	 * const behaviors = mob.behaviors;
+	 * console.log(behaviors.get(BEHAVIOR.AGGRESSIVE)); // true
+	 * console.log(behaviors.get(BEHAVIOR.WANDER)); // true
+	 * ```
+	 */
+	public get behaviors(): ReadonlyMap<BEHAVIOR, boolean> {
+		return this._behaviors;
+	}
+
+	/**
+	 * Gets whether a specific behavior is enabled for this mob.
+	 * Only NPCs (mobs without a character) can have behaviors.
+	 *
+	 * @param behavior The behavior enum to check
+	 * @returns True if the behavior is enabled, false otherwise
+	 *
+	 * @example
+	 * ```typescript
+	 * import { BEHAVIOR } from "./dungeon.js";
+	 *
+	 * const mob = new Mob();
+	 * mob.setBehavior(BEHAVIOR.AGGRESSIVE, true);
+	 * console.log(mob.hasBehavior(BEHAVIOR.AGGRESSIVE)); // true
+	 * console.log(mob.hasBehavior(BEHAVIOR.WANDER)); // false
+	 * ```
+	 */
+	public hasBehavior(behavior: BEHAVIOR): boolean {
+		if (this.character) {
+			return false; // Only NPCs have behaviors
+		}
+		return this._behaviors.get(behavior) ?? false;
+	}
+
+	/**
+	 * Sets a behavior flag for this mob.
+	 * Only NPCs (mobs without a character) can have behaviors.
+	 * Setting a behavior to false removes it from the map.
+	 *
+	 * @param behavior The behavior enum to set
+	 * @param value True to enable the behavior, false to disable it
+	 *
+	 * @example
+	 * ```typescript
+	 * import { BEHAVIOR } from "./dungeon.js";
+	 *
+	 * const mob = new Mob();
+	 * mob.setBehavior(BEHAVIOR.AGGRESSIVE, true);
+	 * mob.setBehavior(BEHAVIOR.WANDER, true);
+	 * mob.setBehavior(BEHAVIOR.WIMPY, false); // Removes wimpy behavior
+	 * ```
+	 */
+	public setBehavior(behavior: BEHAVIOR, value: boolean): void {
+		if (this.character) {
+			return; // Only NPCs can have behaviors
+		}
+		if (value) {
+			this._behaviors.set(behavior, true);
+			// Add to wandering cache when wander behavior is enabled
+			if (behavior === BEHAVIOR.WANDER) {
+				SAFE_WANDERING_MOBS.add(this);
+			}
+		} else {
+			this._behaviors.delete(behavior);
+			// Remove from wandering cache when wander behavior is disabled
+			if (behavior === BEHAVIOR.WANDER) {
+				SAFE_WANDERING_MOBS.delete(this);
+			}
+		}
+	}
+
+	/**
+	 * Override applyTemplate to handle Mob-specific properties.
+	 * Applies race, job, level, experience, bonuses, resources, and behaviors
+	 * from the template.
+	 *
+	 * @param template - Template object containing mob properties
+	 *
+	 * @example
+	 * ```typescript
+	 * import { BEHAVIOR } from "./dungeon.js";
+	 *
+	 * const mob = new Mob();
+	 * const template: MobTemplate = {
+	 *   id: "goblin-warrior",
+	 *   type: "Mob",
+	 *   race: "goblin",
+	 *   job: "warrior",
+	 *   level: 5,
+	 *   behaviors: {
+	 *     [BEHAVIOR.AGGRESSIVE]: true,
+	 *     [BEHAVIOR.WANDER]: true
+	 *   }
+	 * };
+	 * mob.applyTemplate(template);
+	 * ```
+	 */
+	override applyTemplate(template: DungeonObjectTemplate | MobTemplate): void {
+		// Call parent to apply base properties
+		super.applyTemplate(template);
+
+		// Handle Mob-specific properties
+		const mobTemplate = template as MobTemplate;
+		if (mobTemplate.race !== undefined) {
+			const race = getRaceById(mobTemplate.race);
+			if (race) {
+				this._race = race;
+				this.recalculateDerivedAttributes(this.captureResourceRatios());
+			}
+		}
+		if (mobTemplate.job !== undefined) {
+			const job = getJobById(mobTemplate.job);
+			if (job) {
+				this._job = job;
+				this.recalculateDerivedAttributes(this.captureResourceRatios());
+			}
+		}
+		if (mobTemplate.level !== undefined) {
+			this.level = mobTemplate.level;
+		}
+		if (mobTemplate.experience !== undefined) {
+			this.experience = mobTemplate.experience;
+		}
+		if (mobTemplate.attributeBonuses !== undefined) {
+			this.setAttributeBonuses(mobTemplate.attributeBonuses);
+		}
+		if (mobTemplate.resourceBonuses !== undefined) {
+			this.setResourceBonuses(mobTemplate.resourceBonuses);
+		}
+		if (mobTemplate.health !== undefined) {
+			this.health = mobTemplate.health;
+		}
+		if (mobTemplate.mana !== undefined) {
+			this.mana = mobTemplate.mana;
+		}
+		if (mobTemplate.exhaustion !== undefined) {
+			this.exhaustion = mobTemplate.exhaustion;
+		}
+		if (mobTemplate.behaviors !== undefined) {
+			// Apply behavior flags from template
+			for (const [key, value] of Object.entries(mobTemplate.behaviors)) {
+				// Validate that the key is a valid BEHAVIOR enum value
+				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR)) {
+					this.setBehavior(key as BEHAVIOR, !!value);
+				}
+			}
 		}
 	}
 
@@ -6009,6 +6327,49 @@ export class Mob extends Movable {
 	}
 
 	/**
+	 * Override onStep to handle aggressive behavior for wandering mobs.
+	 * When an aggressive mob steps into a room, it checks for character mobs to attack.
+	 *
+	 * @param direction The direction that was moved
+	 * @param destinationRoom The room that was entered
+	 */
+	override onStep(direction: DIRECTION, destinationRoom: Room): void {
+		// Only NPCs can be aggressive
+		if (this.character) {
+			return;
+		}
+
+		// Check if mob has aggressive behavior
+		if (!this.hasBehavior(BEHAVIOR.AGGRESSIVE)) {
+			return;
+		}
+
+		// Don't attack if already in combat
+		if (this.isInCombat()) {
+			return;
+		}
+
+		// Don't attack if dead
+		if (this.health <= 0) {
+			return;
+		}
+
+		// Look for character mobs in the room to attack
+		for (const obj of destinationRoom.contents) {
+			if (!(obj instanceof Mob)) continue;
+			const target = obj as Mob;
+			if (target === this) continue; // Don't attack self
+			if (!target.character) continue; // Only attack character mobs
+			if (target.health <= 0) continue; // Don't attack dead mobs
+
+			// Found a character mob to attack - initiate combat
+			initiateCombat(this, target, destinationRoom);
+			// Only attack the first valid target
+			break;
+		}
+	}
+
+	/**
 	 * Equip an item to the appropriate slot.
 	 * The equipment is moved to the mob's inventory if not already there, and all
 	 * attributes are automatically recalculated to include the equipment's bonuses.
@@ -6497,6 +6858,16 @@ export class Mob extends Movable {
 			mana: this._mana,
 			exhaustion: this._exhaustion,
 			...(equipped && Object.keys(equipped).length > 0 ? { equipped } : {}),
+			...(this._behaviors.size > 0
+				? {
+						behaviors: Object.fromEntries(
+							Array.from(this._behaviors.entries()).map(([key, value]) => [
+								key as string,
+								value,
+							])
+						) as Record<string, boolean>,
+				  }
+				: {}),
 		};
 
 		// If compressing, prefer template-aware compression and also prune equipped entries
@@ -6579,6 +6950,9 @@ export class Mob extends Movable {
 		if (this._threatTable) {
 			this._threatTable.clear();
 		}
+
+		// Remove from wandering cache
+		SAFE_WANDERING_MOBS.delete(this);
 
 		// Call parent destroy
 		super.destroy(destroyContents);
@@ -7087,6 +7461,17 @@ export function serializedToOptions(
 		}
 		case "Mob": {
 			const m = norm as SerializedMob;
+			// Convert serialized behaviors (strings) back to enum keys
+			const behaviors: Partial<Record<BEHAVIOR, boolean>> | undefined =
+				m.behaviors
+					? Object.fromEntries(
+							Object.entries(m.behaviors)
+								.filter(([key]) =>
+									Object.values(BEHAVIOR).includes(key as BEHAVIOR)
+								)
+								.map(([key, value]) => [key as BEHAVIOR, !!value])
+					  )
+					: undefined;
 			const opts: MobOptions = pruneUndefined({
 				...base,
 				level: m.level,
@@ -7098,6 +7483,7 @@ export function serializedToOptions(
 				health: m.health,
 				mana: m.mana,
 				exhaustion: m.exhaustion,
+				behaviors,
 			});
 			return opts;
 		}

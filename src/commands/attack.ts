@@ -17,7 +17,7 @@
  * @module commands/attack
  */
 
-import { CommandContext, ParseResult } from "../command.js";
+import { CommandContext, ParseResult, PRIORITY } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Mob, Room } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
@@ -25,7 +25,8 @@ import { initiateCombat, addToCombatQueue } from "../combat.js";
 
 export default {
 	pattern: "attack~ <target:mob>",
-	aliases: ["engage <target:mob>", "kill <target:mob>"],
+	aliases: ["engage~ <target:mob>", "kill~ <target:mob>"],
+	priority: PRIORITY.LOW,
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const target = args.get("target") as Mob;
 		const { actor, room } = context;

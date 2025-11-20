@@ -36,7 +36,7 @@ import { CommandObject } from "../package/commands.js";
 import { COLOR, color, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { string } from "mud-ext";
-import { generateMinimap } from "../minimap.js";
+import { generateMinimap, generateMinimapFromSteps } from "../minimap.js";
 
 /**
  * Displays a room description to a player.

@@ -17,8 +17,9 @@
 		"deploy": "npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
 		"rerun": "npm run build && npm run start",
-		"map-editor": "npm run build && node dist/src/start-map-editor.js",
-		"post-changelog": "node scripts/post-changelog-to-board.js"
+		"post-changelog": "node scripts/post-changelog-to-board.js",
+		"mapeditor": "node mud3-dungeon-editor/dist/start-map-editor.js",
+		"update-mapeditor": "cd mud3-dungeon-editor && git pull origin && npm run build"
 	},
 	"devDependencies": {
 		"@types/ini": "^4.1.1",

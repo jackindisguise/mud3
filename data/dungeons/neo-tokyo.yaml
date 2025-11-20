@@ -6,26 +6,26 @@ dungeon:
     layers: 1
   grid:
     - - - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
+        - 1
         - 0
         - 0
         - 0
@@ -10006,15 +10006,10 @@ dungeon:
         - 0
         - 0
   rooms:
-    - display: Jon is Gay
-      description: It turns out, Jon is a gay n-word.
-      mapText: Œ
+    - display: Neo Tokyo
+      description: Yep. Nothing to see here.
+      mapText: ':'
       mapColor: 11
-      allowedExits: 15
-    - display: Cum
-      description: It's cum.
-      mapText: "~"
-      mapColor: 15
       allowedExits: 15
   templates:
     - id: qweqweqew
@@ -10032,5 +10027,5 @@ dungeon:
       roomDescription: A giant candy-colored bazooka is lying on the floor.
       keywords: bazooka candy bubblegum bubble gum cannon
       hitType: blast
-      attackPower: 75
+      attackPower: 12
   resets: []

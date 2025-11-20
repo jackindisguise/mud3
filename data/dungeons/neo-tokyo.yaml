@@ -5,7 +5,7 @@ dungeon:
     height: 100
     layers: 1
   grid:
-    - - - 3
+    - - - 0
         - 1
         - 1
         - 1
@@ -10006,23 +10006,11 @@ dungeon:
         - 0
         - 0
   rooms:
-    - display: Jon is Gay
-      description: It turns out, Jon is a gay bitch.
+    - display: Neo Tokyo
+      description: Yep. Nothing to see here.
       mapText: ':'
       mapColor: 11
       allowedExits: 15
-    - display: Cum
-      description: It's cum.
-      mapText: '~'
-      mapColor: 15
-      allowedExits: 15
-    - display: Jon is not Gay
-      description: Jon isn't gay, okay?
-      mapText: <
-      mapColor: 13
-      allowedExits: 15
-      roomLinks:
-        west: '@tower{9,14,0}'
   templates:
     - id: qweqweqew
       type: Weapon

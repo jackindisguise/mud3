@@ -9,10 +9,9 @@
  * @module package/reservedNames
  */
 
-import { Package } from "package-loader";
+import { loadPackage, Package } from "package-loader";
 import logger from "../logger.js";
-import { DUNGEON_REGISTRY, DungeonObjectTemplate } from "../dungeon.js";
-import dungeonPkg from "./dungeon.js";
+import { DUNGEON_REGISTRY } from "../dungeon.js";
 import { stripColors } from "../color.js";
 
 /**
@@ -549,7 +548,6 @@ function buildBlockedNamesCache(): void {
 
 export default {
 	name: "reservedNames",
-	dependencies: [dungeonPkg],
 	loader: async () => {
 		await logger.block("reservedNames", async () => {
 			buildBlockedNamesCache();

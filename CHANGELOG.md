@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.15.0](https://github.com/jackindisguise/mud3/compare/v1.14.0...v1.15.0) (2025-11-20)
+
+
+### Features
+
+* added combat movement restrictions and minimap improvements ([5b2ae51](https://github.com/jackindisguise/mud3/commit/5b2ae51a5b2464154756cf4996462c8db61f01f0))
+* added debug logging setup script for map editor development ([27b083f](https://github.com/jackindisguise/mud3/commit/27b083ffcc583fa65d655c53f6ff11063d300a0e))
+* added flee command for escaping combat ([2cd5828](https://github.com/jackindisguise/mud3/commit/2cd5828100a49e8dcbf24817dafdaa17d5605f9d))
+* added flee command with 5-second cooldown that allows players to attempt escape from combat ([2cd5828](https://github.com/jackindisguise/mud3/commit/2cd5828100a49e8dcbf24817dafdaa17d5605f9d))
+* added generateMinimapFromSteps function that respects portals and room links ([5b2ae51](https://github.com/jackindisguise/mud3/commit/5b2ae51a5b2464154756cf4996462c8db61f01f0))
+* added map editor frontend with HTML, CSS, and JavaScript ([27b083f](https://github.com/jackindisguise/mud3/commit/27b083ffcc583fa65d655c53f6ff11063d300a0e))
+* added map editor HTTP server with API endpoints for dungeon management ([27b083f](https://github.com/jackindisguise/mud3/commit/27b083ffcc583fa65d655c53f6ff11063d300a0e))
+* added start script for map editor server ([27b083f](https://github.com/jackindisguise/mud3/commit/27b083ffcc583fa65d655c53f6ff11063d300a0e))
+* added vision blocking for dense rooms in minimap generation ([5b2ae51](https://github.com/jackindisguise/mud3/commit/5b2ae51a5b2464154756cf4996462c8db61f01f0))
+* added web-based map editor for dungeon editing ([27b083f](https://github.com/jackindisguise/mud3/commit/27b083ffcc583fa65d655c53f6ff11063d300a0e))
+* disabled movement commands when player is in combat ([5b2ae51](https://github.com/jackindisguise/mud3/commit/5b2ae51a5b2464154756cf4996462c8db61f01f0))
+* flee command bypasses combat movement restriction by calling actor.step() directly ([2cd5828](https://github.com/jackindisguise/mud3/commit/2cd5828100a49e8dcbf24817dafdaa17d5605f9d))
+* flee command can only be used when player is in combat ([2cd5828](https://github.com/jackindisguise/mud3/commit/2cd5828100a49e8dcbf24817dafdaa17d5605f9d))
+* flee command has 33% chance of failure with act message ([2cd5828](https://github.com/jackindisguise/mud3/commit/2cd5828100a49e8dcbf24817dafdaa17d5605f9d))
+* flee command sends act message when player successfully flees to a random direction ([2cd5828](https://github.com/jackindisguise/mud3/commit/2cd5828100a49e8dcbf24817dafdaa17d5605f9d))
+* updated look command to use new minimap generation function ([5b2ae51](https://github.com/jackindisguise/mud3/commit/5b2ae51a5b2464154756cf4996462c8db61f01f0))
+
 ## [1.14.0](https://github.com/jackindisguise/mud3/compare/v1.13.0...v1.14.0) (2025-11-19)
 
 

@@ -6,3 +6,4 @@ logs/*.log
 .cursor
 guides
 commit-message.md
+mud3-dungeon-editor

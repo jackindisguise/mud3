@@ -35,6 +35,15 @@ export function executeMovement(
 		return;
 	}
 
+	// Prevent movement if in combat
+	if (actor.isInCombat()) {
+		actor.sendMessage(
+			"You cannot move while in combat!",
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
 	if (!actor.canStep(direction)) {
 		actor.sendMessage(
 			`You cannot go ${directionText}.`,

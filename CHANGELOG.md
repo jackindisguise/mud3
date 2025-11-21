@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/jackindisguise/mud3/compare/v1.16.0...v1.17.0) (2025-11-21)
+
+
+### Features
+
+* dungedit now properly supports macOS .app generation ([e69d292](https://github.com/jackindisguise/mud3/commit/e69d292f065635cda134c9289770c97949475623))
+
 ## [1.16.0](https://github.com/jackindisguise/mud3/compare/v1.15.0...v1.16.0) (2025-11-21)
 
 

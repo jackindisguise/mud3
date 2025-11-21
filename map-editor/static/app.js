@@ -3554,6 +3554,7 @@ class MapEditor {
 		const yaml = jsyaml.dump(this.yamlData, {
 			lineWidth: 120,
 			noRefs: true,
+			flowLevel: 4,
 		});
 
 		// Save via IPC/API

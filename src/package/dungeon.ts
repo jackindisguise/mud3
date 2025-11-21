@@ -62,8 +62,11 @@ import {
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const DUNGEON_DIR = join(process.cwd(), "data", "dungeons");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
+const DUNGEON_DIR = join(DATA_DIRECTORY, "dungeons");
 
 /**
  * Pending room links to be processed after all dungeons are loaded.
@@ -124,7 +127,7 @@ async function ensureDir(): Promise<void> {
 	} catch {
 		await mkdir(DUNGEON_DIR, { recursive: true });
 		logger.debug(
-			`Created dungeon directory: ${relative(process.cwd(), DUNGEON_DIR)}`
+			`Created dungeon directory: ${relative(ROOT_DIRECTORY, DUNGEON_DIR)}`
 		);
 	}
 }
@@ -373,7 +376,7 @@ export async function saveDungeon(dungeon: Dungeon): Promise<void> {
 		await rename(tempPath, filePath);
 
 		logger.debug(
-			`Saved dungeon: ${relative(process.cwd(), filePath)} for ${dungeon.id}`
+			`Saved dungeon: ${relative(ROOT_DIRECTORY, filePath)} for ${dungeon.id}`
 		);
 	} catch (error) {
 		// Clean up temp file if it exists
@@ -400,7 +403,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 	}
 
 	try {
-		logger.debug(`Loading dungeon from ${relative(process.cwd(), filePath)}`);
+		logger.debug(`Loading dungeon from ${relative(ROOT_DIRECTORY, filePath)}`);
 		const content = await readFile(filePath, "utf-8");
 		const data = YAML.load(content) as SerializedDungeonFormat;
 
@@ -598,7 +601,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 
 		logger.debug(
 			`Successfully loaded dungeon "${id}" from ${relative(
-				process.cwd(),
+				ROOT_DIRECTORY,
 				filePath
 			)}${
 				resets && resets.length > 0 ? ` with ${resets.length} reset(s)` : ""

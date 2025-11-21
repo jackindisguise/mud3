@@ -19,6 +19,7 @@ import {
 	PHYSICAL_DAMAGE_TYPE,
 } from "./damage-types.js";
 import logger from "./logger.js";
+import { getSafeRootDirectory } from "./utils/path.js";
 
 export interface DungeonListResponse {
 	dungeons: string[];
@@ -82,7 +83,8 @@ export class MapEditorService {
 	private readonly dungeonDir: string;
 
 	constructor(config: MapEditorServiceConfig = {}) {
-		this.dungeonDir = config.dungeonDir ?? join(process.cwd(), "data", "dungeons");
+		this.dungeonDir =
+			config.dungeonDir ?? join(getSafeRootDirectory(), "data", "dungeons");
 	}
 
 	public async listDungeons(): Promise<DungeonListResponse> {

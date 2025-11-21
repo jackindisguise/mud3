@@ -18,9 +18,11 @@ import {
 	createMapEditorService,
 	MapEditorService,
 } from "./map-editor-service.js";
+import { getSafeRootDirectory } from "./utils/path.js";
 
 const PORT = 3000;
-const MAP_EDITOR_DIR = join(process.cwd(), "map-editor");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const MAP_EDITOR_DIR = join(ROOT_DIRECTORY, "map-editor");
 
 // Verify map editor directory exists at startup (async check)
 access(MAP_EDITOR_DIR, FS_CONSTANTS.F_OK)
@@ -29,7 +31,7 @@ access(MAP_EDITOR_DIR, FS_CONSTANTS.F_OK)
 	})
 	.catch((error) => {
 		logger.error(`Map editor directory not found: ${MAP_EDITOR_DIR}`);
-		logger.error(`Current working directory: ${process.cwd()}`);
+		logger.error(`Current working directory: ${ROOT_DIRECTORY}`);
 	});
 
 interface MapEditorServer {
@@ -159,10 +161,10 @@ class MapEditorServerImpl implements MapEditorServer {
 		} catch (error) {
 			logger.error(`Failed to serve file: ${filePath}`);
 			logger.error(`Error details: ${error}`);
-			logger.error(`Current working directory: ${process.cwd()}`);
+			logger.error(`Current working directory: ${ROOT_DIRECTORY}`);
 			res.writeHead(404, { "Content-Type": "text/plain" });
 			res.end(
-				`File not found: ${filePath}\n\nCurrent directory: ${process.cwd()}`
+				`File not found: ${filePath}\n\nCurrent directory: ${ROOT_DIRECTORY}`
 			);
 		}
 	}

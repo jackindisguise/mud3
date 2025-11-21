@@ -7,3 +7,6 @@ logs/*.log
 guides
 commit-message.md
 mud3-dungeon-editor
+build
+electron-errors.log
+*.exe

@@ -32,11 +32,13 @@
 
 import { Package } from "package-loader";
 import { readdir, readFile } from "node:fs/promises";
-import { parse as parseYaml } from "yaml";
+import YAML from "js-yaml";
 import { join, extname, relative } from "node:path";
 import logger from "../logger.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const DATA_DIRECTORY = join(process.cwd(), "data");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const HELP_DIRECTORY = join(DATA_DIRECTORY, "help");
 
 /**
@@ -131,8 +133,13 @@ function validateHelpfile(raw: RawHelpfile): Helpfile {
  */
 async function loadHelpfile(filePath: string): Promise<Helpfile> {
 	const content = await readFile(filePath, "utf-8");
-	const raw = parseYaml(content) as RawHelpfile;
-	return validateHelpfile(raw);
+	const raw = YAML.load(content);
+
+	if (!raw || typeof raw !== "object") {
+		throw new Error(`Invalid helpfile format in ${filePath}`);
+	}
+
+	return validateHelpfile(raw as RawHelpfile);
 }
 
 /**
@@ -378,7 +385,7 @@ export default {
 	loader: async () => {
 		await logger.block("help", async () => {
 			logger.debug(
-				`Loading helpfiles from ${relative(process.cwd(), HELP_DIRECTORY)}`
+				`Loading helpfiles from ${relative(ROOT_DIRECTORY, HELP_DIRECTORY)}`
 			);
 
 			let loaded = 0;
@@ -406,7 +413,7 @@ export default {
 						loaded++;
 					} catch (error) {
 						logger.error(
-							`Failed to load helpfile ${relative(process.cwd(), filePath)}: ${
+							`Failed to load helpfile ${relative(ROOT_DIRECTORY, filePath)}: ${
 								error instanceof Error ? error.message : String(error)
 							}`
 						);
@@ -425,7 +432,7 @@ export default {
 			} catch (error) {
 				logger.warn(
 					`Failed to read helpfile directory ${relative(
-						process.cwd(),
+						ROOT_DIRECTORY,
 						HELP_DIRECTORY
 					)}: ${error instanceof Error ? error.message : String(error)}`
 				);

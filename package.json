@@ -20,24 +20,55 @@
 		"post-changelog": "node scripts/post-changelog-to-board.js",
 		"mapeditor": "node mud3-dungeon-editor/dist/start-map-editor.js",
 		"update-mapeditor": "cd mud3-dungeon-editor && git pull origin && npm run build",
-		"electron:dev": "npm run build && electron dist/src/electron/main.js"
+		"icon": "node scripts/generate-icon.cjs",
+		"electron:dev": "npm run build && npm run icon && electron dist/src/electron/main.js",
+		"electron:portable": "npm run build && npm run icon && electron-builder --win portable --publish never"
 	},
 	"devDependencies": {
-		"@types/ini": "^4.1.1",
 		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^24.9.1",
-		"@types/xml2js": "^0.4.14",
 		"c8": "^10.1.3",
-		"js-yaml": "^4.1.0",
+		"sharp": "^0.33.5",
+		"png-to-ico": "^2.1.4",
 		"rimraf": "^6.0.1",
 		"smol-toml": "^1.4.2",
 		"ts-node": "^10.9.2",
 		"typedoc": "^0.28.14",
 		"typescript": "^5.9.3",
-		"winston": "^3.18.3",
-		"electron": "^31.0.0"
+		"electron": "^31.0.0",
+		"electron-builder": "^25.1.8"
+	},
+	"build": {
+		"appId": "com.mud.mapeditor",
+		"productName": "Mud Map Editor",
+		"directories": {
+			"output": "build/electron"
+		},
+		"files": [
+			"dist/**/*",
+			"map-editor/**/*",
+			"package.json"
+		],
+		"extraMetadata": {
+			"main": "dist/src/electron/main.js"
+		},
+		"asar": true,
+		"win": {
+			"icon": "assets/icon.ico",
+			"target": [
+				{
+					"target": "portable",
+					"arch": [
+						"x64"
+					]
+				}
+			],
+			"artifactName": "mud-map-editor-portable-${version}.exe"
+		}
 	},
 	"dependencies": {
+		"js-yaml": "^4.1.0",
+		"winston": "^3.18.3",
 		"accurate-intervals": "github:jackindisguise/accurate-intervals",
 		"mud-ext": "github:jackindisguise/mud-ext#v2.12.1",
 		"node-test-reporter": "^1.2.0",

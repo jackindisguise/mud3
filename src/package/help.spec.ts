@@ -2,7 +2,7 @@ import { suite, test, before, after } from "node:test";
 import assert from "node:assert";
 import { writeFile, mkdir, rm, readdir, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { getSafeRootDirectory } from "../utils/path.js";
 import helpPkg, {
 	getHelpfile,
 	getAllHelpKeywords,
@@ -12,7 +12,7 @@ import helpPkg, {
 	searchHelpfiles,
 } from "./help.js";
 
-const TEST_HELP_DIR = join(process.cwd(), "data", "help");
+const TEST_HELP_DIR = join(getSafeRootDirectory(), "data", "help");
 const TEST_FILE_COMBAT = "zztest_combat.yaml";
 const TEST_FILE_COMMANDS = "zztest_commands.yaml";
 const TEST_FILE_CAST = "zztest_cast.yaml";

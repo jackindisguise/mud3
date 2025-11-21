@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+	<defs>
+		<linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#10121a" />
+			<stop offset="100%" stop-color="#07080c" />
+		</linearGradient>
+		<linearGradient id="tile-on" x1="0%" y1="0%" x2="100%" y2="0%">
+			<stop offset="0%" stop-color="#40e0d0" />
+			<stop offset="100%" stop-color="#6ae7f2" />
+		</linearGradient>
+		<linearGradient id="tile-off" x1="0%" y1="0%" x2="100%" y2="0%">
+			<stop offset="0%" stop-color="#8b90a3" />
+			<stop offset="100%" stop-color="#5f6370" />
+		</linearGradient>
+		<linearGradient id="pencil-body" x1="0%" y1="0%" x2="0%" y2="100%">
+			<stop offset="0%" stop-color="#ffc44d" />
+			<stop offset="100%" stop-color="#f0a000" />
+		</linearGradient>
+		<linearGradient id="pencil-tip" x1="0%" y1="0%" x2="0%" y2="100%">
+			<stop offset="0%" stop-color="#f5deb3" />
+			<stop offset="100%" stop-color="#c8a165" />
+		</linearGradient>
+	</defs>
+	<g transform="translate(2,80)">
+		<g stroke="#0a0a0a" stroke-width="4" stroke-linecap="round">
+			<path d="M16 -72 L148 -72" stroke="#6b91a5" />
+			<path d="M192 -72 L236 -72" stroke="#2cd8c9" />
+			<path d="M60 -72 L60 -28" stroke="#2cd8c9" />
+			<path d="M148 -72 L148 -28" stroke="#6b91a5" />
+			<path d="M16 -28 L236 -28" stroke="#2cd8c9" />
+			<path d="M16 16 L148 16" stroke="#2cd8c9" />
+			<path d="M60 16 L60 104" stroke="#2cd8c9" />
+			<path d="M104 16 L104 148" stroke="#2cd8c9" />
+			<path d="M148 16 L148 60" stroke="#2cd8c9" />
+			<path d="M192 16 L192 148" stroke="#6b91a5" />
+			<path d="M236 16 L236 60" stroke="#6b91a5" />
+			<path d="M16 60 L236 60" stroke="#6b91a5" />
+			<path d="M16 104 L148 104" stroke="#2cd8c9" />
+			<path d="M192 104 L236 104" stroke="#6b91a5" />
+			<path d="M16 148 L236 148" stroke="#2cd8c9" />
+			<path d="M60 148 L60 192" stroke="#2cd8c9" />
+			<path d="M104 148 L104 192" stroke="#6b91a5" />
+			<path d="M148 148 L148 192" stroke="#2cd8c9" />
+			<path d="M16 192 L236 192" stroke="#6b91a5" />
+			<path d="M236 104 L236 192" stroke="#2cd8c9" />
+		</g>
+		<g fill="url(#tile-off)" stroke="#0a0a0a" stroke-width="3">
+			<rect x="0" y="-88" width="32" height="32" rx="5" />
+			<rect x="44" y="-88" width="32" height="32" rx="5" />
+			<rect x="88" y="-88" width="32" height="32" rx="5" />
+			<rect x="132" y="-88" width="32" height="32" rx="5" />
+			<rect x="176" y="-88" width="32" height="32" rx="5" />
+			<rect x="220" y="-88" width="32" height="32" rx="5" />
+
+			<rect x="0" y="-44" width="32" height="32" rx="5" />
+			<rect x="44" y="-44" width="32" height="32" rx="5" />
+			<rect x="88" y="-44" width="32" height="32" rx="5" />
+			<rect x="132" y="-44" width="32" height="32" rx="5" />
+			<rect x="176" y="-44" width="32" height="32" rx="5" />
+			<rect x="220" y="-44" width="32" height="32" rx="5" />
+
+			<rect x="0" y="0" width="32" height="32" rx="5" />
+			<rect x="44" y="0" width="32" height="32" rx="5" />
+			<rect x="88" y="0" width="32" height="32" rx="5" />
+			<rect x="132" y="0" width="32" height="32" rx="5" />
+			<rect x="176" y="0" width="32" height="32" rx="5" />
+			<rect x="220" y="0" width="32" height="32" rx="5" />
+
+			<rect x="0" y="44" width="32" height="32" rx="5" />
+			<rect x="44" y="44" width="32" height="32" rx="5" />
+			<rect x="88" y="44" width="32" height="32" rx="5" />
+			<rect x="132" y="44" width="32" height="32" rx="5" />
+			<rect x="176" y="44" width="32" height="32" rx="5" />
+			<rect x="220" y="44" width="32" height="32" rx="5" />
+
+			<rect x="0" y="88" width="32" height="32" rx="5" />
+			<rect x="44" y="88" width="32" height="32" rx="5" />
+			<rect x="88" y="88" width="32" height="32" rx="5" />
+			<rect x="132" y="88" width="32" height="32" rx="5" />
+			<rect x="176" y="88" width="32" height="32" rx="5" />
+			<rect x="220" y="88" width="32" height="32" rx="5" />
+
+			<rect x="0" y="132" width="32" height="32" rx="5" />
+			<rect x="44" y="132" width="32" height="32" rx="5" />
+			<rect x="88" y="132" width="32" height="32" rx="5" />
+			<rect x="132" y="132" width="32" height="32" rx="5" />
+			<rect x="176" y="132" width="32" height="32" rx="5" />
+			<rect x="220" y="132" width="32" height="32" rx="5" />
+		</g>
+		<g fill="url(#tile-on)" stroke="#0a0a0a" stroke-width="3">
+			<rect x="44" y="-44" width="32" height="32" rx="5" />
+			<rect x="88" y="-44" width="32" height="32" rx="5" />
+			<rect x="132" y="-44" width="32" height="32" rx="5" />
+			<rect x="176" y="-44" width="32" height="32" rx="5" />
+
+			<rect x="44" y="0" width="32" height="32" rx="5" />
+			<rect x="88" y="0" width="32" height="32" rx="5" />
+			<rect x="132" y="0" width="32" height="32" rx="5" />
+			<rect x="176" y="0" width="32" height="32" rx="5" />
+
+			<rect x="44" y="44" width="32" height="32" rx="5" />
+			<rect x="88" y="44" width="32" height="32" rx="5" />
+			<rect x="132" y="44" width="32" height="32" rx="5" />
+			<rect x="176" y="44" width="32" height="32" rx="5" />
+		</g>
+	</g>
+	<g transform="translate(45,-55) rotate(-40 215 70)">
+		<rect x="105" y="60" width="150" height="26" rx="13" fill="url(#pencil-body)" stroke="#8c5b16" stroke-width="4" />
+		<rect x="255" y="60" width="28" height="26" fill="#ff7f7f" stroke="#c54d4d" stroke-width="4" />
+		<polygon points="105,60 77,73 105,86" fill="url(#pencil-tip)" stroke="#8c5b16" stroke-width="4" />
+	</g>
+</svg>
+

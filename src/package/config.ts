@@ -23,8 +23,10 @@ import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const DATA_DIRECTORY = join(process.cwd(), "data");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const CONFIG_PATH = join(DATA_DIRECTORY, "config.yaml");
 
 export type GameConfig = {
@@ -69,7 +71,7 @@ export const CONFIG: Config = {
 };
 
 export async function loadConfig() {
-	logger.debug(`Loading config from ${relative(process.cwd(), CONFIG_PATH)}`);
+	logger.debug(`Loading config from ${relative(ROOT_DIRECTORY, CONFIG_PATH)}`);
 	try {
 		const content = await readFile(CONFIG_PATH, "utf-8");
 		const parsed = YAML.load(content) as Partial<Config> | undefined;

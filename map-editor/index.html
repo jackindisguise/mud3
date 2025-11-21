@@ -5,6 +5,33 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Dungeon Map Editor</title>
 		<link rel="stylesheet" href="./static/style.css" />
+		<style>
+			body {
+				background: radial-gradient(circle at top, #1b1f2a, #101218 60%);
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+				height: 100vh;
+				display: flex;
+				flex-direction: column;
+				overflow: hidden;
+			}
+			#app {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				box-sizing: border-box;
+			}
+			header {
+				margin: 0;
+				border-radius: 0;
+			}
+			.main-container,
+			.sidebar,
+			main {
+				overflow: hidden;
+			}
+		</style>
 	</head>
 	<body>
 		<div id="app">

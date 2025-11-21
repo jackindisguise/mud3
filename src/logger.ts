@@ -35,11 +35,8 @@
  */
 import winston from "winston";
 import path from "path";
-import { fileURLToPath } from "url";
 import { mkdirSync } from "fs";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { getSafeRootDirectory } from "./utils/path.js";
 
 // Detect if we're running tests
 // Check for node:test runner or jest/mocha
@@ -54,7 +51,9 @@ const HMS = zTimestamp.split(":").join(""); // HHMMSS
 const testSuffix = isTestMode ? ".test" : "";
 
 // Create date-based folder for logs
-const logsBaseDir = path.join(__dirname, "..", "..", "logs");
+const logRoot = getSafeRootDirectory();
+
+const logsBaseDir = path.join(logRoot, "logs");
 const logsDateDir = path.join(logsBaseDir, date);
 mkdirSync(logsDateDir, { recursive: true });
 

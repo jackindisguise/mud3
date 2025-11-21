@@ -3,10 +3,23 @@ import { suite, test } from "node:test";
 import { DungeonObject, Equipment, EQUIPMENT_SLOT } from "./dungeon.js";
 import { serializedToOptions } from "./dungeon.js";
 
+function xoid(object: any) {
+	const { oid, ...rest } = object;
+	for (let key in rest) {
+		const value = rest[key];
+		if (typeof value === "object") rest[key] = xoid(value);
+		if (Array.isArray(value))
+			rest[key] = value.map((val) =>
+				typeof val === "object" ? xoid(val) : val
+			);
+	}
+	return rest;
+}
+
 suite("compressed serialization", () => {
 	test("base serialization includes keys with undefined for a vanilla DungeonObject", () => {
 		const obj = new DungeonObject();
-		const serialized = obj.serialize();
+		const serialized = xoid(obj.serialize());
 
 		assert.deepEqual(serialized, {
 			type: "DungeonObject",
@@ -21,14 +34,14 @@ suite("compressed serialization", () => {
 
 	test("compressed serialization of vanilla DungeonObject is minimal", () => {
 		const obj = new DungeonObject();
-		const compressed = obj.serialize({ compress: true });
+		const compressed = xoid(obj.serialize({ compress: true }));
 		assert.deepEqual(compressed, { type: "DungeonObject" });
 	});
 
 	test("compressed serialization includes changed fields", () => {
 		const obj = new DungeonObject();
 		obj.display = "changed";
-		const compressed = obj.serialize({ compress: true });
+		const compressed = xoid(obj.serialize({ compress: true }));
 		assert.deepEqual(compressed, {
 			type: "DungeonObject",
 			display: "changed",
@@ -41,7 +54,7 @@ suite("compressed serialization", () => {
 		const child2 = new DungeonObject();
 		parent.add(child1, child2);
 
-		const compressed = parent.serialize({ compress: true });
+		const compressed = xoid(parent.serialize({ compress: true }));
 
 		assert.deepEqual(compressed, {
 			type: "DungeonObject",
@@ -51,7 +64,7 @@ suite("compressed serialization", () => {
 
 	test("compressed serialization works for subtypes (Equipment)", () => {
 		const eq = new Equipment({ slot: EQUIPMENT_SLOT.FINGER });
-		const compressed = eq.serialize({ compress: true });
+		const compressed = xoid(eq.serialize({ compress: true }));
 
 		// Base for Equipment defaults to slot HEAD; FINGER differs, so it should be included
 		assert.deepEqual(compressed, {
@@ -69,14 +82,17 @@ suite("deserialize normalization", () => {
 		child.display = "Child";
 		parent.add(child);
 
-		const uncompressed = parent.serialize();
-		const compressed = parent.serialize({ compress: true });
+		const uncompressed = xoid(parent.serialize());
+		const compressed = xoid(parent.serialize({ compress: true }));
 
 		const fromUncompressed = DungeonObject.deserialize(uncompressed);
 		const fromCompressed = DungeonObject.deserialize(compressed);
 
 		// Compare by re-serializing into uncompressed form
-		assert.deepEqual(fromCompressed.serialize(), fromUncompressed.serialize());
+		assert.deepEqual(
+			xoid(fromCompressed.serialize()),
+			xoid(fromUncompressed.serialize())
+		);
 	});
 
 	test("compressed and uncompressed Equipment deserialize identically", () => {
@@ -85,13 +101,16 @@ suite("deserialize normalization", () => {
 			attributeBonuses: { strength: 3 },
 		});
 
-		const uncompressed = eq.serialize();
-		const compressed = eq.serialize({ compress: true });
+		const uncompressed = xoid(eq.serialize());
+		const compressed = xoid(eq.serialize({ compress: true }));
 
 		const fromUncompressed = DungeonObject.deserialize(uncompressed);
 		const fromCompressed = DungeonObject.deserialize(compressed);
 
-		assert.deepEqual(fromCompressed.serialize(), fromUncompressed.serialize());
+		assert.deepEqual(
+			xoid(fromCompressed.serialize()),
+			xoid(fromUncompressed.serialize())
+		);
 	});
 
 	test("nested contents: both forms deserialize to equivalent hierarchies", () => {
@@ -103,13 +122,16 @@ suite("deserialize normalization", () => {
 		const c2 = new DungeonObject();
 		parent.add(c1, c2);
 
-		const uncompressed = parent.serialize();
-		const compressed = parent.serialize({ compress: true });
+		const uncompressed = xoid(parent.serialize());
+		const compressed = xoid(parent.serialize({ compress: true }));
 
 		const fromUncompressed = DungeonObject.deserialize(uncompressed);
 		const fromCompressed = DungeonObject.deserialize(compressed);
 
-		assert.deepEqual(fromCompressed.serialize(), fromUncompressed.serialize());
+		assert.deepEqual(
+			xoid(fromCompressed.serialize()),
+			xoid(fromUncompressed.serialize())
+		);
 	});
 });
 
@@ -118,7 +140,7 @@ suite("serializedToOptions", () => {
 		const obj = new DungeonObject();
 		obj.display = "X";
 		obj.description = "Y";
-		const ser = obj.serialize({ compress: true });
+		const ser = xoid(obj.serialize({ compress: true }));
 
 		const opts = serializedToOptions(ser);
 		assert.deepEqual(opts, {
@@ -134,7 +156,7 @@ suite("serializedToOptions", () => {
 			attributeBonuses: { strength: 1 },
 			resourceBonuses: { maxHealth: 5 },
 		});
-		const ser = eq.serialize({ compress: true });
+		const ser = xoid(eq.serialize({ compress: true }));
 		const opts = serializedToOptions(ser);
 		assert.deepEqual(opts, {
 			keywords: "dungeon object",

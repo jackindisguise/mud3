@@ -36,11 +36,26 @@
 	<body>
 		<div id="app">
 			<header>
-				<h1>Dungeon Map Editor</h1>
+				<div class="header-title">
+					<h1>Dungeon Map Editor</h1>
+					<div class="current-dungeon-display">
+						<span id="current-dungeon-name">No dungeon selected</span>
+						<button
+							id="edit-dungeon-settings-btn"
+							class="edit-dungeon-btn"
+							title="Edit dungeon settings"
+							disabled
+						>
+							⚙️ Edit Settings
+						</button>
+					</div>
+				</div>
 				<div class="header-controls">
-					<select id="dungeon-select">
-						<option value="">Select a dungeon...</option>
-					</select>
+					<div class="dungeon-select-group">
+						<select id="dungeon-select">
+							<option value="">Select a dungeon...</option>
+						</select>
+					</div>
 					<button id="save-btn">Save</button>
 					<button id="help-btn" class="help-btn" title="Show help">?</button>
 				</div>
@@ -81,47 +96,12 @@
 				<!-- Center: Map Grid -->
 				<main class="map-container">
 					<div class="map-area">
-						<div class="map-controls">
-							<label>
-								Layer:
-								<select id="layer-select"></select>
-							</label>
-							<label>
-								Dimensions:
-								<input
-									type="number"
-									id="width-input"
-									min="1"
-									max="100"
-									placeholder="width"
-								/>
-								<input
-									type="number"
-									id="height-input"
-									min="1"
-									max="100"
-									placeholder="height"
-								/>
-								<input
-									type="number"
-									id="layers-input"
-									min="1"
-									max="100"
-									placeholder="layers"
-								/>
-								<button id="resize-btn">Resize</button>
-							</label>
-							<label>
-								Reset Message:
-								<input
-									type="text"
-									id="reset-message-input"
-									placeholder="Reset message..."
-								/>
-							</label>
-						</div>
 						<!-- Selection Tools Bar -->
 						<div class="toolbox-bar">
+							<div class="layer-controls">
+								<label for="layer-select">Layer</label>
+								<select id="layer-select"></select>
+							</div>
 							<div class="toolbox-label">Selection Tools</div>
 							<div class="toolbox-tools">
 								<button
@@ -499,6 +479,70 @@
 					<div class="modal-actions">
 						<button id="reset-edit-save">Save</button>
 						<button id="reset-edit-cancel">Cancel</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Dungeon settings modal -->
+			<div id="dungeon-settings-modal" class="modal">
+				<div class="modal-content dungeon-settings-content">
+					<span class="close" id="dungeon-settings-close">&times;</span>
+					<h2>Dungeon Settings</h2>
+					<div class="dungeon-settings-grid">
+						<div class="form-group">
+							<label>Dungeon Name</label>
+							<input
+								type="text"
+								id="dungeon-name-input"
+								placeholder="Display name..."
+							/>
+						</div>
+						<div class="form-group">
+							<label>Dungeon Description</label>
+							<textarea
+								id="dungeon-description-input"
+								rows="3"
+								placeholder="Short description..."
+							></textarea>
+						</div>
+						<div class="form-group">
+							<label>Dimensions</label>
+							<div class="dimension-inputs">
+								<input
+									type="number"
+									id="width-input"
+									min="1"
+									max="100"
+									placeholder="Width"
+								/>
+								<input
+									type="number"
+									id="height-input"
+									min="1"
+									max="100"
+									placeholder="Height"
+								/>
+								<input
+									type="number"
+									id="layers-input"
+									min="1"
+									max="100"
+									placeholder="Layers"
+								/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label>Reset Message</label>
+							<input
+								type="text"
+								id="reset-message-input"
+								placeholder="Reset message..."
+							/>
+						</div>
+					</div>
+					<div class="modal-actions dungeon-settings-actions">
+						<button id="apply-dungeon-settings-btn">Apply Dimensions</button>
+						<button id="dungeon-settings-done">Done</button>
 					</div>
 				</div>
 			</div>

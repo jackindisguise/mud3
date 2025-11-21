@@ -1,4 +1,11 @@
-import { access, mkdir, readFile, rename, unlink, writeFile } from "fs/promises";
+import {
+	access,
+	mkdir,
+	readFile,
+	rename,
+	unlink,
+	writeFile,
+} from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
 import YAML from "js-yaml";
@@ -29,6 +36,8 @@ export interface DungeonResponse {
 	id: string;
 	dimensions: SerializedDungeonFormat["dungeon"]["dimensions"];
 	resetMessage?: string;
+	name?: string;
+	description?: string;
 	yaml: string;
 }
 
@@ -105,6 +114,8 @@ export class MapEditorService {
 			id: data.dungeon.id || id,
 			dimensions: data.dungeon.dimensions,
 			resetMessage: data.dungeon.resetMessage,
+			name: data.dungeon.name,
+			description: data.dungeon.description,
 			yaml: yamlContent,
 		};
 	}
@@ -157,7 +168,7 @@ export class MapEditorService {
 	}
 
 	public async calculateAttributes(
-		payload: CalculateAttributesPayload,
+		payload: CalculateAttributesPayload
 	): Promise<CalculateAttributesResponse> {
 		const { raceId, jobId, level } = payload;
 
@@ -222,7 +233,7 @@ export class MapEditorService {
 
 	private async writeDungeonFile(
 		filePath: string,
-		content: string,
+		content: string
 	): Promise<void> {
 		const tempPath = `${filePath}.tmp`;
 		await mkdir(this.dungeonDir, { recursive: true });
@@ -241,8 +252,7 @@ export class MapEditorService {
 }
 
 export function createMapEditorService(
-	config?: MapEditorServiceConfig,
+	config?: MapEditorServiceConfig
 ): MapEditorService {
 	return new MapEditorService(config);
 }
-

@@ -12,6 +12,44 @@ body {
 	overflow: hidden;
 }
 
+:root {
+	--scrollbar-track: #1a1a1a;
+	--scrollbar-thumb: #555;
+	--scrollbar-thumb-hover: #777;
+}
+
+/* WebKit browsers: Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+	width: 16px;
+	height: 16px;
+  }
+  
+  *::-webkit-scrollbar-corner {
+	background: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-track {
+	background: var(--scrollbar-track);
+	border-radius: 9999px;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+	border-radius: 9999px;
+	border: 4px solid var(--scrollbar-track);
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+  }
+  
+  /* Remove up/down arrow buttons */
+  *::-webkit-scrollbar-button {
+	display: none;
+	width: 0;
+	height: 0;
+}
+
 #app {
 	display: flex;
 	flex-direction: column;
@@ -23,7 +61,9 @@ header {
 	padding: 1rem;
 	display: flex;
 	justify-content: space-between;
-	align-items: center;
+	align-items: flex-start;
+	flex-wrap: wrap;
+	gap: 1rem;
 	border-bottom: 1px solid #444;
 }
 
@@ -32,10 +72,53 @@ header h1 {
 	color: #fff;
 }
 
+.header-title {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.current-dungeon-display {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: #ccc;
+	font-size: 0.95rem;
+}
+
+.current-dungeon-display span {
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.edit-dungeon-btn {
+	padding: 0.25rem 0.75rem;
+	background: #3a3a3a;
+	border: 1px solid #555;
+	border-radius: 9999px;
+	color: #fff;
+	font-size: 0.8rem;
+	cursor: pointer;
+	transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.edit-dungeon-btn:hover:not(:disabled) {
+	background: #4a4a4a;
+	border-color: #666;
+}
+
+.edit-dungeon-btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
 .header-controls {
 	display: flex;
-	gap: 1rem;
+	gap: 0.75rem;
 	align-items: center;
+	flex-wrap: wrap;
 }
 
 .header-controls select,
@@ -323,9 +406,30 @@ header h1 {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
+	flex-wrap: wrap;
 	padding: 0.5rem 1rem;
 	gap: 1rem;
 	flex-shrink: 0;
+}
+
+.layer-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: #ccc;
+	font-size: 0.85rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.layer-controls select {
+	padding: 0.35rem 0.75rem;
+	background: #2a2a2a;
+	border: 1px solid #555;
+	color: #fff;
+	border-radius: 4px;
+	min-width: 110px;
 }
 
 .toolbox-label {
@@ -376,45 +480,6 @@ header h1 {
 	background: rgba(74, 106, 200, 0.4) !important;
 	border: 2px solid #4a6ac8 !important;
 	box-shadow: 0 0 4px rgba(74, 106, 200, 0.6);
-}
-
-.map-area .map-controls {
-	padding: 1rem;
-	background: #252525;
-	border-bottom: 1px solid #444;
-	display: flex;
-	gap: 1rem;
-	align-items: center;
-	flex-wrap: wrap;
-}
-
-.map-area .map-controls label {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	color: #ccc;
-}
-
-.map-area .map-controls input,
-.map-area .map-controls select {
-	padding: 0.5rem;
-	background: #2a2a2a;
-	border: 1px solid #555;
-	color: #fff;
-	border-radius: 4px;
-}
-
-.map-area .map-controls button {
-	padding: 0.5rem 1rem;
-	background: #3a3a3a;
-	border: 1px solid #555;
-	color: #fff;
-	border-radius: 4px;
-	cursor: pointer;
-}
-
-.map-area .map-controls button:hover {
-	background: #4a4a4a;
 }
 
 .map-area .map-grid {
@@ -823,6 +888,34 @@ header h1 {
 
 .modal-actions button:hover {
 	background: #4a4a4a;
+}
+
+.dungeon-settings-content {
+	max-width: 520px;
+	width: 90%;
+}
+
+.dungeon-settings-grid {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	margin-top: 1rem;
+}
+
+.dimension-inputs {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.dimension-inputs input {
+	flex: 1;
+	min-width: 90px;
+}
+
+.dungeon-settings-actions {
+	margin-top: 1rem;
+	justify-content: space-between;
 }
 
 .modal-actions-bottom {
@@ -1662,22 +1755,6 @@ header h1 {
 		font-size: 0.85rem;
 	}
 
-	.map-area .map-controls {
-		padding: 0.75rem;
-		gap: 0.75rem;
-	}
-
-	.map-area .map-controls label {
-		font-size: 0.85rem;
-	}
-
-	.map-area .map-controls input,
-	.map-area .map-controls select,
-	.map-area .map-controls button {
-		padding: 0.4rem;
-		font-size: 0.85rem;
-	}
-
 	.grid-cell {
 		width: 25px;
 		height: 25px;
@@ -1745,29 +1822,6 @@ header h1 {
 
 	.add-btn {
 		padding: 0.4rem;
-		font-size: 0.8rem;
-	}
-
-	.map-area .map-controls {
-		padding: 0.5rem;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-
-	.map-area .map-controls label {
-		font-size: 0.8rem;
-		gap: 0.25rem;
-	}
-
-	.map-area .map-controls input,
-	.map-area .map-controls select {
-		padding: 0.3rem;
-		font-size: 0.8rem;
-		width: 60px;
-	}
-
-	.map-area .map-controls button {
-		padding: 0.3rem 0.5rem;
 		font-size: 0.8rem;
 	}
 
@@ -1907,27 +1961,6 @@ header h1 {
 
 	.add-btn {
 		padding: 0.35rem;
-		font-size: 0.75rem;
-	}
-
-	.map-area .map-controls {
-		padding: 0.4rem;
-		gap: 0.4rem;
-	}
-
-	.map-area .map-controls label {
-		font-size: 0.75rem;
-	}
-
-	.map-area .map-controls input,
-	.map-area .map-controls select {
-		padding: 0.25rem;
-		font-size: 0.75rem;
-		width: 50px;
-	}
-
-	.map-area .map-controls button {
-		padding: 0.25rem 0.4rem;
 		font-size: 0.75rem;
 	}
 

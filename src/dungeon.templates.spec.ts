@@ -2,14 +2,21 @@ import assert from "node:assert";
 import { suite, test } from "node:test";
 
 import {
+	AnySerializedDungeonObject,
 	DungeonObject,
 	Item,
 	Room,
+	SerializedItem,
 	createFromTemplate,
 	type DungeonObjectTemplate,
 	type RoomTemplate,
 	type SerializedDungeonObject,
 } from "./dungeon.js";
+
+function xoid(object: any) {
+	const { oid, ...rest } = object as any;
+	return rest;
+}
 
 suite("Template-aware serialization", () => {
 	test("serialize() includes templateId when created from template", () => {
@@ -22,7 +29,7 @@ suite("Template-aware serialization", () => {
 			baseWeight: 1.5,
 		};
 		const obj = createFromTemplate(tmpl);
-		const ser = obj.serialize();
+		const ser = xoid(obj.serialize());
 		assert.deepStrictEqual(ser, {
 			type: "Item",
 			keywords: "potion",
@@ -46,9 +53,11 @@ suite("Template-aware serialization", () => {
 			baseWeight: 1.5,
 		};
 		const obj = createFromTemplate(tmpl);
-		const compressed = obj.serialize({
-			compress: true,
-		}) as SerializedDungeonObject;
+		const compressed = xoid(
+			obj.serialize({
+				compress: true,
+			})
+		);
 		assert.deepStrictEqual(
 			compressed,
 			{ type: "Item", templateId: "potion" },
@@ -71,9 +80,11 @@ suite("Template-aware serialization", () => {
 		// change a template field
 		obj.display = "Greater Potion";
 
-		const compressed = obj.serialize({
-			compress: true,
-		}) as SerializedDungeonObject;
+		const compressed = xoid(
+			obj.serialize({
+				compress: true,
+			})
+		);
 		assert.deepStrictEqual(compressed, {
 			type: "Item",
 			templateId: "potion",
@@ -93,15 +104,17 @@ suite("Template-aware serialization", () => {
 		};
 		const obj = createFromTemplate(tmpl);
 		obj.roomDescription = "A glowing ring lies here.";
-		const uncompressed = obj.serialize();
-		const compressed = obj.serialize({ compress: true });
+		const uncompressed = xoid(obj.serialize());
+		const compressed = xoid(obj.serialize({ compress: true }));
 		assert.deepStrictEqual(compressed, {
 			type: "Item",
 			templateId: "ring-power",
 			roomDescription: "A glowing ring lies here.",
 		});
 		const fromUncompressed = DungeonObject.deserialize(uncompressed);
-		const fromCompressed = DungeonObject.deserialize(compressed);
+		const fromCompressed = DungeonObject.deserialize(
+			compressed as AnySerializedDungeonObject
+		);
 		assert.deepStrictEqual(
 			fromCompressed.serialize(),
 			fromUncompressed.serialize()

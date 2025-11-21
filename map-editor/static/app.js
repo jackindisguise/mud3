@@ -506,9 +506,157 @@ class MapEditor {
 				option.textContent = id;
 				select.appendChild(option);
 			});
+
+			this.updateCurrentDungeonDisplay();
+			this.updateDungeonSettingsForm(this.yamlData?.dungeon || null);
 		} catch (error) {
 			console.error("Failed to load dungeon list:", error);
 		}
+	}
+
+	updateCurrentDungeonDisplay(dungeonMeta) {
+		const nameEl = document.getElementById("current-dungeon-name");
+		const editBtn = document.getElementById("edit-dungeon-settings-btn");
+		if (!nameEl || !editBtn) return;
+
+		const meta = dungeonMeta || this.yamlData?.dungeon || null;
+		const id = meta?.id || this.currentDungeonId;
+
+		if (!id) {
+			const placeholder = "No dungeon selected";
+			nameEl.textContent = placeholder;
+			nameEl.title = placeholder;
+			editBtn.disabled = true;
+			editBtn.title = "Select a dungeon to edit settings";
+			return;
+		}
+
+		const trimmedName = meta?.name?.trim();
+		const description = meta?.description?.trim();
+		const displayName = trimmedName ? `${trimmedName} (${id})` : id;
+
+		nameEl.textContent = displayName;
+		nameEl.title = description ? `${displayName}\n${description}` : displayName;
+		editBtn.disabled = false;
+		editBtn.title = `Edit settings for ${displayName}`;
+	}
+
+	ensureDungeonMetadata(dungeon, fallbackId = this.currentDungeonId) {
+		if (!dungeon) return;
+		const fallbackName =
+			(dungeon.name && dungeon.name.trim()) ||
+			dungeon.id ||
+			fallbackId ||
+			this.currentDungeon?.name ||
+			"Untitled Dungeon";
+		dungeon.name = fallbackName.trim();
+
+		if (typeof dungeon.description === "string") {
+			const trimmedDescription = dungeon.description.trim();
+			dungeon.description = trimmedDescription || undefined;
+		}
+	}
+
+	updateDungeonSettingsForm(dungeon) {
+		const dimensions = dungeon?.dimensions;
+		const widthInput = document.getElementById("width-input");
+		const heightInput = document.getElementById("height-input");
+		const layersInput = document.getElementById("layers-input");
+		const resetMessageInput = document.getElementById("reset-message-input");
+		const nameInput = document.getElementById("dungeon-name-input");
+		const descriptionInput = document.getElementById(
+			"dungeon-description-input"
+		);
+
+		if (widthInput) {
+			widthInput.value =
+				dimensions && typeof dimensions.width === "number"
+					? dimensions.width
+					: "";
+		}
+		if (heightInput) {
+			heightInput.value =
+				dimensions && typeof dimensions.height === "number"
+					? dimensions.height
+					: "";
+		}
+		if (layersInput) {
+			layersInput.value =
+				dimensions && typeof dimensions.layers === "number"
+					? dimensions.layers
+					: "";
+		}
+		if (resetMessageInput) {
+			resetMessageInput.value = dungeon?.resetMessage || "";
+		}
+		if (nameInput) {
+			nameInput.value =
+				(dungeon && (dungeon.name || dungeon.id)) ||
+				this.currentDungeon?.name ||
+				this.currentDungeonId ||
+				"";
+		}
+		if (descriptionInput) {
+			descriptionInput.value = dungeon?.description || "";
+		}
+	}
+
+	commitDungeonSettingsForm() {
+		if (!this.yamlData || !this.yamlData.dungeon) return false;
+
+		const dungeon = this.yamlData.dungeon;
+		const resetMessageInput = document.getElementById("reset-message-input");
+		const nameInput = document.getElementById("dungeon-name-input");
+		const descriptionInput = document.getElementById(
+			"dungeon-description-input"
+		);
+
+		const newResetMessage = resetMessageInput?.value || "";
+		const trimmedName = nameInput?.value?.trim() || "";
+		if (!trimmedName) {
+			this.showToast("Dungeon name is required", "");
+			if (nameInput) {
+				nameInput.focus();
+			}
+			return false;
+		}
+		const newDescription = descriptionInput?.value?.trim() || "";
+
+		let changed = false;
+
+		const normalizedResetMessage = newResetMessage || undefined;
+		if (dungeon.resetMessage !== normalizedResetMessage) {
+			dungeon.resetMessage = normalizedResetMessage;
+			if (this.currentDungeon) {
+				this.currentDungeon.resetMessage = normalizedResetMessage || "";
+			}
+			changed = true;
+		}
+
+		const normalizedName = trimmedName;
+		if (dungeon.name !== normalizedName) {
+			dungeon.name = normalizedName;
+			if (this.currentDungeon) {
+				this.currentDungeon.name = normalizedName;
+			}
+			changed = true;
+		}
+
+		const normalizedDescription = newDescription || undefined;
+		if (dungeon.description !== normalizedDescription) {
+			dungeon.description = normalizedDescription;
+			if (this.currentDungeon) {
+				this.currentDungeon.description = normalizedDescription || "";
+			}
+			changed = true;
+		}
+
+		if (changed) {
+			this.updateCurrentDungeonDisplay(dungeon);
+			this.saveToLocalStorage();
+		}
+
+		return true;
 	}
 
 	async loadDungeon(id) {
@@ -526,10 +674,16 @@ class MapEditor {
 					this.currentDungeonId = id;
 					this.yamlData = parsed.yamlData;
 					const dungeon = this.yamlData.dungeon;
+					this.ensureDungeonMetadata(dungeon, id);
 					this.currentDungeon = {
 						dimensions: dungeon.dimensions,
 						resetMessage: dungeon.resetMessage || "",
+						name: dungeon.name || "",
+						description: dungeon.description || "",
 					};
+
+					this.updateCurrentDungeonDisplay(dungeon);
+					this.updateDungeonSettingsForm(dungeon);
 
 					// Initialize history with restored state
 					this.history = [this.cloneDungeonState(dungeon)];
@@ -541,16 +695,6 @@ class MapEditor {
 					);
 					this.hasUnsavedChanges = true;
 					this.updateSaveButton();
-					// Update UI for restored state
-					document.getElementById("width-input").value =
-						dungeon.dimensions.width;
-					document.getElementById("height-input").value =
-						dungeon.dimensions.height;
-					document.getElementById("layers-input").value =
-						dungeon.dimensions.layers;
-					document.getElementById("reset-message-input").value =
-						dungeon.resetMessage || "";
-
 					// Load templates
 					this.loadTemplates(dungeon);
 
@@ -583,30 +727,30 @@ class MapEditor {
 		this.currentDungeon = {
 			dimensions: data.dimensions,
 			resetMessage: data.resetMessage || "",
+			name: data.name || id || "",
+			description: data.description || "",
 		};
 
 		// Clear selection and indicator
-		this.selectedTemplate = null;
-		this.selectedTemplateType = null;
-		document
-			.querySelectorAll(".template-item")
-			.forEach((i) => i.classList.remove("selected"));
-		this.updatePlacementIndicator(null, null, null);
+		this.clearSelectionTool();
+		this.clearSelectedTemplate();
 
 		// Parse YAML
 		this.yamlData = jsyaml.load(data.yaml);
 		const dungeon = this.yamlData.dungeon;
+		this.ensureDungeonMetadata(dungeon, id);
+		this.currentDungeon.name = dungeon.name || this.currentDungeon.name || "";
+		this.currentDungeon.description =
+			dungeon.description || this.currentDungeon.description || "";
+
+		this.updateCurrentDungeonDisplay(dungeon);
 
 		// Initialize history with current state
 		this.history = [this.cloneDungeonState(dungeon)];
 		this.historyIndex = 0;
 
 		// Update UI
-		document.getElementById("width-input").value = dungeon.dimensions.width;
-		document.getElementById("height-input").value = dungeon.dimensions.height;
-		document.getElementById("layers-input").value = dungeon.dimensions.layers;
-		document.getElementById("reset-message-input").value =
-			dungeon.resetMessage || "";
+		this.updateDungeonSettingsForm(dungeon);
 
 		// Load templates
 		this.loadTemplates(dungeon);
@@ -713,9 +857,7 @@ class MapEditor {
 			if (this.selectedCells.size > 0) {
 				this.placeTemplateInSelection(type, id);
 				// Clear selection after placement
-				this.selectedCells.clear();
-				this.updateSelectionVisuals();
-				this.setSelectionMode(null);
+				this.clearSelectionTool();
 			}
 
 			document
@@ -3346,9 +3488,29 @@ class MapEditor {
 			return;
 		}
 
+		if (!this.commitDungeonSettingsForm()) {
+			return;
+		}
+
 		// Update reset message
 		const resetMessage = document.getElementById("reset-message-input").value;
 		this.yamlData.dungeon.resetMessage = resetMessage || undefined;
+		const dungeonName = document
+			.getElementById("dungeon-name-input")
+			.value.trim();
+		const dungeonDescription = document
+			.getElementById("dungeon-description-input")
+			.value.trim();
+		const normalizedName = dungeonName || undefined;
+		const normalizedDescription = dungeonDescription || undefined;
+		this.yamlData.dungeon.name = normalizedName;
+		this.yamlData.dungeon.description = normalizedDescription;
+		if (this.currentDungeon) {
+			this.currentDungeon.resetMessage = resetMessage || "";
+			this.currentDungeon.name = normalizedName || "";
+			this.currentDungeon.description = normalizedDescription || "";
+		}
+		this.updateCurrentDungeonDisplay(this.yamlData.dungeon);
 
 		// Clear any pending auto-save timeout before saving
 		if (this.autoSaveTimeout) {
@@ -3773,8 +3935,7 @@ class MapEditor {
 						this.selectedTemplate
 					);
 					// Clear selection after placement (but keep selection tool active)
-					this.selectedCells.clear();
-					this.updateSelectionVisuals();
+					this.clearSelectedCells();
 				}
 			} else if (this.isDragging) {
 				// Cancel drag on mouseup anywhere
@@ -4034,23 +4195,42 @@ class MapEditor {
 					return;
 				}
 
+				const dungeonSettingsModal = document.getElementById(
+					"dungeon-settings-modal"
+				);
+				if (
+					dungeonSettingsModal &&
+					dungeonSettingsModal.classList.contains("active")
+				) {
+					if (!this.commitDungeonSettingsForm()) {
+						return;
+					}
+					dungeonSettingsModal.classList.remove("active");
+					return;
+				}
+
 				// If no modals are open, handle selection/deselection
 				if (this.isSelecting) {
-					// Cancel selection if currently selecting
-					this.isSelecting = false;
-					this.selectedCells.clear();
-					this.selectedCell = null; // Also clear single cell selection
-					this.updateSelectionVisuals();
-					// Remove selected class from grid cells
-					document.querySelectorAll(".grid-cell").forEach((cell) => {
-						cell.classList.remove("selected");
-						cell.classList.remove("selected-cell");
-					});
-					this.selectionStart = null;
-					this.selectionEnd = null;
-				} else {
-					// Deselect everything
-					this.deselectAll();
+					this.cancelSelection();
+					return;
+				}
+
+				const hasCellSelection =
+					this.selectedCells.size > 0 || this.selectedCell !== null;
+
+				if (hasCellSelection) {
+					this.clearSelectedCells();
+					return;
+				}
+
+				// No cell selection - clear selection tool and template selection
+				this.clearSelectionTool();
+
+				if (
+					this.selectedTemplate !== null ||
+					this.selectedTemplateType !== null
+				) {
+					this.clearSelectedTemplate();
 				}
 			} else if (e.ctrlKey && e.key === "z" && !e.shiftKey) {
 				// Undo (Ctrl+Z)
@@ -4082,10 +4262,56 @@ class MapEditor {
 			}
 		});
 
-		// Resize button
-		document.getElementById("resize-btn").addEventListener("click", () => {
-			this.resizeDungeon();
-		});
+		// Dungeon settings modal
+		const dungeonSettingsModal = document.getElementById(
+			"dungeon-settings-modal"
+		);
+		const editSettingsBtn = document.getElementById(
+			"edit-dungeon-settings-btn"
+		);
+		const dungeonSettingsClose = document.getElementById(
+			"dungeon-settings-close"
+		);
+		const dungeonSettingsDone = document.getElementById(
+			"dungeon-settings-done"
+		);
+		const applyDungeonSettingsBtn = document.getElementById(
+			"apply-dungeon-settings-btn"
+		);
+
+		const closeDungeonSettingsModal = () => {
+			if (!this.commitDungeonSettingsForm()) {
+				return;
+			}
+			if (dungeonSettingsModal) {
+				dungeonSettingsModal.classList.remove("active");
+			}
+		};
+
+		if (editSettingsBtn && dungeonSettingsModal) {
+			editSettingsBtn.addEventListener("click", () => {
+				if (!this.currentDungeonId) return;
+				this.updateDungeonSettingsForm(this.yamlData?.dungeon || null);
+				dungeonSettingsModal.classList.add("active");
+			});
+		}
+
+		if (dungeonSettingsClose) {
+			dungeonSettingsClose.addEventListener("click", closeDungeonSettingsModal);
+		}
+
+		if (dungeonSettingsDone) {
+			dungeonSettingsDone.addEventListener("click", closeDungeonSettingsModal);
+		}
+
+		if (applyDungeonSettingsBtn) {
+			applyDungeonSettingsBtn.addEventListener("click", () => {
+				if (!this.commitDungeonSettingsForm()) {
+					return;
+				}
+				this.resizeDungeon();
+			});
+		}
 
 		// Toolbox buttons
 		document.querySelectorAll(".tool-btn").forEach((btn) => {
@@ -4096,32 +4322,66 @@ class MapEditor {
 		});
 	}
 
-	setSelectionMode(mode) {
-		// Toggle mode: if clicking the same tool, deselect it
-		if (this.selectionMode === mode) {
-			this.selectionMode = null;
-		} else {
-			this.selectionMode = mode;
-			// Clear template selection when entering selection mode
-			this.selectedTemplate = null;
-			this.selectedTemplateType = null;
-			this.updatePlacementIndicator(null, null, null);
-			// Clear single cell selection when using a selection tool
-			this.selectedCell = null;
-			// Remove selected class from grid cells
-			document.querySelectorAll(".grid-cell").forEach((cell) => {
-				cell.classList.remove("selected");
-			});
+	clearSelectedTemplate() {
+		this.selectedTemplate = null;
+		this.selectedTemplateType = null;
+		document.querySelectorAll(".template-item").forEach((item) => {
+			item.classList.remove("selected");
+		});
+		this.updatePlacementIndicator(null, null, null);
+	}
+
+	clearSelectedCells() {
+		this.selectedCells.clear();
+		this.selectedCell = null;
+		this.selectionStart = null;
+		this.selectionEnd = null;
+		this.updateSelectionVisuals();
+		document.querySelectorAll(".grid-cell").forEach((cell) => {
+			cell.classList.remove("selected");
+			cell.classList.remove("selected-cell");
+		});
+	}
+
+	clearSelectionTool() {
+		this.clearSelectedCells();
+
+		if (this.selectionMode === null) {
+			this.isSelecting = false;
+			return;
 		}
+
+		this.selectionMode = null;
+		this.isSelecting = false;
+		document.querySelectorAll(".tool-btn").forEach((btn) => {
+			btn.classList.remove("active");
+		});
+	}
+
+	cancelSelection() {
+		if (!this.isSelecting) {
+			return;
+		}
+
+		this.isSelecting = false;
+		this.clearSelectedCells();
+	}
+
+	setSelectionMode(mode) {
+		// Toggle mode: clicking the same tool (or null) deselects it
+		if (mode === null || this.selectionMode === mode) {
+			this.clearSelectionTool();
+			return;
+		}
+
+		this.selectionMode = mode;
+		this.isSelecting = false;
+		this.clearSelectedCells();
 
 		// Update button highlights
 		document.querySelectorAll(".tool-btn").forEach((btn) => {
 			btn.classList.toggle("active", btn.dataset.tool === this.selectionMode);
 		});
-
-		// Clear selection when switching modes
-		this.selectedCells.clear();
-		this.updateSelectionVisuals();
 	}
 
 	updateSelection() {
@@ -4384,40 +4644,16 @@ class MapEditor {
 	}
 
 	deselectAll() {
-		// Clear multi-cell selection
-		this.selectedCells.clear();
-
-		// Clear single cell selection
-		this.selectedCell = null;
-
-		// Clear template selection
-		this.selectedTemplate = null;
-		this.selectedTemplateType = null;
+		this.clearSelectedCells();
+		this.clearSelectedTemplate();
 
 		// Don't clear selection mode - keep tool active
 		// this.selectionMode = null;
-
-		// Update visual indicators
-		this.updateSelectionVisuals();
 
 		// Don't clear tool button highlights - keep selection tool active
 		// document.querySelectorAll(".tool-btn").forEach((btn) => {
 		// 	btn.classList.remove("active");
 		// });
-
-		// Remove selected class from grid cells
-		document.querySelectorAll(".grid-cell").forEach((cell) => {
-			cell.classList.remove("selected");
-			cell.classList.remove("selected-cell");
-		});
-
-		// Remove selected class from template items
-		document.querySelectorAll(".template-item").forEach((item) => {
-			item.classList.remove("selected");
-		});
-
-		// Hide placement indicator
-		this.updatePlacementIndicator(null, null, null);
 	}
 
 	selectAllCurrentLayer() {
@@ -4491,8 +4727,7 @@ class MapEditor {
 		}
 
 		// Clear selection after deletion
-		this.selectedCells.clear();
-		this.updateSelectionVisuals();
+		this.clearSelectedCells();
 	}
 
 	cloneDungeonState(dungeon) {
@@ -4504,6 +4739,8 @@ class MapEditor {
 			templates: JSON.parse(JSON.stringify(dungeon.templates || [])),
 			resets: JSON.parse(JSON.stringify(dungeon.resets || [])),
 			resetMessage: dungeon.resetMessage,
+			name: dungeon.name,
+			description: dungeon.description,
 		};
 	}
 
@@ -4539,13 +4776,12 @@ class MapEditor {
 		dungeon.templates = state.templates;
 		dungeon.resets = state.resets;
 		dungeon.resetMessage = state.resetMessage;
+		dungeon.name = state.name;
+		dungeon.description = state.description;
 
 		// Update UI
-		document.getElementById("width-input").value = dungeon.dimensions.width;
-		document.getElementById("height-input").value = dungeon.dimensions.height;
-		document.getElementById("layers-input").value = dungeon.dimensions.layers;
-		document.getElementById("reset-message-input").value =
-			dungeon.resetMessage || "";
+		this.updateDungeonSettingsForm(dungeon);
+		this.updateCurrentDungeonDisplay(dungeon);
 
 		// Reload templates and resets
 		this.loadTemplates(dungeon);
@@ -4700,7 +4936,8 @@ class MapEditor {
 		const heightInput = document.getElementById("new-dungeon-height");
 		const layersInput = document.getElementById("new-dungeon-layers");
 
-		const name = nameInput.value.trim().toLowerCase();
+		const rawName = nameInput.value.trim();
+		const name = rawName.toLowerCase();
 		const width = parseInt(widthInput.value, 10);
 		const height = parseInt(heightInput.value, 10);
 		const layers = parseInt(layersInput.value, 10);
@@ -4723,6 +4960,7 @@ class MapEditor {
 			);
 			return;
 		}
+		const displayName = rawName || sanitizedName;
 
 		if (width < 1 || width > 100) {
 			this.showToast("Invalid width", "Width must be between 1 and 100");
@@ -4754,6 +4992,7 @@ class MapEditor {
 			const dungeonData = {
 				dungeon: {
 					id: sanitizedName,
+					name: displayName,
 					dimensions: {
 						width,
 						height,
@@ -4781,7 +5020,7 @@ class MapEditor {
 			// Load the new dungeon
 			await this.loadDungeon(sanitizedName);
 
-			this.showToast("Dungeon created", `Created "${sanitizedName}"`);
+			this.showToast("Dungeon created", `Created "${displayName}"`);
 		} catch (error) {
 			console.error("Failed to create dungeon:", error);
 			this.showToast("Failed to create dungeon", error.message);
@@ -4861,9 +5100,7 @@ class MapEditor {
 		};
 
 		// Clear selection
-		this.selectedCells.clear();
-		this.updateSelectionVisuals();
-		this.setSelectionMode(null);
+		this.clearSelectionTool();
 
 		this.showToast(
 			"Copied selection",

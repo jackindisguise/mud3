@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.16.0](https://github.com/jackindisguise/mud3/compare/v1.15.0...v1.16.0) (2025-11-21)
+
+
+### Features
+
+* add portable electron build tooling ([cabac0b](https://github.com/jackindisguise/mud3/commit/cabac0b39926aae1e4d7ae9cbd00dc61bb19015d))
+* add post-processing for electron builds ([f48dbd3](https://github.com/jackindisguise/mud3/commit/f48dbd3a773b8726126ab64f1535897fded81a9f))
+* added a map editor service plus HTTP and electron entrypoints that expose dungeon CRUD, race/job/hit-type data, attribute calculations, and safe portable paths. ([1023dae](https://github.com/jackindisguise/mud3/commit/1023dae9161ee076739472a2ba9483111a0eeb60))
+* added electron-builder config, icon pipeline, and assets ([cabac0b](https://github.com/jackindisguise/mud3/commit/cabac0b39926aae1e4d7ae9cbd00dc61bb19015d))
+* added line and grouped edge selection buttons in toolbox ([66fe7b9](https://github.com/jackindisguise/mud3/commit/66fe7b98afc21bfd695eaf66db7f62f98428c955))
+* added post build steps for win/mac portable artifacts ([f48dbd3](https://github.com/jackindisguise/mud3/commit/f48dbd3a773b8726126ab64f1535897fded81a9f))
+* adjusted `jsyaml.dump` flow level to preserve the new row formatting when saving from the editor. ([f5b21e0](https://github.com/jackindisguise/mud3/commit/f5b21e0420c2bf3e2a8f2e8bc3fd866ac2341cd0))
+* aligned sidebar tabs with the toolbox bar using shared toolbar sizing vars. ([f1bc940](https://github.com/jackindisguise/mud3/commit/f1bc940bca32e895332a473b40a3080e2bc30fd1))
+* bundled the in-repo dungeon map editor UI with new selection tools, placement modes, undo/redo history, template modals, and richer help/toast UX. ([1023dae](https://github.com/jackindisguise/mud3/commit/1023dae9161ee076739472a2ba9483111a0eeb60))
+* enforced a local js-yaml bundle plus CSP so the electron renderer avoids external scripts and warnings. ([f1bc940](https://github.com/jackindisguise/mud3/commit/f1bc940bca32e895332a473b40a3080e2bc30fd1))
+* extended dungeon serialization, data packages, and specs to persist dungeon metadata, improve templates, and broaden serializer/template/location coverage. ([1023dae](https://github.com/jackindisguise/mud3/commit/1023dae9161ee076739472a2ba9483111a0eeb60))
+* format dungeon grid rows ([f5b21e0](https://github.com/jackindisguise/mud3/commit/f5b21e0420c2bf3e2a8f2e8bc3fd866ac2341cd0))
+* integrate map editor and tooling ([1023dae](https://github.com/jackindisguise/mud3/commit/1023dae9161ee076739472a2ba9483111a0eeb60))
+* moved template action buttons under descriptions for clarity ([6118ebb](https://github.com/jackindisguise/mud3/commit/6118ebbcaf01c52aea656ea5231d94d4efee2fc2))
+* ordered dungeon YAML serialization to keep core fields readable and deterministic. ([f1bc940](https://github.com/jackindisguise/mud3/commit/f1bc940bca32e895332a473b40a3080e2bc30fd1))
+* polish template and reset controls ([6118ebb](https://github.com/jackindisguise/mud3/commit/6118ebbcaf01c52aea656ea5231d94d4efee2fc2))
+* reformatted `data/dungeons/tower.yaml` so each grid row renders as a single inline array. ([f5b21e0](https://github.com/jackindisguise/mud3/commit/f5b21e0420c2bf3e2a8f2e8bc3fd866ac2341cd0))
+* refreshed map editor frontend bundle and package data modules for new build ([cabac0b](https://github.com/jackindisguise/mud3/commit/cabac0b39926aae1e4d7ae9cbd00dc61bb19015d))
+* restyled reset list cards and icons to match template panel ([6118ebb](https://github.com/jackindisguise/mud3/commit/6118ebbcaf01c52aea656ea5231d94d4efee2fc2))
+* tighten map editor security ([f1bc940](https://github.com/jackindisguise/mud3/commit/f1bc940bca32e895332a473b40a3080e2bc30fd1))
+* updated electron bootstrap, services, and logger to use safe paths and structured renderer logging ([cabac0b](https://github.com/jackindisguise/mud3/commit/cabac0b39926aae1e4d7ae9cbd00dc61bb19015d))
+
+
+### Bug Fixes
+
+* ensured toast stack respects toolbox and placement indicator bounds ([6118ebb](https://github.com/jackindisguise/mud3/commit/6118ebbcaf01c52aea656ea5231d94d4efee2fc2))
+* improve selection tools behavior and ui ([66fe7b9](https://github.com/jackindisguise/mud3/commit/66fe7b98afc21bfd695eaf66db7f62f98428c955))
+* kept selection tool active when placing templates on selections ([66fe7b9](https://github.com/jackindisguise/mud3/commit/66fe7b98afc21bfd695eaf66db7f62f98428c955))
+* returned early to skip template selection toggling after bulk placement ([66fe7b9](https://github.com/jackindisguise/mud3/commit/66fe7b98afc21bfd695eaf66db7f62f98428c955))
+
 ## [1.15.0](https://github.com/jackindisguise/mud3/compare/v1.14.0...v1.15.0) (2025-11-20)
 
 

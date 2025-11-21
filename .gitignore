@@ -10,3 +10,4 @@ mud3-dungeon-editor
 build
 electron-errors.log
 *.exe
+*.dmg

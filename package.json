@@ -23,7 +23,7 @@
 		"icon": "node scripts/generate-icon.cjs",
 		"electron:dev": "npm run build && npm run icon && electron dist/src/electron/main.js",
 		"electron:win:portable": "npm run build && npm run icon && electron-builder --win portable --publish never && node scripts/post-win-portable.js",
-		"electron:mac": "npm run build && npm run icon && electron-builder --mac dmg --publish never"
+		"electron:mac": "npm run build && npm run icon && electron-builder --mac dmg --publish never && node scripts/post-mac.js"
 	},
 	"devDependencies": {
 		"@types/js-yaml": "^4.0.9",

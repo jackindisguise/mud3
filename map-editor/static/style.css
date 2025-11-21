@@ -455,6 +455,7 @@ header h1 {
 	flex-direction: row;
 	gap: 0.5rem;
 	align-items: center;
+	flex-wrap: wrap;
 }
 
 .tool-btn {
@@ -483,6 +484,28 @@ header h1 {
 	background: #4a6a4a;
 	border-color: #6a8a6a;
 	box-shadow: 0 0 8px rgba(74, 106, 74, 0.5);
+}
+
+.edge-selection-group {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.35rem 0.5rem;
+	background: #1d1d1d;
+	border: 1px solid #444;
+	border-radius: 6px;
+}
+
+.edge-selection-label {
+	font-size: 0.75rem;
+	color: #aaa;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.edge-selection-buttons {
+	display: flex;
+	gap: 0.25rem;
 }
 
 .grid-cell.selected-cell {
@@ -1403,20 +1426,20 @@ header h1 {
 }
 
 .toast-container {
-	position: absolute;
-	bottom: 140px;
-	right: 20px;
-	top: 60px;
+	position: fixed;
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
 	z-index: 1001;
 	pointer-events: none;
-	overflow: hidden;
 	align-items: flex-end;
-	justify-content: flex-end;
-	-webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 10%, rgba(0, 0, 0, 1) 20%);
-	mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 10%, rgba(0, 0, 0, 1) 20%);
+	right: 20px;
+	bottom: 20px;
+	transition: bottom 0.2s ease;
+}
+
+.toast-container.has-indicator {
+	bottom: 160px;
 }
 
 .toast {

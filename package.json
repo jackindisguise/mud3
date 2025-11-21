@@ -19,7 +19,8 @@
 		"rerun": "npm run build && npm run start",
 		"post-changelog": "node scripts/post-changelog-to-board.js",
 		"mapeditor": "node mud3-dungeon-editor/dist/start-map-editor.js",
-		"update-mapeditor": "cd mud3-dungeon-editor && git pull origin && npm run build"
+		"update-mapeditor": "cd mud3-dungeon-editor && git pull origin && npm run build",
+		"electron:dev": "npm run build && electron dist/src/electron/main.js"
 	},
 	"devDependencies": {
 		"@types/ini": "^4.1.1",
@@ -33,7 +34,8 @@
 		"ts-node": "^10.9.2",
 		"typedoc": "^0.28.14",
 		"typescript": "^5.9.3",
-		"winston": "^3.18.3"
+		"winston": "^3.18.3",
+		"electron": "^31.0.0"
 	},
 	"dependencies": {
 		"accurate-intervals": "github:jackindisguise/accurate-intervals",

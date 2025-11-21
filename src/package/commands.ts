@@ -49,6 +49,7 @@ import {
 } from "../social.js";
 import { executeSocial, onSocialError } from "../commands/_social.js";
 import { Mob } from "../dungeon.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
 /**
  * Interface for command objects (JavaScript or TypeScript plain objects)
@@ -230,19 +231,23 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 /** Directory for runtime command files (user-editable) */
-const DATA_COMMAND_DIRECTORY = join(process.cwd(), "data", "commands");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
+const DATA_COMMAND_DIRECTORY = join(DATA_DIRECTORY, "commands");
 /** Directory for compiled built-in commands */
-const SRC_COMMAND_DIRECTORY = join(process.cwd(), "dist", "src", "commands");
+const SRC_COMMAND_DIRECTORY = join(ROOT_DIRECTORY, "dist", "src", "commands");
 
 async function loadCommands() {
 	const directories = [DATA_COMMAND_DIRECTORY, SRC_COMMAND_DIRECTORY];
 	for (const commandDir of directories) {
 		if (!(await fileExists(commandDir))) continue;
-		logger.info(`Loading commands from ${relative(process.cwd(), commandDir)}`);
+		logger.info(
+			`Loading commands from ${relative(ROOT_DIRECTORY, commandDir)}`
+		);
 		try {
 			const files = await readdir(commandDir);
 			logger.debug(
-				`Found ${files.length} files in ${relative(process.cwd(), commandDir)}`
+				`Found ${files.length} files in ${relative(ROOT_DIRECTORY, commandDir)}`
 			);
 
 			// Filter for JavaScript files
@@ -251,7 +256,7 @@ async function loadCommands() {
 			);
 			logger.debug(
 				`Found ${jsFiles.length} JavaScript command files in ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					commandDir
 				)}`
 			);
@@ -264,7 +269,7 @@ async function loadCommands() {
 			);
 			logger.debug(
 				`Found ${yamlFiles.length} YAML command files in ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					commandDir
 				)}`
 			);
@@ -276,7 +281,7 @@ async function loadCommands() {
 					const filePath = join(commandDir, file);
 					const fileUrl = pathToFileURL(filePath).href;
 					/*logger.debug(
-						`Importing command from ${relative(process.cwd(), filePath)}`
+						`Importing command from ${relative(ROOT_DIRECTORY, filePath)}`
 					);*/
 					const commandModule = await import(fileUrl);
 					const commandObj = commandModule.default;
@@ -286,7 +291,7 @@ async function loadCommands() {
 						CommandRegistry.default.register(command);
 						logger.debug(
 							`Loaded command "${commandObj.pattern}" from ${relative(
-								process.cwd(),
+								ROOT_DIRECTORY,
 								filePath
 							)}`
 						);
@@ -296,7 +301,7 @@ async function loadCommands() {
 					} else {
 						logger.warn(
 							`Invalid command structure in ${relative(
-								process.cwd(),
+								ROOT_DIRECTORY,
 								filePath
 							)}`
 						);
@@ -304,7 +309,7 @@ async function loadCommands() {
 				} catch (error) {
 					logger.error(
 						`Failed to load command from ${relative(
-							process.cwd(),
+							ROOT_DIRECTORY,
 							join(commandDir, file)
 						)}: ${error}`
 					);
@@ -317,7 +322,7 @@ async function loadCommands() {
 				try {
 					const filePath = join(commandDir, file);
 					logger.debug(
-						`Loading YAML command from ${relative(process.cwd(), filePath)}`
+						`Loading YAML command from ${relative(ROOT_DIRECTORY, filePath)}`
 					);
 
 					const fileContent = await readFile(filePath, "utf-8");
@@ -328,7 +333,7 @@ async function loadCommands() {
 						CommandRegistry.default.register(command);
 						logger.info(
 							`Loaded YAML command "${yamlDef.pattern}" from ${relative(
-								process.cwd(),
+								ROOT_DIRECTORY,
 								filePath
 							)}`
 						);
@@ -338,7 +343,7 @@ async function loadCommands() {
 					} else {
 						logger.warn(
 							`Invalid YAML command structure in ${relative(
-								process.cwd(),
+								ROOT_DIRECTORY,
 								filePath
 							)}: missing pattern or execute`
 						);
@@ -346,7 +351,7 @@ async function loadCommands() {
 				} catch (error) {
 					logger.error(
 						`Failed to load YAML command from ${relative(
-							process.cwd(),
+							ROOT_DIRECTORY,
 							join(commandDir, file)
 						)}: ${error}`
 					);
@@ -355,7 +360,7 @@ async function loadCommands() {
 		} catch (error) {
 			logger.warn(
 				`Failed to read commands directory ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					commandDir
 				)}: ${error}`
 			);

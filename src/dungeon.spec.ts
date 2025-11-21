@@ -142,6 +142,25 @@ suite("dungeon.ts", () => {
 	});
 
 	suite("Dungeon", () => {
+		test("should trim provided name and prevent empty assignments", () => {
+			const dungeon = new Dungeon({
+				dimensions: { width: 1, height: 1, layers: 1 },
+				name: "  My Dungeon  ",
+			});
+			assert.strictEqual(dungeon.name, "My Dungeon");
+
+			dungeon.name = " Updated Name ";
+			assert.strictEqual(dungeon.name, "Updated Name");
+		});
+
+		test("should fall back to id when no name is provided", () => {
+			const dungeon = new Dungeon({
+				id: "midgar",
+				dimensions: { width: 1, height: 1, layers: 1 },
+			});
+			assert.strictEqual(dungeon.name, "midgar");
+		});
+
 		test("generateEmptyDungeon() should generate rooms correctly", () => {
 			const dimensions = { width: 3, height: 2, layers: 2 };
 			const dungeon = Dungeon.generateEmptyDungeon({ dimensions });
@@ -1723,6 +1742,36 @@ suite("dungeon.ts", () => {
 			// Return to center
 			movable.step(DIRECTION.NORTHEAST);
 			assert.deepStrictEqual(movable.coordinates, { x: 1, y: 1, z: 1 });
+		});
+	});
+
+	suite("Mob resource scaling", () => {
+		test("should floor health when scaling ratios after capacity changes", () => {
+			const mob = new Mob();
+			const baseMax = mob.maxHealth;
+			const startingHealth = Math.floor(baseMax * 0.75);
+
+			mob.health = startingHealth;
+			const ratio = startingHealth / baseMax;
+
+			mob.setResourceBonuses({ maxHealth: 15 });
+
+			assert(Number.isInteger(mob.health));
+			assert.strictEqual(mob.health, Math.floor(ratio * mob.maxHealth));
+		});
+
+		test("should floor mana when scaling ratios after capacity changes", () => {
+			const mob = new Mob();
+			const baseMax = mob.maxMana;
+			const startingMana = Math.floor(baseMax * 0.6);
+
+			mob.mana = startingMana;
+			const ratio = startingMana / baseMax;
+
+			mob.setResourceBonuses({ maxMana: 7 });
+
+			assert(Number.isInteger(mob.mana));
+			assert.strictEqual(mob.mana, Math.floor(ratio * mob.maxMana));
 		});
 	});
 

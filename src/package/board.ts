@@ -41,8 +41,11 @@ import {
 } from "../board.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const BOARD_DIR = join(process.cwd(), "data", "boards");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
+const BOARD_DIR = join(DATA_DIRECTORY, "boards");
 const BOARD_REGISTRY = new Map<string, Board>();
 
 function sanitizeBoardName(name: string): string {
@@ -102,7 +105,7 @@ export async function saveBoard(board: Board): Promise<void> {
 
 	logger.debug(
 		`Saving board "${board.name}" to ${relative(
-			process.cwd(),
+			ROOT_DIRECTORY,
 			configPath
 		)} (+ messages)`
 	);
@@ -119,10 +122,10 @@ export async function saveBoard(board: Board): Promise<void> {
 		await rename(messagesTempPath, messagesPath);
 
 		logger.debug(
-			`Saved board files: ${relative(process.cwd(), configPath)} and ${relative(
-				process.cwd(),
-				messagesPath
-			)} for ${board.name}`
+			`Saved board files: ${relative(
+				ROOT_DIRECTORY,
+				configPath
+			)} and ${relative(ROOT_DIRECTORY, messagesPath)} for ${board.name}`
 		);
 	} catch (error) {
 		// Clean up temp files if they exist
@@ -191,7 +194,7 @@ export async function loadBoard(name: string): Promise<Board | undefined> {
 		const messageCount = board.getMessageCount();
 		logger.debug(
 			`Loaded board "${name}" with ${messageCount} message(s) from ${relative(
-				process.cwd(),
+				ROOT_DIRECTORY,
 				configPath
 			)}`
 		);
@@ -241,7 +244,7 @@ export async function getAllBoardNames(): Promise<string[]> {
 		const names = Array.from(boardNames);
 		logger.debug(
 			`Discovered ${names.length} board config(s) under ${relative(
-				process.cwd(),
+				ROOT_DIRECTORY,
 				BOARD_DIR
 			)}`
 		);

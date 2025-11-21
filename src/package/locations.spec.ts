@@ -15,8 +15,11 @@ import locationsPkg, {
 	LOCATIONS_DEFAULT,
 } from "./locations.js";
 
-const LOCATIONS_PATH = join(process.cwd(), "data", "locations.yaml");
-const BACKUP_PATH = join(process.cwd(), "data", "locations.yaml.backup");
+import { getSafeRootDirectory } from "../utils/path.js";
+
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const LOCATIONS_PATH = join(ROOT_DIRECTORY, "data", "locations.yaml");
+const BACKUP_PATH = join(ROOT_DIRECTORY, "data", "locations.yaml.backup");
 
 suite("package/locations.ts", () => {
 	let testDungeon: Dungeon;

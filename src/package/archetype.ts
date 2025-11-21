@@ -15,6 +15,7 @@ import { mkdir, readdir, readFile } from "fs/promises";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import logger from "../logger.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 import {
 	BaseArchetypeDefinition,
 	Job,
@@ -32,7 +33,8 @@ import {
 	DAMAGE_TYPE,
 } from "../damage-types.js";
 
-const DATA_DIRECTORY = join(process.cwd(), "data");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const RACES_DIRECTORY = join(DATA_DIRECTORY, "races");
 const JOBS_DIRECTORY = join(DATA_DIRECTORY, "jobs");
 const VALID_EXTENSIONS = new Set([".yaml", ".yml"]);
@@ -217,7 +219,7 @@ function parseArchetypeFile(
 		if (!archetype) {
 			logger.warn(
 				`Skipping archetype file without 'archetype' root: ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					filePath
 				)}`
 			);
@@ -229,7 +231,7 @@ function parseArchetypeFile(
 		if (!id || !name) {
 			logger.warn(
 				`Skipping archetype missing required fields (id, name): ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					filePath
 				)}`
 			);
@@ -271,7 +273,7 @@ function parseArchetypeFile(
 	} catch (error) {
 		logger.error(
 			`Failed to parse archetype file ${relative(
-				process.cwd(),
+				ROOT_DIRECTORY,
 				filePath
 			)}: ${error}`
 		);
@@ -306,7 +308,7 @@ async function loadDirectory(
 	const entries = await readdir(directory, { withFileTypes: true });
 	let count = 0;
 	logger.debug(
-		`Loading archetypes from ${relative(process.cwd(), directory)}...`
+		`Loading archetypes from ${relative(ROOT_DIRECTORY, directory)}...`
 	);
 
 	for (const entry of entries) {
@@ -413,7 +415,7 @@ export default {
 				if (raceCount === 0) {
 					logger.warn(
 						`No race archetypes found in ${relative(
-							process.cwd(),
+							ROOT_DIRECTORY,
 							RACES_DIRECTORY
 						)}`
 					);
@@ -426,7 +428,7 @@ export default {
 				if (jobCount === 0) {
 					logger.warn(
 						`No job archetypes found in ${relative(
-							process.cwd(),
+							ROOT_DIRECTORY,
 							JOBS_DIRECTORY
 						)}`
 					);

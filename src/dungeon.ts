@@ -121,6 +121,9 @@ import {
 	createResourceCapsView,
 } from "./attribute.js";
 
+const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
+let testObjectIdCounter = -1;
+
 /**
  * Enum for handling directional movement in the dungeon.
  *
@@ -781,8 +784,10 @@ export interface MapDimensions {
  */
 export interface DungeonOptions {
 	id?: string;
+	name?: string;
 	dimensions: MapDimensions;
 	resetMessage?: string;
+	description?: string;
 }
 
 /**
@@ -946,6 +951,8 @@ export class Dungeon {
 	 */
 	private _templates: Map<string, DungeonObjectTemplate> = new Map();
 	private _resetMessage?: string;
+	private _name: string;
+	private _description?: string;
 
 	/**
 	 * The size of the dungeon in all three dimensions. Used for bounds checking
@@ -999,6 +1006,13 @@ export class Dungeon {
 		// assign id early so the registry contains the dungeon immediately
 		if (options.id) this.id = options.id;
 		this._rooms = this.generateGrid();
+		const derivedName = (
+			options.name ??
+			options.id ??
+			"Untitled Dungeon"
+		).trim();
+		this._name = derivedName;
+		this._description = options.description?.trim();
 		this._resetMessage = options.resetMessage?.trim();
 	}
 
@@ -1076,6 +1090,27 @@ export class Dungeon {
 
 	public set resetMessage(message: string | undefined) {
 		this._resetMessage = message?.trim();
+	}
+
+	public get name(): string {
+		return this._name;
+	}
+
+	public set name(value: string) {
+		const trimmed = value?.trim();
+		if (!trimmed) {
+			throw new Error("Dungeon name cannot be empty");
+		}
+		this._name = trimmed;
+	}
+
+	public get description(): string | undefined {
+		return this._description;
+	}
+
+	public set description(value: string | undefined) {
+		const trimmed = value?.trim();
+		this._description = trimmed || undefined;
 	}
 
 	public broadcast(
@@ -2485,7 +2520,13 @@ export class DungeonObject {
 	 */
 	constructor(options?: DungeonObjectOptions) {
 		// Assign unique object ID (OID) - use provided oid if deserializing, otherwise generate new one
-		this.oid = options?.oid ?? getNextObjectIdSync();
+		if (options?.oid !== undefined) {
+			this.oid = options.oid;
+		} else if (IS_TEST_MODE) {
+			this.oid = testObjectIdCounter--;
+		} else {
+			this.oid = getNextObjectIdSync();
+		}
 
 		if (!options) return;
 		if (options.dungeon) this.dungeon = options.dungeon;
@@ -5515,6 +5556,10 @@ export class Mob extends Movable {
 		};
 	}
 
+	private clampResourceValue(value: number, maxValue: number): number {
+		return Math.floor(clampNumber(value, 0, maxValue));
+	}
+
 	private recalculateDerivedAttributes(
 		opts: { bootstrap?: boolean; healthRatio?: number; manaRatio?: number } = {}
 	): void {
@@ -5627,33 +5672,23 @@ export class Mob extends Movable {
 		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
 
 		if (opts.bootstrap) {
-			this._health = this._resourceCaps.maxHealth;
-			this._mana = this._resourceCaps.maxMana;
-			this._exhaustion = 0;
+			this.resetResources();
 			return;
 		}
 
 		if (opts.healthRatio !== undefined && Number.isFinite(opts.healthRatio)) {
-			this._health = clampNumber(
-				opts.healthRatio * this._resourceCaps.maxHealth,
-				0,
-				this._resourceCaps.maxHealth
-			);
+			this.health = opts.healthRatio * this._resourceCaps.maxHealth;
 		} else {
-			this._health = clampNumber(this._health, 0, this._resourceCaps.maxHealth);
+			this.health = this.health;
 		}
 
 		if (opts.manaRatio !== undefined && Number.isFinite(opts.manaRatio)) {
-			this._mana = clampNumber(
-				opts.manaRatio * this._resourceCaps.maxMana,
-				0,
-				this._resourceCaps.maxMana
-			);
+			this.mana = opts.manaRatio * this._resourceCaps.maxMana;
 		} else {
-			this._mana = clampNumber(this._mana, 0, this._resourceCaps.maxMana);
+			this.mana = this.mana;
 		}
 
-		this._exhaustion = clampNumber(this._exhaustion, 0, MAX_EXHAUSTION);
+		this.exhaustion = this.exhaustion;
 	}
 
 	private applyLevelDelta(delta: number): void {
@@ -6143,7 +6178,7 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public set health(value: number) {
-		this._health = clampNumber(value, 0, this.maxHealth);
+		this._health = this.clampResourceValue(value, this.maxHealth);
 	}
 
 	/**
@@ -6170,7 +6205,7 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public set mana(value: number) {
-		this._mana = clampNumber(value, 0, this.maxMana);
+		this._mana = this.clampResourceValue(value, this.maxMana);
 	}
 
 	/**
@@ -6220,8 +6255,8 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public resetResources(): void {
-		this._health = this.maxHealth;
-		this._mana = this.maxMana;
+		this.health = this.maxHealth;
+		this.mana = this.maxMana;
 		this._exhaustion = 0;
 	}
 

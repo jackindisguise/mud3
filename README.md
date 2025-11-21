@@ -58,16 +58,23 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 
 ## Dungeon Editor
 
-This project's dungeons can be edited using the **mud3-dungeon-editor**, a visual tool for creating and managing dungeon layouts:
+mud3 ships with a first-party, Electron-based dungeon editor that lives in this repository (see `map-editor/` and `src/electron/`).
 
-**Repository**: [github.com/jackindisguise/mud3-dungeon-editor](https://github.com/jackindisguise/mud3-dungeon-editor)
+Launch the editor locally with:
 
-The dungeon editor provides a graphical interface for:
-- Creating and editing room layouts
-- Configuring room properties and exits
-- Managing room links and connections
-- Working with dungeon templates
-- Visualizing dungeon structure
+```bash
+npm run electron:dev
+```
+
+The Electron shell loads the bundled `map-editor` frontend, talks directly to the MUD data files, and provides:
+- Visual room layout editing across layers
+- Exit/link editing with validation
+- Template-aware dungeon creation and duplication
+- Attribute calculators for race/job combinations
+
+You can also create distributable builds:
+- `npm run electron:mac` – build a signed DMG for macOS (ARM64)
+- `npm run electron:win:portable` – build a portable Windows executable
 
 ## Getting Started
 
@@ -106,8 +113,12 @@ npm run doc
 # Run with auto-rebuild
 npm run rerun
 
-# Start map editor
-npm run map-editor
+# Launch the Electron-based dungeon editor
+npm run electron:dev
+
+# Package the dungeon editor (optional)
+npm run electron:mac
+npm run electron:win:portable
 ```
 
 ## Project Structure
@@ -117,8 +128,3 @@ npm run map-editor
 - `dist/` - Compiled JavaScript output
 - `docs/` - Generated TypeScript documentation
 - `coverage/` - Test coverage reports
-
-## License
-
-ISC
-

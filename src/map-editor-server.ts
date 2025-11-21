@@ -10,33 +10,19 @@
  */
 
 import { createServer, IncomingMessage, ServerResponse } from "http";
-import { readFile, writeFile, readdir, access } from "fs/promises";
+import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants as FS_CONSTANTS } from "fs";
-import YAML from "js-yaml";
-import {
-	loadDungeon,
-	saveDungeon,
-	getAllDungeonIds,
-	SerializedDungeonFormat,
-} from "./package/dungeon.js";
-import {
-	getAllRaces,
-	getAllJobs,
-	getRaceById,
-	getJobById,
-} from "./package/archetype.js";
-import { Mob } from "./dungeon.js";
-import {
-	COMMON_HIT_TYPES,
-	PHYSICAL_DAMAGE_TYPE,
-	MAGICAL_DAMAGE_TYPE,
-} from "./damage-types.js";
 import logger from "./logger.js";
+import {
+	createMapEditorService,
+	MapEditorService,
+} from "./map-editor-service.js";
+import { getSafeRootDirectory } from "./utils/path.js";
 
 const PORT = 3000;
-const DUNGEON_DIR = join(process.cwd(), "data", "dungeons");
-const MAP_EDITOR_DIR = join(process.cwd(), "map-editor");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const MAP_EDITOR_DIR = join(ROOT_DIRECTORY, "map-editor");
 
 // Verify map editor directory exists at startup (async check)
 access(MAP_EDITOR_DIR, FS_CONSTANTS.F_OK)
@@ -45,7 +31,7 @@ access(MAP_EDITOR_DIR, FS_CONSTANTS.F_OK)
 	})
 	.catch((error) => {
 		logger.error(`Map editor directory not found: ${MAP_EDITOR_DIR}`);
-		logger.error(`Current working directory: ${process.cwd()}`);
+		logger.error(`Current working directory: ${ROOT_DIRECTORY}`);
 	});
 
 interface MapEditorServer {
@@ -55,7 +41,12 @@ interface MapEditorServer {
 }
 
 class MapEditorServerImpl implements MapEditorServer {
+	private readonly service: MapEditorService;
 	public server = createServer(this.handleRequest.bind(this));
+
+	constructor(service: MapEditorService = createMapEditorService()) {
+		this.service = service;
+	}
 
 	private async handleRequest(
 		req: IncomingMessage,
@@ -170,46 +161,28 @@ class MapEditorServerImpl implements MapEditorServer {
 		} catch (error) {
 			logger.error(`Failed to serve file: ${filePath}`);
 			logger.error(`Error details: ${error}`);
-			logger.error(`Current working directory: ${process.cwd()}`);
+			logger.error(`Current working directory: ${ROOT_DIRECTORY}`);
 			res.writeHead(404, { "Content-Type": "text/plain" });
 			res.end(
-				`File not found: ${filePath}\n\nCurrent directory: ${process.cwd()}`
+				`File not found: ${filePath}\n\nCurrent directory: ${ROOT_DIRECTORY}`
 			);
 		}
 	}
 
 	private async listDungeons(res: ServerResponse): Promise<void> {
-		const ids = await getAllDungeonIds();
+		const ids = await this.service.listDungeons();
 		res.writeHead(200, { "Content-Type": "application/json" });
-		res.end(JSON.stringify({ dungeons: ids }));
+		res.end(JSON.stringify(ids));
 	}
 
 	private async getDungeon(res: ServerResponse, id: string): Promise<void> {
-		// Read the raw YAML file directly (don't load into registry)
-		const filePath = join(DUNGEON_DIR, `${id}.yaml`);
 		try {
-			const yamlContent = await readFile(filePath, "utf-8");
-
-			// Parse YAML to get basic info without loading into registry
-			const data = YAML.load(yamlContent) as SerializedDungeonFormat;
-
-			if (!data.dungeon) {
-				res.writeHead(400, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ error: "Invalid dungeon format" }));
-				return;
-			}
-
+			const data = await this.service.getDungeon(id);
 			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(
-				JSON.stringify({
-					id: data.dungeon.id || id,
-					dimensions: data.dungeon.dimensions,
-					resetMessage: data.dungeon.resetMessage,
-					yaml: yamlContent,
-				})
-			);
+			res.end(JSON.stringify(data));
 		} catch (error) {
-			if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			const err = error as NodeJS.ErrnoException;
+			if (err.code === "ENOENT") {
 				res.writeHead(404, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: "Dungeon not found" }));
 			} else {
@@ -232,63 +205,34 @@ class MapEditorServerImpl implements MapEditorServer {
 
 		const data = JSON.parse(body);
 
-		// Check if dungeon already exists
-		const filePath = join(DUNGEON_DIR, `${id}.yaml`);
 		try {
-			await access(filePath, FS_CONSTANTS.F_OK);
-			// File exists
-			res.writeHead(409, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ error: "Dungeon already exists" }));
-			return;
+			const result = await this.service.createDungeon({
+				id,
+				yaml: data.yaml,
+			});
+			res.writeHead(201, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(result));
 		} catch (error) {
-			// File doesn't exist, which is what we want
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-				logger.error(`Failed to check dungeon existence ${id}: ${error}`);
+			const err = error as NodeJS.ErrnoException;
+			if (err.code === "ENOENT") {
 				res.writeHead(500, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: String(error) }));
 				return;
 			}
-		}
-
-		// If YAML is provided, save it directly
-		if (data.yaml) {
-			const tempPath = `${filePath}.tmp`;
-
-			try {
-				// Ensure directory exists
-				const { mkdir } = await import("fs/promises");
-				await mkdir(DUNGEON_DIR, { recursive: true });
-
-				// Write to temporary file first (atomic write)
-				await writeFile(tempPath, data.yaml, "utf-8");
-				// Atomically rename
-				const { rename } = await import("fs/promises");
-				await rename(tempPath, filePath);
-
-				logger.debug(`Created dungeon YAML: ${id}`);
-				res.writeHead(201, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ success: true, id }));
-				return;
-			} catch (error) {
-				// Clean up temp file
-				try {
-					const { unlink } = await import("fs/promises");
-					await unlink(tempPath);
-				} catch {
-					// Ignore cleanup errors
-				}
-				logger.error(`Failed to create dungeon ${id}: ${error}`);
-				res.writeHead(500, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ error: String(error) }));
+			if (err.message === "Dungeon already exists") {
+				res.writeHead(409, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: err.message }));
 				return;
 			}
+			if (err.message === "YAML data is required for dungeon creation") {
+				res.writeHead(400, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: err.message }));
+				return;
+			}
+			logger.error(`Failed to create dungeon ${id}: ${error}`);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: String(error) }));
 		}
-
-		// Fallback: if no YAML provided, return error (YAML is required)
-		res.writeHead(400, { "Content-Type": "application/json" });
-		res.end(
-			JSON.stringify({ error: "YAML data is required for dungeon creation" })
-		);
 	}
 
 	private async updateDungeon(
@@ -303,48 +247,31 @@ class MapEditorServerImpl implements MapEditorServer {
 
 		const data = JSON.parse(body);
 
-		// If YAML is provided, save it directly (preferred method)
-		if (data.yaml) {
-			const filePath = join(DUNGEON_DIR, `${id}.yaml`);
-			const tempPath = `${filePath}.tmp`;
-
-			try {
-				// Write to temporary file first (atomic write)
-				await writeFile(tempPath, data.yaml, "utf-8");
-				// Atomically rename
-				const { rename } = await import("fs/promises");
-				await rename(tempPath, filePath);
-
-				logger.debug(`Saved dungeon YAML: ${id}`);
-				res.writeHead(200, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ success: true }));
+		try {
+			const result = await this.service.updateDungeon({
+				id,
+				yaml: data.yaml,
+			});
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(result));
+		} catch (error) {
+			const err = error as Error;
+			if (err.message === "YAML data is required for updates") {
+				res.writeHead(400, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: err.message }));
 				return;
-			} catch (error) {
-				// Clean up temp file
-				try {
-					const { unlink } = await import("fs/promises");
-					await unlink(tempPath);
-				} catch {
-					// Ignore cleanup errors
-				}
-				throw error;
 			}
+			logger.error(`Failed to update dungeon ${id}: ${error}`);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: String(error) }));
 		}
-
-		// Fallback: if no YAML provided, return error (YAML is required)
-		res.writeHead(400, { "Content-Type": "application/json" });
-		res.end(JSON.stringify({ error: "YAML data is required for updates" }));
 	}
 
 	private async getRaces(res: ServerResponse): Promise<void> {
 		try {
-			const races = getAllRaces();
-			const raceList = races.map((race) => ({
-				id: race.id,
-				display: race.name,
-			}));
+			const races = await this.service.getRaces();
 			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ races: raceList }));
+			res.end(JSON.stringify(races));
 		} catch (error) {
 			logger.error(`Failed to get races: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
@@ -354,13 +281,9 @@ class MapEditorServerImpl implements MapEditorServer {
 
 	private async getJobs(res: ServerResponse): Promise<void> {
 		try {
-			const jobs = getAllJobs();
-			const jobList = jobs.map((job) => ({
-				id: job.id,
-				display: job.name,
-			}));
+			const jobs = await this.service.getJobs();
 			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ jobs: jobList }));
+			res.end(JSON.stringify(jobs));
 		} catch (error) {
 			logger.error(`Failed to get jobs: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
@@ -379,81 +302,26 @@ class MapEditorServerImpl implements MapEditorServer {
 
 		try {
 			const data = JSON.parse(body);
-			const { raceId, jobId, level } = data;
-
-			if (!raceId || !jobId || level === undefined) {
-				res.writeHead(400, { "Content-Type": "application/json" });
-				res.end(
-					JSON.stringify({ error: "raceId, jobId, and level are required" })
-				);
-				return;
-			}
-
-			const race = getRaceById(raceId);
-			const job = getJobById(jobId);
-
-			if (!race || !job) {
-				res.writeHead(400, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ error: "Invalid race or job ID" }));
-				return;
-			}
-
-			// Create a temporary mob to calculate attributes
-			const mob = new Mob({
-				race,
-				job,
-				level: parseInt(level) || 1,
+			const result = await this.service.calculateAttributes({
+				raceId: data.raceId,
+				jobId: data.jobId,
+				level: data.level,
 			});
-
-			// Get calculated attributes
-			const primary = mob.primaryAttributes;
-			const secondary = mob.secondaryAttributes;
-			const resourceCaps = {
-				maxHealth: mob.maxHealth,
-				maxMana: mob.maxMana,
-			};
-
 			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(
-				JSON.stringify({
-					primary,
-					secondary,
-					resourceCaps,
-				})
-			);
+			res.end(JSON.stringify(result));
 		} catch (error) {
 			logger.error(`Failed to calculate attributes: ${error}`);
-			res.writeHead(500, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ error: String(error) }));
+			const err = error as Error;
+			res.writeHead(400, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: err.message }));
 		}
 	}
 
 	private async getHitTypes(res: ServerResponse): Promise<void> {
 		try {
-			// Convert COMMON_HIT_TYPES Map to a serializable format
-			const hitTypes: Record<
-				string,
-				{
-					verb: string;
-					verbThirdPerson?: string;
-					damageType: string;
-				}
-			> = {};
-			for (const [key, hitType] of COMMON_HIT_TYPES) {
-				hitTypes[key] = {
-					verb: hitType.verb,
-					verbThirdPerson: hitType.verbThirdPerson,
-					damageType: hitType.damageType,
-				};
-			}
+			const data = await this.service.getHitTypes();
 			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(
-				JSON.stringify({
-					hitTypes,
-					physicalDamageTypes: PHYSICAL_DAMAGE_TYPE,
-					magicalDamageTypes: MAGICAL_DAMAGE_TYPE,
-				})
-			);
+			res.end(JSON.stringify(data));
 		} catch (error) {
 			logger.error(`Failed to get hit types: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });

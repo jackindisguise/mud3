@@ -1,5 +1,5 @@
 // Map Editor Application
-// Uses js-yaml for parsing (loaded via CDN in HTML)
+// Uses js-yaml for parsing (loaded via local script tag in index.html)
 
 // Color constants matching the game's COLOR enum
 const COLORS = [
@@ -23,6 +23,7 @@ const COLORS = [
 
 class MapEditor {
 	constructor() {
+		this.api = window.mapEditorAPI || null;
 		this.currentDungeon = null;
 		this.currentDungeonId = null;
 		this.selectedTemplate = null;
@@ -45,6 +46,8 @@ class MapEditor {
 		this.selectionEnd = null; // {x, y, z} when selection ends
 		this.selectedCells = new Set(); // Set of cell keys "x,y,z"
 		this.isSelecting = false; // Whether we're currently dragging a selection
+		this.selectionBaseCells = new Set(); // Cells to keep when additive selecting
+		this.isSelectionAddMode = false;
 		this.history = []; // Array of dungeon states for undo/redo
 		this.historyIndex = -1; // Current position in history (-1 means no history)
 		this.maxHistorySize = 50; // Maximum number of undo states to keep
@@ -53,6 +56,118 @@ class MapEditor {
 		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
 
 		this.init();
+	}
+
+	async fetchHitTypesData() {
+		if (this.api?.getHitTypes) {
+			return this.api.getHitTypes();
+		}
+		const response = await fetch("/api/hit-types");
+		if (!response.ok) {
+			throw new Error(`Failed to load hit types: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async fetchRacesData() {
+		if (this.api?.getRaces) {
+			return this.api.getRaces();
+		}
+		const response = await fetch("/api/races");
+		if (!response.ok) {
+			throw new Error(`Failed to load races: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async fetchJobsData() {
+		if (this.api?.getJobs) {
+			return this.api.getJobs();
+		}
+		const response = await fetch("/api/jobs");
+		if (!response.ok) {
+			throw new Error(`Failed to load jobs: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async fetchDungeonListData() {
+		if (this.api?.listDungeons) {
+			return this.api.listDungeons();
+		}
+		const response = await fetch("/api/dungeons");
+		if (!response.ok) {
+			throw new Error(`Failed to load dungeon list: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async fetchDungeonData(id) {
+		if (this.api?.getDungeon) {
+			return this.api.getDungeon(id);
+		}
+		const response = await fetch(`/api/dungeons/${id}`);
+		if (!response.ok) {
+			throw new Error(`Failed to load dungeon: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async saveDungeonData(id, yaml) {
+		if (this.api?.updateDungeon) {
+			return this.api.updateDungeon({ id, yaml });
+		}
+		const response = await fetch(`/api/dungeons/${id}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ yaml }),
+		});
+		if (!response.ok) {
+			let error;
+			try {
+				error = await response.json();
+			} catch {
+				error = {};
+			}
+			throw new Error(error?.error || "Failed to save dungeon");
+		}
+		return response.json();
+	}
+
+	async createDungeonData(id, yaml) {
+		if (this.api?.createDungeon) {
+			return this.api.createDungeon({ id, yaml });
+		}
+		const response = await fetch(`/api/dungeons/${id}`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ yaml }),
+		});
+		if (!response.ok) {
+			let error;
+			try {
+				error = await response.json();
+			} catch {
+				error = {};
+			}
+			throw new Error(error?.error || "Failed to create dungeon");
+		}
+		return response.json();
+	}
+
+	async calculateAttributesFromSource(payload) {
+		if (this.api?.calculateAttributes) {
+			return this.api.calculateAttributes(payload);
+		}
+		const response = await fetch("/api/calculate-attributes", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(payload),
+		});
+		if (!response.ok) {
+			throw new Error("Failed to calculate attributes");
+		}
+		return response.json();
 	}
 
 	async init() {
@@ -67,11 +182,7 @@ class MapEditor {
 
 	async loadHitTypes() {
 		try {
-			const response = await fetch("/api/hit-types");
-			if (!response.ok) {
-				throw new Error(`Failed to load hit types: ${response.statusText}`);
-			}
-			const data = await response.json();
+			const data = await this.fetchHitTypesData();
 			this.hitTypes = data.hitTypes;
 			this.physicalDamageTypes = data.physicalDamageTypes;
 			this.magicalDamageTypes = data.magicalDamageTypes;
@@ -158,7 +269,7 @@ class MapEditor {
 				if (hitTypesByDamage[damageType]) {
 					html += this.generateHitTypeOptions(
 						hitTypesByDamage[damageType],
-						selectedKey,
+						selectedKey
 					);
 				}
 			}
@@ -174,11 +285,11 @@ class MapEditor {
 				) {
 					const damageTypeColor = damageTypeColors[damageType] || "#ffffff";
 					html += `<optgroup label="─── ${formatDamageTypeName(
-						damageType,
+						damageType
 					)} ───" style="color: ${damageTypeColor}; font-weight: 600;">`;
 					html += this.generateHitTypeOptions(
 						hitTypesByDamage[damageType],
-						selectedKey,
+						selectedKey
 					);
 					html += "</optgroup>";
 				}
@@ -304,7 +415,7 @@ class MapEditor {
 					selectedColor === color.id ? "selected" : ""
 				} style="background-color: ${color.hex}; color: ${
 					color.id <= 7 ? "#fff" : "#000"
-				};">${color.name}</option>`,
+				};">${color.name}</option>`
 		).join("");
 		return `<select id="${id}" class="color-selector">
 			<option value="">None (default)</option>
@@ -326,7 +437,7 @@ class MapEditor {
 		// Check for mobs first
 		for (const reset of resets) {
 			const template = dungeon.templates?.find(
-				(t) => t.id === reset.templateId,
+				(t) => t.id === reset.templateId
 			);
 			if (template && template.type === "Mob") {
 				mapText = template.mapText !== undefined ? template.mapText : "!";
@@ -338,7 +449,7 @@ class MapEditor {
 		// Check for objects
 		for (const reset of resets) {
 			const template = dungeon.templates?.find(
-				(t) => t.id === reset.templateId,
+				(t) => t.id === reset.templateId
 			);
 			if (template && template.type !== "Mob") {
 				if (template.mapText !== undefined) mapText = template.mapText;
@@ -368,14 +479,12 @@ class MapEditor {
 
 	async loadRacesAndJobs() {
 		try {
-			const [racesRes, jobsRes] = await Promise.all([
-				fetch("/api/races"),
-				fetch("/api/jobs"),
+			const [racesData, jobsData] = await Promise.all([
+				this.fetchRacesData(),
+				this.fetchJobsData(),
 			]);
-			const racesData = await racesRes.json();
-			const jobsData = await jobsRes.json();
-			this.races = racesData.races || [];
-			this.jobs = jobsData.jobs || [];
+			this.races = racesData?.races || [];
+			this.jobs = jobsData?.jobs || [];
 		} catch (error) {
 			console.error("Failed to load races/jobs:", error);
 		}
@@ -383,8 +492,7 @@ class MapEditor {
 
 	async loadDungeonList() {
 		try {
-			const response = await fetch("/api/dungeons");
-			const data = await response.json();
+			const data = await this.fetchDungeonListData();
 			const select = document.getElementById("dungeon-select");
 			select.innerHTML = '<option value="">Select a dungeon...</option>';
 
@@ -394,15 +502,163 @@ class MapEditor {
 			newOption.textContent = "New...";
 			select.appendChild(newOption);
 
-			data.dungeons.forEach((id) => {
+			(data.dungeons || []).forEach((id) => {
 				const option = document.createElement("option");
 				option.value = id;
 				option.textContent = id;
 				select.appendChild(option);
 			});
+
+			this.updateCurrentDungeonDisplay();
+			this.updateDungeonSettingsForm(this.yamlData?.dungeon || null);
 		} catch (error) {
 			console.error("Failed to load dungeon list:", error);
 		}
+	}
+
+	updateCurrentDungeonDisplay(dungeonMeta) {
+		const nameEl = document.getElementById("current-dungeon-name");
+		const editBtn = document.getElementById("edit-dungeon-settings-btn");
+		if (!nameEl || !editBtn) return;
+
+		const meta = dungeonMeta || this.yamlData?.dungeon || null;
+		const id = meta?.id || this.currentDungeonId;
+
+		if (!id) {
+			const placeholder = "No dungeon selected";
+			nameEl.textContent = placeholder;
+			nameEl.title = placeholder;
+			editBtn.disabled = true;
+			editBtn.title = "Select a dungeon to edit settings";
+			return;
+		}
+
+		const trimmedName = meta?.name?.trim();
+		const description = meta?.description?.trim();
+		const displayName = trimmedName ? `${trimmedName} (${id})` : id;
+
+		nameEl.textContent = displayName;
+		nameEl.title = description ? `${displayName}\n${description}` : displayName;
+		editBtn.disabled = false;
+		editBtn.title = `Edit settings for ${displayName}`;
+	}
+
+	ensureDungeonMetadata(dungeon, fallbackId = this.currentDungeonId) {
+		if (!dungeon) return;
+		const fallbackName =
+			(dungeon.name && dungeon.name.trim()) ||
+			dungeon.id ||
+			fallbackId ||
+			this.currentDungeon?.name ||
+			"Untitled Dungeon";
+		dungeon.name = fallbackName.trim();
+
+		if (typeof dungeon.description === "string") {
+			const trimmedDescription = dungeon.description.trim();
+			dungeon.description = trimmedDescription || undefined;
+		}
+	}
+
+	updateDungeonSettingsForm(dungeon) {
+		const dimensions = dungeon?.dimensions;
+		const widthInput = document.getElementById("width-input");
+		const heightInput = document.getElementById("height-input");
+		const layersInput = document.getElementById("layers-input");
+		const resetMessageInput = document.getElementById("reset-message-input");
+		const nameInput = document.getElementById("dungeon-name-input");
+		const descriptionInput = document.getElementById(
+			"dungeon-description-input"
+		);
+
+		if (widthInput) {
+			widthInput.value =
+				dimensions && typeof dimensions.width === "number"
+					? dimensions.width
+					: "";
+		}
+		if (heightInput) {
+			heightInput.value =
+				dimensions && typeof dimensions.height === "number"
+					? dimensions.height
+					: "";
+		}
+		if (layersInput) {
+			layersInput.value =
+				dimensions && typeof dimensions.layers === "number"
+					? dimensions.layers
+					: "";
+		}
+		if (resetMessageInput) {
+			resetMessageInput.value = dungeon?.resetMessage || "";
+		}
+		if (nameInput) {
+			nameInput.value =
+				(dungeon && (dungeon.name || dungeon.id)) ||
+				this.currentDungeon?.name ||
+				this.currentDungeonId ||
+				"";
+		}
+		if (descriptionInput) {
+			descriptionInput.value = dungeon?.description || "";
+		}
+	}
+
+	commitDungeonSettingsForm() {
+		if (!this.yamlData || !this.yamlData.dungeon) return false;
+
+		const dungeon = this.yamlData.dungeon;
+		const resetMessageInput = document.getElementById("reset-message-input");
+		const nameInput = document.getElementById("dungeon-name-input");
+		const descriptionInput = document.getElementById(
+			"dungeon-description-input"
+		);
+
+		const newResetMessage = resetMessageInput?.value || "";
+		const trimmedName = nameInput?.value?.trim() || "";
+		if (!trimmedName) {
+			this.showToast("Dungeon name is required", "");
+			if (nameInput) {
+				nameInput.focus();
+			}
+			return false;
+		}
+		const newDescription = descriptionInput?.value?.trim() || "";
+
+		let changed = false;
+
+		const normalizedResetMessage = newResetMessage || undefined;
+		if (dungeon.resetMessage !== normalizedResetMessage) {
+			dungeon.resetMessage = normalizedResetMessage;
+			if (this.currentDungeon) {
+				this.currentDungeon.resetMessage = normalizedResetMessage || "";
+			}
+			changed = true;
+		}
+
+		const normalizedName = trimmedName;
+		if (dungeon.name !== normalizedName) {
+			dungeon.name = normalizedName;
+			if (this.currentDungeon) {
+				this.currentDungeon.name = normalizedName;
+			}
+			changed = true;
+		}
+
+		const normalizedDescription = newDescription || undefined;
+		if (dungeon.description !== normalizedDescription) {
+			dungeon.description = normalizedDescription;
+			if (this.currentDungeon) {
+				this.currentDungeon.description = normalizedDescription || "";
+			}
+			changed = true;
+		}
+
+		if (changed) {
+			this.updateCurrentDungeonDisplay(dungeon);
+			this.saveToLocalStorage();
+		}
+
+		return true;
 	}
 
 	async loadDungeon(id) {
@@ -420,10 +676,16 @@ class MapEditor {
 					this.currentDungeonId = id;
 					this.yamlData = parsed.yamlData;
 					const dungeon = this.yamlData.dungeon;
+					this.ensureDungeonMetadata(dungeon, id);
 					this.currentDungeon = {
 						dimensions: dungeon.dimensions,
 						resetMessage: dungeon.resetMessage || "",
+						name: dungeon.name || "",
+						description: dungeon.description || "",
 					};
+
+					this.updateCurrentDungeonDisplay(dungeon);
+					this.updateDungeonSettingsForm(dungeon);
 
 					// Initialize history with restored state
 					this.history = [this.cloneDungeonState(dungeon)];
@@ -431,20 +693,10 @@ class MapEditor {
 
 					this.showToast(
 						"Restored unsaved work",
-						`Last saved: ${new Date(parsed.timestamp).toLocaleString()}`,
+						`Last saved: ${new Date(parsed.timestamp).toLocaleString()}`
 					);
 					this.hasUnsavedChanges = true;
 					this.updateSaveButton();
-					// Update UI for restored state
-					document.getElementById("width-input").value =
-						dungeon.dimensions.width;
-					document.getElementById("height-input").value =
-						dungeon.dimensions.height;
-					document.getElementById("layers-input").value =
-						dungeon.dimensions.layers;
-					document.getElementById("reset-message-input").value =
-						dungeon.resetMessage || "";
-
 					// Load templates
 					this.loadTemplates(dungeon);
 
@@ -459,11 +711,11 @@ class MapEditor {
 				} else {
 					// Load from server and clear localStorage
 					localStorage.removeItem(unsavedData);
-					await this.loadDungeonFromServer(id);
+					await this.loadDungeonFromSource(id);
 				}
 			} else {
 				// No unsaved work, load from server
-				await this.loadDungeonFromServer(id);
+				await this.loadDungeonFromSource(id);
 			}
 		} catch (error) {
 			console.error("Failed to load dungeon:", error);
@@ -471,37 +723,36 @@ class MapEditor {
 		}
 	}
 
-	async loadDungeonFromServer(id) {
-		const response = await fetch(`/api/dungeons/${id}`);
-		const data = await response.json();
+	async loadDungeonFromSource(id) {
+		const data = await this.fetchDungeonData(id);
 		this.currentDungeonId = id;
 		this.currentDungeon = {
 			dimensions: data.dimensions,
 			resetMessage: data.resetMessage || "",
+			name: data.name || id || "",
+			description: data.description || "",
 		};
 
 		// Clear selection and indicator
-		this.selectedTemplate = null;
-		this.selectedTemplateType = null;
-		document
-			.querySelectorAll(".template-item")
-			.forEach((i) => i.classList.remove("selected"));
-		this.updatePlacementIndicator(null, null, null);
+		this.clearSelectionTool();
+		this.clearSelectedTemplate();
 
 		// Parse YAML
 		this.yamlData = jsyaml.load(data.yaml);
 		const dungeon = this.yamlData.dungeon;
+		this.ensureDungeonMetadata(dungeon, id);
+		this.currentDungeon.name = dungeon.name || this.currentDungeon.name || "";
+		this.currentDungeon.description =
+			dungeon.description || this.currentDungeon.description || "";
+
+		this.updateCurrentDungeonDisplay(dungeon);
 
 		// Initialize history with current state
 		this.history = [this.cloneDungeonState(dungeon)];
 		this.historyIndex = 0;
 
 		// Update UI
-		document.getElementById("width-input").value = dungeon.dimensions.width;
-		document.getElementById("height-input").value = dungeon.dimensions.height;
-		document.getElementById("layers-input").value = dungeon.dimensions.layers;
-		document.getElementById("reset-message-input").value =
-			dungeon.resetMessage || "";
+		this.updateDungeonSettingsForm(dungeon);
 
 		// Load templates
 		this.loadTemplates(dungeon);
@@ -530,7 +781,7 @@ class MapEditor {
 			"room",
 			"__DELETE__",
 			"🗑️ Delete Room",
-			"Click on rooms to remove them",
+			"Click on rooms to remove them"
 		);
 		roomList.appendChild(deleteItem);
 
@@ -540,7 +791,7 @@ class MapEditor {
 					"room",
 					index,
 					room.display || `Room ${index + 1}`,
-					room.description || "",
+					room.description || ""
 				);
 				roomList.appendChild(item);
 			});
@@ -557,7 +808,7 @@ class MapEditor {
 						"mob",
 						template.id,
 						template.display || template.id,
-						template.description || "",
+						template.description || ""
 					);
 					mobList.appendChild(item);
 				});
@@ -574,7 +825,7 @@ class MapEditor {
 						"object",
 						template.id,
 						template.display || template.id,
-						template.description || "",
+						template.description || ""
 					);
 					objectList.appendChild(item);
 				});
@@ -591,26 +842,25 @@ class MapEditor {
 			<div class="template-item-content">
 				<h3>${display}</h3>
 				<p>${description}</p>
+				${
+					!isDeleteTemplate
+						? `
+				<div class="template-item-actions">
+					<button class="template-edit-btn" title="Edit template">✏️</button>
+					<button class="template-delete-btn" title="Delete template">🗑️</button>
+				</div>
+				`
+						: ""
+				}
 			</div>
-			${
-				!isDeleteTemplate
-					? `
-			<div class="template-item-actions">
-				<button class="template-edit-btn" title="Edit template">✏️</button>
-				<button class="template-delete-btn" title="Delete template">🗑️</button>
-			</div>
-			`
-					: ""
-			}
 		`;
 		item.addEventListener("click", () => {
 			// If there's an active selection, place template in all selected cells
 			if (this.selectedCells.size > 0) {
 				this.placeTemplateInSelection(type, id);
-				// Clear selection after placement
-				this.selectedCells.clear();
-				this.updateSelectionVisuals();
-				this.setSelectionMode(null);
+				// Clear selection after placement but keep the tool active
+				this.clearSelectedCells();
+				return;
 			}
 
 			document
@@ -661,7 +911,17 @@ class MapEditor {
 		this.saveToLocalStorage();
 
 		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
 		let placedCount = 0;
+		let skippedEmptyRooms = 0;
+		let skippedDenseRooms = 0;
+		const isDeleteRoomTemplate = type === "room" && id === "__DELETE__";
+		const roomTemplateIndex =
+			type === "room" && !isDeleteRoomTemplate ? parseInt(id, 10) : Number.NaN;
+		const selectedRoomTemplate =
+			type === "room" && !Number.isNaN(roomTemplateIndex)
+				? dungeon.rooms[roomTemplateIndex]
+				: null;
 
 		// Process each selected cell
 		this.selectedCells.forEach((cellKey) => {
@@ -677,59 +937,130 @@ class MapEditor {
 					layer[y] = new Array(dungeon.dimensions.width).fill(0);
 				}
 
-				const templateIndex = parseInt(id) + 1;
+				if (isDeleteRoomTemplate) {
+					if (layer[y][x] > 0) {
+						layer[y][x] = 0;
+						this.removeResetsAt(x, y, z);
+						placedCount++;
+					}
+					return;
+				}
+
+				const templateIndex = parseInt(id, 10) + 1;
 				layer[y][x] = templateIndex;
+				if (selectedRoomTemplate?.dense) {
+					this.removeResetsAt(x, y, z);
+				}
 				placedCount++;
 			} else if (type === "mob" || type === "object") {
-				// Add reset for mob or object - only if there's a room at this location
-				const layerIndex = dungeon.dimensions.layers - 1 - z;
-				const layer = dungeon.grid[layerIndex] || [];
-				const row = layer[y] || [];
-				const roomIndex = row[x] || 0;
-
-				// Only add reset if there's a room at this location
-				if (roomIndex > 0) {
-					const dungeonId = this.currentDungeonId;
-					const roomRef = `@${dungeonId}{${x},${y},${z}}`;
-
-					// Check if reset already exists
-					const existingReset = dungeon.resets?.find(
-						(r) => r.roomRef === roomRef && r.templateId === id,
-					);
-
-					if (existingReset) {
-						// Increment maxCount if it exists
-						existingReset.maxCount = (existingReset.maxCount || 1) + 1;
-					} else {
-						// Add new reset
-						if (!dungeon.resets) {
-							dungeon.resets = [];
-						}
-						dungeon.resets.push({
-							templateId: id,
-							roomRef: roomRef,
-							minCount: 1,
-							maxCount: 1,
-						});
-					}
-					placedCount++;
+				const room = this.getRoomAt(dungeon, x, y, z);
+				if (!room) {
+					skippedEmptyRooms++;
+					return;
 				}
+				if (room.dense) {
+					skippedDenseRooms++;
+					return;
+				}
+
+				const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+
+				// Check if reset already exists
+				const existingReset = dungeon.resets?.find(
+					(r) => r.roomRef === roomRef && r.templateId === id
+				);
+
+				if (existingReset) {
+					// Increment maxCount if it exists
+					existingReset.maxCount = (existingReset.maxCount || 1) + 1;
+				} else {
+					// Add new reset
+					if (!dungeon.resets) {
+						dungeon.resets = [];
+					}
+					dungeon.resets.push({
+						templateId: id,
+						roomRef: roomRef,
+						minCount: 1,
+						maxCount: 1,
+					});
+				}
+				placedCount++;
 			}
 		});
 
 		// Get template name for toast
 		const template =
-			type === "room"
-				? dungeon.rooms[parseInt(id)]
+			type === "room" && !isDeleteRoomTemplate
+				? dungeon.rooms[parseInt(id, 10)]
 				: dungeon.templates?.find((t) => t.id === id);
-		const templateName =
-			template?.display || (type === "room" ? `Room ${parseInt(id) + 1}` : id);
+		const templateName = isDeleteRoomTemplate
+			? "Room Delete"
+			: template?.display ||
+			  (type === "room" ? `Room ${parseInt(id, 10) + 1}` : id);
 
-		// Show toast notification
+		if (isDeleteRoomTemplate) {
+			if (placedCount === 0) {
+				this.showToast("No rooms deleted", "Selection did not contain rooms");
+			} else {
+				this.showToast(
+					"Deleted rooms",
+					`Cleared ${placedCount} cell${placedCount === 1 ? "" : "s"}`
+				);
+			}
+			this.loadResets(dungeon);
+			this.renderMap(dungeon);
+			return;
+		}
+
+		if ((type === "mob" || type === "object") && placedCount === 0) {
+			const reasons = [];
+			if (skippedEmptyRooms) {
+				reasons.push(
+					skippedEmptyRooms === 1
+						? "Selected cell has no room"
+						: "Some selected cells do not contain rooms"
+				);
+			}
+			if (skippedDenseRooms) {
+				reasons.push(
+					skippedDenseRooms === 1
+						? "Selected room is dense"
+						: "Dense rooms cannot contain mobs or objects"
+				);
+			}
+			this.showToast(
+				`No ${type === "mob" ? "mobs" : "objects"} placed`,
+				reasons.join(". ") || "Select a valid room first"
+			);
+			return;
+		}
+
+		// Show toast notification when placements succeeded
 		this.showToast(
 			`Placed ${templateName} in selection`,
-			`${placedCount} cell${placedCount !== 1 ? "s" : ""}`,
+			`${placedCount} cell${placedCount !== 1 ? "s" : ""}`
 		);
+
+		if (
+			(type === "mob" || type === "object") &&
+			(skippedEmptyRooms > 0 || skippedDenseRooms > 0)
+		) {
+			const skippedReasons = [];
+			if (skippedEmptyRooms) {
+				skippedReasons.push(
+					`${skippedEmptyRooms} cell${
+						skippedEmptyRooms === 1 ? "" : "s"
+					} without rooms`
+				);
+			}
+			if (skippedDenseRooms) {
+				skippedReasons.push(
+					`${skippedDenseRooms} dense room${skippedDenseRooms === 1 ? "" : "s"}`
+				);
+			}
+			this.showToast("Skipped cells", skippedReasons.join(", "));
+		}
 
 		// Reload resets and re-render map
 		this.loadResets(dungeon);
@@ -762,7 +1093,7 @@ class MapEditor {
 
 		filteredResets.forEach((reset, filteredIndex) => {
 			const template = dungeon.templates?.find(
-				(t) => t.id === reset.templateId,
+				(t) => t.id === reset.templateId
 			);
 			const templateName = template
 				? template.display || reset.templateId
@@ -795,8 +1126,8 @@ class MapEditor {
 				<h4>${templateName}</h4>
 				${details}
 				<div class="reset-actions">
-					<button class="edit-reset-btn" data-index="${filteredIndex}">Edit</button>
-					<button class="delete-reset-btn" data-index="${filteredIndex}">Delete</button>
+					<button class="edit-reset-btn" data-index="${filteredIndex}" title="Edit reset">✏️</button>
+					<button class="delete-reset-btn" data-index="${filteredIndex}" title="Delete reset">🗑️</button>
 				</div>
 			`;
 
@@ -830,6 +1161,60 @@ class MapEditor {
 			return dungeon.rooms[roomIndex - 1] || null;
 		}
 		return null;
+	}
+
+	removeResetsAt(x, y, z) {
+		if (!this.yamlData?.dungeon?.resets) {
+			return 0;
+		}
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
+		const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+		const initialCount = dungeon.resets.length;
+		dungeon.resets = dungeon.resets.filter(
+			(reset) => reset.roomRef !== roomRef
+		);
+		return initialCount - dungeon.resets.length;
+	}
+
+	removeResetsForRoomTemplate(roomIndex) {
+		if (
+			!this.yamlData?.dungeon?.resets ||
+			roomIndex === undefined ||
+			roomIndex === null
+		) {
+			return 0;
+		}
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
+		const targetValue = roomIndex + 1;
+		const refsToRemove = new Set();
+
+		for (
+			let layerIndex = 0;
+			layerIndex < (dungeon.grid?.length || 0);
+			layerIndex++
+		) {
+			const layer = dungeon.grid[layerIndex] || [];
+			for (let y = 0; y < layer.length; y++) {
+				const row = layer[y] || [];
+				for (let x = 0; x < row.length; x++) {
+					if (row[x] === targetValue) {
+						const z = dungeon.dimensions.layers - 1 - layerIndex;
+						refsToRemove.add(`@${dungeonId}{${x},${y},${z}}`);
+					}
+				}
+			}
+		}
+
+		if (refsToRemove.size === 0) return 0;
+
+		const initialCount = dungeon.resets.length;
+		dungeon.resets = dungeon.resets.filter(
+			(reset) => !refsToRemove.has(reset.roomRef)
+		);
+		return initialCount - dungeon.resets.length;
 	}
 
 	// Helper function to check if a room has an exit in a direction
@@ -1015,7 +1400,7 @@ class MapEditor {
 					dungeon,
 					x,
 					y,
-					this.currentLayer,
+					this.currentLayer
 				);
 
 				// Set text content
@@ -1034,11 +1419,11 @@ class MapEditor {
 					dungeon,
 					x,
 					y,
-					this.currentLayer,
+					this.currentLayer
 				);
 				// Add classes for exit visualization
 				for (const [direction, indicatorType] of Object.entries(
-					exitIndicators,
+					exitIndicators
 				)) {
 					if (indicatorType === "exit") {
 						cell.classList.add(`exit-${direction}`);
@@ -1065,6 +1450,12 @@ class MapEditor {
 						this.isSelecting = true;
 						this.selectionStart = { x, y, z: this.currentLayer };
 						this.selectionEnd = { x, y, z: this.currentLayer };
+						this.isSelectionAddMode = e.ctrlKey || e.metaKey;
+						if (this.isSelectionAddMode) {
+							this.selectionBaseCells = new Set(this.selectedCells);
+						} else {
+							this.selectionBaseCells.clear();
+						}
 						this.updateSelection();
 					} else if (this.selectedTemplate !== null) {
 						// Only enable drag in insert mode
@@ -1127,7 +1518,7 @@ class MapEditor {
 		if (this.selectedCell && this.selectedCell.z === this.currentLayer) {
 			const { x, y, z } = this.selectedCell;
 			const cell = document.querySelector(
-				`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`,
+				`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`
 			);
 			if (cell) {
 				cell.classList.add("selected");
@@ -1146,7 +1537,7 @@ class MapEditor {
 				.querySelectorAll(".grid-cell")
 				.forEach((c) => c.classList.remove("selected"));
 			const cell = document.querySelector(
-				`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`,
+				`[data-x="${x}"][data-y="${y}"][data-z="${z}"]`
 			);
 			if (cell) {
 				cell.classList.add("selected");
@@ -1231,7 +1622,6 @@ class MapEditor {
 					const targetRoom = dungeon.rooms[targetRoomIndex];
 					const roomName = targetRoom?.display || `Room ${targetRoomIndex + 1}`;
 					let deletedCount = 0;
-					const dungeonId = this.currentDungeonId;
 
 					// Flood fill algorithm: delete connected matching cells
 					const visited = new Set();
@@ -1262,12 +1652,7 @@ class MapEditor {
 							deletedCount++;
 
 							// Remove resets for this room
-							const cellRoomRef = `@${dungeonId}{${cell.x},${cell.y},${cell.z}}`;
-							if (dungeon.resets) {
-								dungeon.resets = dungeon.resets.filter(
-									(r) => r.roomRef !== cellRoomRef,
-								);
-							}
+							this.removeResetsAt(cell.x, cell.y, cell.z);
 
 							// Check adjacent cells (up, down, left, right)
 							const directions = [
@@ -1302,13 +1687,13 @@ class MapEditor {
 
 					this.showToast(
 						`Painted delete: ${roomName}`,
-						`Deleted ${deletedCount} room${deletedCount !== 1 ? "s" : ""}`,
+						`Deleted ${deletedCount} room${deletedCount !== 1 ? "s" : ""}`
 					);
 					this.loadResets(dungeon);
 				} else {
 					this.showToast(
 						"No room to delete",
-						`At coordinates (${x}, ${y}, ${z})`,
+						`At coordinates (${x}, ${y}, ${z})`
 					);
 				}
 			} else {
@@ -1324,23 +1709,17 @@ class MapEditor {
 					layer[y][x] = 0;
 
 					// Also remove any resets for this room
-					const dungeonId = this.currentDungeonId;
-					const roomRef = `@${dungeonId}{${x},${y},${z}}`;
-					if (dungeon.resets) {
-						dungeon.resets = dungeon.resets.filter(
-							(r) => r.roomRef !== roomRef,
-						);
-					}
+					this.removeResetsAt(x, y, z);
 
 					this.showToast(
 						`Deleted ${roomName}`,
-						`At coordinates (${x}, ${y}, ${z})`,
+						`At coordinates (${x}, ${y}, ${z})`
 					);
 					this.loadResets(dungeon);
 				} else {
 					this.showToast(
 						"No room to delete",
-						`At coordinates (${x}, ${y}, ${z})`,
+						`At coordinates (${x}, ${y}, ${z})`
 					);
 				}
 			}
@@ -1351,13 +1730,17 @@ class MapEditor {
 		}
 
 		// Regular room placement
+		let densePlacementRemovedResets = false;
+		const newRoomTemplate =
+			this.selectedTemplate !== "__DELETE__"
+				? dungeon.rooms[this.selectedTemplate]
+				: null;
 		if (this.placementMode === "paint") {
 			// Paint mode: flood fill connected matching cells
 			const targetRoomIndex = layer[y][x] > 0 ? layer[y][x] - 1 : -1;
 			const targetValue = layer[y][x]; // The value we're matching (0 for empty, or room index + 1)
 			const templateIndex = parseInt(this.selectedTemplate) + 1;
-			const newRoom = dungeon.rooms[this.selectedTemplate];
-			const newRoomName = newRoom?.display || `Room ${templateIndex}`;
+			const newRoomName = newRoomTemplate?.display || `Room ${templateIndex}`;
 			let filledCount = 0;
 
 			// Flood fill algorithm: fill connected matching cells
@@ -1387,6 +1770,12 @@ class MapEditor {
 					// Fill this cell
 					cellRow[cell.x] = templateIndex;
 					filledCount++;
+					if (
+						newRoomTemplate?.dense &&
+						this.removeResetsAt(cell.x, cell.y, cell.z) > 0
+					) {
+						densePlacementRemovedResets = true;
+					}
 
 					// Check adjacent cells (up, down, left, right)
 					const directions = [
@@ -1421,30 +1810,36 @@ class MapEditor {
 
 			this.showToast(
 				`Painted: ${newRoomName}`,
-				`Filled ${filledCount} cell${filledCount !== 1 ? "s" : ""}`,
+				`Filled ${filledCount} cell${filledCount !== 1 ? "s" : ""}`
 			);
 		} else {
 			// Insert mode: place single room
 			const templateIndex = parseInt(this.selectedTemplate) + 1;
 			const hadRoom = layer[y][x] > 0;
 			layer[y][x] = templateIndex;
+			if (newRoomTemplate?.dense && this.removeResetsAt(x, y, z) > 0) {
+				densePlacementRemovedResets = true;
+			}
 
 			// Get room template name for toast
-			const room = dungeon.rooms[this.selectedTemplate];
-			const roomName = room?.display || `Room ${templateIndex}`;
+			const roomName = newRoomTemplate?.display || `Room ${templateIndex}`;
 
 			// Show toast notification
 			if (hadRoom) {
 				this.showToast(
 					`Replaced with ${roomName}`,
-					`At coordinates (${x}, ${y}, ${z})`,
+					`At coordinates (${x}, ${y}, ${z})`
 				);
 			} else {
 				this.showToast(
 					`Placed ${roomName}`,
-					`At coordinates (${x}, ${y}, ${z})`,
+					`At coordinates (${x}, ${y}, ${z})`
 				);
 			}
+		}
+
+		if (densePlacementRemovedResets) {
+			this.loadResets(dungeon);
 		}
 
 		// Re-render map
@@ -1459,14 +1854,32 @@ class MapEditor {
 		)
 			return;
 
+		const dungeon = this.yamlData.dungeon;
+		const room = this.getRoomAt(dungeon, x, y, z);
+
+		if (!room) {
+			this.showToast(
+				"Cannot add reset",
+				"Select a room before placing mobs or objects"
+			);
+			return;
+		}
+
+		if (room.dense) {
+			this.showToast(
+				"Cannot add reset",
+				"Dense rooms cannot contain mobs or objects"
+			);
+			return;
+		}
+
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
 		// Auto-save to localStorage
 		this.saveToLocalStorage();
 
-		const dungeon = this.yamlData.dungeon;
-		const dungeonId = this.currentDungeonId;
+		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
 		const roomRef = `@${dungeonId}{${x},${y},${z}}`;
 
 		if (!dungeon.resets) {
@@ -1475,12 +1888,12 @@ class MapEditor {
 
 		// Check if reset already exists - if so, increment count instead of alerting
 		const existing = dungeon.resets.find(
-			(r) => r.roomRef === roomRef && r.templateId === this.selectedTemplate,
+			(r) => r.roomRef === roomRef && r.templateId === this.selectedTemplate
 		);
 
 		// Get template name for toast
 		const template = dungeon.templates?.find(
-			(t) => t.id === this.selectedTemplate,
+			(t) => t.id === this.selectedTemplate
 		);
 		const templateName = template?.display || this.selectedTemplate;
 		const templateType = this.selectedTemplateType === "mob" ? "Mob" : "Object";
@@ -1493,7 +1906,7 @@ class MapEditor {
 				`Updated ${templateType} Reset: ${templateName}`,
 				`Count: ${existing.minCount || 1}-${
 					existing.maxCount
-				} at (${x}, ${y}, ${z})`,
+				} at (${x}, ${y}, ${z})`
 			);
 		} else {
 			// Add new reset
@@ -1506,7 +1919,7 @@ class MapEditor {
 			// Show toast notification
 			this.showToast(
 				`Added ${templateType} Reset: ${templateName}`,
-				`At coordinates (${x}, ${y}, ${z})`,
+				`At coordinates (${x}, ${y}, ${z})`
 			);
 		}
 
@@ -1549,7 +1962,7 @@ class MapEditor {
 						? resets
 								.map((reset, i) => {
 									const template = dungeon.templates?.find(
-										(t) => t.id === reset.templateId,
+										(t) => t.id === reset.templateId
 									);
 									return `<p>• ${template?.display || reset.templateId} (${
 										reset.minCount || 1
@@ -1602,8 +2015,8 @@ class MapEditor {
 			type === "room"
 				? "Edit Room Template"
 				: type === "mob"
-					? "Edit Mob Template"
-					: "Edit Object Template";
+				? "Edit Mob Template"
+				: "Edit Object Template";
 
 		let html = "";
 		const isMob = type !== "room" && template.type === "Mob";
@@ -1662,7 +2075,7 @@ class MapEditor {
 				.map(([dir, ref], index) => {
 					// Get available directions (all except the ones used by other links)
 					const availableDirs = allDirections.filter(
-						(d) => d === dir || !usedDirections.includes(d),
+						(d) => d === dir || !usedDirections.includes(d)
 					);
 
 					return `
@@ -1673,7 +2086,7 @@ class MapEditor {
 								(d) =>
 									`<option value="${d}" ${d === dir ? "selected" : ""}>${
 										d.charAt(0).toUpperCase() + d.slice(1)
-									}</option>`,
+									}</option>`
 							)
 							.join("")}
 					</select>
@@ -1725,8 +2138,8 @@ class MapEditor {
 							<button type="button" class="exit-btn ${
 								template.dense ? "enabled" : "disabled"
 							}" id="template-dense-btn" data-dense="${
-								template.dense ? "true" : "false"
-							}">DENSE</button>
+				template.dense ? "true" : "false"
+			}">DENSE</button>
 						</div>
 					</div>
 				</div>
@@ -1759,7 +2172,7 @@ class MapEditor {
 					(r) =>
 						`<option value="${r.id}" ${
 							template.race === r.id ? "selected" : ""
-						}>${r.display}</option>`,
+						}>${r.display}</option>`
 				)
 				.join("");
 			const jobOptions = this.jobs
@@ -1767,7 +2180,7 @@ class MapEditor {
 					(j) =>
 						`<option value="${j.id}" ${
 							template.job === j.id ? "selected" : ""
-						}>${j.display}</option>`,
+						}>${j.display}</option>`
 				)
 				.join("");
 
@@ -1786,8 +2199,8 @@ class MapEditor {
 				<div class="form-group">
 					<label>ID</label>
 					<input type="text" id="template-id" value="${template.id || ""}" ${
-						id ? "readonly" : ""
-					}>
+				id ? "readonly" : ""
+			}>
 				</div>
 				<div class="form-group">
 					<label>Type</label>
@@ -2169,6 +2582,8 @@ class MapEditor {
 
 		const dungeon = this.yamlData.dungeon;
 
+		let removedDenseResets = 0;
+
 		if (type === "room") {
 			const index = id !== null && id !== undefined ? parseInt(id) : -1;
 			const display = document.getElementById("template-display").value;
@@ -2267,6 +2682,11 @@ class MapEditor {
 				if (!mapText) delete updated.mapText;
 				if (mapColor === undefined) delete updated.mapColor;
 				dungeon.rooms[index] = updated;
+
+				const wasDense = !!oldTemplate?.dense;
+				if (dense && !wasDense) {
+					removedDenseResets = this.removeResetsForRoomTemplate(index);
+				}
 			} else {
 				// Add new
 				const newRoom = { display, description };
@@ -2284,7 +2704,7 @@ class MapEditor {
 				dungeon.rooms.push(newRoom);
 				this.showToast(
 					"Room template created",
-					`Created "${display || "New Room"}"`,
+					`Created "${display || "New Room"}"`
 				);
 			}
 		} else {
@@ -2293,7 +2713,7 @@ class MapEditor {
 			const display = document.getElementById("template-display").value;
 			const description = document.getElementById("template-description").value;
 			const roomDescriptionInput = document.getElementById(
-				"template-room-description",
+				"template-room-description"
 			);
 			const roomDescription = roomDescriptionInput
 				? roomDescriptionInput.value.trim()
@@ -2347,7 +2767,7 @@ class MapEditor {
 			if (templateType === "Weapon") {
 				const hitType = document.getElementById("template-hit-type")?.value;
 				const attackPower = document.getElementById(
-					"template-attack-power",
+					"template-attack-power"
 				)?.value;
 				if (hitType) {
 					newTemplate.hitType = hitType;
@@ -2533,6 +2953,15 @@ class MapEditor {
 
 		document.getElementById("template-modal").classList.remove("active");
 		this.loadTemplates(dungeon);
+		if (removedDenseResets > 0) {
+			this.loadResets(dungeon);
+			this.showToast(
+				"Dense room updated",
+				`Removed ${removedDenseResets} reset${
+					removedDenseResets === 1 ? "" : "s"
+				} from this template`
+			);
+		}
 		// Re-render map to reflect any changes to mapText/mapColor
 		this.renderMap(dungeon);
 	}
@@ -2575,7 +3004,7 @@ class MapEditor {
 							const roomRef = `@${dungeonId}{${x},${y},${z}}`;
 							if (dungeon.resets) {
 								dungeon.resets = dungeon.resets.filter(
-									(r) => r.roomRef !== roomRef,
+									(r) => r.roomRef !== roomRef
 								);
 							}
 						}
@@ -2601,7 +3030,7 @@ class MapEditor {
 
 			this.showToast(
 				`Deleted ${roomName}`,
-				`Removed ${deletedCount} room${deletedCount !== 1 ? "s" : ""} from grid`,
+				`Removed ${deletedCount} room${deletedCount !== 1 ? "s" : ""} from grid`
 			);
 		} else {
 			// Mob or Object template
@@ -2628,7 +3057,7 @@ class MapEditor {
 				`Deleted ${templateName}`,
 				`Removed ${deletedResetCount} reset${
 					deletedResetCount !== 1 ? "s" : ""
-				}`,
+				}`
 			);
 		}
 
@@ -2645,8 +3074,7 @@ class MapEditor {
 
 		// Get all equipment templates (Equipment, Armor, Weapon) from all dungeons
 		const equipmentTemplates = allTemplates.filter(
-			(t) =>
-				t.type === "Equipment" || t.type === "Armor" || t.type === "Weapon",
+			(t) => t.type === "Equipment" || t.type === "Armor" || t.type === "Weapon"
 		);
 
 		// Get all item templates (Item, Equipment, Armor, Weapon - all are items) from all dungeons
@@ -2655,7 +3083,7 @@ class MapEditor {
 				t.type === "Item" ||
 				t.type === "Equipment" ||
 				t.type === "Armor" ||
-				t.type === "Weapon",
+				t.type === "Weapon"
 		);
 
 		// Populate equipment table
@@ -2744,8 +3172,7 @@ class MapEditor {
 
 		// Load templates from all other dungeons
 		try {
-			const response = await fetch("/api/dungeons");
-			const data = await response.json();
+			const data = await this.fetchDungeonListData();
 			const dungeonIds = data.dungeons || [];
 
 			// Load each dungeon's templates
@@ -2753,8 +3180,7 @@ class MapEditor {
 				if (dungeonId === currentDungeonId) continue; // Skip current dungeon (already loaded)
 
 				try {
-					const dungeonResponse = await fetch(`/api/dungeons/${dungeonId}`);
-					const dungeonData = await dungeonResponse.json();
+					const dungeonData = await this.fetchDungeonData(dungeonId);
 					const dungeonYaml = jsyaml.load(dungeonData.yaml);
 					const templates = dungeonYaml.dungeon?.templates || [];
 
@@ -2771,7 +3197,7 @@ class MapEditor {
 				} catch (error) {
 					console.warn(
 						`Failed to load templates from dungeon ${dungeonId}:`,
-						error,
+						error
 					);
 				}
 			}
@@ -2953,7 +3379,7 @@ class MapEditor {
 
 		const items = list.querySelectorAll(".template-list-item");
 		const templateIds = Array.from(items).map(
-			(item) => item.dataset.templateId,
+			(item) => item.dataset.templateId
 		);
 		// Store as comma-separated string in hidden input for compatibility
 		input.value = templateIds.join(", ");
@@ -3045,7 +3471,7 @@ class MapEditor {
 			if (minCount > maxCount) {
 				this.showToast(
 					"Invalid count range",
-					"Minimum count cannot be greater than maximum count",
+					"Minimum count cannot be greater than maximum count"
 				);
 				return;
 			}
@@ -3055,7 +3481,7 @@ class MapEditor {
 
 			// Update equipped and inventory if this is a mob reset
 			const template = dungeon.templates?.find(
-				(t) => t.id === reset.templateId,
+				(t) => t.id === reset.templateId
 			);
 			if (template?.type === "Mob") {
 				// Get values from the lists
@@ -3141,7 +3567,7 @@ class MapEditor {
 		if (!width || !height || !layers) {
 			this.showToast(
 				"Invalid dimensions",
-				"Please enter valid width, height, and layers",
+				"Please enter valid width, height, and layers"
 			);
 			return;
 		}
@@ -3244,9 +3670,29 @@ class MapEditor {
 			return;
 		}
 
+		if (!this.commitDungeonSettingsForm()) {
+			return;
+		}
+
 		// Update reset message
 		const resetMessage = document.getElementById("reset-message-input").value;
 		this.yamlData.dungeon.resetMessage = resetMessage || undefined;
+		const dungeonName = document
+			.getElementById("dungeon-name-input")
+			.value.trim();
+		const dungeonDescription = document
+			.getElementById("dungeon-description-input")
+			.value.trim();
+		const normalizedName = dungeonName || undefined;
+		const normalizedDescription = dungeonDescription || undefined;
+		this.yamlData.dungeon.name = normalizedName;
+		this.yamlData.dungeon.description = normalizedDescription;
+		if (this.currentDungeon) {
+			this.currentDungeon.resetMessage = resetMessage || "";
+			this.currentDungeon.name = normalizedName || "";
+			this.currentDungeon.description = normalizedDescription || "";
+		}
+		this.updateCurrentDungeonDisplay(this.yamlData.dungeon);
 
 		// Clear any pending auto-save timeout before saving
 		if (this.autoSaveTimeout) {
@@ -3254,34 +3700,56 @@ class MapEditor {
 			this.autoSaveTimeout = null;
 		}
 
-		// Convert back to YAML
-		const yaml = jsyaml.dump(this.yamlData, { lineWidth: 120, noRefs: true });
+		// Rebuild the dungeon object to control YAML key order
+		const preferredOrder = [
+			"id",
+			"name",
+			"description",
+			"dimensions",
+			"resetMessage",
+			"grid",
+			"rooms",
+			"templates",
+			"resets",
+		];
+		const dungeonData = this.yamlData.dungeon || {};
+		const orderedDungeon = {};
 
-		// Save via API
-		try {
-			const response = await fetch(`/api/dungeons/${this.currentDungeonId}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					dimensions: this.yamlData.dungeon.dimensions,
-					resetMessage: this.yamlData.dungeon.resetMessage,
-					yaml: yaml,
-				}),
-			});
-
-			if (response.ok) {
-				this.showToast("Dungeon saved successfully!", "");
-				// Clear localStorage since we've saved to server
-				const storageKey = this.getLocalStorageKey(this.currentDungeonId);
-				localStorage.removeItem(storageKey);
-				this.hasUnsavedChanges = false;
-				this.updateSaveButton();
-				// Reload to get fresh data
-				await this.loadDungeonFromServer(this.currentDungeonId);
-			} else {
-				const error = await response.json();
-				this.showToast("Failed to save", error.error || "Unknown error");
+		for (const key of preferredOrder) {
+			if (
+				Object.prototype.hasOwnProperty.call(dungeonData, key) &&
+				dungeonData[key] !== undefined
+			) {
+				orderedDungeon[key] = dungeonData[key];
 			}
+		}
+
+		for (const key of Object.keys(dungeonData)) {
+			if (!preferredOrder.includes(key) && dungeonData[key] !== undefined) {
+				orderedDungeon[key] = dungeonData[key];
+			}
+		}
+
+		this.yamlData.dungeon = orderedDungeon;
+
+		// Convert back to YAML
+		const yaml = jsyaml.dump(this.yamlData, {
+			lineWidth: 120,
+			noRefs: true,
+			flowLevel: 4,
+		});
+
+		// Save via IPC/API
+		try {
+			await this.saveDungeonData(this.currentDungeonId, yaml);
+			this.showToast("Dungeon saved successfully!", "");
+			// Clear localStorage since we've saved
+			const storageKey = this.getLocalStorageKey(this.currentDungeonId);
+			localStorage.removeItem(storageKey);
+			this.hasUnsavedChanges = false;
+			this.updateSaveButton();
+			// Reload to get fresh data
+			await this.loadDungeonFromSource(this.currentDungeonId);
 		} catch (error) {
 			this.showToast("Failed to save", error.message);
 		}
@@ -3293,7 +3761,7 @@ class MapEditor {
 
 		const allDirections = ["north", "south", "east", "west", "up", "down"];
 		const usedDirections = Array.from(
-			container.querySelectorAll(".room-link-direction"),
+			container.querySelectorAll(".room-link-direction")
 		).map((select) => select.value);
 
 		return allDirections.filter((d) => !usedDirections.includes(d));
@@ -3310,14 +3778,14 @@ class MapEditor {
 			const currentValue = select.value;
 			// Get all directions used by OTHER selects (not this one)
 			const usedByOthers = Array.from(
-				container.querySelectorAll(".room-link-direction"),
+				container.querySelectorAll(".room-link-direction")
 			)
 				.filter((s) => s !== select)
 				.map((s) => s.value);
 
 			// Available directions: current value + all unused directions
 			const availableDirs = allDirections.filter(
-				(d) => d === currentValue || !usedByOthers.includes(d),
+				(d) => d === currentValue || !usedByOthers.includes(d)
 			);
 
 			// Save current value and rebuild options
@@ -3326,14 +3794,14 @@ class MapEditor {
 					(d) =>
 						`<option value="${d}" ${d === currentValue ? "selected" : ""}>${
 							d.charAt(0).toUpperCase() + d.slice(1)
-						}</option>`,
+						}</option>`
 				)
 				.join("");
 		});
 
 		// Recalculate used directions after updates
 		const usedDirections = Array.from(
-			container.querySelectorAll(".room-link-direction"),
+			container.querySelectorAll(".room-link-direction")
 		).map((select) => select.value);
 
 		// Update add button state
@@ -3381,7 +3849,7 @@ class MapEditor {
 						(d) =>
 							`<option value="${d}">${
 								d.charAt(0).toUpperCase() + d.slice(1)
-							}</option>`,
+							}</option>`
 					)
 					.join("")}
 			</select>
@@ -3455,17 +3923,11 @@ class MapEditor {
 		}
 
 		try {
-			const response = await fetch("/api/calculate-attributes", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ raceId, jobId, level }),
+			const data = await this.calculateAttributesFromSource({
+				raceId,
+				jobId,
+				level,
 			});
-
-			if (!response.ok) {
-				throw new Error("Failed to calculate attributes");
-			}
-
-			const data = await response.json();
 			const { primary, secondary, resourceCaps } = data;
 
 			displayDiv.innerHTML = `
@@ -3473,13 +3935,13 @@ class MapEditor {
 					<h4>Primary Attributes</h4>
 					<div class="attribute-grid">
 						<div class="attribute-item"><span class="attr-label">Strength:</span> <span class="attr-value">${primary.strength.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Agility:</span> <span class="attr-value">${primary.agility.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Intelligence:</span> <span class="attr-value">${primary.intelligence.toFixed(
-							2,
+							2
 						)}</span></div>
 					</div>
 				</div>
@@ -3487,34 +3949,34 @@ class MapEditor {
 					<h4>Secondary Attributes</h4>
 					<div class="attribute-grid">
 						<div class="attribute-item"><span class="attr-label">Attack Power:</span> <span class="attr-value">${secondary.attackPower.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Defense:</span> <span class="attr-value">${secondary.defense.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Vitality:</span> <span class="attr-value">${secondary.vitality.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Crit Rate:</span> <span class="attr-value">${secondary.critRate.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Avoidance:</span> <span class="attr-value">${secondary.avoidance.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Accuracy:</span> <span class="attr-value">${secondary.accuracy.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Endurance:</span> <span class="attr-value">${secondary.endurance.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Spell Power:</span> <span class="attr-value">${secondary.spellPower.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Wisdom:</span> <span class="attr-value">${secondary.wisdom.toFixed(
-							2,
+							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Resilience:</span> <span class="attr-value">${secondary.resilience.toFixed(
-							2,
+							2
 						)}</span></div>
 					</div>
 				</div>
@@ -3522,10 +3984,10 @@ class MapEditor {
 					<h4>Resource Capacities</h4>
 					<div class="attribute-grid">
 						<div class="attribute-item"><span class="attr-label">Max Health:</span> <span class="attr-value">${Math.round(
-							resourceCaps.maxHealth,
+							resourceCaps.maxHealth
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Max Mana:</span> <span class="attr-value">${Math.round(
-							resourceCaps.maxMana,
+							resourceCaps.maxMana
 						)}</span></div>
 					</div>
 				</div>
@@ -3537,10 +3999,15 @@ class MapEditor {
 
 	updatePlacementIndicator(type, id, display) {
 		const indicator = document.getElementById("placement-indicator");
-		if (!indicator) return;
+		const toastContainer = document.getElementById("toast-container");
+		if (!indicator) {
+			toastContainer?.classList.remove("has-indicator");
+			return;
+		}
 
 		if (!type || id === null || id === undefined) {
 			indicator.style.display = "none";
+			toastContainer?.classList.remove("has-indicator");
 			return;
 		}
 
@@ -3552,17 +4019,18 @@ class MapEditor {
 				? "Paint Delete"
 				: "Delete Room"
 			: type === "room"
-				? this.placementMode === "paint"
-					? "Paint Room"
-					: "Place Room"
-				: type === "mob"
-					? "Add Mob Reset"
-					: "Add Object Reset";
+			? this.placementMode === "paint"
+				? "Paint Room"
+				: "Place Room"
+			: type === "mob"
+			? "Add Mob Reset"
+			: "Add Object Reset";
 
 		indicator.setAttribute("data-type", isDelete ? "delete" : type);
 		indicator.querySelector(".placement-action").textContent = actionText;
 		indicator.querySelector(".placement-template").textContent = display || id;
 		indicator.style.display = "block";
+		toastContainer?.classList.add("has-indicator");
 
 		// Set up mode buttons if not already set up
 		const insertBtn = document.getElementById("placement-mode-insert");
@@ -3609,12 +4077,12 @@ class MapEditor {
 		if (this.selectedTemplate !== null && this.selectedTemplateType) {
 			const template = this.getTemplateDisplay(
 				this.selectedTemplateType,
-				this.selectedTemplate,
+				this.selectedTemplate
 			);
 			this.updatePlacementIndicator(
 				this.selectedTemplateType,
 				this.selectedTemplate,
-				template,
+				template
 			);
 		}
 	}
@@ -3648,6 +4116,9 @@ class MapEditor {
 		if (indicator) {
 			indicator.style.display = "none";
 		}
+
+		const toastContainer = document.getElementById("toast-container");
+		toastContainer?.classList.remove("has-indicator");
 	}
 
 	showToast(message, details) {
@@ -3682,17 +4153,18 @@ class MapEditor {
 			if (this.isSelecting) {
 				// End selection
 				this.isSelecting = false;
+				this.selectionBaseCells.clear();
+				this.isSelectionAddMode = false;
 
 				// If template is selected, place it in all selected cells
 				if (this.selectedTemplate !== null && this.selectedCells.size > 0) {
 					// Use placeTemplateInSelection which handles history properly
 					this.placeTemplateInSelection(
 						this.selectedTemplateType,
-						this.selectedTemplate,
+						this.selectedTemplate
 					);
 					// Clear selection after placement (but keep selection tool active)
-					this.selectedCells.clear();
-					this.updateSelectionVisuals();
+					this.clearSelectedCells();
 				}
 			} else if (this.isDragging) {
 				// Cancel drag on mouseup anywhere
@@ -3918,7 +4390,7 @@ class MapEditor {
 					this.deleteRoomAtCell(
 						this.selectedCell.x,
 						this.selectedCell.y,
-						this.selectedCell.z,
+						this.selectedCell.z
 					);
 				}
 			} else if (e.key === "Escape") {
@@ -3952,23 +4424,42 @@ class MapEditor {
 					return;
 				}
 
+				const dungeonSettingsModal = document.getElementById(
+					"dungeon-settings-modal"
+				);
+				if (
+					dungeonSettingsModal &&
+					dungeonSettingsModal.classList.contains("active")
+				) {
+					if (!this.commitDungeonSettingsForm()) {
+						return;
+					}
+					dungeonSettingsModal.classList.remove("active");
+					return;
+				}
+
 				// If no modals are open, handle selection/deselection
 				if (this.isSelecting) {
-					// Cancel selection if currently selecting
-					this.isSelecting = false;
-					this.selectedCells.clear();
-					this.selectedCell = null; // Also clear single cell selection
-					this.updateSelectionVisuals();
-					// Remove selected class from grid cells
-					document.querySelectorAll(".grid-cell").forEach((cell) => {
-						cell.classList.remove("selected");
-						cell.classList.remove("selected-cell");
-					});
-					this.selectionStart = null;
-					this.selectionEnd = null;
-				} else {
-					// Deselect everything
-					this.deselectAll();
+					this.cancelSelection();
+					return;
+				}
+
+				const hasCellSelection =
+					this.selectedCells.size > 0 || this.selectedCell !== null;
+
+				if (hasCellSelection) {
+					this.clearSelectedCells();
+					return;
+				}
+
+				// No cell selection - clear selection tool and template selection
+				this.clearSelectionTool();
+
+				if (
+					this.selectedTemplate !== null ||
+					this.selectedTemplateType !== null
+				) {
+					this.clearSelectedTemplate();
 				}
 			} else if (e.ctrlKey && e.key === "z" && !e.shiftKey) {
 				// Undo (Ctrl+Z)
@@ -4000,46 +4491,135 @@ class MapEditor {
 			}
 		});
 
-		// Resize button
-		document.getElementById("resize-btn").addEventListener("click", () => {
-			this.resizeDungeon();
-		});
+		// Dungeon settings modal
+		const dungeonSettingsModal = document.getElementById(
+			"dungeon-settings-modal"
+		);
+		const editSettingsBtn = document.getElementById(
+			"edit-dungeon-settings-btn"
+		);
+		const dungeonSettingsClose = document.getElementById(
+			"dungeon-settings-close"
+		);
+		const dungeonSettingsDone = document.getElementById(
+			"dungeon-settings-done"
+		);
+		const applyDungeonSettingsBtn = document.getElementById(
+			"apply-dungeon-settings-btn"
+		);
+
+		const closeDungeonSettingsModal = () => {
+			if (!this.commitDungeonSettingsForm()) {
+				return;
+			}
+			if (dungeonSettingsModal) {
+				dungeonSettingsModal.classList.remove("active");
+			}
+		};
+
+		if (editSettingsBtn && dungeonSettingsModal) {
+			editSettingsBtn.addEventListener("click", () => {
+				if (!this.currentDungeonId) return;
+				this.updateDungeonSettingsForm(this.yamlData?.dungeon || null);
+				dungeonSettingsModal.classList.add("active");
+			});
+		}
+
+		if (dungeonSettingsClose) {
+			dungeonSettingsClose.addEventListener("click", closeDungeonSettingsModal);
+		}
+
+		if (dungeonSettingsDone) {
+			dungeonSettingsDone.addEventListener("click", closeDungeonSettingsModal);
+		}
+
+		if (applyDungeonSettingsBtn) {
+			applyDungeonSettingsBtn.addEventListener("click", () => {
+				if (!this.commitDungeonSettingsForm()) {
+					return;
+				}
+				this.resizeDungeon();
+			});
+		}
 
 		// Toolbox buttons
 		document.querySelectorAll(".tool-btn").forEach((btn) => {
 			btn.addEventListener("click", (e) => {
-				const tool = e.target.dataset.tool;
-				this.setSelectionMode(tool);
+				const tool = e.currentTarget.dataset.tool;
+				this.setSelectionMode(tool, e.currentTarget);
 			});
 		});
 	}
 
-	setSelectionMode(mode) {
-		// Toggle mode: if clicking the same tool, deselect it
-		if (this.selectionMode === mode) {
-			this.selectionMode = null;
-		} else {
-			this.selectionMode = mode;
-			// Clear template selection when entering selection mode
-			this.selectedTemplate = null;
-			this.selectedTemplateType = null;
-			this.updatePlacementIndicator(null, null, null);
-			// Clear single cell selection when using a selection tool
-			this.selectedCell = null;
-			// Remove selected class from grid cells
-			document.querySelectorAll(".grid-cell").forEach((cell) => {
-				cell.classList.remove("selected");
-			});
+	clearSelectedTemplate() {
+		this.selectedTemplate = null;
+		this.selectedTemplateType = null;
+		document.querySelectorAll(".template-item").forEach((item) => {
+			item.classList.remove("selected");
+		});
+		this.updatePlacementIndicator(null, null, null);
+	}
+
+	clearSelectedCells() {
+		this.selectedCells.clear();
+		this.selectedCell = null;
+		this.selectionStart = null;
+		this.selectionEnd = null;
+		this.selectionBaseCells.clear();
+		this.isSelectionAddMode = false;
+		this.updateSelectionVisuals();
+		document.querySelectorAll(".grid-cell").forEach((cell) => {
+			cell.classList.remove("selected");
+			cell.classList.remove("selected-cell");
+		});
+	}
+
+	clearSelectionTool() {
+		this.clearSelectedCells();
+
+		if (this.selectionMode === null) {
+			this.isSelecting = false;
+			return;
 		}
+
+		this.selectionMode = null;
+		this.isSelecting = false;
+		document.querySelectorAll(".tool-btn").forEach((btn) => {
+			btn.classList.remove("active");
+		});
+	}
+
+	cancelSelection() {
+		if (!this.isSelecting) {
+			return;
+		}
+
+		this.isSelecting = false;
+		this.clearSelectedCells();
+	}
+
+	setSelectionMode(mode, button = null) {
+		// Toggle mode: clicking the same tool (or null) deselects it
+		if (mode === null || this.selectionMode === mode) {
+			this.clearSelectionTool();
+			return;
+		}
+
+		this.selectionMode = mode;
+		this.isSelecting = false;
+		this.selectionStart = null;
+		this.selectionEnd = null;
+		this.selectionBaseCells.clear();
+		this.isSelectionAddMode = false;
 
 		// Update button highlights
 		document.querySelectorAll(".tool-btn").forEach((btn) => {
 			btn.classList.toggle("active", btn.dataset.tool === this.selectionMode);
 		});
 
-		// Clear selection when switching modes
-		this.selectedCells.clear();
-		this.updateSelectionVisuals();
+		if (typeof button?.focus === "function") {
+			button.focus();
+		}
 	}
 
 	updateSelection() {
@@ -4056,11 +4636,107 @@ class MapEditor {
 		const maxY = Math.max(this.selectionStart.y, this.selectionEnd.y);
 		const z = this.selectionStart.z;
 
-		if (this.selectionMode === "rectangle") {
+		if (this.selectionMode === "line") {
+			// Line: use Bresenham's algorithm between start and end on the same layer
+			const startX = this.selectionStart.x;
+			const startY = this.selectionStart.y;
+			const endX = this.selectionEnd.x;
+			const endY = this.selectionEnd.y;
+
+			let x0 = startX;
+			let y0 = startY;
+			const x1 = endX;
+			const y1 = endY;
+
+			const dx = Math.abs(x1 - x0);
+			const dy = Math.abs(y1 - y0);
+			const sx = x0 < x1 ? 1 : -1;
+			const sy = y0 < y1 ? 1 : -1;
+			let err = dx - dy;
+
+			while (true) {
+				// Clamp coordinates to dungeon bounds
+				if (
+					x0 >= 0 &&
+					x0 < this.yamlData.dungeon.dimensions.width &&
+					y0 >= 0 &&
+					y0 < this.yamlData.dungeon.dimensions.height
+				) {
+					cells.add(`${x0},${y0},${z}`);
+				}
+
+				if (x0 === x1 && y0 === y1) break;
+				const e2 = 2 * err;
+				if (e2 > -dy) {
+					err -= dy;
+					x0 += sx;
+				}
+				if (e2 < dx) {
+					err += dx;
+					y0 += sy;
+				}
+			}
+		} else if (this.selectionMode === "rectangle") {
 			// Rectangle: all cells in the bounding box
 			for (let y = minY; y <= maxY; y++) {
 				for (let x = minX; x <= maxX; x++) {
 					cells.add(`${x},${y},${z}`);
+				}
+			}
+		} else if (this.selectionMode === "edge-line") {
+			const startX = this.selectionStart.x;
+			const startY = this.selectionStart.y;
+			const endX = this.selectionEnd.x;
+			const endY = this.selectionEnd.y;
+
+			let x0 = startX;
+			let y0 = startY;
+			const x1 = endX;
+			const y1 = endY;
+
+			const dx = Math.abs(x1 - x0);
+			const dy = Math.abs(y1 - y0);
+			const sx = x0 < x1 ? 1 : -1;
+			const sy = y0 < y1 ? 1 : -1;
+			let err = dx - dy;
+
+			while (true) {
+				if (
+					x0 >= 0 &&
+					x0 < this.yamlData.dungeon.dimensions.width &&
+					y0 >= 0 &&
+					y0 < this.yamlData.dungeon.dimensions.height
+				) {
+					// Add current cell
+					cells.add(`${x0},${y0},${z}`);
+
+					// Add perpendicular neighbors to render a 2-cell-thick line
+					const neighbors =
+						Math.abs(dx) >= Math.abs(dy)
+							? [`${x0},${y0 - 1},${z}`, `${x0},${y0 + 1},${z}`]
+							: [`${x0 - 1},${y0},${z}`, `${x0 + 1},${y0},${z}`];
+					neighbors.forEach((neighbor) => {
+						const [nx, ny] = neighbor.split(",").map(Number);
+						if (
+							nx >= 0 &&
+							nx < this.yamlData.dungeon.dimensions.width &&
+							ny >= 0 &&
+							ny < this.yamlData.dungeon.dimensions.height
+						) {
+							cells.add(neighbor);
+						}
+					});
+				}
+
+				if (x0 === x1 && y0 === y1) break;
+				const e2 = 2 * err;
+				if (e2 > -dy) {
+					err -= dy;
+					x0 += sx;
+				}
+				if (e2 < dx) {
+					err += dx;
+					y0 += sy;
 				}
 			}
 		} else if (this.selectionMode === "edge-rectangle") {
@@ -4242,6 +4918,10 @@ class MapEditor {
 			}
 		}
 
+		if (this.isSelectionAddMode && this.selectionBaseCells.size > 0) {
+			this.selectionBaseCells.forEach((cellKey) => cells.add(cellKey));
+		}
+
 		this.selectedCells = cells;
 		this.updateSelectionVisuals();
 	}
@@ -4292,7 +4972,7 @@ class MapEditor {
 
 			this.showToast(
 				`Deleted ${roomName}`,
-				`At coordinates (${x}, ${y}, ${z})`,
+				`At coordinates (${x}, ${y}, ${z})`
 			);
 			this.loadResets(dungeon);
 			this.renderMap(dungeon);
@@ -4302,40 +4982,16 @@ class MapEditor {
 	}
 
 	deselectAll() {
-		// Clear multi-cell selection
-		this.selectedCells.clear();
-
-		// Clear single cell selection
-		this.selectedCell = null;
-
-		// Clear template selection
-		this.selectedTemplate = null;
-		this.selectedTemplateType = null;
+		this.clearSelectedCells();
+		this.clearSelectedTemplate();
 
 		// Don't clear selection mode - keep tool active
 		// this.selectionMode = null;
-
-		// Update visual indicators
-		this.updateSelectionVisuals();
 
 		// Don't clear tool button highlights - keep selection tool active
 		// document.querySelectorAll(".tool-btn").forEach((btn) => {
 		// 	btn.classList.remove("active");
 		// });
-
-		// Remove selected class from grid cells
-		document.querySelectorAll(".grid-cell").forEach((cell) => {
-			cell.classList.remove("selected");
-			cell.classList.remove("selected-cell");
-		});
-
-		// Remove selected class from template items
-		document.querySelectorAll(".template-item").forEach((item) => {
-			item.classList.remove("selected");
-		});
-
-		// Hide placement indicator
-		this.updatePlacementIndicator(null, null, null);
 	}
 
 	selectAllCurrentLayer() {
@@ -4361,7 +5017,7 @@ class MapEditor {
 		const totalCells = dungeon.dimensions.width * dungeon.dimensions.height;
 		this.showToast(
 			"Selected all",
-			`${totalCells} cells on layer ${this.currentLayer}`,
+			`${totalCells} cells on layer ${this.currentLayer}`
 		);
 	}
 
@@ -4402,15 +5058,14 @@ class MapEditor {
 		if (deletedCount > 0) {
 			this.showToast(
 				`Deleted ${deletedCount} room${deletedCount !== 1 ? "s" : ""}`,
-				"From selected area",
+				"From selected area"
 			);
 			this.loadResets(dungeon);
 			this.renderMap(dungeon);
 		}
 
 		// Clear selection after deletion
-		this.selectedCells.clear();
-		this.updateSelectionVisuals();
+		this.clearSelectedCells();
 	}
 
 	cloneDungeonState(dungeon) {
@@ -4422,6 +5077,8 @@ class MapEditor {
 			templates: JSON.parse(JSON.stringify(dungeon.templates || [])),
 			resets: JSON.parse(JSON.stringify(dungeon.resets || [])),
 			resetMessage: dungeon.resetMessage,
+			name: dungeon.name,
+			description: dungeon.description,
 		};
 	}
 
@@ -4457,13 +5114,12 @@ class MapEditor {
 		dungeon.templates = state.templates;
 		dungeon.resets = state.resets;
 		dungeon.resetMessage = state.resetMessage;
+		dungeon.name = state.name;
+		dungeon.description = state.description;
 
 		// Update UI
-		document.getElementById("width-input").value = dungeon.dimensions.width;
-		document.getElementById("height-input").value = dungeon.dimensions.height;
-		document.getElementById("layers-input").value = dungeon.dimensions.layers;
-		document.getElementById("reset-message-input").value =
-			dungeon.resetMessage || "";
+		this.updateDungeonSettingsForm(dungeon);
+		this.updateCurrentDungeonDisplay(dungeon);
 
 		// Reload templates and resets
 		this.loadTemplates(dungeon);
@@ -4547,7 +5203,7 @@ class MapEditor {
 		// Check all localStorage keys for unsaved work
 		const keys = Object.keys(localStorage);
 		const unsavedKeys = keys.filter((key) =>
-			key.startsWith("mud-map-editor-unsaved-"),
+			key.startsWith("mud-map-editor-unsaved-")
 		);
 
 		if (unsavedKeys.length > 0) {
@@ -4618,7 +5274,8 @@ class MapEditor {
 		const heightInput = document.getElementById("new-dungeon-height");
 		const layersInput = document.getElementById("new-dungeon-layers");
 
-		const name = nameInput.value.trim().toLowerCase();
+		const rawName = nameInput.value.trim();
+		const name = rawName.toLowerCase();
 		const width = parseInt(widthInput.value, 10);
 		const height = parseInt(heightInput.value, 10);
 		const layers = parseInt(layersInput.value, 10);
@@ -4627,7 +5284,7 @@ class MapEditor {
 		if (!name) {
 			this.showToast(
 				"Invalid dungeon name",
-				"Please enter a name for the dungeon",
+				"Please enter a name for the dungeon"
 			);
 			return;
 		}
@@ -4637,10 +5294,11 @@ class MapEditor {
 		if (sanitizedName !== name) {
 			this.showToast(
 				"Invalid characters in name",
-				"Name can only contain lowercase letters, numbers, hyphens, and underscores",
+				"Name can only contain lowercase letters, numbers, hyphens, and underscores"
 			);
 			return;
 		}
+		const displayName = rawName || sanitizedName;
 
 		if (width < 1 || width > 100) {
 			this.showToast("Invalid width", "Width must be between 1 and 100");
@@ -4672,6 +5330,7 @@ class MapEditor {
 			const dungeonData = {
 				dungeon: {
 					id: sanitizedName,
+					name: displayName,
 					dimensions: {
 						width,
 						height,
@@ -4684,21 +5343,11 @@ class MapEditor {
 				},
 			};
 
-			// Create dungeon on server
-			const response = await fetch(`/api/dungeons/${sanitizedName}`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					yaml: jsyaml.dump(dungeonData, { lineWidth: -1, noRefs: true }),
-				}),
-			});
-
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.error || "Failed to create dungeon");
-			}
+			// Create dungeon via IPC/API
+			await this.createDungeonData(
+				sanitizedName,
+				jsyaml.dump(dungeonData, { lineWidth: -1, noRefs: true })
+			);
 
 			// Close modal
 			document.getElementById("new-dungeon-modal").classList.remove("active");
@@ -4709,7 +5358,7 @@ class MapEditor {
 			// Load the new dungeon
 			await this.loadDungeon(sanitizedName);
 
-			this.showToast("Dungeon created", `Created "${sanitizedName}"`);
+			this.showToast("Dungeon created", `Created "${displayName}"`);
 		} catch (error) {
 			console.error("Failed to create dungeon:", error);
 			this.showToast("Failed to create dungeon", error.message);
@@ -4789,13 +5438,11 @@ class MapEditor {
 		};
 
 		// Clear selection
-		this.selectedCells.clear();
-		this.updateSelectionVisuals();
-		this.setSelectionMode(null);
+		this.clearSelectionTool();
 
 		this.showToast(
 			"Copied selection",
-			`${cells.length} cell${cells.length !== 1 ? "s" : ""}`,
+			`${cells.length} cell${cells.length !== 1 ? "s" : ""}`
 		);
 	}
 
@@ -4863,7 +5510,7 @@ class MapEditor {
 						const roomRef = `@${dungeonId}{${targetX},${targetY},${targetZ}}`;
 						if (dungeon.resets) {
 							dungeon.resets = dungeon.resets.filter(
-								(r) => r.roomRef !== roomRef,
+								(r) => r.roomRef !== roomRef
 							);
 						}
 					}
@@ -4924,7 +5571,7 @@ window.addEventListener("DOMContentLoaded", () => {
 	setTimeout(() => {
 		if (typeof jsyaml === "undefined") {
 			console.error(
-				"js-yaml library not loaded. Please check the script tag in index.html",
+				"js-yaml library not loaded. Please check the script tag in index.html"
 			);
 			return;
 		}

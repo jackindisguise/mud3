@@ -53,8 +53,11 @@ import { Character, SerializedCharacter } from "../character.js";
 import archetypePkg, { getRaceById, getJobById } from "../package/archetype.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const CHAR_DIR = join(process.cwd(), "data", "characters");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
+const CHAR_DIR = join(DATA_DIRECTORY, "characters");
 
 // --- Active character registry (local lock) ---
 type ActiveEntry = { character: Character; since: Date };
@@ -156,7 +159,7 @@ export async function saveCharacter(character: Character) {
 		await rename(tempPath, filePath);
 
 		logger.debug(
-			`Saved character file: ${relative(process.cwd(), filePath)} for ${
+			`Saved character file: ${relative(ROOT_DIRECTORY, filePath)} for ${
 				character.credentials.username
 			}`
 		);
@@ -193,7 +196,7 @@ export async function checkCharacterPassword(
 	if (!(await characterExists(username))) {
 		logger.debug(
 			`Character file not found: ${relative(
-				process.cwd(),
+				ROOT_DIRECTORY,
 				filePath
 			)} (username=${username})`
 		);
@@ -242,7 +245,7 @@ export async function loadCharacter(
 	if (!(await characterExists(username))) {
 		logger.debug(
 			`Character file not found: ${relative(
-				process.cwd(),
+				ROOT_DIRECTORY,
 				filePath
 			)} (username=${username})`
 		);
@@ -266,7 +269,7 @@ export default {
 		await logger.block("character", async () => {
 			logger.debug(
 				`Character storage directory ready: ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					CHAR_DIR
 				)}`
 			);

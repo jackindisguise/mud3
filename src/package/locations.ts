@@ -23,8 +23,10 @@ import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const DATA_DIRECTORY = join(process.cwd(), "data");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const LOCATIONS_PATH = join(DATA_DIRECTORY, "locations.yaml");
 
 /**
@@ -128,7 +130,7 @@ export function getAllLocationRefs(): LocationsConfig {
 
 export async function loadLocations() {
 	logger.debug(
-		`Loading locations from ${relative(process.cwd(), LOCATIONS_PATH)}`
+		`Loading locations from ${relative(ROOT_DIRECTORY, LOCATIONS_PATH)}`
 	);
 	try {
 		const content = await readFile(LOCATIONS_PATH, "utf-8");

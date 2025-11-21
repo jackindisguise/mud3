@@ -26,8 +26,10 @@ import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import logger from "../logger.js";
 import YAML from "js-yaml";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const DATA_DIRECTORY = join(process.cwd(), "data");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const GAMESTATE_PATH = join(DATA_DIRECTORY, "gamestate.yaml");
 
 /**
@@ -124,7 +126,7 @@ export function getNextObjectIdSync(): number {
  */
 export async function loadGameState(): Promise<void> {
 	logger.debug(
-		`Loading game state from ${relative(process.cwd(), GAMESTATE_PATH)}`
+		`Loading game state from ${relative(ROOT_DIRECTORY, GAMESTATE_PATH)}`
 	);
 	try {
 		const content = await readFile(GAMESTATE_PATH, "utf-8");
@@ -189,7 +191,7 @@ export async function loadGameState(): Promise<void> {
 		if (error?.code === "ENOENT") {
 			logger.debug(
 				`Game state file not found or unreadable, creating default at ${relative(
-					process.cwd(),
+					ROOT_DIRECTORY,
 					GAMESTATE_PATH
 				)}`
 			);
@@ -228,7 +230,7 @@ export async function saveGameState() {
 		await rename(tempPath, GAMESTATE_PATH);
 
 		logger.debug(
-			`Saved game state: ${relative(process.cwd(), GAMESTATE_PATH)}`
+			`Saved game state: ${relative(ROOT_DIRECTORY, GAMESTATE_PATH)}`
 		);
 	} catch (error) {
 		// Clean up temp file if it exists

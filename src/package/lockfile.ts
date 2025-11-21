@@ -21,9 +21,11 @@ import { existsSync } from "fs";
 import { hostname } from "node:os";
 import logger from "../logger.js";
 import { unlinkSync } from "node:fs";
+import { getSafeRootDirectory } from "../utils/path.js";
 
-const ROOT_DIRECTORY = join(process.cwd());
-export const LOCKFILE_PATH = join(ROOT_DIRECTORY, ".lock");
+const ROOT_DIRECTORY = getSafeRootDirectory();
+const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
+export const LOCKFILE_PATH = join(DATA_DIRECTORY, ".lock");
 
 export type LockInfo = {
 	pid: number;

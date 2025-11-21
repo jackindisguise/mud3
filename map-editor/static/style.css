@@ -341,7 +341,8 @@ header h1 {
 .template-item-actions {
 	display: flex;
 	gap: 0.25rem;
-	flex-shrink: 0;
+	margin-top: 0.5rem;
+	flex-wrap: wrap;
 }
 
 .template-edit-btn,
@@ -822,21 +823,29 @@ header h1 {
 
 .reset-item .reset-actions {
 	display: flex;
-	gap: 0.5rem;
+	gap: 0.25rem;
+	margin-top: 0.5rem;
 }
 
 .reset-item button {
-	padding: 0.25rem 0.5rem;
-	background: #3a3a3a;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	background: transparent;
 	border: 1px solid #555;
 	color: #fff;
 	border-radius: 4px;
 	cursor: pointer;
-	font-size: 0.75rem;
+	font-size: 0.85rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s;
 }
 
 .reset-item button:hover {
-	background: #4a4a4a;
+	background: rgba(255, 255, 255, 0.1);
+	border-color: #4a9eff;
 }
 
 .info-panel {
@@ -1426,7 +1435,7 @@ header h1 {
 }
 
 .toast-container {
-	position: fixed;
+	position: absolute;
 	display: flex;
 	flex-direction: column;
 	gap: 0.5rem;
@@ -1435,6 +1444,9 @@ header h1 {
 	align-items: flex-end;
 	right: 20px;
 	bottom: 20px;
+	top: calc(var(--toolbar-min-height) + 10px);
+	justify-content: flex-end;
+	overflow: hidden;
 	transition: bottom 0.2s ease;
 }
 
@@ -1455,6 +1467,26 @@ header h1 {
 	pointer-events: none;
 	position: relative;
 	overflow: hidden;
+}
+
+.toast-container .toast:nth-last-child(1) {
+	opacity: 1;
+}
+
+.toast-container .toast:nth-last-child(2) {
+	opacity: 0.8;
+}
+
+.toast-container .toast:nth-last-child(3) {
+	opacity: 0.6;
+}
+
+.toast-container .toast:nth-last-child(4) {
+	opacity: 0.4;
+}
+
+.toast-container .toast:nth-last-child(n + 5) {
+	opacity: 0.2;
 }
 
 @keyframes fadeOut {

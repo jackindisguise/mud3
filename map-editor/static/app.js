@@ -842,17 +842,17 @@ class MapEditor {
 			<div class="template-item-content">
 				<h3>${display}</h3>
 				<p>${description}</p>
+				${
+					!isDeleteTemplate
+						? `
+				<div class="template-item-actions">
+					<button class="template-edit-btn" title="Edit template">✏️</button>
+					<button class="template-delete-btn" title="Delete template">🗑️</button>
+				</div>
+				`
+						: ""
+				}
 			</div>
-			${
-				!isDeleteTemplate
-					? `
-			<div class="template-item-actions">
-				<button class="template-edit-btn" title="Edit template">✏️</button>
-				<button class="template-delete-btn" title="Delete template">🗑️</button>
-			</div>
-			`
-					: ""
-			}
 		`;
 		item.addEventListener("click", () => {
 			// If there's an active selection, place template in all selected cells
@@ -1126,8 +1126,8 @@ class MapEditor {
 				<h4>${templateName}</h4>
 				${details}
 				<div class="reset-actions">
-					<button class="edit-reset-btn" data-index="${filteredIndex}">Edit</button>
-					<button class="delete-reset-btn" data-index="${filteredIndex}">Delete</button>
+					<button class="edit-reset-btn" data-index="${filteredIndex}" title="Edit reset">✏️</button>
+					<button class="delete-reset-btn" data-index="${filteredIndex}" title="Delete reset">🗑️</button>
 				</div>
 			`;
 

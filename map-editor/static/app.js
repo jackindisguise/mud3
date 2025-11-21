@@ -1,5 +1,5 @@
 // Map Editor Application
-// Uses js-yaml for parsing (loaded via CDN in HTML)
+// Uses js-yaml for parsing (loaded via local script tag in index.html)
 
 // Color constants matching the game's COLOR enum
 const COLORS = [
@@ -3518,8 +3518,43 @@ class MapEditor {
 			this.autoSaveTimeout = null;
 		}
 
+		// Rebuild the dungeon object to control YAML key order
+		const preferredOrder = [
+			"id",
+			"name",
+			"description",
+			"dimensions",
+			"resetMessage",
+			"grid",
+			"rooms",
+			"templates",
+			"resets",
+		];
+		const dungeonData = this.yamlData.dungeon || {};
+		const orderedDungeon = {};
+
+		for (const key of preferredOrder) {
+			if (
+				Object.prototype.hasOwnProperty.call(dungeonData, key) &&
+				dungeonData[key] !== undefined
+			) {
+				orderedDungeon[key] = dungeonData[key];
+			}
+		}
+
+		for (const key of Object.keys(dungeonData)) {
+			if (!preferredOrder.includes(key) && dungeonData[key] !== undefined) {
+				orderedDungeon[key] = dungeonData[key];
+			}
+		}
+
+		this.yamlData.dungeon = orderedDungeon;
+
 		// Convert back to YAML
-		const yaml = jsyaml.dump(this.yamlData, { lineWidth: 120, noRefs: true });
+		const yaml = jsyaml.dump(this.yamlData, {
+			lineWidth: 120,
+			noRefs: true,
+		});
 
 		// Save via IPC/API
 		try {

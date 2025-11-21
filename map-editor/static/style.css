@@ -16,6 +16,8 @@ body {
 	--scrollbar-track: #1a1a1a;
 	--scrollbar-thumb: #555;
 	--scrollbar-thumb-hover: #777;
+	--toolbar-min-height: 64px;
+	--toolbar-padding-y: 0.5rem;
 }
 
 /* WebKit browsers: Chrome, Edge, Safari */
@@ -246,17 +248,23 @@ header h1 {
 .tabs {
 	display: flex;
 	border-bottom: 1px solid #444;
+	min-height: var(--toolbar-min-height);
+	padding: 0 var(--toolbar-padding-y);
+	align-items: stretch;
 }
 
 .tab {
 	flex: 1;
-	padding: 0.75rem;
+	padding: 0 0.75rem;
 	background: #2a2a2a;
 	border: none;
 	border-right: 1px solid #444;
 	color: #ccc;
 	cursor: pointer;
 	transition: background 0.2s;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .tab:last-child {
@@ -407,9 +415,10 @@ header h1 {
 	flex-direction: row;
 	align-items: center;
 	flex-wrap: wrap;
-	padding: 0.5rem 1rem;
+	padding: var(--toolbar-padding-y) 1rem;
 	gap: 1rem;
 	flex-shrink: 0;
+	min-height: var(--toolbar-min-height);
 }
 
 .layer-controls {

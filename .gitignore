@@ -11,3 +11,4 @@ build
 electron-errors.log
 *.exe
 *.dmg
+*.app

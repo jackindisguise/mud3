@@ -8,7 +8,24 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const buildDir = path.join(rootDir, "build");
 const electronDir = path.join(buildDir, "electron");
-const targetName = "dungedit-arm64.dmg";
+const packageJsonPath = path.join(rootDir, "package.json");
+
+function getPackageVersion() {
+	if (!fs.existsSync(packageJsonPath)) {
+		throw new Error(`package.json not found at ${packageJsonPath}`);
+	}
+
+	const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+
+	if (!packageJson.version) {
+		throw new Error(`version field missing in ${packageJsonPath}`);
+	}
+
+	return packageJson.version;
+}
+
+const packageVersion = getPackageVersion();
+const targetName = `dungedit-arm64-v${packageVersion}.dmg`;
 const targetPath = path.join(rootDir, targetName);
 
 function findDmg() {

@@ -10,6 +10,7 @@ import board from "./src/package/board.js";
 import gamestate from "./src/package/gamestate.js";
 import dungeon from "./src/package/dungeon.js";
 import reservedNames from "./src/package/reservedNames.js";
+import abilities from "./src/package/abilities.js";
 import logger from "./src/logger.js";
 import {
 	buildDungeonGraph,
@@ -22,6 +23,7 @@ await logger.block("packages", async () => {
 	logger.info("Loading packages...");
 	await loadPackage(lockfile); // always load first
 	await loadPackage(commands);
+	await loadPackage(abilities);
 	await loadPackage(config);
 	await loadPackage(archetype);
 	await loadPackage(character);

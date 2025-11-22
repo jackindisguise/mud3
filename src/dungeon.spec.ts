@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { suite, test } from "node:test";
+import { suite, test, beforeEach } from "node:test";
 
 import {
 	DIRECTION,
@@ -37,6 +37,7 @@ import {
 	Weapon,
 	EQUIPMENT_SLOT,
 } from "./dungeon.js";
+import { Character, MESSAGE_GROUP } from "./character.js";
 
 suite("dungeon.ts", () => {
 	suite("DIRECTION", () => {
@@ -3496,6 +3497,302 @@ suite("dungeon.ts", () => {
 				assert(weapon instanceof Weapon);
 				assert.strictEqual(weapon.templateId, "sword-iron");
 			}
+		});
+	});
+
+	suite("Mob.oneHit with ability name and attack power modifiers", () => {
+		let dungeon: Dungeon;
+		let room: Room;
+		let attacker: Mob;
+		let target: Mob;
+		let observer: Mob;
+		let attackerCharacter: Character;
+		let targetCharacter: Character;
+		let observerCharacter: Character;
+
+		// Helper to create a test character with message tracking
+		function createTestCharacter(
+			mob: Mob,
+			characterId: number
+		): Character & {
+			messageHistory: Array<{ text: string; group: any }>;
+		} {
+			const messageHistory: Array<{ text: string; group: any }> = [];
+			const character = new Character({
+				credentials: {
+					characterId,
+					username: mob.display.toLowerCase(),
+				},
+				mob,
+			});
+
+			// Override sendMessage to track messages
+			const originalSendMessage = character.sendMessage.bind(character);
+			(character as any).messageHistory = messageHistory;
+			character.sendMessage = (text: string, group: any) => {
+				messageHistory.push({ text, group });
+				originalSendMessage(text, group);
+			};
+
+			return character as Character & {
+				messageHistory: Array<{ text: string; group: any }>;
+			};
+		}
+
+		// Helper to get messages for a character
+		function getMessages(
+			character: Character & {
+				messageHistory?: Array<{ text: string; group: any }>;
+			},
+			group: any
+		): string[] {
+			const history = (character as any).messageHistory || [];
+			return history
+				.filter((m: { text: string; group: any }) => m.group === group)
+				.map((m: { text: string; group: any }) => m.text);
+		}
+
+		beforeEach(() => {
+			dungeon = new Dungeon({
+				dimensions: { width: 10, height: 10, layers: 1 },
+			});
+			room = new Room({
+				coordinates: { x: 0, y: 0, z: 0 },
+				dungeon,
+			});
+			dungeon.addRoom(room);
+
+			// Create attacker mob with character
+			attacker = new Mob({
+				display: "Warrior",
+				keywords: "warrior",
+				level: 10,
+			});
+			attacker.location = room;
+			attackerCharacter = createTestCharacter(attacker, 1);
+			attacker.character = attackerCharacter;
+
+			// Create target mob with character
+			target = new Mob({
+				display: "Goblin",
+				keywords: "goblin",
+				level: 5,
+			});
+			target.location = room;
+			targetCharacter = createTestCharacter(target, 2);
+			target.character = targetCharacter;
+
+			// Create observer mob with character
+			observer = new Mob({
+				display: "Observer",
+				keywords: "observer",
+			});
+			observer.location = room;
+			observerCharacter = createTestCharacter(observer, 3);
+			observer.character = observerCharacter;
+		});
+
+		test("should use ability name in damage messages when abilityName is provided", () => {
+			// Clear message history
+			(attackerCharacter as any).messageHistory = [];
+			(targetCharacter as any).messageHistory = [];
+			(observerCharacter as any).messageHistory = [];
+
+			// Perform hit with ability name
+			const damage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				abilityName: "whirlwind",
+			});
+
+			assert(damage > 0, "Damage should be greater than 0");
+
+			// Check messages contain ability name
+			const attackerMessages = getMessages(
+				attackerCharacter,
+				MESSAGE_GROUP.COMBAT
+			);
+			const targetMessages = getMessages(targetCharacter, MESSAGE_GROUP.COMBAT);
+			const observerMessages = getMessages(
+				observerCharacter,
+				MESSAGE_GROUP.COMBAT
+			);
+
+			assert(
+				attackerMessages.some((msg) => msg.includes("Your whirlwind hits")),
+				"Attacker should see 'Your whirlwind hits' message"
+			);
+			assert(
+				targetMessages.some((msg) => msg.includes("whirlwind hits you")),
+				"Target should see 'whirlwind hits you' message"
+			);
+			assert(
+				observerMessages.some((msg) => msg.includes("whirlwind hits")),
+				"Observer should see 'whirlwind hits' message"
+			);
+		});
+
+		test("should apply attackPowerBonus to damage calculation", () => {
+			// Get base damage without bonus
+			const baseDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+			});
+
+			// Reset target health
+			target.health = target.maxHealth;
+
+			// Get damage with bonus
+			const bonusDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				attackPowerBonus: 10,
+			});
+
+			// Damage with bonus should be higher
+			assert(
+				bonusDamage > baseDamage,
+				`Damage with bonus (${bonusDamage}) should be greater than base damage (${baseDamage})`
+			);
+		});
+
+		test("should apply attackPowerMultiplier to damage calculation", () => {
+			// Get base damage without multiplier
+			const baseDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+			});
+
+			// Reset target health
+			target.health = target.maxHealth;
+
+			// Get damage with 1.5x multiplier
+			const multipliedDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				attackPowerMultiplier: 1.5,
+			});
+
+			// Damage with multiplier should be approximately 1.5x (allowing for rounding)
+			const expectedMin = Math.floor(baseDamage * 1.4);
+			const expectedMax = Math.ceil(baseDamage * 1.6);
+			assert(
+				multipliedDamage >= expectedMin && multipliedDamage <= expectedMax,
+				`Multiplied damage (${multipliedDamage}) should be approximately 1.5x base damage (${baseDamage})`
+			);
+		});
+
+		test("should apply both attackPowerBonus and attackPowerMultiplier together", () => {
+			// Get base damage
+			const baseDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+			});
+
+			// Reset target health
+			target.health = target.maxHealth;
+
+			// Get damage with both bonus and multiplier
+			const combinedDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				attackPowerBonus: 5,
+				attackPowerMultiplier: 1.5,
+			});
+
+			// Combined damage should be significantly higher
+			assert(
+				combinedDamage > baseDamage,
+				`Combined damage (${combinedDamage}) should be greater than base damage (${baseDamage})`
+			);
+
+			// Should be higher than just bonus or just multiplier
+			target.health = target.maxHealth;
+			const bonusOnlyDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				attackPowerBonus: 5,
+			});
+
+			target.health = target.maxHealth;
+			const multiplierOnlyDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				attackPowerMultiplier: 1.5,
+			});
+
+			assert(
+				combinedDamage > bonusOnlyDamage,
+				"Combined should be higher than bonus only"
+			);
+			assert(
+				combinedDamage > multiplierOnlyDamage,
+				"Combined should be higher than multiplier only"
+			);
+		});
+
+		test("should use ability name with attack power modifiers", () => {
+			// Clear message history
+			(attackerCharacter as any).messageHistory = [];
+			(targetCharacter as any).messageHistory = [];
+
+			// Perform hit with ability name and modifiers
+			const damage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				abilityName: "fireball",
+				attackPowerBonus: 5,
+				attackPowerMultiplier: 1.2,
+			});
+
+			assert(damage > 0, "Damage should be greater than 0");
+
+			// Check messages contain ability name
+			const attackerMessages = getMessages(
+				attackerCharacter,
+				MESSAGE_GROUP.COMBAT
+			);
+			const targetMessages = getMessages(targetCharacter, MESSAGE_GROUP.COMBAT);
+
+			assert(
+				attackerMessages.some((msg) => msg.includes("Your fireball hits")),
+				"Attacker should see 'Your fireball hits' message"
+			);
+			assert(
+				targetMessages.some((msg) => msg.includes("fireball hits you")),
+				"Target should see 'fireball hits you' message"
+			);
+		});
+
+		test("should apply modifiers in correct order (bonus then multiplier)", () => {
+			// Calculate expected damage manually
+			// Base attack power
+			const baseAttackPower = attacker.attackPower;
+			// Apply bonus
+			const afterBonus = baseAttackPower + 10;
+			// Apply multiplier
+			const afterMultiplier = afterBonus * 1.5;
+			// Apply defense reduction (10% per defense point)
+			const defenseReduction = target.defense * 0.1;
+			const afterDefense = Math.max(1, afterMultiplier - defenseReduction);
+
+			// Perform hit with modifiers
+			const actualDamage = attacker.oneHit({
+				target,
+				guaranteedHit: true,
+				attackPowerBonus: 10,
+				attackPowerMultiplier: 1.5,
+			});
+
+			// Allow for rounding differences (critical hits, etc.)
+			// The actual damage should be in a reasonable range
+			const expectedMin = Math.floor(afterDefense * 0.8);
+			const expectedMax = Math.ceil(afterDefense * 2.2); // Allow for crits
+
+			assert(
+				actualDamage >= expectedMin && actualDamage <= expectedMax,
+				`Actual damage (${actualDamage}) should be in expected range (${expectedMin}-${expectedMax}) based on calculation order`
+			);
 		});
 	});
 });

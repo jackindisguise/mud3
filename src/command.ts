@@ -1571,6 +1571,96 @@ export interface ActionState {
  *
  * @class
  */
+
+/**
+ * Command class for abilities that require the actor to know the ability.
+ *
+ * Ability commands are only matched if the actor knows the associated ability.
+ * This prevents players from using commands for abilities they haven't learned.
+ *
+ * @example
+ * ```typescript
+ * const command = new AbilityCommand(
+ *   "whirlwind",
+ *   {
+ *     pattern: "whirlwind",
+ *     execute: (ctx, args) => {
+ *       // Execute ability logic
+ *     }
+ *   }
+ * );
+ * ```
+ */
+export class AbilityCommand extends Command {
+	readonly abilityId: string;
+
+	constructor(
+		abilityId: string,
+		commandObj: {
+			pattern: string;
+			aliases?: string[];
+			priority?: PRIORITY;
+			execute: (context: CommandContext, args: Map<string, any>) => void;
+			onError?: (context: CommandContext, result: ParseResult) => void;
+			cooldown?:
+				| number
+				| ((
+						context: CommandContext,
+						args: Map<string, any>
+				  ) => number | undefined);
+		}
+	) {
+		super({
+			pattern: commandObj.pattern,
+			aliases: commandObj.aliases,
+			priority: commandObj.priority,
+		});
+		this.abilityId = abilityId;
+		this.executeFunction = commandObj.execute;
+		this.errorFunction = commandObj.onError;
+		if (typeof commandObj.cooldown === "function") {
+			this.cooldownResolver = commandObj.cooldown;
+		} else if (typeof commandObj.cooldown === "number") {
+			const value = commandObj.cooldown;
+			this.cooldownResolver = () => value;
+		}
+	}
+
+	private executeFunction: (
+		context: CommandContext,
+		args: Map<string, any>
+	) => void;
+	private errorFunction?: (
+		context: CommandContext,
+		result: ParseResult
+	) => void;
+	private cooldownResolver?: (
+		context: CommandContext,
+		args: Map<string, any>
+	) => number | undefined;
+
+	execute(context: CommandContext, args: Map<string, any>): void {
+		this.executeFunction(context, args);
+	}
+
+	onError(context: CommandContext, result: ParseResult): void {
+		if (this.errorFunction) {
+			this.errorFunction(context, result);
+		} else {
+			logger.error(`Command error: ${result.error}`);
+		}
+	}
+
+	override getActionCooldownMs(
+		context: CommandContext,
+		args: Map<string, any>
+	): number | undefined {
+		if (!this.cooldownResolver) return undefined;
+		const value = this.cooldownResolver(context, args);
+		return typeof value === "number" ? value : undefined;
+	}
+}
+
 export class CommandRegistry {
 	/**
 	 * Default global command registry instance.
@@ -1721,6 +1811,12 @@ export class CommandRegistry {
 
 		// Commands are already sorted by priority and pattern length
 		for (const command of this.commands) {
+			// Skip ability commands if the actor doesn't know the ability
+			if (command instanceof AbilityCommand) {
+				if (!context.actor.knowsAbility(command.abilityId)) {
+					continue;
+				}
+			}
 			const result = command.parse(input, context);
 			if (result.success) {
 				const cooldownMs =

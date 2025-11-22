@@ -1804,6 +1804,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 	>;
 	/** Behavior flags serialized as strings (enum values) */
 	behaviors?: Record<string, boolean>;
+	/** Learned abilities map (ability id -> proficiency 0-100) */
+	learnedAbilities?: Record<string, number>;
 }
 
 /**
@@ -5016,6 +5018,8 @@ export interface MobOptions extends DungeonObjectOptions {
 	exhaustion?: number;
 	/** Behavior flags for NPCs (mobs without a character) */
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
+	/** Learned abilities map (ability id -> proficiency 0-100) */
+	learnedAbilities?: Record<string, number>;
 }
 
 const MAX_EXHAUSTION = 100;
@@ -5055,6 +5059,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 	>;
 	/** Behavior flags serialized as strings (enum values) */
 	behaviors?: Record<string, boolean>;
+	/** Learned abilities map (ability id -> proficiency 0-100) */
+	learnedAbilities?: Record<string, number>;
 }
 
 /**
@@ -5109,6 +5115,12 @@ export interface OneHitOptions {
 	weapon?: Weapon;
 	/** If true, the attack will never miss (guaranteed hit) */
 	guaranteedHit?: boolean;
+	/** Optional ability name to use in damage messages instead of the hit verb */
+	abilityName?: string;
+	/** Optional flat bonus to add to attack power before damage calculation */
+	attackPowerBonus?: number;
+	/** Optional multiplier to apply to attack power before damage calculation */
+	attackPowerMultiplier?: number;
 }
 
 export class Mob extends Movable {
@@ -5133,6 +5145,7 @@ export class Mob extends Movable {
 	private _combatTarget?: Mob;
 	private _threatTable?: Map<Mob, number>;
 	private _behaviors: Map<BEHAVIOR, boolean>;
+	private _learnedAbilities: Map<string, number>;
 	constructor(options?: MobOptions) {
 		super(options);
 
@@ -5178,6 +5191,17 @@ export class Mob extends Movable {
 					// Use setBehavior to ensure cache is updated
 					this.setBehavior(key as BEHAVIOR, !!value);
 				}
+			}
+		}
+
+		// Initialize learned abilities map (ability id -> proficiency 0-100)
+		this._learnedAbilities = new Map<string, number>();
+		if (options?.learnedAbilities) {
+			for (const [abilityId, proficiency] of Object.entries(
+				options.learnedAbilities
+			)) {
+				const prof = Math.max(0, Math.min(100, Number(proficiency)));
+				this._learnedAbilities.set(abilityId, prof);
 			}
 		}
 
@@ -5460,6 +5484,79 @@ export class Mob extends Movable {
 				SAFE_WANDERING_MOBS.delete(this);
 			}
 		}
+	}
+
+	/**
+	 * Gets the learned abilities map for this mob.
+	 * Returns a readonly view of the abilities (ability id -> proficiency 0-100).
+	 *
+	 * @returns Readonly map of learned abilities
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.addAbility("whirlwind", 50);
+	 * const abilities = mob.learnedAbilities;
+	 * console.log(abilities.get("whirlwind")); // 50
+	 * ```
+	 */
+	public get learnedAbilities(): ReadonlyMap<string, number> {
+		return this._learnedAbilities;
+	}
+
+	/**
+	 * Checks if this mob knows a specific ability.
+	 *
+	 * @param abilityId The ability ID to check
+	 * @returns True if the mob knows the ability, false otherwise
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.addAbility("whirlwind", 75);
+	 * console.log(mob.knowsAbility("whirlwind")); // true
+	 * console.log(mob.knowsAbility("fireball")); // false
+	 * ```
+	 */
+	public knowsAbility(abilityId: string): boolean {
+		return this._learnedAbilities.has(abilityId);
+	}
+
+	/**
+	 * Adds or updates an ability for this mob.
+	 * Proficiency is clamped to 0-100.
+	 *
+	 * @param abilityId The ability ID to add or update
+	 * @param proficiency Proficiency rating from 0 to 100 (defaults to 0)
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.addAbility("whirlwind", 50);
+	 * mob.addAbility("fireball", 100); // Max proficiency
+	 * ```
+	 */
+	public addAbility(abilityId: string, proficiency: number = 0): void {
+		const prof = Math.max(0, Math.min(100, Number(proficiency)));
+		this._learnedAbilities.set(abilityId, prof);
+	}
+
+	/**
+	 * Removes an ability from this mob.
+	 *
+	 * @param abilityId The ability ID to remove
+	 * @returns True if the ability was removed, false if it wasn't learned
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.addAbility("whirlwind", 50);
+	 * mob.removeAbility("whirlwind"); // Returns true
+	 * mob.removeAbility("fireball"); // Returns false (not learned)
+	 * ```
+	 */
+	public removeAbility(abilityId: string): boolean {
+		return this._learnedAbilities.delete(abilityId);
 	}
 
 	/**
@@ -6672,7 +6769,14 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public oneHit(options: OneHitOptions): number {
-		const { target, weapon, guaranteedHit = false } = options;
+		const {
+			target,
+			weapon,
+			guaranteedHit = false,
+			abilityName,
+			attackPowerBonus = 0,
+			attackPowerMultiplier = 1,
+		} = options;
 
 		// Get the room where combat is occurring
 		const room = this.location;
@@ -6727,6 +6831,9 @@ export class Mob extends Movable {
 			? baseAttackPower + weapon.attackPower
 			: baseAttackPower;
 
+		// Apply attack power bonus and multiplier (from abilities, etc.)
+		damage = (damage + attackPowerBonus) * attackPowerMultiplier;
+
 		// Apply defense reduction
 		const defenseReduction = target.defense * 0.1; // 10% damage reduction per defense point
 		damage = Math.max(1, damage - defenseReduction);
@@ -6762,12 +6869,17 @@ export class Mob extends Movable {
 		// Get weapon name if provided
 		const weaponName = weapon ? weapon.display : undefined;
 
-		// Build message templates based on whether weapon is used
+		// Build message templates based on whether ability, weapon, or default verb is used
 		let userMsg: string;
 		let targetMsg: string;
 		let roomMsg: string;
 
-		if (weaponName) {
+		if (abilityName) {
+			// With ability: ability is the subject, always use "hits"
+			userMsg = `Your ${abilityName} hits {target} for ${damageStr} damage!`;
+			targetMsg = `{User}'s ${abilityName} hits you for ${damageStr} damage!`;
+			roomMsg = `{User}'s ${abilityName} hits {target} for ${damageStrPlain} damage!`;
+		} else if (weaponName) {
 			// With weapon: weapon is the subject, so always use third person
 			userMsg = `Your ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
 			targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} you for ${damageStr} damage!`;
@@ -6871,6 +6983,13 @@ export class Mob extends Movable {
 								value,
 							])
 						) as Record<string, boolean>,
+				  }
+				: {}),
+			...(this._learnedAbilities.size > 0
+				? {
+						learnedAbilities: Object.fromEntries(
+							Array.from(this._learnedAbilities.entries())
+						) as Record<string, number>,
 				  }
 				: {}),
 		};
@@ -7491,6 +7610,7 @@ export function serializedToOptions(
 				mana: m.mana,
 				exhaustion: m.exhaustion,
 				behaviors,
+				learnedAbilities: m.learnedAbilities,
 			});
 			return opts;
 		}

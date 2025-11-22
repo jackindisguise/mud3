@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.18.0](https://github.com/jackindisguise/mud3/compare/v1.17.0...v1.18.0) (2025-11-22)
+
+
+### Features
+
+* added change tracking system and improved map editor UX ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added change tracking system with history panel ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added expandable metadata details when selecting history entries ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added selection bounds and shape metadata to placement operations ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added status bar at bottom of editor showing template, tool, mode, position, history, and changes ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* added triangle arrow indicators for UP and DOWN exits on grid cells ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* added visual indicators and status bar improvements ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* changed exit override indicator from lightning bolt to warning triangle symbol ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* implemented edge-line selection tool to create frame around line with two parallel lines and connecting segments ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* implemented flood fill paint mode for mobs and objects ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+
+
+### Bug Fixes
+
+* added filledCount metadata to paint flood-fill change history ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* cleared selection tools when switching to paint flood-fill mode ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* corrected paint mode history tracking for mobs and objects to only record when cells are actually painted ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* corrected selection clearing behavior to clear previous selection when starting new selection with any tool ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* corrected status bar template check to handle template ID 0 correctly ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* ensured edge-line selection always includes start and end cells of original line ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* removed misuse of newParameters/oldParameters in selection placements ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* updated status bar to show selected template and tool, not active usage state ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+
 ## [1.17.0](https://github.com/jackindisguise/mud3/compare/v1.16.0...v1.17.0) (2025-11-21)
 
 

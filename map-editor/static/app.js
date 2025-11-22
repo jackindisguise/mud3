@@ -21,6 +21,23 @@ const COLORS = [
 	{ id: 15, name: "White", hex: "#ffffff", tag: "W" },
 ];
 
+const EDITOR_ACTIONS = Object.freeze({
+	CREATE_TEMPLATE: "CREATE_TEMPLATE",
+	EDIT_TEMPLATE_FIELD: "EDIT_TEMPLATE_FIELD",
+	CREATE_DUNGEON: "CREATE_DUNGEON",
+	EDIT_DUNGEON_FIELD: "EDIT_DUNGEON_FIELD",
+	CREATE_RESET: "CREATE_RESET",
+	EDIT_RESET_FIELD: "EDIT_RESET_FIELD",
+	PLACE_TEMPLATE: "PLACE_TEMPLATE",
+	PLACE_ROOM_TEMPLATE: "PLACE_ROOM_TEMPLATE",
+	DELETE_TEMPLATE: "DELETE_TEMPLATE",
+	DELETE_ROOM_TEMPLATE: "DELETE_ROOM_TEMPLATE",
+	DELETE_RESET: "DELETE_RESET",
+	PASTE_SELECTION: "PASTE_SELECTION",
+	RESIZE_DUNGEON: "RESIZE_DUNGEON",
+	RESTORE_UNSAVED_WORK: "RESTORE_UNSAVED_WORK",
+});
+
 class MapEditor {
 	constructor() {
 		this.api = window.mapEditorAPI || null;
@@ -53,6 +70,12 @@ class MapEditor {
 		this.maxHistorySize = 50; // Maximum number of undo states to keep
 		this.autoSaveTimeout = null; // Timeout for debounced auto-save
 		this.hasUnsavedChanges = false; // Track if there are unsaved changes
+		this.changes = []; // Linear change queue for dirty tracking
+		this.changeCursor = -1; // Pointer to current change in the queue
+		this.lastSavedChangeIndex = -1; // Index of last persisted change
+		this.changeIdCounter = 0; // Unique identifier for change entries
+		this.maxTrackedChanges = 50; // Keep change history manageable
+		this.initialChangeSnapshot = null; // Baseline state for history timeline
 		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
 
 		this.init();
@@ -625,37 +648,67 @@ class MapEditor {
 		const newDescription = descriptionInput?.value?.trim() || "";
 
 		let changed = false;
+		const pendingUpdates = {};
+		const newParameters = {};
+		const oldParameters = {};
 
 		const normalizedResetMessage = newResetMessage || undefined;
 		if (dungeon.resetMessage !== normalizedResetMessage) {
-			dungeon.resetMessage = normalizedResetMessage;
-			if (this.currentDungeon) {
-				this.currentDungeon.resetMessage = normalizedResetMessage || "";
-			}
+			pendingUpdates.resetMessage = normalizedResetMessage;
+			oldParameters.resetMessage = dungeon.resetMessage || "";
+			newParameters.resetMessage = normalizedResetMessage || "";
 			changed = true;
 		}
 
 		const normalizedName = trimmedName;
 		if (dungeon.name !== normalizedName) {
-			dungeon.name = normalizedName;
-			if (this.currentDungeon) {
-				this.currentDungeon.name = normalizedName;
-			}
+			pendingUpdates.name = normalizedName;
+			oldParameters.name = dungeon.name || "";
+			newParameters.name = normalizedName || "";
 			changed = true;
 		}
 
 		const normalizedDescription = newDescription || undefined;
 		if (dungeon.description !== normalizedDescription) {
-			dungeon.description = normalizedDescription;
-			if (this.currentDungeon) {
-				this.currentDungeon.description = normalizedDescription || "";
-			}
+			pendingUpdates.description = normalizedDescription;
+			oldParameters.description = dungeon.description || "";
+			newParameters.description = normalizedDescription || "";
 			changed = true;
 		}
 
 		if (changed) {
+			this.saveStateToHistory();
+
+			if (
+				Object.prototype.hasOwnProperty.call(pendingUpdates, "resetMessage")
+			) {
+				dungeon.resetMessage = pendingUpdates.resetMessage;
+				if (this.currentDungeon) {
+					this.currentDungeon.resetMessage = pendingUpdates.resetMessage || "";
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(pendingUpdates, "name")) {
+				dungeon.name = pendingUpdates.name;
+				if (this.currentDungeon) {
+					this.currentDungeon.name = pendingUpdates.name || "";
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(pendingUpdates, "description")) {
+				dungeon.description = pendingUpdates.description;
+				if (this.currentDungeon) {
+					this.currentDungeon.description = pendingUpdates.description || "";
+				}
+			}
+
 			this.updateCurrentDungeonDisplay(dungeon);
-			this.saveToLocalStorage();
+			this.makeChange({
+				action: EDITOR_ACTIONS.EDIT_DUNGEON_FIELD,
+				actionTarget: this.currentDungeonId,
+				newParameters,
+				oldParameters,
+			});
 		}
 
 		return true;
@@ -690,13 +743,15 @@ class MapEditor {
 					// Initialize history with restored state
 					this.history = [this.cloneDungeonState(dungeon)];
 					this.historyIndex = 0;
+					this.resetChangeTracking({
+						markUnsaved: true,
+						action: EDITOR_ACTIONS.RESTORE_UNSAVED_WORK,
+					});
 
 					this.showToast(
 						"Restored unsaved work",
 						`Last saved: ${new Date(parsed.timestamp).toLocaleString()}`
 					);
-					this.hasUnsavedChanges = true;
-					this.updateSaveButton();
 					// Load templates
 					this.loadTemplates(dungeon);
 
@@ -766,9 +821,8 @@ class MapEditor {
 		// Setup layer selector
 		this.setupLayerSelector(dungeon.dimensions.layers);
 
-		// Clear unsaved changes flag
-		this.hasUnsavedChanges = false;
-		this.updateSaveButton();
+		// Reset change tracking for clean load
+		this.resetChangeTracking();
 	}
 
 	loadTemplates(dungeon) {
@@ -907,14 +961,15 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
 		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
 		let placedCount = 0;
 		let skippedEmptyRooms = 0;
 		let skippedDenseRooms = 0;
+		let changeOccurred = false;
+		const selectionSize = this.selectedCells.size;
+		const selectionBounds = this.getSelectionBounds();
+		const selectionShape = this.selectionMode;
 		const isDeleteRoomTemplate = type === "room" && id === "__DELETE__";
 		const roomTemplateIndex =
 			type === "room" && !isDeleteRoomTemplate ? parseInt(id, 10) : Number.NaN;
@@ -942,6 +997,7 @@ class MapEditor {
 						layer[y][x] = 0;
 						this.removeResetsAt(x, y, z);
 						placedCount++;
+						changeOccurred = true;
 					}
 					return;
 				}
@@ -952,6 +1008,7 @@ class MapEditor {
 					this.removeResetsAt(x, y, z);
 				}
 				placedCount++;
+				changeOccurred = true;
 			} else if (type === "mob" || type === "object") {
 				const room = this.getRoomAt(dungeon, x, y, z);
 				if (!room) {
@@ -973,6 +1030,7 @@ class MapEditor {
 				if (existingReset) {
 					// Increment maxCount if it exists
 					existingReset.maxCount = (existingReset.maxCount || 1) + 1;
+					changeOccurred = true;
 				} else {
 					// Add new reset
 					if (!dungeon.resets) {
@@ -984,6 +1042,7 @@ class MapEditor {
 						minCount: 1,
 						maxCount: 1,
 					});
+					changeOccurred = true;
 				}
 				placedCount++;
 			}
@@ -1007,6 +1066,23 @@ class MapEditor {
 					"Deleted rooms",
 					`Cleared ${placedCount} cell${placedCount === 1 ? "" : "s"}`
 				);
+				this.makeChange({
+					action: EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE,
+					actionTarget: id,
+					metadata: {
+						templateType: type,
+						selectionSize,
+						placedCount,
+						selectionShape,
+						selectionFrom: selectionBounds
+							? `${selectionBounds.from.x},${selectionBounds.from.y},${selectionBounds.from.z}`
+							: null,
+						selectionTo: selectionBounds
+							? `${selectionBounds.to.x},${selectionBounds.to.y},${selectionBounds.to.z}`
+							: null,
+						roomTemplateName: templateName,
+					},
+				});
 			}
 			this.loadResets(dungeon);
 			this.renderMap(dungeon);
@@ -1065,6 +1141,35 @@ class MapEditor {
 		// Reload resets and re-render map
 		this.loadResets(dungeon);
 		this.renderMap(dungeon);
+
+		if (changeOccurred) {
+			const actionType = isDeleteRoomTemplate
+				? EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE
+				: type === "room"
+				? EDITOR_ACTIONS.PLACE_ROOM_TEMPLATE
+				: EDITOR_ACTIONS.PLACE_TEMPLATE;
+
+			this.makeChange({
+				action: actionType,
+				actionTarget: id,
+				metadata: {
+					templateType: type,
+					selectionSize,
+					placedCount,
+					skippedEmptyRooms,
+					skippedDenseRooms,
+					selectionShape,
+					selectionFrom: selectionBounds
+						? `${selectionBounds.from.x},${selectionBounds.from.y},${selectionBounds.from.z}`
+						: null,
+					selectionTo: selectionBounds
+						? `${selectionBounds.to.x},${selectionBounds.to.y},${selectionBounds.to.z}`
+						: null,
+					roomTemplateName:
+						type === "room" && !isDeleteRoomTemplate ? templateName : null,
+				},
+			});
+		}
 	}
 
 	loadResets(dungeon) {
@@ -1600,12 +1705,14 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
 		const layerIndex = dungeon.dimensions.layers - 1 - z;
 		const layer = dungeon.grid[layerIndex] || [];
+		let changeOccurred = false;
+		const changeMetadata = {
+			mode: this.placementMode,
+			coordinates: { x, y, z },
+		};
 
 		// Ensure row exists
 		if (!layer[y]) {
@@ -1690,6 +1797,11 @@ class MapEditor {
 						`Deleted ${deletedCount} room${deletedCount !== 1 ? "s" : ""}`
 					);
 					this.loadResets(dungeon);
+					if (deletedCount > 0) {
+						changeOccurred = true;
+						changeMetadata.deletedCount = deletedCount;
+						changeMetadata.deleteMode = "paint";
+					}
 				} else {
 					this.showToast(
 						"No room to delete",
@@ -1716,6 +1828,10 @@ class MapEditor {
 						`At coordinates (${x}, ${y}, ${z})`
 					);
 					this.loadResets(dungeon);
+					changeOccurred = true;
+					changeMetadata.deletedCount = 1;
+					changeMetadata.deleteMode = "single";
+					changeMetadata.deletedRoom = roomName;
 				} else {
 					this.showToast(
 						"No room to delete",
@@ -1726,6 +1842,16 @@ class MapEditor {
 
 			// Re-render map
 			this.renderMap(dungeon);
+			if (changeOccurred) {
+				this.makeChange({
+					action: EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE,
+					actionTarget: `${x},${y},${z}`,
+					newParameters: {
+						mode: this.placementMode,
+					},
+					metadata: changeMetadata,
+				});
+			}
 			return;
 		}
 
@@ -1812,6 +1938,12 @@ class MapEditor {
 				`Painted: ${newRoomName}`,
 				`Filled ${filledCount} cell${filledCount !== 1 ? "s" : ""}`
 			);
+			if (filledCount > 0) {
+				changeOccurred = true;
+				changeMetadata.filledCount = filledCount;
+				changeMetadata.fillMode = "paint";
+				changeMetadata.targetRoomIndex = targetRoomIndex;
+			}
 		} else {
 			// Insert mode: place single room
 			const templateIndex = parseInt(this.selectedTemplate) + 1;
@@ -1836,14 +1968,37 @@ class MapEditor {
 					`At coordinates (${x}, ${y}, ${z})`
 				);
 			}
+			changeOccurred = true;
+			changeMetadata.fillMode = "single";
+			changeMetadata.replacedRoom = hadRoom;
+			changeMetadata.templateIndex = templateIndex;
 		}
 
 		if (densePlacementRemovedResets) {
 			this.loadResets(dungeon);
+			changeMetadata.removedResets = true;
 		}
 
 		// Re-render map
 		this.renderMap(dungeon);
+
+		if (changeOccurred) {
+			const action =
+				this.selectedTemplate === "__DELETE__"
+					? EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE
+					: EDITOR_ACTIONS.PLACE_ROOM_TEMPLATE;
+
+			this.makeChange({
+				action,
+				actionTarget:
+					this.selectedTemplate === "__DELETE__" ? null : this.selectedTemplate,
+				newParameters: {
+					mode: this.placementMode,
+					template: this.selectedTemplate,
+				},
+				metadata: changeMetadata,
+			});
+		}
 	}
 
 	addReset(x, y, z) {
@@ -1876,9 +2031,6 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
 		const roomRef = `@${dungeonId}{${x},${y},${z}}`;
 
@@ -1897,10 +2049,17 @@ class MapEditor {
 		);
 		const templateName = template?.display || this.selectedTemplate;
 		const templateType = this.selectedTemplateType === "mob" ? "Mob" : "Object";
+		let changeAction = EDITOR_ACTIONS.CREATE_RESET;
+		let newParameters = null;
+		let oldParameters = null;
 
 		if (existing) {
 			// Increment maxCount
-			existing.maxCount = (existing.maxCount || 1) + 1;
+			const previousMax = existing.maxCount || 1;
+			existing.maxCount = previousMax + 1;
+			changeAction = EDITOR_ACTIONS.EDIT_RESET_FIELD;
+			oldParameters = { maxCount: previousMax };
+			newParameters = { maxCount: existing.maxCount };
 			// Show toast notification
 			this.showToast(
 				`Updated ${templateType} Reset: ${templateName}`,
@@ -1916,6 +2075,7 @@ class MapEditor {
 				minCount: 1,
 				maxCount: 1,
 			});
+			newParameters = { minCount: 1, maxCount: 1 };
 			// Show toast notification
 			this.showToast(
 				`Added ${templateType} Reset: ${templateName}`,
@@ -1928,6 +2088,18 @@ class MapEditor {
 
 		// Re-render map to reflect the new reset (mob/object will show on grid)
 		this.renderMap(dungeon);
+
+		this.makeChange({
+			action: changeAction,
+			actionTarget: roomRef,
+			newParameters,
+			oldParameters,
+			metadata: {
+				templateId: this.selectedTemplate,
+				templateType,
+				roomRef,
+			},
+		});
 	}
 
 	showRoomInfo(x, y, z) {
@@ -2577,10 +2749,18 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
+		let changeAction = oldTemplate
+			? EDITOR_ACTIONS.EDIT_TEMPLATE_FIELD
+			: EDITOR_ACTIONS.CREATE_TEMPLATE;
+		let changeTarget = id ?? null;
+		const newParametersSummary = { type };
+		const oldParametersSummary = oldTemplate
+			? {
+					display: oldTemplate.display || "",
+					description: oldTemplate.description || "",
+			  }
+			: null;
 
 		let removedDenseResets = 0;
 
@@ -2593,6 +2773,8 @@ class MapEditor {
 			const mapColor = mapColorSelect.value
 				? parseInt(mapColorSelect.value)
 				: undefined;
+			newParametersSummary.display = display;
+			newParametersSummary.description = description;
 
 			// Get dense button value (only for rooms)
 			const denseBtn = document.getElementById("template-dense-btn");
@@ -2682,6 +2864,9 @@ class MapEditor {
 				if (!mapText) delete updated.mapText;
 				if (mapColor === undefined) delete updated.mapColor;
 				dungeon.rooms[index] = updated;
+				changeTarget = index;
+				newParametersSummary.roomIndex = index;
+				changeAction = EDITOR_ACTIONS.EDIT_TEMPLATE_FIELD;
 
 				const wasDense = !!oldTemplate?.dense;
 				if (dense && !wasDense) {
@@ -2702,6 +2887,9 @@ class MapEditor {
 					newRoom.roomLinks = roomLinks;
 				}
 				dungeon.rooms.push(newRoom);
+				changeTarget = dungeon.rooms.length - 1;
+				newParametersSummary.roomIndex = changeTarget;
+				changeAction = EDITOR_ACTIONS.CREATE_TEMPLATE;
 				this.showToast(
 					"Room template created",
 					`Created "${display || "New Room"}"`
@@ -2724,12 +2912,20 @@ class MapEditor {
 			const mapColor = mapColorSelect.value
 				? parseInt(mapColorSelect.value)
 				: undefined;
+			newParametersSummary.display = display;
+			newParametersSummary.description = description;
 
 			if (!dungeon.templates) {
 				dungeon.templates = [];
 			}
 
 			const existing = dungeon.templates.findIndex((t) => t.id === templateId);
+			changeAction =
+				existing >= 0
+					? EDITOR_ACTIONS.EDIT_TEMPLATE_FIELD
+					: EDITOR_ACTIONS.CREATE_TEMPLATE;
+			changeTarget = templateId;
+			newParametersSummary.templateId = templateId;
 			const newTemplate = {
 				id: templateId,
 				type: templateType,
@@ -2964,6 +3160,16 @@ class MapEditor {
 		}
 		// Re-render map to reflect any changes to mapText/mapColor
 		this.renderMap(dungeon);
+
+		this.makeChange({
+			action: changeAction,
+			actionTarget: changeTarget,
+			newParameters: newParametersSummary,
+			oldParameters: oldParametersSummary,
+			metadata: {
+				templateType: type,
+			},
+		});
 	}
 
 	deleteTemplate(type, id) {
@@ -2972,11 +3178,10 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
 		const dungeonId = this.currentDungeonId;
+		let oldParameters = null;
+		const metadata = { type };
 
 		if (type === "room") {
 			const roomIndex = parseInt(id);
@@ -3032,6 +3237,8 @@ class MapEditor {
 				`Deleted ${roomName}`,
 				`Removed ${deletedCount} room${deletedCount !== 1 ? "s" : ""} from grid`
 			);
+			oldParameters = { display: roomName, deletedRooms: deletedCount };
+			metadata.roomIndex = roomIndex;
 		} else {
 			// Mob or Object template
 			const template = dungeon.templates?.find((t) => t.id === id);
@@ -3059,12 +3266,23 @@ class MapEditor {
 					deletedResetCount !== 1 ? "s" : ""
 				}`
 			);
+			oldParameters = {
+				display: templateName,
+				resetsRemoved: deletedResetCount,
+			};
 		}
 
 		// Reload templates and resets, re-render map
 		this.loadTemplates(dungeon);
 		this.loadResets(dungeon);
 		this.renderMap(dungeon);
+
+		this.makeChange({
+			action: EDITOR_ACTIONS.DELETE_TEMPLATE,
+			actionTarget: id,
+			oldParameters,
+			metadata,
+		});
 	}
 
 	async populateTemplateTables(dungeon) {
@@ -3395,12 +3613,6 @@ class MapEditor {
 	}
 
 	editReset(index) {
-		// Save state to history before making changes
-		this.saveStateToHistory();
-
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
 		const reset = dungeon.resets[index];
 
@@ -3463,6 +3675,13 @@ class MapEditor {
 		};
 
 		newSaveBtn.addEventListener("click", () => {
+			this.saveStateToHistory();
+			const previousValues = {
+				minCount: reset.minCount || 1,
+				maxCount: reset.maxCount || 1,
+				equipped: reset.equipped ? [...reset.equipped] : undefined,
+				inventory: reset.inventory ? [...reset.inventory] : undefined,
+			};
 			const minCount =
 				parseInt(document.getElementById("reset-min-count").value) || 1;
 			const maxCount =
@@ -3509,6 +3728,21 @@ class MapEditor {
 			this.renderMap(dungeon);
 
 			this.showToast("Reset updated", `Count: ${minCount}-${maxCount}`);
+			this.makeChange({
+				action: EDITOR_ACTIONS.EDIT_RESET_FIELD,
+				actionTarget: reset.roomRef,
+				newParameters: {
+					minCount,
+					maxCount,
+					equipped: reset.equipped,
+					inventory: reset.inventory,
+				},
+				oldParameters: previousValues,
+				metadata: {
+					templateId: reset.templateId,
+					index,
+				},
+			});
 			closeModal();
 		});
 
@@ -3519,9 +3753,6 @@ class MapEditor {
 	deleteReset(index) {
 		// Save state to history before making changes
 		this.saveStateToHistory();
-
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
 
 		const dungeon = this.yamlData.dungeon;
 		const reset = dungeon.resets[index];
@@ -3537,6 +3768,19 @@ class MapEditor {
 		this.renderMap(dungeon);
 
 		this.showToast("Reset deleted", templateName);
+
+		this.makeChange({
+			action: EDITOR_ACTIONS.DELETE_RESET,
+			actionTarget: reset.roomRef,
+			oldParameters: {
+				minCount: reset.minCount || 1,
+				maxCount: reset.maxCount || 1,
+				templateId: reset.templateId,
+			},
+			metadata: {
+				index,
+			},
+		});
 	}
 
 	setupLayerSelector(layers) {
@@ -3556,9 +3800,6 @@ class MapEditor {
 
 		// Save state to history before making changes
 		this.saveStateToHistory();
-
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
 
 		const width = parseInt(document.getElementById("width-input").value);
 		const height = parseInt(document.getElementById("height-input").value);
@@ -3645,6 +3886,17 @@ class MapEditor {
 		this.setupLayerSelector(layers);
 		this.renderMap(dungeon);
 		this.loadResets(dungeon);
+
+		this.makeChange({
+			action: EDITOR_ACTIONS.RESIZE_DUNGEON,
+			actionTarget: this.currentDungeonId,
+			newParameters: { width, height, layers },
+			oldParameters: {
+				width: oldDims.width,
+				height: oldDims.height,
+				layers: oldDims.layers,
+			},
+		});
 	}
 
 	showConfirmModal() {
@@ -3746,8 +3998,7 @@ class MapEditor {
 			// Clear localStorage since we've saved
 			const storageKey = this.getLocalStorageKey(this.currentDungeonId);
 			localStorage.removeItem(storageKey);
-			this.hasUnsavedChanges = false;
-			this.updateSaveButton();
+			this.markChangesSaved();
 			// Reload to get fresh data
 			await this.loadDungeonFromSource(this.currentDungeonId);
 		} catch (error) {
@@ -4073,6 +4324,14 @@ class MapEditor {
 
 	setPlacementMode(mode) {
 		this.placementMode = mode;
+
+		// Flood-fill paint mode conflicts with selection tools because they
+		// hijack mouse events. Clear any active selection tool when switching
+		// to paint so clicks trigger flood fill as expected.
+		if (mode === "paint" && this.selectionMode !== null) {
+			this.clearSelectionTool();
+		}
+
 		// Update indicator to reflect new mode
 		if (this.selectedTemplate !== null && this.selectedTemplateType) {
 			const template = this.getTemplateDisplay(
@@ -4308,6 +4567,16 @@ class MapEditor {
 				});
 			});
 		});
+
+		const historyList = document.getElementById("history-list");
+		if (historyList) {
+			historyList.addEventListener("click", (e) => {
+				const item = e.target.closest(".history-item");
+				if (!item) return;
+				const index = item.dataset.index;
+				this.jumpToChange(Number(index));
+			});
+		}
 
 		// Add template buttons
 		document.getElementById("add-room-btn").addEventListener("click", () => {
@@ -4937,14 +5206,55 @@ class MapEditor {
 		});
 	}
 
+	getSelectionBounds() {
+		if (!this.selectedCells || this.selectedCells.size === 0) {
+			return null;
+		}
+
+		let minX = Infinity;
+		let minY = Infinity;
+		let minZ = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		let maxZ = -Infinity;
+
+		this.selectedCells.forEach((cellKey) => {
+			const [xStr, yStr, zStr] = cellKey.split(",");
+			const x = parseInt(xStr, 10);
+			const y = parseInt(yStr, 10);
+			const z = parseInt(zStr, 10);
+
+			if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(z)) {
+				return;
+			}
+
+			minX = Math.min(minX, x);
+			minY = Math.min(minY, y);
+			minZ = Math.min(minZ, z);
+			maxX = Math.max(maxX, x);
+			maxY = Math.max(maxY, y);
+			maxZ = Math.max(maxZ, z);
+		});
+
+		if (
+			!Number.isFinite(minX) ||
+			!Number.isFinite(minY) ||
+			!Number.isFinite(minZ)
+		) {
+			return null;
+		}
+
+		return {
+			from: { x: minX, y: minY, z: minZ },
+			to: { x: maxX, y: maxY, z: maxZ },
+		};
+	}
+
 	deleteRoomAtCell(x, y, z) {
 		if (!this.yamlData) return;
 
 		// Save state to history before making changes
 		this.saveStateToHistory();
-
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
 
 		const dungeon = this.yamlData.dungeon;
 		const dungeonId = this.currentDungeonId;
@@ -4976,6 +5286,16 @@ class MapEditor {
 			);
 			this.loadResets(dungeon);
 			this.renderMap(dungeon);
+			this.makeChange({
+				action: EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE,
+				actionTarget: `${x},${y},${z}`,
+				oldParameters: {
+					roomName,
+				},
+				metadata: {
+					coordinates: { x, y, z },
+				},
+			});
 		} else {
 			this.showToast("No room to delete", `At coordinates (${x}, ${y}, ${z})`);
 		}
@@ -5027,9 +5347,6 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
 		const dungeonId = this.currentDungeonId;
 		let deletedCount = 0;
@@ -5062,6 +5379,16 @@ class MapEditor {
 			);
 			this.loadResets(dungeon);
 			this.renderMap(dungeon);
+			this.makeChange({
+				action: EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE,
+				actionTarget: "selection",
+				oldParameters: {
+					deletedCount,
+				},
+				metadata: {
+					selectionSize: this.selectedCells.size,
+				},
+			});
 		}
 
 		// Clear selection after deletion
@@ -5104,6 +5431,479 @@ class MapEditor {
 		}
 	}
 
+	resetChangeTracking(options = {}) {
+		this.changes = [];
+		this.changeCursor = -1;
+		this.lastSavedChangeIndex = -1;
+		this.changeIdCounter = 0;
+		if (options.initialStateOverride) {
+			this.initialChangeSnapshot = options.initialStateOverride
+				? this.cloneDungeonState(options.initialStateOverride)
+				: null;
+		} else if (this.yamlData?.dungeon) {
+			this.initialChangeSnapshot = this.cloneDungeonState(
+				this.yamlData.dungeon
+			);
+		} else {
+			this.initialChangeSnapshot = null;
+		}
+
+		if (options.markUnsaved) {
+			this.makeChange(
+				{
+					action: options.action || EDITOR_ACTIONS.RESTORE_UNSAVED_WORK,
+					actionTarget: options.actionTarget || this.currentDungeonId,
+					newParameters: options.newParameters || null,
+					oldParameters: options.oldParameters || null,
+					metadata: options.metadata || null,
+				},
+				{
+					skipAutosave: true,
+					previousStateOverride: Object.prototype.hasOwnProperty.call(
+						options,
+						"previousStateOverride"
+					)
+						? options.previousStateOverride
+						: null,
+					newStateOverride: Object.prototype.hasOwnProperty.call(
+						options,
+						"newStateOverride"
+					)
+						? options.newStateOverride
+						: this.yamlData?.dungeon
+						? this.cloneDungeonState(this.yamlData.dungeon)
+						: null,
+				}
+			);
+			this.changeCursor = this.changes.length - 1;
+			this.lastSavedChangeIndex = -1;
+			this.renderChangeHistory();
+			return;
+		}
+
+		this.updateUnsavedState();
+		this.renderChangeHistory();
+	}
+
+	updateUnsavedState() {
+		this.hasUnsavedChanges = this.changeCursor !== this.lastSavedChangeIndex;
+		this.updateSaveButton();
+	}
+
+	markChangesSaved() {
+		this.lastSavedChangeIndex = this.changeCursor;
+		this.updateUnsavedState();
+		this.renderChangeHistory();
+	}
+
+	makeChange(changeDetails = {}, options = {}) {
+		if (!changeDetails || !changeDetails.action) {
+			console.warn("map-editor: attempted to record change without action");
+			return;
+		}
+
+		const now = Date.now();
+		const hasPrevOverride = Object.prototype.hasOwnProperty.call(
+			options,
+			"previousStateOverride"
+		);
+		const hasNewOverride = Object.prototype.hasOwnProperty.call(
+			options,
+			"newStateOverride"
+		);
+
+		const previousState = hasPrevOverride
+			? options.previousStateOverride
+			: this.history[this.historyIndex]
+			? JSON.parse(JSON.stringify(this.history[this.historyIndex]))
+			: this.yamlData?.dungeon
+			? this.cloneDungeonState(this.yamlData.dungeon)
+			: null;
+
+		const newState = hasNewOverride
+			? options.newStateOverride
+			: this.yamlData?.dungeon
+			? this.cloneDungeonState(this.yamlData.dungeon)
+			: null;
+
+		if (this.changeCursor < this.changes.length - 1) {
+			this.changes = this.changes.slice(0, this.changeCursor + 1);
+			if (this.lastSavedChangeIndex > this.changeCursor) {
+				this.lastSavedChangeIndex = this.changeCursor;
+			}
+		}
+
+		const changeEntry = {
+			id: ++this.changeIdCounter,
+			timestamp: now,
+			action: changeDetails.action,
+			actionTarget: changeDetails.actionTarget || null,
+			newParameters: changeDetails.newParameters || null,
+			oldParameters: changeDetails.oldParameters || null,
+			metadata: changeDetails.metadata || null,
+			previousState,
+			newState,
+		};
+
+		this.changes.push(changeEntry);
+		this.changeCursor = this.changes.length - 1;
+
+		if (this.changes.length > this.maxTrackedChanges) {
+			this.changes.shift();
+			this.changeCursor = this.changes.length - 1;
+			this.lastSavedChangeIndex =
+				this.lastSavedChangeIndex <= -1
+					? -1
+					: Math.max(-1, this.lastSavedChangeIndex - 1);
+		}
+
+		this.updateUnsavedState();
+		this.renderChangeHistory();
+
+		if (!options.skipAutosave) {
+			this.saveToLocalStorage();
+		}
+	}
+
+	renderChangeHistory() {
+		const list = document.getElementById("history-list");
+		const emptyState = document.getElementById("history-empty");
+
+		if (!list) {
+			return;
+		}
+
+		if (!this.yamlData) {
+			list.innerHTML = "";
+			if (emptyState) {
+				emptyState.style.display = "block";
+				emptyState.textContent = "Load a dungeon to start editing.";
+			}
+			return;
+		}
+
+		list.innerHTML = "";
+
+		const entries = [];
+
+		const initialMeta =
+			this.changes.length === 0 ? "No recorded changes yet" : "Original state";
+		entries.push({
+			index: -1,
+			label: "Initial state",
+			meta: initialMeta,
+			time: "",
+		});
+
+		this.changes.forEach((change, index) => {
+			entries.push({
+				index,
+				label: this.getChangeActionLabel(change),
+				meta: this.getChangeMeta(change),
+				time: this.getChangeTimestamp(change),
+			});
+		});
+
+		const hasHistory = this.changes.length > 0;
+		if (emptyState) {
+			emptyState.style.display = hasHistory ? "none" : "block";
+			emptyState.textContent = "Make a change to start building history.";
+		}
+
+		// Show newest changes at the top while keeping initial state at the bottom
+		const [initialEntry] = entries.splice(0, 1);
+		const orderedEntries = [...entries].reverse();
+		if (initialEntry) {
+			orderedEntries.push(initialEntry);
+		}
+
+		orderedEntries.forEach((entry) => {
+			const changeForEntry =
+				entry.index >= 0 ? this.changes[entry.index] : null;
+			const item = document.createElement("button");
+			item.type = "button";
+			item.className = "history-item";
+			if (entry.index === this.changeCursor) {
+				item.classList.add("active");
+			}
+			if (entry.index === this.lastSavedChangeIndex) {
+				item.classList.add("saved");
+			}
+			item.dataset.index = entry.index;
+
+			const title = document.createElement("div");
+			title.className = "history-item-title";
+			title.textContent = entry.label;
+			item.appendChild(title);
+
+			if (entry.meta || entry.time) {
+				const metaRow = document.createElement("div");
+				metaRow.className = "history-item-meta";
+
+				const metaText = document.createElement("span");
+				metaText.textContent = entry.meta || "";
+				metaRow.appendChild(metaText);
+
+				const timeText = document.createElement("span");
+				timeText.textContent = entry.time || "";
+				metaRow.appendChild(timeText);
+
+				item.appendChild(metaRow);
+			}
+
+			if (entry.index === this.lastSavedChangeIndex) {
+				const status = document.createElement("span");
+				status.className = "history-item-status";
+				status.textContent = "saved";
+				item.appendChild(status);
+			}
+
+			if (entry.index === this.changeCursor && changeForEntry) {
+				const detailEntries = this.getChangeDetails(changeForEntry);
+				if (detailEntries.length > 0) {
+					const detailsContainer = document.createElement("div");
+					detailsContainer.className = "history-item-details";
+					detailEntries.forEach(({ label, value }) => {
+						const detailRow = document.createElement("div");
+						detailRow.className = "history-item-detail";
+
+						const detailLabel = document.createElement("span");
+						detailLabel.className = "history-item-detail-label";
+						detailLabel.textContent = `${label}:`;
+
+						const detailValue = document.createElement("span");
+						detailValue.className = "history-item-detail-value";
+						detailValue.textContent = value;
+
+						detailRow.appendChild(detailLabel);
+						detailRow.appendChild(detailValue);
+						detailsContainer.appendChild(detailRow);
+					});
+					item.appendChild(detailsContainer);
+				}
+			}
+
+			list.appendChild(item);
+		});
+	}
+
+	getChangeActionLabel(change) {
+		const actionLabels = {
+			[EDITOR_ACTIONS.CREATE_TEMPLATE]: "Created template",
+			[EDITOR_ACTIONS.EDIT_TEMPLATE_FIELD]: "Updated template",
+			[EDITOR_ACTIONS.DELETE_TEMPLATE]: "Deleted template",
+			[EDITOR_ACTIONS.CREATE_RESET]: "Added reset",
+			[EDITOR_ACTIONS.EDIT_RESET_FIELD]: "Updated reset",
+			[EDITOR_ACTIONS.DELETE_RESET]: "Deleted reset",
+			[EDITOR_ACTIONS.PLACE_TEMPLATE]: "Placed template",
+			[EDITOR_ACTIONS.PLACE_ROOM_TEMPLATE]: "Edited room placement",
+			[EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE]: "Removed rooms",
+			[EDITOR_ACTIONS.PASTE_SELECTION]: "Pasted selection",
+			[EDITOR_ACTIONS.RESIZE_DUNGEON]: "Resized dungeon",
+			[EDITOR_ACTIONS.EDIT_DUNGEON_FIELD]: "Edited dungeon info",
+			[EDITOR_ACTIONS.RESTORE_UNSAVED_WORK]: "Restored unsaved work",
+		};
+		return actionLabels[change.action] || change.action || "Change";
+	}
+
+	getChangeMeta(change) {
+		const details = [];
+		if (change.metadata?.templateType) {
+			details.push(change.metadata.templateType);
+		}
+		if (change.metadata?.placedCount) {
+			details.push(`${change.metadata.placedCount} cell(s) affected`);
+		} else if (change.metadata?.deletedCount) {
+			details.push(`${change.metadata.deletedCount} cell(s) removed`);
+		} else if (change.metadata?.filledCount) {
+			details.push(`${change.metadata.filledCount} cell(s) filled`);
+		}
+		if (
+			typeof change.metadata?.selectionSize === "number" &&
+			change.metadata.selectionSize > 0
+		) {
+			details.push(`Selection: ${change.metadata.selectionSize}`);
+		} else if (change.metadata?.selectionFrom && change.metadata?.selectionTo) {
+			const shapeLabel = change.metadata?.selectionShape
+				? `${change.metadata.selectionShape} `
+				: "";
+			details.push(
+				`Selection: ${shapeLabel}${change.metadata.selectionFrom} \u2192 ${change.metadata.selectionTo}`
+			);
+		}
+		if (change.metadata?.roomTemplateName) {
+			details.push(change.metadata.roomTemplateName);
+		}
+		if (change.metadata?.templateId) {
+			details.push(`#${change.metadata.templateId}`);
+		}
+		if (change.actionTarget && change.actionTarget !== "selection") {
+			details.push(change.actionTarget);
+		}
+		return details.join(" • ");
+	}
+
+	getChangeDetails(change) {
+		if (!change) return [];
+		const details = [];
+		const addDetail = (label, value) => {
+			if (
+				label &&
+				value !== undefined &&
+				value !== null &&
+				value !== "" &&
+				(!(typeof value === "string") || value.trim().length > 0)
+			) {
+				details.push({ label, value: String(value) });
+			}
+		};
+
+		if (change.actionTarget && change.actionTarget !== "selection") {
+			addDetail("Target", change.actionTarget);
+		}
+
+		if (
+			change.metadata &&
+			typeof change.metadata === "object" &&
+			Object.keys(change.metadata).length > 0
+		) {
+			Object.entries(change.metadata).forEach(([key, value]) => {
+				addDetail(
+					this.formatChangeDetailLabel(key),
+					this.formatChangeDetailValue(value)
+				);
+			});
+		}
+
+		if (
+			change.newParameters &&
+			typeof change.newParameters === "object" &&
+			Object.keys(change.newParameters).length > 0
+		) {
+			addDetail(
+				"New Values",
+				this.formatParameterSummary(change.newParameters)
+			);
+		}
+
+		if (
+			change.oldParameters &&
+			typeof change.oldParameters === "object" &&
+			Object.keys(change.oldParameters).length > 0
+		) {
+			addDetail(
+				"Previous Values",
+				this.formatParameterSummary(change.oldParameters)
+			);
+		}
+
+		return details;
+	}
+
+	formatChangeDetailLabel(label) {
+		if (!label) return "";
+		return label
+			.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+			.replace(/[_-]/g, " ")
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
+	formatChangeDetailValue(value) {
+		if (value === null || value === undefined) return "";
+		if (typeof value === "boolean") {
+			return value ? "Yes" : "No";
+		}
+		if (typeof value === "number") {
+			return value.toString();
+		}
+		if (typeof value === "string") {
+			return value;
+		}
+		if (Array.isArray(value)) {
+			return value
+				.map((entry) => this.formatChangeDetailValue(entry))
+				.join(", ");
+		}
+		if (typeof value === "object") {
+			return Object.entries(value)
+				.map(
+					([key, val]) =>
+						`${this.formatChangeDetailLabel(
+							key
+						)}: ${this.formatChangeDetailValue(val)}`
+				)
+				.join(", ");
+		}
+		return String(value);
+	}
+
+	formatParameterSummary(params) {
+		if (params === null || params === undefined) {
+			return "";
+		}
+		if (typeof params !== "object") {
+			return this.formatChangeDetailValue(params);
+		}
+		const entries = Object.entries(params);
+		if (entries.length === 0) return "";
+		return entries
+			.map(
+				([key, value]) =>
+					`${this.formatChangeDetailLabel(key)}: ${this.formatChangeDetailValue(
+						value
+					)}`
+			)
+			.join(", ");
+	}
+
+	getChangeTimestamp(change) {
+		if (!change.timestamp) return "";
+		try {
+			const date = new Date(change.timestamp);
+			return date.toLocaleTimeString([], {
+				hour: "2-digit",
+				minute: "2-digit",
+			});
+		} catch {
+			return "";
+		}
+	}
+
+	jumpToChange(targetIndex) {
+		if (!this.yamlData) return;
+		const numericIndex = Number(targetIndex);
+		if (Number.isNaN(numericIndex)) return;
+		if (numericIndex === this.changeCursor) return;
+		if (numericIndex < -1 || numericIndex > this.changes.length - 1) return;
+
+		let snapshot = null;
+		if (numericIndex === -1) {
+			if (this.initialChangeSnapshot) {
+				snapshot = this.cloneDungeonState(this.initialChangeSnapshot);
+			} else if (this.changes[0]?.previousState) {
+				snapshot = this.cloneDungeonState(this.changes[0].previousState);
+			} else if (this.yamlData?.dungeon) {
+				snapshot = this.cloneDungeonState(this.yamlData.dungeon);
+			}
+		} else {
+			const targetChange = this.changes[numericIndex];
+			if (targetChange?.newState) {
+				snapshot = this.cloneDungeonState(targetChange.newState);
+			}
+		}
+
+		if (!snapshot) {
+			return;
+		}
+
+		this.restoreStateFromHistory(snapshot);
+		this.history = [this.cloneDungeonState(this.yamlData.dungeon)];
+		this.historyIndex = 0;
+		this.changeCursor = numericIndex;
+		this.updateUnsavedState();
+		this.renderChangeHistory();
+	}
+
 	restoreStateFromHistory(state) {
 		if (!this.yamlData) return;
 
@@ -5130,28 +5930,24 @@ class MapEditor {
 	}
 
 	undo() {
-		if (this.historyIndex <= 0) {
+		if (this.changeCursor < 0) {
 			// Already at the beginning of history
 			this.showToast("Nothing to undo", "");
 			return;
 		}
 
-		this.historyIndex--;
-		const state = this.history[this.historyIndex];
-		this.restoreStateFromHistory(state);
+		this.jumpToChange(this.changeCursor - 1);
 		this.showToast("Undone", "");
 	}
 
 	redo() {
-		if (this.historyIndex >= this.history.length - 1) {
+		if (this.changeCursor >= this.changes.length - 1) {
 			// Already at the end of history
 			this.showToast("Nothing to redo", "");
 			return;
 		}
 
-		this.historyIndex++;
-		const state = this.history[this.historyIndex];
-		this.restoreStateFromHistory(state);
+		this.jumpToChange(this.changeCursor + 1);
 		this.showToast("Redone", "");
 	}
 
@@ -5189,8 +5985,6 @@ class MapEditor {
 					dungeonId: this.currentDungeonId,
 				};
 				localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-				this.hasUnsavedChanges = true;
-				this.updateSaveButton();
 			} catch (error) {
 				console.error("Failed to save to localStorage:", error);
 				// localStorage might be full or disabled
@@ -5453,9 +6247,6 @@ class MapEditor {
 		// Save state to history before making changes
 		this.saveStateToHistory();
 
-		// Auto-save to localStorage
-		this.saveToLocalStorage();
-
 		const dungeon = this.yamlData.dungeon;
 		const dungeonId = this.currentDungeonId;
 
@@ -5477,6 +6268,7 @@ class MapEditor {
 
 		let pastedCount = 0;
 		let skippedCount = 0;
+		let changeOccurred = false;
 
 		// Paste cells
 		this.clipboard.cells.forEach((cell) => {
@@ -5513,10 +6305,12 @@ class MapEditor {
 								(r) => r.roomRef !== roomRef
 							);
 						}
+						changeOccurred = true;
 					}
 				} else {
 					// Place room (convert back to 1-based index)
 					layer[targetY][targetX] = cell.roomIndex + 1;
+					changeOccurred = true;
 				}
 				pastedCount++;
 			} else {
@@ -5547,6 +6341,7 @@ class MapEditor {
 				const newReset = JSON.parse(JSON.stringify(resetData.reset));
 				newReset.roomRef = newRoomRef;
 				dungeon.resets.push(newReset);
+				changeOccurred = true;
 			}
 		});
 
@@ -5560,6 +6355,19 @@ class MapEditor {
 		// Reload resets and re-render map
 		this.loadResets(dungeon);
 		this.renderMap(dungeon);
+
+		if (changeOccurred) {
+			this.makeChange({
+				action: EDITOR_ACTIONS.PASTE_SELECTION,
+				actionTarget: `${pasteX},${pasteY},${pasteZ}`,
+				newParameters: {
+					pastedCount,
+				},
+				metadata: {
+					skippedCount,
+				},
+			});
+		}
 	}
 }
 

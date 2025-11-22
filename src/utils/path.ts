@@ -1,4 +1,4 @@
-import { app } from "electron";
+//import { app } from "electron";
 import { join } from "path";
 /**
  * Returns the safe current working directory for runtime operations.
@@ -13,7 +13,7 @@ export function getSafeRootDirectory(): string {
 	}
 
 	const cwd = process.cwd();
-	if(cwd === "/") return app.getAppPath().replace(/dungedit\.app\/.+/g, "");
+	//	if (cwd === "/") return app.getAppPath().replace(/dungedit\.app\/.+/g, "");
 
 	return cwd;
 }

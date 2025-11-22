@@ -245,6 +245,111 @@ header h1 {
 	border-left: 1px solid #444;
 }
 
+.history-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	min-height: 0;
+	height: 100%;
+}
+
+.history-empty {
+	padding: 0.75rem;
+	background: #2a2a2a;
+	border: 1px dashed #555;
+	border-radius: 4px;
+	color: #bbb;
+	font-size: 0.9rem;
+	text-align: center;
+}
+
+.history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	overflow-y: auto;
+	padding-right: 0.25rem;
+}
+
+.history-item {
+	width: 100%;
+	padding: 0.65rem 0.75rem;
+	background: #2a2a2a;
+	border: 1px solid #3f3f3f;
+	border-radius: 6px;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	transition: border-color 0.2s, background 0.2s;
+	position: relative;
+}
+
+.history-item:hover {
+	background: #313131;
+	border-color: #666;
+}
+
+.history-item.active {
+	border-color: #4a9eff;
+	box-shadow: 0 0 0 1px rgba(74, 158, 255, 0.3);
+}
+
+.history-item.saved {
+	border-color: #5a8a5a;
+}
+
+.history-item-title {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: #fff;
+}
+
+.history-item-meta {
+	font-size: 0.75rem;
+	color: #aaa;
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.history-item-status {
+	font-size: 0.7rem;
+	color: #6bcc6b;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.history-item-details {
+	margin-top: 0.35rem;
+	padding-top: 0.35rem;
+	border-top: 1px solid #3f3f3f;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.75rem;
+	color: #ddd;
+}
+
+.history-item-detail {
+	display: flex;
+	gap: 0.35rem;
+	align-items: flex-start;
+}
+
+.history-item-detail-label {
+	color: #7fb2ff;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.history-item-detail-value {
+	color: #f6f6f6;
+	flex: 1;
+}
+
 .tabs {
 	display: flex;
 	border-bottom: 1px solid #444;

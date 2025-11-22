@@ -177,6 +177,20 @@ export function generateMinimap(
 										(targetRoom.x * targetRoom.y + targetRoom.z) % 2
 									];
 							}
+
+							// Replace mapText with ^ for up exits or V for down exits
+							// If both exist, default to ^
+							const hasUp =
+								targetRoom.canExit(mob, DIRECTION.UP) &&
+								targetRoom.getStep(DIRECTION.UP);
+							const hasDown =
+								targetRoom.canExit(mob, DIRECTION.DOWN) &&
+								targetRoom.getStep(DIRECTION.DOWN);
+							if (hasUp) {
+								mapText = "^";
+							} else if (hasDown) {
+								mapText = "V";
+							}
 						}
 					}
 				} else {
@@ -469,6 +483,16 @@ export function generateMinimapFromSteps(
 									ALTERNATING_MINIMAP_COLORS[
 										(targetRoom.x * targetRoom.y + targetRoom.z) % 2
 									];
+							}
+
+							// Replace mapText with ^ for up exits or V for down exits
+							// If both exist, default to ^
+							const hasUp = targetRoom.getStep(DIRECTION.UP);
+							const hasDown = targetRoom.getStep(DIRECTION.DOWN);
+							if (hasUp) {
+								mapText = "^";
+							} else if (hasDown) {
+								mapText = "V";
 							}
 						}
 					}

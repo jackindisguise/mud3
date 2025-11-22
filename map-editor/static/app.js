@@ -2557,10 +2557,10 @@ class MapEditor {
 					Template default: ${this.formatAllowedExits(templateAllowedExits)}
 				</p>
 				<div class="exit-buttons" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
-					<button class="exit-btn" data-direction="north" style="padding: 0.5rem;">N</button>
-					<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">S</button>
-					<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">E</button>
-					<button class="exit-btn" data-direction="west" style="padding: 0.5rem;">W</button>
+					<button class="exit-btn" data-direction="north" style="padding: 0.5rem;">NORTH</button>
+					<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">SOUTH</button>
+					<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">EAST</button>
+					<button class="exit-btn" data-direction="west" style="padding: 0.5rem;">WEST</button>
 					<button class="exit-btn" data-direction="up" style="padding: 0.5rem;">UP</button>
 					<button class="exit-btn" data-direction="down" style="padding: 0.5rem;">DOWN</button>
 				</div>
@@ -2590,7 +2590,7 @@ class MapEditor {
 		customModalActions.style.display = "flex";
 		customModalActions.innerHTML = `
 			<button id="exit-override-save-btn" class="save-btn">Save</button>
-			<button id="exit-override-clear-btn" class="cancel-btn" style="background: #d44; margin-left: 0.5rem;">Clear Override</button>
+			<button id="exit-override-clear-btn" class="cancel-btn clear-override-btn" style="margin-left: 0.5rem;">Clear Override</button>
 			<button id="exit-override-cancel-btn" class="cancel-btn">Cancel</button>
 		`;
 
@@ -5094,6 +5094,55 @@ class MapEditor {
 
 		if (helpClose) {
 			helpClose.addEventListener("click", closeHelpModal);
+		}
+
+		// Theme toggle button
+		const themeToggleBtn = document.getElementById("theme-toggle-btn");
+		const themeStylesheet = document.getElementById("theme-stylesheet");
+
+		// Get current theme from stylesheet (already set by inline script in head)
+		const getCurrentTheme = () => {
+			return themeStylesheet.href.includes("light.css") ? "light" : "dark";
+		};
+
+		// Update button icon based on current theme
+		const updateThemeButton = () => {
+			if (themeToggleBtn) {
+				themeToggleBtn.textContent =
+					getCurrentTheme() === "light" ? "☀️" : "🌙";
+			}
+		};
+
+		// Initialize button icon
+		updateThemeButton();
+
+		// Theme toggle handler
+		if (themeToggleBtn && themeStylesheet) {
+			themeToggleBtn.addEventListener("click", () => {
+				const currentTheme = getCurrentTheme();
+				const newTheme = currentTheme === "dark" ? "light" : "dark";
+
+				// Add spinning animation
+				themeToggleBtn.classList.add("spinning");
+
+				// Change icon halfway through animation (at 180 degrees)
+				setTimeout(() => {
+					if (newTheme === "light") {
+						themeStylesheet.href = "./static/light.css";
+						localStorage.setItem("theme", "light");
+						themeToggleBtn.textContent = "☀️";
+					} else {
+						themeStylesheet.href = "./static/dark.css";
+						localStorage.setItem("theme", "dark");
+						themeToggleBtn.textContent = "🌙";
+					}
+				}, 300); // Halfway through 600ms animation
+
+				// Remove spinning class after animation completes
+				setTimeout(() => {
+					themeToggleBtn.classList.remove("spinning");
+				}, 600);
+			});
 		}
 
 		// Close help modal when clicking outside

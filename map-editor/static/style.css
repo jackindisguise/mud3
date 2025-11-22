@@ -354,7 +354,7 @@ header h1 {
 	display: flex;
 	border-bottom: 1px solid #444;
 	min-height: var(--toolbar-min-height);
-	padding: 0 var(--toolbar-padding-y);
+	padding: 0;
 	align-items: stretch;
 }
 
@@ -899,6 +899,45 @@ header h1 {
 
 .grid-row-wrapper .grid-cell.link-west {
 	border-left-color: #00ffff;
+}
+
+/* Exit override indicator - cells with custom exit overrides */
+.grid-row-wrapper .grid-cell.has-exit-override {
+	box-shadow: inset 0 0 0 2px #ffaa0083;
+	position: relative;
+}
+
+/*.grid-row-wrapper .grid-cell.has-exit-override::after {
+	content: "⚠";
+	position: absolute;
+	top: 1px;
+	left: 1px;
+	font-size: 0.7rem;
+	color: #ff0000;
+	pointer-events: none;
+	font-weight: bold;
+	z-index: 1;
+}*/
+
+/* UP and DOWN exit indicators - arrows on cells */
+.grid-row-wrapper .grid-cell .exit-arrow {
+	position: absolute;
+	font-size: 0.75rem;
+	color: #4a9eff;
+	pointer-events: none;
+	line-height: 1;
+	z-index: 1;
+	font-weight: bold;
+}
+
+.grid-row-wrapper .grid-cell .exit-arrow-up {
+	top: 1px;
+	right: 1px;
+}
+
+.grid-row-wrapper .grid-cell .exit-arrow-down {
+	bottom: 1px;
+	right: 1px;
 }
 
 .reset-list {
@@ -2271,5 +2310,57 @@ header h1 {
 		bottom: 70px;
 		right: 5px;
 	}
+}
+
+/* Status Bar */
+.status-bar {
+	background: #2a2a2a;
+	border-top: 1px solid #444;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	padding: 0.4rem 1rem;
+	gap: 1.5rem;
+	flex-shrink: 0;
+	font-size: 0.85rem;
+	color: #ccc;
+	height: 24px;
+	box-sizing: border-box;
+}
+
+.status-section {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex: 1; /* Each section takes equal space */
+	min-width: 0; /* Allow flex item to shrink below content size */
+}
+
+.status-label {
+	color: #888;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	font-size: 0.75rem;
+	flex-shrink: 0;
+}
+
+.status-value {
+	color: #fff;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0; /* Allow flex item to shrink below content size */
+	flex: 1; /* Value takes remaining space in section */
+}
+
+.status-section.status-changes .status-value.unsaved {
+	color: #ff6b6b;
+	font-weight: 600;
+}
+
+.status-section.status-changes .status-value.saved {
+	color: #6bff6b;
 }
 

@@ -107,6 +107,7 @@ export interface SerializedDungeonFormat {
 		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets). In-file ids are local (no "@").
 		resets?: SerializedReset[]; // Optional array of resets
 		resetMessage?: string;
+		exitOverrides?: Record<string, number>; // Dictionary: "x,y,z" -> allowedExits bitmask override
 	};
 }
 
@@ -168,232 +169,6 @@ function globalizeTemplateId(
 }
 
 /**
- * Save a dungeon to disk using atomic write (temp file + rename).
- * This prevents corruption if the process is killed during the write.
- *
- * @param dungeon - The dungeon to save
- */
-export async function saveDungeon(dungeon: Dungeon): Promise<void> {
-	if (!dungeon.id) {
-		throw new Error("Cannot save dungeon without an id");
-	}
-
-	await ensureDir();
-
-	const filePath = getDungeonFilePath(dungeon.id);
-	const tempPath = `${filePath}.tmp`;
-
-	// Build room templates list by collecting unique room templates
-	const roomTemplates: Array<Omit<RoomTemplate, "id" | "type">> = [];
-	const roomToTemplateIndex = new Map<Room, number>(); // Maps room to its 1-based template index
-
-	// Iterate through all rooms and collect unique templates
-	for (let z = 0; z < dungeon.dimensions.layers; z++) {
-		for (let y = 0; y < dungeon.dimensions.height; y++) {
-			for (let x = 0; x < dungeon.dimensions.width; x++) {
-				const room = dungeon.getRoom({ x, y, z });
-				if (!room) continue;
-
-				// Check if we've seen this template before
-				let templateIndex = roomToTemplateIndex.get(room);
-				if (templateIndex === undefined) {
-					// Create template from room (without id/type)
-					const fullTemplate = room.toTemplate("") as RoomTemplate; // We'll strip id/type
-					const template: Omit<RoomTemplate, "id" | "type"> = {
-						allowedExits: fullTemplate.allowedExits, // Mandatory field
-					};
-					if (fullTemplate.keywords !== undefined) {
-						template.keywords = fullTemplate.keywords;
-					}
-					if (fullTemplate.display !== undefined) {
-						template.display = fullTemplate.display;
-					}
-					if (fullTemplate.description !== undefined) {
-						template.description = fullTemplate.description;
-					}
-					// Note: baseWeight is not included for rooms
-
-					// Extract roomLinks from room's _links array
-					const roomLinks: Record<string, string> = {};
-					const roomPrivate = room as any;
-					if (roomPrivate._links && roomPrivate._links.length > 0) {
-						for (const link of roomPrivate._links) {
-							const linkPrivate = link as any;
-							// Only include links where this room is the "from" room
-							if (linkPrivate._from?.room === room) {
-								const direction = linkPrivate._from.direction;
-								const destination = linkPrivate._to?.room;
-								if (destination) {
-									const directionText = dir2text(direction);
-									const roomRef = destination.getRoomRef();
-									if (roomRef && directionText) {
-										roomLinks[directionText] = roomRef;
-									}
-								}
-							}
-						}
-					}
-					if (Object.keys(roomLinks).length > 0) {
-						template.roomLinks = roomLinks as Record<DirectionText, string>;
-					}
-
-					// Check if this template already exists in our list
-					// Include roomLinks in comparison so rooms with different links get different templates
-					templateIndex = roomTemplates.findIndex((t) => {
-						const roomLinksMatch =
-							JSON.stringify(t.roomLinks || {}) ===
-							JSON.stringify(template.roomLinks || {});
-						return (
-							t.keywords === template.keywords &&
-							t.display === template.display &&
-							t.description === template.description &&
-							t.allowedExits === template.allowedExits &&
-							roomLinksMatch
-						);
-					});
-
-					if (templateIndex === -1) {
-						// New template - add it
-						templateIndex = roomTemplates.length;
-						roomTemplates.push(template);
-					}
-
-					// Store mapping (convert to 1-based)
-					roomToTemplateIndex.set(room, templateIndex + 1);
-				}
-			}
-		}
-	}
-
-	// Build grid
-	const grid: number[][][] = [];
-	for (let z = 0; z < dungeon.dimensions.layers; z++) {
-		const layer: number[][] = [];
-		for (let y = 0; y < dungeon.dimensions.height; y++) {
-			const row: number[] = [];
-			// Map output row index (top-first) to internal y coordinate (bottom-first)
-			const sourceY = dungeon.dimensions.height - 1 - y;
-			for (let x = 0; x < dungeon.dimensions.width; x++) {
-				const room = dungeon.getRoom({ x, y, z });
-				if (room) {
-					const templateIndex = roomToTemplateIndex.get(room);
-					if (templateIndex === undefined) {
-						throw new Error(
-							`Room at ${x},${y},${z} not found in template index map`
-						);
-					}
-					row.push(templateIndex);
-				} else {
-					row.push(0);
-				}
-			}
-			layer.push(row);
-		}
-		grid.push(layer);
-	}
-	// Reverse the grid so that top floor appears first in YAML files
-	const reversedGrid = [...grid].reverse();
-
-	// Serialize resets (only include if there are any)
-	const resets: SerializedReset[] = [];
-	for (const reset of dungeon.resets) {
-		const serialized: SerializedReset = {
-			templateId: localizeTemplateId(reset.templateId, dungeon.id!),
-			roomRef: reset.roomRef,
-		};
-		// Only include minCount/maxCount if they differ from defaults (1)
-		if (reset.minCount !== 1) {
-			serialized.minCount = reset.minCount;
-		}
-		if (reset.maxCount !== 1) {
-			serialized.maxCount = reset.maxCount;
-		}
-		// Include equipped and inventory if present
-		if (reset.equipped && reset.equipped.length > 0) {
-			serialized.equipped = reset.equipped.map((id) =>
-				localizeTemplateId(id, dungeon.id!)
-			);
-		}
-		if (reset.inventory && reset.inventory.length > 0) {
-			serialized.inventory = reset.inventory.map((id) =>
-				localizeTemplateId(id, dungeon.id!)
-			);
-		}
-		resets.push(serialized);
-	}
-
-	// Serialize templates referenced by resets
-	const templates: DungeonObjectTemplate[] = [];
-	const templateIds = new Set<string>();
-	for (const reset of dungeon.resets) {
-		templateIds.add(reset.templateId);
-		// Also include templates referenced in equipped and inventory
-		if (reset.equipped) {
-			for (const id of reset.equipped) {
-				templateIds.add(id);
-			}
-		}
-		if (reset.inventory) {
-			for (const id of reset.inventory) {
-				templateIds.add(id);
-			}
-		}
-	}
-	for (const templateId of templateIds) {
-		const template = dungeon.templates.get(templateId);
-		if (template) {
-			const localized: DungeonObjectTemplate = {
-				...template,
-				id: localizeTemplateId(template.id, dungeon.id!),
-			};
-			templates.push(localized);
-		} else {
-			logger.warn(
-				`Template "${templateId}" referenced by reset not found in dungeon's template registry`
-			);
-		}
-	}
-
-	const data: SerializedDungeonFormat = {
-		dungeon: {
-			id: dungeon.id,
-			name: dungeon.name,
-			...(dungeon.description ? { description: dungeon.description } : {}),
-			dimensions: dungeon.dimensions,
-			grid: reversedGrid,
-			rooms: roomTemplates,
-			...(templates.length > 0 && { templates }),
-			...(resets.length > 0 && { resets }),
-			...(dungeon.resetMessage ? { resetMessage: dungeon.resetMessage } : {}),
-		},
-	};
-
-	const yaml = YAML.dump(data as any, {
-		noRefs: true,
-		lineWidth: 120,
-	});
-
-	try {
-		// Write to temporary file first
-		await writeFile(tempPath, yaml, "utf-8");
-		// Atomically rename temp file to final location
-		await rename(tempPath, filePath);
-
-		logger.debug(
-			`Saved dungeon: ${relative(ROOT_DIRECTORY, filePath)} for ${dungeon.id}`
-		);
-	} catch (error) {
-		// Clean up temp file if it exists
-		try {
-			await unlink(tempPath);
-		} catch {
-			// Ignore cleanup errors
-		}
-		throw error;
-	}
-}
-
-/**
  * Load a dungeon from disk.
  * Returns undefined if the dungeon file doesn't exist.
  */
@@ -424,6 +199,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			resetMessage,
 			name,
 			description,
+			exitOverrides,
 		} = data.dungeon;
 
 		// Validate dimensions
@@ -541,6 +317,15 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 						y,
 						z,
 					});
+
+					// Apply exit override if present (before adding to dungeon)
+					if (exitOverrides && typeof exitOverrides === "object") {
+						const coordKey = `${x},${y},${z}`;
+						const override = exitOverrides[coordKey];
+						if (override !== undefined && typeof override === "number") {
+							room.allowedExits = override;
+						}
+					}
 
 					// Add room to dungeon
 					if (!dungeon.addRoom(room)) {

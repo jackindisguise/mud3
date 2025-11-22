@@ -36,6 +36,7 @@ const EDITOR_ACTIONS = Object.freeze({
 	PASTE_SELECTION: "PASTE_SELECTION",
 	RESIZE_DUNGEON: "RESIZE_DUNGEON",
 	RESTORE_UNSAVED_WORK: "RESTORE_UNSAVED_WORK",
+	EDIT_ROOM_EXIT_OVERRIDE: "EDIT_ROOM_EXIT_OVERRIDE",
 });
 
 class MapEditor {
@@ -77,6 +78,7 @@ class MapEditor {
 		this.maxTrackedChanges = 50; // Keep change history manageable
 		this.initialChangeSnapshot = null; // Baseline state for history timeline
 		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
+		this.currentMousePosition = null; // {x, y, z} of cell mouse is over
 
 		this.init();
 	}
@@ -924,6 +926,7 @@ class MapEditor {
 			this.selectedTemplate = id;
 			this.selectedTemplateType = type;
 			this.updatePlacementIndicator(type, id, display);
+			this.updateStatusBar();
 		});
 		item.addEventListener("contextmenu", (e) => {
 			e.preventDefault();
@@ -1263,7 +1266,23 @@ class MapEditor {
 		const row = layer[y] || [];
 		const roomIndex = row[x] || 0;
 		if (roomIndex > 0) {
-			return dungeon.rooms[roomIndex - 1] || null;
+			const room = dungeon.rooms[roomIndex - 1];
+			if (!room) return null;
+
+			// Apply exit override if present (create a copy to avoid mutating template)
+			const coordKey = `${x},${y},${z}`;
+			if (
+				dungeon.exitOverrides &&
+				dungeon.exitOverrides[coordKey] !== undefined
+			) {
+				// Return a copy with the override applied
+				return {
+					...room,
+					allowedExits: dungeon.exitOverrides[coordKey],
+				};
+			}
+
+			return room;
 		}
 		return null;
 	}
@@ -1331,6 +1350,7 @@ class MapEditor {
 			EAST: 1 << 2,
 			WEST: 1 << 3,
 		};
+		// Room's allowedExits already includes any exit overrides applied at load time
 		return (room.allowedExits & DIRECTION[direction]) !== 0;
 	}
 
@@ -1498,6 +1518,16 @@ class MapEditor {
 							cell.classList.add("dense-room");
 						}
 					}
+
+					// Check if this cell has an exit override
+					const coordKey = `${x},${y},${this.currentLayer}`;
+					if (
+						dungeon.exitOverrides &&
+						dungeon.exitOverrides[coordKey] !== undefined
+					) {
+						cell.classList.add("has-exit-override");
+						cell.title = (cell.title || "") + " (Exit Override)";
+					}
 				}
 
 				// Get map display (text and color) with priority: mob > object > room
@@ -1544,6 +1574,26 @@ class MapEditor {
 					}
 				}
 
+				// Check for UP and DOWN exits and add arrow indicators
+				// Use getRoomAt to get the room with exit overrides applied
+				const roomAtCell = this.getRoomAt(dungeon, x, y, this.currentLayer);
+				if (roomAtCell && roomAtCell.allowedExits) {
+					const UP = 1 << 8;
+					const DOWN = 1 << 9;
+					if (roomAtCell.allowedExits & UP) {
+						const upArrow = document.createElement("span");
+						upArrow.className = "exit-arrow exit-arrow-up";
+						upArrow.textContent = "▲";
+						cell.appendChild(upArrow);
+					}
+					if (roomAtCell.allowedExits & DOWN) {
+						const downArrow = document.createElement("span");
+						downArrow.className = "exit-arrow exit-arrow-down";
+						downArrow.textContent = "▼";
+						cell.appendChild(downArrow);
+					}
+				}
+
 				// Prevent text selection on cells
 				cell.style.userSelect = "none";
 				cell.style.webkitUserSelect = "none";
@@ -1552,15 +1602,16 @@ class MapEditor {
 					e.preventDefault();
 					if (this.selectionMode !== null) {
 						// Selection mode: start selection
-						this.isSelecting = true;
-						this.selectionStart = { x, y, z: this.currentLayer };
-						this.selectionEnd = { x, y, z: this.currentLayer };
 						this.isSelectionAddMode = e.ctrlKey || e.metaKey;
 						if (this.isSelectionAddMode) {
 							this.selectionBaseCells = new Set(this.selectedCells);
 						} else {
-							this.selectionBaseCells.clear();
+							// Clear previous selection when starting a new one (unless in add mode)
+							this.clearSelectedCells();
 						}
+						this.isSelecting = true;
+						this.selectionStart = { x, y, z: this.currentLayer };
+						this.selectionEnd = { x, y, z: this.currentLayer };
 						this.updateSelection();
 					} else if (this.selectedTemplate !== null) {
 						// Only enable drag in insert mode
@@ -1580,6 +1631,10 @@ class MapEditor {
 				});
 
 				cell.addEventListener("mouseenter", (e) => {
+					// Update mouse position for status bar
+					this.currentMousePosition = { x, y, z: this.currentLayer };
+					this.updateStatusBar();
+
 					if (this.isSelecting && this.selectionMode !== null) {
 						// Update selection end point
 						this.selectionEnd = { x, y, z: this.currentLayer };
@@ -1597,6 +1652,12 @@ class MapEditor {
 							this.handleCellClick(x, y, this.currentLayer, roomIndex, true);
 						}
 					}
+				});
+
+				cell.addEventListener("mouseleave", () => {
+					// Clear mouse position when leaving cell
+					this.currentMousePosition = null;
+					this.updateStatusBar();
 				});
 
 				cell.addEventListener("click", (e) => {
@@ -1631,6 +1692,102 @@ class MapEditor {
 		} else if (this.selectedCell && this.selectedCell.z !== this.currentLayer) {
 			// Clear selectedCell if it's on a different layer
 			this.selectedCell = null;
+		}
+
+		// Update status bar after rendering
+		this.updateStatusBar();
+	}
+
+	updateStatusBar() {
+		// Template - shows the selected template, not active placement
+		const templateEl = document.getElementById("status-template");
+		if (templateEl) {
+			if (
+				this.selectedTemplate !== null &&
+				this.selectedTemplate !== undefined &&
+				this.selectedTemplateType
+			) {
+				const dungeon = this.yamlData?.dungeon;
+				if (dungeon) {
+					let templateName = "Unknown";
+					if (this.selectedTemplateType === "room") {
+						const template = dungeon.rooms[this.selectedTemplate];
+						templateName = template?.display || `Room ${this.selectedTemplate}`;
+					} else if (this.selectedTemplateType === "mob") {
+						const template = dungeon.templates?.find(
+							(t) => t.id === this.selectedTemplate
+						);
+						templateName = template?.display || `Mob ${this.selectedTemplate}`;
+					} else if (this.selectedTemplateType === "object") {
+						const template = dungeon.templates?.find(
+							(t) => t.id === this.selectedTemplate
+						);
+						templateName =
+							template?.display || `Object ${this.selectedTemplate}`;
+					}
+					templateEl.textContent = templateName;
+				} else {
+					templateEl.textContent = "None";
+				}
+			} else {
+				templateEl.textContent = "None";
+			}
+		}
+
+		// Tool - shows the selected tool, not active usage
+		const toolEl = document.getElementById("status-tool");
+		if (toolEl) {
+			if (this.selectionMode) {
+				const toolNames = {
+					rectangle: "Rectangle",
+					circle: "Circle",
+					squircle: "Squircle",
+					line: "Line",
+					"edge-line": "Edge Line",
+					"edge-rectangle": "Edge Rectangle",
+					"edge-circle": "Edge Circle",
+					"edge-squircle": "Edge Squircle",
+				};
+				toolEl.textContent =
+					toolNames[this.selectionMode] || this.selectionMode;
+			} else {
+				toolEl.textContent = "None";
+			}
+		}
+
+		// Mode
+		const modeEl = document.getElementById("status-mode");
+		if (modeEl) {
+			modeEl.textContent = this.placementMode === "paint" ? "Paint" : "Insert";
+		}
+
+		// Position
+		const positionEl = document.getElementById("status-position");
+		if (positionEl) {
+			if (this.currentMousePosition) {
+				const { x, y, z } = this.currentMousePosition;
+				positionEl.textContent = `(${x}, ${y}, ${z})`;
+			} else {
+				positionEl.textContent = "—";
+			}
+		}
+
+		// History
+		const historyEl = document.getElementById("status-history");
+		if (historyEl) {
+			historyEl.textContent = this.changes.length.toString();
+		}
+
+		// Changes
+		const changesEl = document.getElementById("status-changes");
+		if (changesEl) {
+			if (this.hasUnsavedChanges) {
+				changesEl.textContent = "Unsaved";
+				changesEl.className = "status-value unsaved";
+			} else {
+				changesEl.textContent = "Saved";
+				changesEl.className = "status-value saved";
+			}
 		}
 	}
 
@@ -2010,9 +2167,18 @@ class MapEditor {
 			return;
 
 		const dungeon = this.yamlData.dungeon;
-		const room = this.getRoomAt(dungeon, x, y, z);
+		const layerIndex = dungeon.dimensions.layers - 1 - z;
+		const layer = dungeon.grid[layerIndex] || [];
 
-		if (!room) {
+		// Ensure row exists
+		if (!layer[y]) {
+			layer[y] = new Array(dungeon.dimensions.width).fill(0);
+		}
+
+		// Get the room template ID at the clicked cell
+		const targetRoomIndex = layer[y][x] > 0 ? layer[y][x] - 1 : -1;
+
+		if (targetRoomIndex < 0) {
 			this.showToast(
 				"Cannot add reset",
 				"Select a room before placing mobs or objects"
@@ -2020,7 +2186,8 @@ class MapEditor {
 			return;
 		}
 
-		if (room.dense) {
+		const targetRoom = dungeon.rooms[targetRoomIndex];
+		if (targetRoom?.dense) {
 			this.showToast(
 				"Cannot add reset",
 				"Dense rooms cannot contain mobs or objects"
@@ -2032,16 +2199,11 @@ class MapEditor {
 		this.saveStateToHistory();
 
 		const dungeonId = this.currentDungeonId || dungeon.id || "dungeon";
-		const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+		const targetValue = layer[y][x]; // The room template index + 1 we're matching
 
 		if (!dungeon.resets) {
 			dungeon.resets = [];
 		}
-
-		// Check if reset already exists - if so, increment count instead of alerting
-		const existing = dungeon.resets.find(
-			(r) => r.roomRef === roomRef && r.templateId === this.selectedTemplate
-		);
 
 		// Get template name for toast
 		const template = dungeon.templates?.find(
@@ -2049,57 +2211,181 @@ class MapEditor {
 		);
 		const templateName = template?.display || this.selectedTemplate;
 		const templateType = this.selectedTemplateType === "mob" ? "Mob" : "Object";
-		let changeAction = EDITOR_ACTIONS.CREATE_RESET;
-		let newParameters = null;
-		let oldParameters = null;
 
-		if (existing) {
-			// Increment maxCount
-			const previousMax = existing.maxCount || 1;
-			existing.maxCount = previousMax + 1;
-			changeAction = EDITOR_ACTIONS.EDIT_RESET_FIELD;
-			oldParameters = { maxCount: previousMax };
-			newParameters = { maxCount: existing.maxCount };
-			// Show toast notification
-			this.showToast(
-				`Updated ${templateType} Reset: ${templateName}`,
-				`Count: ${existing.minCount || 1}-${
-					existing.maxCount
-				} at (${x}, ${y}, ${z})`
-			);
+		if (this.placementMode === "paint") {
+			// Paint mode: flood fill all cells with the same room template ID
+			const visited = new Set();
+			const queue = [{ x, y, z }];
+			let filledCount = 0;
+
+			while (queue.length > 0) {
+				const cell = queue.shift();
+				const cellKey = `${cell.x},${cell.y},${cell.z}`;
+
+				// Skip if already visited
+				if (visited.has(cellKey)) continue;
+				visited.add(cellKey);
+
+				// Get the layer for this cell
+				const cellLayerIndex = dungeon.dimensions.layers - 1 - cell.z;
+				const cellLayer = dungeon.grid[cellLayerIndex] || [];
+
+				// Ensure row exists
+				if (!cellLayer[cell.y]) {
+					cellLayer[cell.y] = new Array(dungeon.dimensions.width).fill(0);
+				}
+				const cellRow = cellLayer[cell.y];
+
+				// Check if this cell matches the target room template ID
+				if (cellRow[cell.x] === targetValue) {
+					const cellRoom = this.getRoomAt(dungeon, cell.x, cell.y, cell.z);
+					if (cellRoom && !cellRoom.dense) {
+						const cellRoomRef = `@${dungeonId}{${cell.x},${cell.y},${cell.z}}`;
+
+						// Check if reset already exists
+						const existing = dungeon.resets.find(
+							(r) =>
+								r.roomRef === cellRoomRef &&
+								r.templateId === this.selectedTemplate
+						);
+
+						if (!existing) {
+							// Add new reset
+							dungeon.resets.push({
+								templateId: this.selectedTemplate,
+								roomRef: cellRoomRef,
+								minCount: 1,
+								maxCount: 1,
+							});
+							filledCount++;
+						}
+					}
+
+					// Check adjacent cells (up, down, left, right)
+					const directions = [
+						{ x: 0, y: -1, z: 0 }, // up
+						{ x: 0, y: 1, z: 0 }, // down
+						{ x: -1, y: 0, z: 0 }, // left
+						{ x: 1, y: 0, z: 0 }, // right
+					];
+
+					for (const dir of directions) {
+						const nextX = cell.x + dir.x;
+						const nextY = cell.y + dir.y;
+						const nextZ = cell.z + dir.z;
+
+						// Check bounds
+						if (
+							nextX >= 0 &&
+							nextX < dungeon.dimensions.width &&
+							nextY >= 0 &&
+							nextY < dungeon.dimensions.height &&
+							nextZ >= 0 &&
+							nextZ < dungeon.dimensions.layers
+						) {
+							const nextKey = `${nextX},${nextY},${nextZ}`;
+							if (!visited.has(nextKey)) {
+								queue.push({ x: nextX, y: nextY, z: nextZ });
+							}
+						}
+					}
+				}
+			}
+
+			if (filledCount > 0) {
+				this.showToast(
+					`Painted ${templateType} Reset: ${templateName}`,
+					`Added to ${filledCount} cell${filledCount !== 1 ? "s" : ""}`
+				);
+
+				// Reload resets display
+				this.loadResets(dungeon);
+
+				// Re-render map to reflect the new resets (mob/object will show on grid)
+				this.renderMap(dungeon);
+
+				this.makeChange({
+					action: EDITOR_ACTIONS.CREATE_RESET,
+					actionTarget: this.selectedTemplate,
+					newParameters: {
+						mode: this.placementMode,
+						template: this.selectedTemplate,
+					},
+					metadata: {
+						templateId: this.selectedTemplate,
+						templateType,
+						filledCount,
+						mode: this.placementMode,
+					},
+				});
+			} else {
+				this.showToast(
+					`No cells painted`,
+					`All matching cells already have this ${templateType.toLowerCase()} reset`
+				);
+			}
+			return;
 		} else {
-			// Add new reset
-			dungeon.resets.push({
-				templateId: this.selectedTemplate,
-				roomRef: roomRef,
-				minCount: 1,
-				maxCount: 1,
-			});
-			newParameters = { minCount: 1, maxCount: 1 };
-			// Show toast notification
-			this.showToast(
-				`Added ${templateType} Reset: ${templateName}`,
-				`At coordinates (${x}, ${y}, ${z})`
+			// Insert mode: add reset to single cell
+			const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+
+			// Check if reset already exists - if so, increment count instead of alerting
+			const existing = dungeon.resets.find(
+				(r) => r.roomRef === roomRef && r.templateId === this.selectedTemplate
 			);
+
+			let changeAction = EDITOR_ACTIONS.CREATE_RESET;
+			let newParameters = null;
+			let oldParameters = null;
+
+			if (existing) {
+				// Increment maxCount
+				const previousMax = existing.maxCount || 1;
+				existing.maxCount = previousMax + 1;
+				changeAction = EDITOR_ACTIONS.EDIT_RESET_FIELD;
+				oldParameters = { maxCount: previousMax };
+				newParameters = { maxCount: existing.maxCount };
+				// Show toast notification
+				this.showToast(
+					`Updated ${templateType} Reset: ${templateName}`,
+					`Count: ${existing.minCount || 1}-${
+						existing.maxCount
+					} at (${x}, ${y}, ${z})`
+				);
+			} else {
+				// Add new reset
+				dungeon.resets.push({
+					templateId: this.selectedTemplate,
+					roomRef: roomRef,
+					minCount: 1,
+					maxCount: 1,
+				});
+				newParameters = { minCount: 1, maxCount: 1 };
+				// Show toast notification
+				this.showToast(
+					`Added ${templateType} Reset: ${templateName}`,
+					`At coordinates (${x}, ${y}, ${z})`
+				);
+			}
+
+			// Reload resets display
+			this.loadResets(dungeon);
+
+			// Re-render map to reflect the new reset (mob/object will show on grid)
+			this.renderMap(dungeon);
+
+			this.makeChange({
+				action: changeAction,
+				actionTarget: roomRef,
+				newParameters,
+				oldParameters,
+				metadata: {
+					templateId: this.selectedTemplate,
+					templateType,
+					roomRef,
+				},
+			});
 		}
-
-		// Reload resets display
-		this.loadResets(dungeon);
-
-		// Re-render map to reflect the new reset (mob/object will show on grid)
-		this.renderMap(dungeon);
-
-		this.makeChange({
-			action: changeAction,
-			actionTarget: roomRef,
-			newParameters,
-			oldParameters,
-			metadata: {
-				templateId: this.selectedTemplate,
-				templateType,
-				roomRef,
-			},
-		});
 	}
 
 	showRoomInfo(x, y, z) {
@@ -2118,6 +2404,16 @@ class MapEditor {
 		if (roomIndex > 0) {
 			const room = dungeon.rooms[roomIndex - 1];
 			const resets = dungeon.resets?.filter((r) => r.roomRef === roomRef) || [];
+			const roomAtCell = this.getRoomAt(dungeon, x, y, z);
+
+			// Check if this cell has an exit override
+			const coordKey = `${x},${y},${z}`;
+			const hasOverride =
+				dungeon.exitOverrides && dungeon.exitOverrides[coordKey] !== undefined;
+			const templateAllowedExits = room.allowedExits || 0;
+			const currentAllowedExits = roomAtCell
+				? roomAtCell.allowedExits
+				: templateAllowedExits;
 
 			infoPanel.innerHTML = `
 				<h3>Room: ${room?.display || "Unknown"}</h3>
@@ -2128,6 +2424,17 @@ class MapEditor {
 						? `<p><strong>Description:</strong> ${room.description}</p>`
 						: ""
 				}
+				<h4>Exit Overrides</h4>
+				<p style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.5rem;">
+					${
+						hasOverride
+							? "This room has custom exit overrides"
+							: "Using template's default exits"
+					}
+				</p>
+				<button id="edit-exit-override-btn" class="edit-exit-override-btn" style="margin-bottom: 1rem;">
+					${hasOverride ? "Edit Exit Override" : "Add Exit Override"}
+				</button>
 				<h4>Resets (${resets.length})</h4>
 				${
 					resets.length > 0
@@ -2144,6 +2451,14 @@ class MapEditor {
 						: "<p>No resets</p>"
 				}
 			`;
+
+			// Set up exit override editor button
+			const editBtn = document.getElementById("edit-exit-override-btn");
+			if (editBtn) {
+				editBtn.addEventListener("click", () => {
+					this.editExitOverride(x, y, z);
+				});
+			}
 		} else {
 			infoPanel.innerHTML = `
 				<h3>Empty Cell</h3>
@@ -2176,6 +2491,285 @@ class MapEditor {
 		}
 
 		this.showTemplateModal(type, id, template);
+	}
+
+	editExitOverride(x, y, z) {
+		if (!this.yamlData) return;
+
+		const dungeon = this.yamlData.dungeon;
+		const layerIndex = dungeon.dimensions.layers - 1 - z;
+		const layer = dungeon.grid[layerIndex] || [];
+		const row = layer[y] || [];
+		const roomIndex = row[x] || 0;
+
+		if (roomIndex === 0) {
+			this.showToast("No room to edit", "Select a room cell first");
+			return;
+		}
+
+		const room = dungeon.rooms[roomIndex - 1];
+		const roomAtCell = this.getRoomAt(dungeon, x, y, z);
+		const coordKey = `${x},${y},${z}`;
+
+		// Get current allowedExits (from override if exists, otherwise template default)
+		const templateAllowedExits = room.allowedExits || 0;
+		const currentAllowedExits = roomAtCell
+			? roomAtCell.allowedExits
+			: templateAllowedExits;
+
+		// Initialize exitOverrides if it doesn't exist
+		if (!dungeon.exitOverrides) {
+			dungeon.exitOverrides = {};
+		}
+
+		const DIRECTION = {
+			NORTH: 1 << 0,
+			SOUTH: 1 << 1,
+			EAST: 1 << 2,
+			WEST: 1 << 3,
+			UP: 1 << 8,
+			DOWN: 1 << 9,
+		};
+
+		const TEXT2DIR = {
+			north: DIRECTION.NORTH,
+			south: DIRECTION.SOUTH,
+			east: DIRECTION.EAST,
+			west: DIRECTION.WEST,
+			up: DIRECTION.UP,
+			down: DIRECTION.DOWN,
+		};
+
+		const modal = document.getElementById("template-modal");
+		const title = document.getElementById("modal-title");
+		const body = document.getElementById("modal-body");
+
+		title.textContent = `Edit Exit Override - ${
+			room?.display || "Room"
+		} at (${x}, ${y}, ${z})`;
+
+		let currentAllowedExitsValue = currentAllowedExits;
+
+		const exitButtonsHtml = `
+			<div class="exit-controls" style="margin: 1rem 0;">
+				<h4 style="margin-bottom: 0.5rem;">Allowed Exits</h4>
+				<p style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.75rem;">
+					Template default: ${this.formatAllowedExits(templateAllowedExits)}
+				</p>
+				<div class="exit-buttons" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
+					<button class="exit-btn" data-direction="north" style="padding: 0.5rem;">N</button>
+					<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">S</button>
+					<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">E</button>
+					<button class="exit-btn" data-direction="west" style="padding: 0.5rem;">W</button>
+					<button class="exit-btn" data-direction="up" style="padding: 0.5rem;">UP</button>
+					<button class="exit-btn" data-direction="down" style="padding: 0.5rem;">DOWN</button>
+				</div>
+			</div>
+		`;
+
+		body.innerHTML = `
+			<div class="form-group">
+				<label>Override exits for this specific room cell</label>
+				${exitButtonsHtml}
+			</div>
+		`;
+
+		// Hide the default modal actions and use our custom ones
+		const defaultModalActions = modal.querySelector(".modal-actions");
+		if (defaultModalActions) {
+			defaultModalActions.style.display = "none";
+		}
+
+		// Create custom modal actions for exit override
+		let customModalActions = modal.querySelector(".exit-override-actions");
+		if (!customModalActions) {
+			customModalActions = document.createElement("div");
+			customModalActions.className = "modal-actions exit-override-actions";
+			modal.querySelector(".modal-content").appendChild(customModalActions);
+		}
+		customModalActions.style.display = "flex";
+		customModalActions.innerHTML = `
+			<button id="exit-override-save-btn" class="save-btn">Save</button>
+			<button id="exit-override-clear-btn" class="cancel-btn" style="background: #d44; margin-left: 0.5rem;">Clear Override</button>
+			<button id="exit-override-cancel-btn" class="cancel-btn">Cancel</button>
+		`;
+
+		// Set up close button handler
+		const closeBtn = modal.querySelector(".close");
+		if (closeBtn) {
+			closeBtn.onclick = () => {
+				modal.classList.remove("active");
+				// Restore default modal actions
+				if (defaultModalActions) {
+					defaultModalActions.style.display = "flex";
+				}
+				if (customModalActions) {
+					customModalActions.style.display = "none";
+				}
+			};
+		}
+
+		modal.classList.add("active");
+
+		// Refresh exit button states
+		const refreshExitButtons = () => {
+			document.querySelectorAll(".exit-btn").forEach((btn) => {
+				const direction = btn.dataset.direction;
+				const dirFlag = TEXT2DIR[direction];
+				if (!dirFlag) return;
+
+				const isEnabled = (currentAllowedExitsValue & dirFlag) !== 0;
+
+				if (isEnabled) {
+					btn.classList.remove("disabled");
+					btn.classList.add("enabled");
+				} else {
+					btn.classList.remove("enabled");
+					btn.classList.add("disabled");
+				}
+			});
+		};
+
+		// Set up exit button handlers
+		document.querySelectorAll(".exit-btn").forEach((btn) => {
+			btn.addEventListener("click", () => {
+				const direction = btn.dataset.direction;
+				const dirFlag = TEXT2DIR[direction];
+				if (!dirFlag) return;
+
+				// Toggle the direction bit
+				currentAllowedExitsValue ^= dirFlag;
+				refreshExitButtons();
+			});
+		});
+
+		refreshExitButtons();
+
+		// Save button
+		document
+			.getElementById("exit-override-save-btn")
+			.addEventListener("click", () => {
+				this.saveStateToHistory();
+
+				// Store the old value before updating
+				const oldValue =
+					dungeon.exitOverrides && dungeon.exitOverrides[coordKey] !== undefined
+						? dungeon.exitOverrides[coordKey]
+						: null;
+
+				// Initialize exitOverrides if it doesn't exist
+				if (!dungeon.exitOverrides) {
+					dungeon.exitOverrides = {};
+				}
+
+				// Store the override
+				dungeon.exitOverrides[coordKey] = currentAllowedExitsValue;
+
+				// Re-render map to show updated exits
+				this.renderMap(dungeon);
+
+				this.makeChange({
+					action: EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE,
+					actionTarget: coordKey,
+					newParameters: {
+						allowedExits: currentAllowedExitsValue,
+					},
+					oldParameters: oldValue !== null ? { allowedExits: oldValue } : null,
+					metadata: {
+						coordinates: { x, y, z },
+						roomDisplay: room?.display || "Unknown",
+						templateAllowedExits,
+					},
+				});
+
+				modal.classList.remove("active");
+				// Restore default modal actions
+				if (defaultModalActions) {
+					defaultModalActions.style.display = "flex";
+				}
+				if (customModalActions) {
+					customModalActions.style.display = "none";
+				}
+				this.showToast(
+					"Exit override saved",
+					`Updated exits for ${room?.display || "room"}`
+				);
+				this.showRoomInfo(x, y, z); // Refresh room info
+			});
+
+		// Clear override button
+		document
+			.getElementById("exit-override-clear-btn")
+			.addEventListener("click", () => {
+				if (
+					!dungeon.exitOverrides ||
+					dungeon.exitOverrides[coordKey] === undefined
+				) {
+					this.showToast("No override to clear", "");
+					return;
+				}
+
+				this.saveStateToHistory();
+
+				const oldValue = dungeon.exitOverrides[coordKey];
+				delete dungeon.exitOverrides[coordKey];
+				if (Object.keys(dungeon.exitOverrides).length === 0) {
+					delete dungeon.exitOverrides;
+				}
+
+				// Re-render map
+				this.renderMap(dungeon);
+
+				this.makeChange({
+					action: EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE,
+					actionTarget: coordKey,
+					newParameters: null,
+					oldParameters: {
+						allowedExits: oldValue,
+					},
+					metadata: {
+						coordinates: { x, y, z },
+						roomDisplay: room?.display || "Unknown",
+						templateAllowedExits,
+					},
+				});
+
+				modal.classList.remove("active");
+				// Restore default modal actions
+				if (defaultModalActions) {
+					defaultModalActions.style.display = "flex";
+				}
+				if (customModalActions) {
+					customModalActions.style.display = "none";
+				}
+				this.showToast("Exit override cleared", "Using template defaults");
+				this.showRoomInfo(x, y, z); // Refresh room info
+			});
+
+		// Cancel button
+		document
+			.getElementById("exit-override-cancel-btn")
+			.addEventListener("click", () => {
+				modal.classList.remove("active");
+				// Restore default modal actions
+				if (defaultModalActions) {
+					defaultModalActions.style.display = "flex";
+				}
+				if (customModalActions) {
+					customModalActions.style.display = "none";
+				}
+			});
+	}
+
+	formatAllowedExits(allowedExits) {
+		const directions = [];
+		if (allowedExits & (1 << 0)) directions.push("N");
+		if (allowedExits & (1 << 1)) directions.push("S");
+		if (allowedExits & (1 << 2)) directions.push("E");
+		if (allowedExits & (1 << 3)) directions.push("W");
+		if (allowedExits & (1 << 8)) directions.push("UP");
+		if (allowedExits & (1 << 9)) directions.push("DOWN");
+		return directions.length > 0 ? directions.join(", ") : "None";
 	}
 
 	showTemplateModal(type, id, template) {
@@ -4344,6 +4938,8 @@ class MapEditor {
 				template
 			);
 		}
+
+		this.updateStatusBar();
 	}
 
 	getTemplateDisplay(type, id) {
@@ -4856,6 +5452,8 @@ class MapEditor {
 		document.querySelectorAll(".tool-btn").forEach((btn) => {
 			btn.classList.remove("active");
 		});
+
+		this.updateStatusBar();
 	}
 
 	cancelSelection() {
@@ -4889,6 +5487,8 @@ class MapEditor {
 		if (typeof button?.focus === "function") {
 			button.focus();
 		}
+
+		this.updateStatusBar();
 	}
 
 	updateSelection() {
@@ -4958,6 +5558,10 @@ class MapEditor {
 			const endX = this.selectionEnd.x;
 			const endY = this.selectionEnd.y;
 
+			// Track line cells to avoid selecting them
+			const lineCells = new Set();
+
+			// First pass: draw the line and track all line cells
 			let x0 = startX;
 			let y0 = startY;
 			const x1 = endX;
@@ -4976,25 +5580,7 @@ class MapEditor {
 					y0 >= 0 &&
 					y0 < this.yamlData.dungeon.dimensions.height
 				) {
-					// Add current cell
-					cells.add(`${x0},${y0},${z}`);
-
-					// Add perpendicular neighbors to render a 2-cell-thick line
-					const neighbors =
-						Math.abs(dx) >= Math.abs(dy)
-							? [`${x0},${y0 - 1},${z}`, `${x0},${y0 + 1},${z}`]
-							: [`${x0 - 1},${y0},${z}`, `${x0 + 1},${y0},${z}`];
-					neighbors.forEach((neighbor) => {
-						const [nx, ny] = neighbor.split(",").map(Number);
-						if (
-							nx >= 0 &&
-							nx < this.yamlData.dungeon.dimensions.width &&
-							ny >= 0 &&
-							ny < this.yamlData.dungeon.dimensions.height
-						) {
-							cells.add(neighbor);
-						}
-					});
+					lineCells.add(`${x0},${y0},${z}`);
 				}
 
 				if (x0 === x1 && y0 === y1) break;
@@ -5007,6 +5593,260 @@ class MapEditor {
 					err += dx;
 					y0 += sy;
 				}
+			}
+
+			// Calculate line direction for perpendicular
+			const dirX = endX - startX;
+			const dirY = endY - startY;
+
+			// Determine perpendicular direction (normalized to cardinal)
+			let perpX = 0;
+			let perpY = 0;
+
+			if (dirX === 0 && dirY === 0) {
+				// Degenerate case
+				return;
+			} else if (dirX === 0) {
+				// Vertical line: perpendicular is horizontal
+				perpX = dirY > 0 ? -1 : 1; // Left for downward, right for upward
+				perpY = 0;
+			} else if (dirY === 0) {
+				// Horizontal line: perpendicular is vertical
+				perpX = 0;
+				perpY = dirX > 0 ? -1 : 1; // Above for rightward, below for leftward
+			} else {
+				// Diagonal: use perpendicular vector and round to nearest cardinal
+				// Perpendicular to (dx, dy) is (-dy, dx)
+				const perpDirX = -dirY;
+				const perpDirY = dirX;
+				// Round to nearest cardinal direction
+				if (Math.abs(perpDirX) >= Math.abs(perpDirY)) {
+					perpX = perpDirX > 0 ? 1 : -1;
+					perpY = 0;
+				} else {
+					perpX = 0;
+					perpY = perpDirY > 0 ? 1 : -1;
+				}
+			}
+
+			// Always include the start and end cells of the original line
+			const startKey = `${startX},${startY},${z}`;
+			const endKey = `${endX},${endY},${z}`;
+			if (
+				startX >= 0 &&
+				startX < this.yamlData.dungeon.dimensions.width &&
+				startY >= 0 &&
+				startY < this.yamlData.dungeon.dimensions.height
+			) {
+				cells.add(startKey);
+			}
+			if (
+				endX >= 0 &&
+				endX < this.yamlData.dungeon.dimensions.width &&
+				endY >= 0 &&
+				endY < this.yamlData.dungeon.dimensions.height
+			) {
+				cells.add(endKey);
+			}
+
+			// Also ensure start and end cells of offset parallel lines are selected
+			// Start cells (offset versions)
+			const start1X = startX + perpX;
+			const start1Y = startY + perpY;
+			const start2X = startX - perpX;
+			const start2Y = startY - perpY;
+
+			if (
+				start1X >= 0 &&
+				start1X < this.yamlData.dungeon.dimensions.width &&
+				start1Y >= 0 &&
+				start1Y < this.yamlData.dungeon.dimensions.height
+			) {
+				const start1Key = `${start1X},${start1Y},${z}`;
+				if (!lineCells.has(start1Key)) {
+					cells.add(start1Key);
+				}
+			}
+
+			if (
+				start2X >= 0 &&
+				start2X < this.yamlData.dungeon.dimensions.width &&
+				start2Y >= 0 &&
+				start2Y < this.yamlData.dungeon.dimensions.height
+			) {
+				const start2Key = `${start2X},${start2Y},${z}`;
+				if (!lineCells.has(start2Key)) {
+					cells.add(start2Key);
+				}
+			}
+
+			// End cells (offset versions)
+			const end1X = endX + perpX;
+			const end1Y = endY + perpY;
+			const end2X = endX - perpX;
+			const end2Y = endY - perpY;
+
+			if (
+				end1X >= 0 &&
+				end1X < this.yamlData.dungeon.dimensions.width &&
+				end1Y >= 0 &&
+				end1Y < this.yamlData.dungeon.dimensions.height
+			) {
+				const end1Key = `${end1X},${end1Y},${z}`;
+				if (!lineCells.has(end1Key)) {
+					cells.add(end1Key);
+				}
+			}
+
+			if (
+				end2X >= 0 &&
+				end2X < this.yamlData.dungeon.dimensions.width &&
+				end2Y >= 0 &&
+				end2Y < this.yamlData.dungeon.dimensions.height
+			) {
+				const end2Key = `${end2X},${end2Y},${z}`;
+				if (!lineCells.has(end2Key)) {
+					cells.add(end2Key);
+				}
+			}
+
+			// Select two parallel lines (one on each side of the original line)
+			// Side 1: offset by +perp
+			x0 = startX;
+			y0 = startY;
+			err = dx - dy;
+
+			while (true) {
+				if (
+					x0 >= 0 &&
+					x0 < this.yamlData.dungeon.dimensions.width &&
+					y0 >= 0 &&
+					y0 < this.yamlData.dungeon.dimensions.height
+				) {
+					const edgeX = x0 + perpX;
+					const edgeY = y0 + perpY;
+					const edgeKey = `${edgeX},${edgeY},${z}`;
+
+					if (
+						!lineCells.has(edgeKey) &&
+						edgeX >= 0 &&
+						edgeX < this.yamlData.dungeon.dimensions.width &&
+						edgeY >= 0 &&
+						edgeY < this.yamlData.dungeon.dimensions.height
+					) {
+						cells.add(edgeKey);
+					}
+				}
+
+				if (x0 === x1 && y0 === y1) break;
+				const e2 = 2 * err;
+				if (e2 > -dy) {
+					err -= dy;
+					x0 += sx;
+				}
+				if (e2 < dx) {
+					err += dx;
+					y0 += sy;
+				}
+			}
+
+			// Side 2: offset by -perp
+			x0 = startX;
+			y0 = startY;
+			err = dx - dy;
+
+			while (true) {
+				if (
+					x0 >= 0 &&
+					x0 < this.yamlData.dungeon.dimensions.width &&
+					y0 >= 0 &&
+					y0 < this.yamlData.dungeon.dimensions.height
+				) {
+					const edgeX = x0 - perpX;
+					const edgeY = y0 - perpY;
+					const edgeKey = `${edgeX},${edgeY},${z}`;
+
+					if (
+						!lineCells.has(edgeKey) &&
+						edgeX >= 0 &&
+						edgeX < this.yamlData.dungeon.dimensions.width &&
+						edgeY >= 0 &&
+						edgeY < this.yamlData.dungeon.dimensions.height
+					) {
+						cells.add(edgeKey);
+					}
+				}
+
+				if (x0 === x1 && y0 === y1) break;
+				const e2 = 2 * err;
+				if (e2 > -dy) {
+					err -= dy;
+					x0 += sx;
+				}
+				if (e2 < dx) {
+					err += dx;
+					y0 += sy;
+				}
+			}
+
+			// Connect the start points of the two parallel lines
+			// The connecting line goes along the perpendicular direction
+			// (start1X, start1Y, start2X, start2Y already defined above)
+
+			// Draw connecting line from start1 to start2 (along perp direction)
+			// This is a line in the perpendicular direction, so it's simple
+			let connX = start1X;
+			let connY = start1Y;
+			const connStepX = start2X > start1X ? 1 : start2X < start1X ? -1 : 0;
+			const connStepY = start2Y > start1Y ? 1 : start2Y < start1Y ? -1 : 0;
+
+			while (true) {
+				if (
+					connX >= 0 &&
+					connX < this.yamlData.dungeon.dimensions.width &&
+					connY >= 0 &&
+					connY < this.yamlData.dungeon.dimensions.height
+				) {
+					const connKey = `${connX},${connY},${z}`;
+					if (!lineCells.has(connKey)) {
+						cells.add(connKey);
+					}
+				}
+
+				if (connX === start2X && connY === start2Y) break;
+
+				// Move towards target (this handles both horizontal and vertical connections)
+				if (connX !== start2X) connX += connStepX;
+				if (connY !== start2Y) connY += connStepY;
+			}
+
+			// Connect the end points of the two parallel lines
+			// (end1X, end1Y, end2X, end2Y already defined above)
+
+			// Draw connecting line from end1 to end2
+			connX = end1X;
+			connY = end1Y;
+			const connStepX2 = end2X > end1X ? 1 : end2X < end1X ? -1 : 0;
+			const connStepY2 = end2Y > end1Y ? 1 : end2Y < end1Y ? -1 : 0;
+
+			while (true) {
+				if (
+					connX >= 0 &&
+					connX < this.yamlData.dungeon.dimensions.width &&
+					connY >= 0 &&
+					connY < this.yamlData.dungeon.dimensions.height
+				) {
+					const connKey = `${connX},${connY},${z}`;
+					if (!lineCells.has(connKey)) {
+						cells.add(connKey);
+					}
+				}
+
+				if (connX === end2X && connY === end2Y) break;
+
+				// Move towards target
+				if (connX !== end2X) connX += connStepX2;
+				if (connY !== end2Y) connY += connStepY2;
 			}
 		} else if (this.selectionMode === "edge-rectangle") {
 			// Rectangle edge: only border cells
@@ -5488,12 +6328,14 @@ class MapEditor {
 	updateUnsavedState() {
 		this.hasUnsavedChanges = this.changeCursor !== this.lastSavedChangeIndex;
 		this.updateSaveButton();
+		this.updateStatusBar();
 	}
 
 	markChangesSaved() {
 		this.lastSavedChangeIndex = this.changeCursor;
 		this.updateUnsavedState();
 		this.renderChangeHistory();
+		this.updateStatusBar();
 	}
 
 	makeChange(changeDetails = {}, options = {}) {
@@ -5702,6 +6544,7 @@ class MapEditor {
 			[EDITOR_ACTIONS.RESIZE_DUNGEON]: "Resized dungeon",
 			[EDITOR_ACTIONS.EDIT_DUNGEON_FIELD]: "Edited dungeon info",
 			[EDITOR_ACTIONS.RESTORE_UNSAVED_WORK]: "Restored unsaved work",
+			[EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE]: "Edited exit override",
 		};
 		return actionLabels[change.action] || change.action || "Change";
 	}

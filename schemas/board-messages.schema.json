@@ -6,17 +6,43 @@
 	"properties": {
 		"messages": {
 			"type": "array",
+			"description": "Array of all messages posted to this board.",
 			"items": {
 				"type": "object",
 				"required": ["id", "author", "subject", "content", "postedAt"],
 				"properties": {
-					"id": { "type": "integer", "minimum": 1 },
-					"author": { "type": "string" },
-					"subject": { "type": "string" },
-					"content": { "type": "string" },
-					"postedAt": { "type": "string", "format": "date-time" },
-					"targets": { "type": "array", "items": { "type": "string" } },
-					"readBy": { "type": "array", "items": { "type": "integer" } }
+					"id": {
+						"type": "integer",
+						"minimum": 1,
+						"description": "Unique message identifier (must be at least 1)."
+					},
+					"author": {
+						"type": "string",
+						"description": "Username of the character who posted the message."
+					},
+					"subject": {
+						"type": "string",
+						"description": "Subject line or title of the message."
+					},
+					"content": {
+						"type": "string",
+						"description": "Main body text of the message."
+					},
+					"postedAt": {
+						"type": "string",
+						"format": "date-time",
+						"description": "ISO 8601 timestamp when the message was posted."
+					},
+					"targets": {
+						"type": "array",
+						"description": "Optional list of usernames this message is specifically targeted to.",
+						"items": { "type": "string" }
+					},
+					"readBy": {
+						"type": "array",
+						"description": "List of character IDs who have read this message.",
+						"items": { "type": "integer" }
+					}
 				},
 				"additionalProperties": false
 			}

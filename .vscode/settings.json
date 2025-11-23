@@ -1,16 +1,17 @@
 {
-  "yaml.schemas": {
-    "./schemas/config.schema.json": "data/config.yaml",
-    "./schemas/gamestate.schema.json": "data/gamestate.yaml",
-    "./schemas/board.schema.json": [
-      "data/boards/*.yaml",
-      "!data/boards/*.messages.yaml"
-    ],
-    "./schemas/board-messages.schema.json": "data/boards/*.messages.yaml",
-    "./schemas/dungeon.schema.json": "data/dungeons/*.yaml",
-    "./schemas/help.schema.json": "data/help/*.yaml",
-    "./schemas/race.schema.json": "data/races/*.yaml",
-    "./schemas/job.schema.json": "data/jobs/*.yaml",
-    "./schemas/character.schema.json": "data/characters/*.yaml"
-  }
+	"yaml.schemas": {
+		"./schemas/config.schema.json": "data/config.yaml",
+		"./schemas/gamestate.schema.json": "data/gamestate.yaml",
+		"./schemas/board.schema.json": [
+			"data/boards/*.yaml",
+			"!data/boards/*.messages.yaml"
+		],
+		"./schemas/board-messages.schema.json": "data/boards/*.messages.yaml",
+		"./schemas/dungeon.schema.json": "data/dungeons/*.yaml",
+		"./schemas/help.schema.json": "data/help/*.yaml",
+		"./schemas/race.schema.json": "data/races/*.yaml",
+		"./schemas/job.schema.json": "data/jobs/*.yaml",
+		"./schemas/character.schema.json": "data/characters/*.yaml",
+		"./schemas/locations.schema.json": "data/locations.yaml"
+	}
 }

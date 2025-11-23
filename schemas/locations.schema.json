@@ -2,10 +2,19 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"title": "Locations",
 	"type": "object",
-	"patternProperties": {
-		"^[A-Za-z0-9_-]+$": {
+	"description": "Map of location names to their dungeon coordinates.",
+	"properties": {
+		"recall": {
 			"type": "string",
-			"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
+			"description": "Recalibrate the locations."
+		},
+		"start": {
+			"type": "string",
+			"description": "The starting location."
+		},
+		"graveyard": {
+			"type": "string",
+			"description": "The graveyard location."
 		}
 	},
 	"additionalProperties": false

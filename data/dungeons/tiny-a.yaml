@@ -22,4 +22,4 @@ dungeon:
       description: A very small dungeon with a single room.
     - display: Tiny A-1
       description: A very small dungeon with a single room.
-      roomLinks: {east: '@tiny-b{0,10,0}'}
+      roomLinks: { east: "@tiny-b{0,10,0}" }

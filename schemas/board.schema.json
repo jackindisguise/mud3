@@ -10,13 +10,36 @@
 		"nextMessageId"
 	],
 	"properties": {
-		"name": { "type": "string" },
-		"displayName": { "type": "string" },
-		"description": { "type": "string" },
-		"permanent": { "type": "boolean" },
-		"expirationMs": { "type": "integer", "minimum": 0 },
-		"writePermission": { "type": "string" },
-		"nextMessageId": { "type": "integer", "minimum": 0 }
+		"name": {
+			"type": "string",
+			"description": "Internal identifier for the board (used in file names and references)."
+		},
+		"displayName": {
+			"type": "string",
+			"description": "Name shown to players when viewing or listing boards."
+		},
+		"description": {
+			"type": "string",
+			"description": "Brief description of the board's purpose and content."
+		},
+		"permanent": {
+			"type": "boolean",
+			"description": "If true, the board persists indefinitely. If false, it expires after expirationMs."
+		},
+		"expirationMs": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Time in milliseconds after which a non-permanent board expires (0 = no expiration)."
+		},
+		"writePermission": {
+			"type": "string",
+			"description": "Permission level required to post messages on this board."
+		},
+		"nextMessageId": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "The next message ID to assign when a new message is posted (must be at least 0)."
+		}
 	},
 	"additionalProperties": false
 }

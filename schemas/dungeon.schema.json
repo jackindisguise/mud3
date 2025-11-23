@@ -6,23 +6,47 @@
 	"properties": {
 		"dungeon": {
 			"type": "object",
+			"description": "Complete dungeon definition including rooms, templates, and spawn rules.",
 			"required": ["id", "name", "dimensions", "grid", "rooms"],
 			"properties": {
-				"id": { "type": "string" },
-				"name": { "type": "string" },
-				"resetMessage": { "type": "string" },
+				"id": {
+					"type": "string",
+					"description": "Unique identifier for the dungeon (used in file names and references)."
+				},
+				"name": {
+					"type": "string",
+					"description": "Display name of the dungeon shown to players."
+				},
+				"resetMessage": {
+					"type": "string",
+					"description": "Message displayed to players when the dungeon resets."
+				},
 				"dimensions": {
 					"type": "object",
+					"description": "Spatial dimensions of the dungeon grid.",
 					"required": ["width", "height", "layers"],
 					"properties": {
-						"width": { "type": "integer", "minimum": 1 },
-						"height": { "type": "integer", "minimum": 1 },
-						"layers": { "type": "integer", "minimum": 1 }
+						"width": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Width of the dungeon in grid cells (must be at least 1)."
+						},
+						"height": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Height of the dungeon in grid cells (must be at least 1)."
+						},
+						"layers": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Number of vertical layers/floors in the dungeon (must be at least 1)."
+						}
 					},
 					"additionalProperties": false
 				},
 				"grid": {
 					"type": "array",
+					"description": "3D array [layer][y][x] mapping grid coordinates to room indices (null = no room).",
 					"items": {
 						"type": "array",
 						"items": {
@@ -33,20 +57,46 @@
 				},
 				"rooms": {
 					"type": "array",
+					"description": "Array of room definitions in the dungeon.",
 					"items": {
 						"type": "object",
 						"required": ["display"],
 						"properties": {
-							"display": { "type": "string" },
-							"description": { "type": "string" },
-							"roomDescription": { "type": "string" },
-							"keywords": { "type": "string" },
-							"mapText": { "type": "string" },
-							"mapColor": { "type": "integer" },
-							"allowedExits": { "type": "integer" },
-							"dense": { "type": "boolean" },
+							"display": {
+								"type": "string",
+								"description": "Short name shown when listing or referencing the room."
+							},
+							"description": {
+								"type": "string",
+								"description": "Brief description shown when looking at the room."
+							},
+							"roomDescription": {
+								"type": "string",
+								"description": "Detailed description shown when examining the room closely."
+							},
+							"keywords": {
+								"type": "string",
+								"description": "Comma-separated keywords used to identify this room in commands."
+							},
+							"mapText": {
+								"type": "string",
+								"description": "Single character or symbol displayed on the minimap for this room."
+							},
+							"mapColor": {
+								"type": "integer",
+								"description": "Color code used when rendering this room on the minimap."
+							},
+							"allowedExits": {
+								"type": "integer",
+								"description": "Bitmask representing which directions are valid exits from this room."
+							},
+							"dense": {
+								"type": "boolean",
+								"description": "If true, this room blocks line of sight and movement through it."
+							},
 							"roomLinks": {
 								"type": "object",
+								"description": "Manual exit links to other rooms in format '@dungeon{x,y,z}'.",
 								"patternProperties": {
 									"^(north|south|east|west|up|down|northeast|northwest|southeast|southwest)$": {
 										"type": "string"
@@ -60,39 +110,90 @@
 				},
 				"templates": {
 					"type": "array",
+					"description": "Templates for spawning mobs, items, and other entities in the dungeon.",
 					"items": {
 						"type": "object",
 						"required": ["id", "type", "display"],
 						"properties": {
-							"id": { "type": "string" },
-							"type": { "type": "string" },
-							"display": { "type": "string" },
-							"description": { "type": "string" },
-							"roomDescription": { "type": "string" },
-							"keywords": { "type": "string" },
-							"mapText": { "type": "string" },
-							"mapColor": { "type": "integer" },
-							"slot": { "type": "string" },
-							"hitType": { "type": "string" },
-							"attackPower": { "type": "integer" },
-							"defense": { "type": "integer" },
-							"race": { "type": "string" },
-							"job": { "type": "string" },
-							"level": { "type": "integer", "minimum": 0 },
+							"id": {
+								"type": "string",
+								"description": "Unique identifier for this template."
+							},
+							"type": {
+								"type": "string",
+								"description": "Entity type (e.g., 'mob', 'item', 'npc')."
+							},
+							"display": {
+								"type": "string",
+								"description": "Name shown to players when they see this entity."
+							},
+							"description": {
+								"type": "string",
+								"description": "Brief description shown when looking at the entity."
+							},
+							"roomDescription": {
+								"type": "string",
+								"description": "Description added to room when this entity is present."
+							},
+							"keywords": {
+								"type": "string",
+								"description": "Comma-separated keywords used to identify this entity in commands."
+							},
+							"mapText": {
+								"type": "string",
+								"description": "Single character or symbol displayed on the minimap for this entity."
+							},
+							"mapColor": {
+								"type": "integer",
+								"description": "Color code used when rendering this entity on the minimap."
+							},
+							"slot": {
+								"type": "string",
+								"description": "Equipment slot this item can be worn in (for items only)."
+							},
+							"hitType": {
+								"type": "string",
+								"description": "Type of damage this weapon deals (for weapons only)."
+							},
+							"attackPower": {
+								"type": "integer",
+								"description": "Base attack power of this weapon (for weapons only)."
+							},
+							"defense": {
+								"type": "integer",
+								"description": "Defense value provided by this armor (for armor only)."
+							},
+							"race": {
+								"type": "string",
+								"description": "Race identifier for mobs (must match a race definition)."
+							},
+							"job": {
+								"type": "string",
+								"description": "Job/class identifier for mobs (must match a job definition)."
+							},
+							"level": {
+								"type": "integer",
+								"minimum": 0,
+								"description": "Level of the mob spawned from this template (must be at least 0)."
+							},
 							"behaviors": {
 								"type": "object",
+								"description": "Map of behavior flags to their enabled state (for mobs).",
 								"additionalProperties": { "type": "boolean" }
 							},
 							"attributeBonuses": {
 								"type": "object",
+								"description": "Map of attribute names to bonus values (for items).",
 								"additionalProperties": { "type": "integer" }
 							},
 							"resourceCaps": {
 								"type": "object",
+								"description": "Map of resource names (maxHealth, maxMana) to bonus values (for items).",
 								"additionalProperties": { "type": "integer" }
 							},
 							"secondaryAttributes": {
 								"type": "object",
+								"description": "Map of secondary attribute names to bonus values (for items).",
 								"additionalProperties": { "type": "integer" }
 							}
 						},
@@ -101,25 +202,47 @@
 				},
 				"resets": {
 					"type": "array",
+					"description": "Spawn rules for entities when the dungeon resets.",
 					"items": {
 						"type": "object",
 						"required": ["templateId", "roomRef"],
 						"properties": {
-							"templateId": { "type": "string" },
+							"templateId": {
+								"type": "string",
+								"description": "ID of the template to spawn (must exist in templates array)."
+							},
 							"roomRef": {
 								"type": "string",
-								"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
+								"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$",
+								"description": "Room location reference in format '@dungeon{x,y,z}' where entity spawns."
 							},
-							"minCount": { "type": "integer", "minimum": 0 },
-							"maxCount": { "type": "integer", "minimum": 0 },
-							"equipped": { "type": "array", "items": { "type": "string" } },
-							"inventory": { "type": "array", "items": { "type": "string" } }
+							"minCount": {
+								"type": "integer",
+								"minimum": 0,
+								"description": "Minimum number of entities to spawn (must be at least 0)."
+							},
+							"maxCount": {
+								"type": "integer",
+								"minimum": 0,
+								"description": "Maximum number of entities to spawn (must be at least 0)."
+							},
+							"equipped": {
+								"type": "array",
+								"description": "List of template IDs for items the mob spawns with equipped.",
+								"items": { "type": "string" }
+							},
+							"inventory": {
+								"type": "array",
+								"description": "List of template IDs for items the mob spawns with in inventory.",
+								"items": { "type": "string" }
+							}
 						},
 						"additionalProperties": false
 					}
 				},
 				"exitOverrides": {
 					"type": "object",
+					"description": "Manual exit direction overrides keyed by coordinates 'x,y,z' with direction bitmask values.",
 					"patternProperties": {
 						"^[0-9]+,[0-9]+,[0-9]+$": { "type": "integer" }
 					},

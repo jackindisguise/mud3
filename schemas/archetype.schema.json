@@ -8,35 +8,76 @@
 			"type": "object",
 			"required": ["id", "name", "description", "isStarter"],
 			"properties": {
-				"id": { "type": "string" },
-				"name": { "type": "string" },
-				"description": { "type": "string" },
-				"isStarter": { "type": "boolean" },
-				"startingAttributes": { "$ref": "#/definitions/primaryAttributes" },
-				"attributeGrowthPerLevel": {
-					"$ref": "#/definitions/primaryAttributes"
+				"id": {
+					"type": "string",
+					"description": "Unique identifier for the archetype (e.g., 'human', 'warrior')."
 				},
-				"startingResourceCaps": { "$ref": "#/definitions/resourceCaps" },
-				"resourceGrowthPerLevel": { "$ref": "#/definitions/resourceCaps" },
+				"name": {
+					"type": "string",
+					"description": "Display name of the archetype shown to players."
+				},
+				"description": {
+					"type": "string",
+					"description": "Brief description of the archetype's characteristics and role."
+				},
+				"isStarter": {
+					"type": "boolean",
+					"description": "Whether this archetype can be selected as a starting option for new characters."
+				},
+				"startingAttributes": {
+					"$ref": "#/definitions/primaryAttributes",
+					"description": "Initial values for strength, agility, and intelligence at character creation."
+				},
+				"attributeGrowthPerLevel": {
+					"$ref": "#/definitions/primaryAttributes",
+					"description": "Amount each primary attribute increases per level gained."
+				},
+				"startingResourceCaps": {
+					"$ref": "#/definitions/resourceCaps",
+					"description": "Initial maximum health and mana values at character creation."
+				},
+				"resourceGrowthPerLevel": {
+					"$ref": "#/definitions/resourceCaps",
+					"description": "Amount maximum health and mana increase per level gained."
+				},
 				"skills": {
 					"type": "array",
+					"description": "List of skills available to this archetype with their starting levels.",
 					"items": {
 						"type": "object",
 						"required": ["id", "level"],
 						"properties": {
-							"id": { "type": "string" },
-							"level": { "type": "integer", "minimum": 1 }
+							"id": {
+								"type": "string",
+								"description": "Unique identifier of the skill."
+							},
+							"level": {
+								"type": "integer",
+								"minimum": 1,
+								"description": "Starting level of the skill (minimum 1)."
+							}
 						},
 						"additionalProperties": false
 					}
 				},
-				"passives": { "type": "array", "items": { "type": "string" } },
+				"passives": {
+					"type": "array",
+					"description": "List of passive ability IDs granted by this archetype.",
+					"items": { "type": "string" }
+				},
 				"growthModifier": {
 					"type": "object",
+					"description": "Multiplier affecting overall character growth rate.",
 					"required": ["base", "perLevel"],
 					"properties": {
-						"base": { "type": "number" },
-						"perLevel": { "type": "number" }
+						"base": {
+							"type": "number",
+							"description": "Base growth multiplier applied at all levels."
+						},
+						"perLevel": {
+							"type": "number",
+							"description": "Additional growth multiplier added per level."
+						}
 					},
 					"additionalProperties": false
 				}
@@ -49,17 +90,37 @@
 		"primaryAttributes": {
 			"type": "object",
 			"properties": {
-				"strength": { "type": "integer", "minimum": 0 },
-				"agility": { "type": "integer", "minimum": 0 },
-				"intelligence": { "type": "integer", "minimum": 0 }
+				"strength": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Physical power attribute affecting melee damage and carrying capacity."
+				},
+				"agility": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Dexterity attribute affecting accuracy, dodge chance, and movement speed."
+				},
+				"intelligence": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Mental attribute affecting spell power, mana capacity, and skill learning."
+				}
 			},
 			"additionalProperties": false
 		},
 		"resourceCaps": {
 			"type": "object",
 			"properties": {
-				"maxHealth": { "type": "integer", "minimum": 0 },
-				"maxMana": { "type": "integer", "minimum": 0 }
+				"maxHealth": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Maximum hit points the character can have."
+				},
+				"maxMana": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Maximum mana points available for casting spells and abilities."
+				}
 			},
 			"additionalProperties": false
 		}

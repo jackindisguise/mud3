@@ -6,26 +6,49 @@
 	"properties": {
 		"game": {
 			"type": "object",
+			"description": "Game identification and metadata.",
 			"required": ["name", "creator"],
 			"properties": {
-				"name": { "type": "string" },
-				"creator": { "type": "string" }
+				"name": {
+					"type": "string",
+					"description": "Internal name identifier for the game."
+				},
+				"creator": {
+					"type": "string",
+					"description": "Name or identifier of the game's creator."
+				}
 			},
 			"additionalProperties": false
 		},
 		"server": {
 			"type": "object",
+			"description": "Server network and connection settings.",
 			"required": ["port", "inactivity_timeout"],
 			"properties": {
-				"port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-				"inactivity_timeout": { "type": "integer", "minimum": 0 }
+				"port": {
+					"type": "integer",
+					"minimum": 1,
+					"maximum": 65535,
+					"description": "TCP port number the server listens on (1-65535)."
+				},
+				"inactivity_timeout": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "Time in seconds before disconnecting inactive clients (0 = no timeout)."
+				}
 			},
 			"additionalProperties": false
 		},
 		"security": {
 			"type": "object",
+			"description": "Security and authentication configuration.",
 			"required": ["password_salt"],
-			"properties": { "password_salt": { "type": "string" } },
+			"properties": {
+				"password_salt": {
+					"type": "string",
+					"description": "Salt string used for password hashing (keep secret and unique)."
+				}
+			},
 			"additionalProperties": false
 		}
 	},

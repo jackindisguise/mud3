@@ -4,11 +4,29 @@
 	"type": "object",
 	"required": ["keyword", "content"],
 	"properties": {
-		"keyword": { "type": "string" },
-		"aliases": { "type": "array", "items": { "type": "string" } },
-		"related": { "type": "array", "items": { "type": "string" } },
-		"topic": { "type": "array", "items": { "type": "string" } },
-		"content": { "type": "string" }
+		"keyword": {
+			"type": "string",
+			"description": "Primary keyword used to access this help file (e.g., 'help keyword')."
+		},
+		"aliases": {
+			"type": "array",
+			"description": "Alternative keywords that also access this help file.",
+			"items": { "type": "string" }
+		},
+		"related": {
+			"type": "array",
+			"description": "List of related help file keywords shown at the end of this help file.",
+			"items": { "type": "string" }
+		},
+		"topic": {
+			"type": "array",
+			"description": "Topic categories this help file belongs to (for topic-based searches).",
+			"items": { "type": "string" }
+		},
+		"content": {
+			"type": "string",
+			"description": "Main body text of the help file displayed to players."
+		}
 	},
 	"additionalProperties": false
 }

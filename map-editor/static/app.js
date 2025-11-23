@@ -1275,10 +1275,22 @@ class MapEditor {
 				dungeon.exitOverrides &&
 				dungeon.exitOverrides[coordKey] !== undefined
 			) {
+				const override = dungeon.exitOverrides[coordKey];
+				// Handle both number (allowedExits only) and object (allowedExits and/or roomLinks) formats
+				let allowedExitsOverride = room.allowedExits;
+				if (typeof override === "number") {
+					allowedExitsOverride = override;
+				} else if (
+					typeof override === "object" &&
+					override !== null &&
+					"allowedExits" in override
+				) {
+					allowedExitsOverride = override.allowedExits ?? room.allowedExits;
+				}
 				// Return a copy with the override applied
 				return {
 					...room,
-					allowedExits: dungeon.exitOverrides[coordKey],
+					allowedExits: allowedExitsOverride,
 				};
 			}
 
@@ -2511,11 +2523,40 @@ class MapEditor {
 		const roomAtCell = this.getRoomAt(dungeon, x, y, z);
 		const coordKey = `${x},${y},${z}`;
 
+		// Get current override value (could be number or object)
+		const currentOverride = dungeon.exitOverrides?.[coordKey];
+
 		// Get current allowedExits (from override if exists, otherwise template default)
 		const templateAllowedExits = room.allowedExits || 0;
-		const currentAllowedExits = roomAtCell
-			? roomAtCell.allowedExits
-			: templateAllowedExits;
+		let currentAllowedExitsValue = templateAllowedExits;
+		if (currentOverride !== undefined) {
+			if (typeof currentOverride === "number") {
+				currentAllowedExitsValue = currentOverride;
+			} else if (
+				typeof currentOverride === "object" &&
+				currentOverride !== null &&
+				"allowedExits" in currentOverride
+			) {
+				currentAllowedExitsValue =
+					currentOverride.allowedExits ?? templateAllowedExits;
+			}
+		} else {
+			const currentAllowedExits = roomAtCell
+				? roomAtCell.allowedExits
+				: templateAllowedExits;
+			currentAllowedExitsValue = currentAllowedExits;
+		}
+
+		// Get current roomLinks (from override if exists)
+		let currentRoomLinks = {};
+		if (
+			currentOverride !== undefined &&
+			typeof currentOverride === "object" &&
+			currentOverride !== null &&
+			"roomLinks" in currentOverride
+		) {
+			currentRoomLinks = currentOverride.roomLinks || {};
+		}
 
 		// Initialize exitOverrides if it doesn't exist
 		if (!dungeon.exitOverrides) {
@@ -2548,8 +2589,6 @@ class MapEditor {
 			room?.display || "Room"
 		} at (${x}, ${y}, ${z})`;
 
-		let currentAllowedExitsValue = currentAllowedExits;
-
 		const exitButtonsHtml = `
 			<div class="exit-controls" style="margin: 1rem 0;">
 				<h4 style="margin-bottom: 0.5rem;">Allowed Exits</h4>
@@ -2567,11 +2606,64 @@ class MapEditor {
 			</div>
 		`;
 
+		// Build roomLinks HTML
+		const allDirections = ["north", "south", "east", "west", "up", "down"];
+		const usedDirections = Object.keys(currentRoomLinks);
+
+		const roomLinksHtml = Object.entries(currentRoomLinks)
+			.map(([dir, ref], index) => {
+				// Get available directions (all except the ones used by other links)
+				const availableDirs = allDirections.filter(
+					(d) => d === dir || !usedDirections.includes(d)
+				);
+
+				return `
+			<div class="room-link-item" data-index="${index}">
+				<select class="room-link-direction" data-original-dir="${dir}">
+					${availableDirs
+						.map(
+							(d) =>
+								`<option value="${d}" ${d === dir ? "selected" : ""}>${
+									d.charAt(0).toUpperCase() + d.slice(1)
+								}</option>`
+						)
+						.join("")}
+				</select>
+				<input type="text" class="room-link-ref" value="${ref}" placeholder="@dungeon{x,y,z}">
+				<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
+			</div>
+		`;
+			})
+			.join("");
+
+		const canAddMore = usedDirections.length < allDirections.length;
+
+		const roomLinksSectionHtml = `
+			<div class="form-group" style="margin-top: 1.5rem;">
+				<label>Room Links (optional)</label>
+				<p style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.75rem;">
+					Override exit links to other rooms. If provided, allowedExits should also be set.
+				</p>
+				<div id="exit-override-room-links-container" style="margin-bottom: 0.5rem;">
+					${roomLinksHtml}
+				</div>
+				<button type="button" class="add-link-btn" id="exit-override-add-room-link-btn" ${
+					!canAddMore ? "disabled" : ""
+				} style="padding: 0.5rem;">+ Add Room Link</button>
+				${
+					!canAddMore
+						? '<p style="color: #aaa; font-size: 0.85rem; margin-top: 0.5rem;">All directions are in use</p>'
+						: ""
+				}
+			</div>
+		`;
+
 		body.innerHTML = `
 			<div class="form-group">
 				<label>Override exits for this specific room cell</label>
 				${exitButtonsHtml}
 			</div>
+			${roomLinksSectionHtml}
 		`;
 
 		// Hide the default modal actions and use our custom ones
@@ -2645,6 +2737,156 @@ class MapEditor {
 
 		refreshExitButtons();
 
+		// Set up roomLinks handlers (similar to template modal)
+		const updateExitOverrideRoomLinkDirections = () => {
+			const container = document.getElementById(
+				"exit-override-room-links-container"
+			);
+			if (!container) return;
+
+			// Update each dropdown to only show available directions
+			container.querySelectorAll(".room-link-direction").forEach((select) => {
+				const currentValue = select.value;
+				// Get all directions used by OTHER selects (not this one)
+				const usedByOthers = Array.from(
+					container.querySelectorAll(".room-link-direction")
+				)
+					.filter((s) => s !== select)
+					.map((s) => s.value);
+
+				// Available directions: current value + all unused directions
+				const availableDirs = allDirections.filter(
+					(d) => d === currentValue || !usedByOthers.includes(d)
+				);
+
+				// Update options
+				select.innerHTML = availableDirs
+					.map(
+						(d) =>
+							`<option value="${d}" ${d === currentValue ? "selected" : ""}>${
+								d.charAt(0).toUpperCase() + d.slice(1)
+							}</option>`
+					)
+					.join("");
+			});
+		};
+
+		const getAvailableDirectionsForExitOverride = () => {
+			const container = document.getElementById(
+				"exit-override-room-links-container"
+			);
+			if (!container) return [];
+			const used = Array.from(
+				container.querySelectorAll(".room-link-direction")
+			).map((s) => s.value);
+			return allDirections.filter((d) => !used.includes(d));
+		};
+
+		const addExitOverrideRoomLink = () => {
+			const container = document.getElementById(
+				"exit-override-room-links-container"
+			);
+			if (!container) return;
+
+			const availableDirs = getAvailableDirectionsForExitOverride();
+			if (availableDirs.length === 0) return; // Can't add more
+
+			const index = container.children.length;
+			const linkItem = document.createElement("div");
+			linkItem.className = "room-link-item";
+			linkItem.dataset.index = index;
+			linkItem.innerHTML = `
+				<select class="room-link-direction">
+					${availableDirs
+						.map(
+							(d) =>
+								`<option value="${d}">${
+									d.charAt(0).toUpperCase() + d.slice(1)
+								}</option>`
+						)
+						.join("")}
+				</select>
+				<input type="text" class="room-link-ref" placeholder="@dungeon{x,y,z}">
+				<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
+			`;
+
+			container.appendChild(linkItem);
+
+			// Set up handlers for the new item
+			const deleteBtn = linkItem.querySelector(".delete-link-btn");
+			if (deleteBtn) {
+				deleteBtn.onclick = (e) => {
+					const idx = parseInt(e.target.dataset.index);
+					deleteExitOverrideRoomLink(idx);
+				};
+			}
+
+			const directionSelect = linkItem.querySelector(".room-link-direction");
+			if (directionSelect) {
+				directionSelect.onchange = () => {
+					updateExitOverrideRoomLinkDirections();
+				};
+			}
+
+			updateExitOverrideRoomLinkDirections();
+		};
+
+		const deleteExitOverrideRoomLink = (index) => {
+			const container = document.getElementById(
+				"exit-override-room-links-container"
+			);
+			if (!container) return;
+
+			const items = Array.from(container.querySelectorAll(".room-link-item"));
+			if (index >= 0 && index < items.length) {
+				items[index].remove();
+				// Re-index remaining items
+				container.querySelectorAll(".room-link-item").forEach((item, i) => {
+					item.dataset.index = i;
+					const btn = item.querySelector(".delete-link-btn");
+					if (btn) {
+						btn.dataset.index = i;
+						btn.onclick = (e) => {
+							const idx = parseInt(e.target.dataset.index);
+							deleteExitOverrideRoomLink(idx);
+						};
+					}
+				});
+				updateExitOverrideRoomLinkDirections();
+			}
+		};
+
+		// Add room link button
+		const addLinkBtn = document.getElementById(
+			"exit-override-add-room-link-btn"
+		);
+		if (addLinkBtn) {
+			addLinkBtn.onclick = () => {
+				addExitOverrideRoomLink();
+			};
+		}
+
+		// Delete link buttons
+		document
+			.querySelectorAll("#exit-override-room-links-container .delete-link-btn")
+			.forEach((btn) => {
+				btn.onclick = (e) => {
+					const index = parseInt(e.target.dataset.index);
+					deleteExitOverrideRoomLink(index);
+				};
+			});
+
+		// Direction change handlers
+		document
+			.querySelectorAll(
+				"#exit-override-room-links-container .room-link-direction"
+			)
+			.forEach((select) => {
+				select.onchange = () => {
+					updateExitOverrideRoomLinkDirections();
+				};
+			});
+
 		// Save button
 		document
 			.getElementById("exit-override-save-btn")
@@ -2662,8 +2904,30 @@ class MapEditor {
 					dungeon.exitOverrides = {};
 				}
 
-				// Store the override
-				dungeon.exitOverrides[coordKey] = currentAllowedExitsValue;
+				// Collect roomLinks
+				const roomLinks = {};
+				const linkItems = document.querySelectorAll(
+					"#exit-override-room-links-container .room-link-item"
+				);
+				linkItems.forEach((item) => {
+					const direction = item.querySelector(".room-link-direction").value;
+					const ref = item.querySelector(".room-link-ref").value.trim();
+					if (ref) {
+						roomLinks[direction] = ref;
+					}
+				});
+
+				// Store the override - use object if roomLinks exist, otherwise use number
+				if (Object.keys(roomLinks).length > 0) {
+					// Object with both allowedExits and roomLinks
+					dungeon.exitOverrides[coordKey] = {
+						allowedExits: currentAllowedExitsValue,
+						roomLinks: roomLinks,
+					};
+				} else {
+					// Just number (allowedExits only)
+					dungeon.exitOverrides[coordKey] = currentAllowedExitsValue;
+				}
 
 				// Re-render map to show updated exits
 				this.renderMap(dungeon);
@@ -2673,8 +2937,22 @@ class MapEditor {
 					actionTarget: coordKey,
 					newParameters: {
 						allowedExits: currentAllowedExitsValue,
+						...(Object.keys(roomLinks).length > 0 ? { roomLinks } : {}),
 					},
-					oldParameters: oldValue !== null ? { allowedExits: oldValue } : null,
+					oldParameters:
+						oldValue !== null
+							? {
+									allowedExits:
+										typeof oldValue === "number"
+											? oldValue
+											: oldValue.allowedExits ?? null,
+									...(typeof oldValue === "object" &&
+									oldValue !== null &&
+									oldValue.roomLinks
+										? { roomLinks: oldValue.roomLinks }
+										: {}),
+							  }
+							: null,
 					metadata: {
 						coordinates: { x, y, z },
 						roomDisplay: room?.display || "Unknown",

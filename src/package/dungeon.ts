@@ -107,7 +107,11 @@ export interface SerializedDungeonFormat {
 		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets). In-file ids are local (no "@").
 		resets?: SerializedReset[]; // Optional array of resets
 		resetMessage?: string;
-		exitOverrides?: Record<string, number>; // Dictionary: "x,y,z" -> allowedExits bitmask override
+		exitOverrides?: Record<
+			string,
+			| number // allowedExits bitmask override
+			| { allowedExits?: number; roomLinks?: Record<DirectionText, string> } // allowedExits and/or roomLinks override
+		>; // Dictionary: "x,y,z" -> bitmask, roomLinks object, or both
 	};
 }
 
@@ -319,11 +323,28 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					});
 
 					// Apply exit override if present (before adding to dungeon)
+					// Store roomLinks from exitOverrides to process after room is added
+					let exitOverrideRoomLinks: Record<DirectionText, string> | undefined;
 					if (exitOverrides && typeof exitOverrides === "object") {
 						const coordKey = `${x},${y},${z}`;
 						const override = exitOverrides[coordKey];
-						if (override !== undefined && typeof override === "number") {
-							room.allowedExits = override;
+						if (override !== undefined) {
+							if (typeof override === "number") {
+								// Integer bitmask override for allowedExits
+								room.allowedExits = override;
+							} else if (typeof override === "object" && override !== null) {
+								// Object with allowedExits and/or roomLinks override
+								if (
+									"allowedExits" in override &&
+									typeof override.allowedExits === "number"
+								) {
+									room.allowedExits = override.allowedExits;
+								}
+								if (override.roomLinks) {
+									// Store roomLinks to process after room is added to dungeon
+									exitOverrideRoomLinks = override.roomLinks;
+								}
+							}
 						}
 					}
 
@@ -338,6 +359,22 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 						if (roomRef) {
 							for (const [directionText, targetRoomRef] of Object.entries(
 								roomTemplate.roomLinks
+							)) {
+								pendingRoomLinks.push({
+									roomRef,
+									direction: directionText as DirectionText,
+									targetRoomRef,
+								});
+							}
+						}
+					}
+
+					// Collect roomLinks from exitOverrides for later processing (after room is added)
+					if (exitOverrideRoomLinks) {
+						const roomRef = room.getRoomRef();
+						if (roomRef) {
+							for (const [directionText, targetRoomRef] of Object.entries(
+								exitOverrideRoomLinks
 							)) {
 								pendingRoomLinks.push({
 									roomRef,

@@ -96,10 +96,12 @@
 							},
 							"roomLinks": {
 								"type": "object",
-								"description": "Manual exit links to other rooms in format '@dungeon{x,y,z}'.",
+								"description": "Manual exit links to other rooms in format '@dungeon{x,y,z}'. Keys must be DirectionText values (north, south, east, west, northeast, northwest, southeast, southwest, up, down).",
 								"patternProperties": {
 									"^(north|south|east|west|up|down|northeast|northwest|southeast|southwest)$": {
-										"type": "string"
+										"type": "string",
+										"description": "Room reference in format '@dungeon{x,y,z}' that this DirectionText direction links to.",
+										"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
 									}
 								},
 								"additionalProperties": false
@@ -242,9 +244,40 @@
 				},
 				"exitOverrides": {
 					"type": "object",
-					"description": "Manual exit direction overrides keyed by coordinates 'x,y,z' with direction bitmask values.",
+					"description": "Manual exit direction overrides keyed by coordinates 'x,y,z'. Can be an integer bitmask for allowedExits only, or an object containing allowedExits and/or roomLinks.",
 					"patternProperties": {
-						"^[0-9]+,[0-9]+,[0-9]+$": { "type": "integer" }
+						"^[0-9]+,[0-9]+,[0-9]+$": {
+							"oneOf": [
+								{
+									"type": "integer",
+									"description": "Direction bitmask value for allowedExits override (when only allowedExits needs to be overridden)."
+								},
+								{
+									"type": "object",
+									"description": "Object containing allowedExits and/or roomLinks overrides. At least one property must be present.",
+									"properties": {
+										"allowedExits": {
+											"type": "integer",
+											"description": "Direction bitmask value for allowedExits override."
+										},
+										"roomLinks": {
+											"type": "object",
+											"description": "Manual exit links to other rooms in format '@dungeon{x,y,z}'. Keys must be DirectionText values (north, south, east, west, northeast, northwest, southeast, southwest, up, down). Can be used alone or together with allowedExits.",
+											"patternProperties": {
+												"^(north|south|east|west|up|down|northeast|northwest|southeast|southwest)$": {
+													"type": "string",
+													"description": "Room reference in format '@dungeon{x,y,z}' that this DirectionText direction links to.",
+													"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
+												}
+											},
+											"additionalProperties": false
+										}
+									},
+									"additionalProperties": false,
+									"minProperties": 1
+								}
+							]
+						}
 					},
 					"additionalProperties": false
 				}

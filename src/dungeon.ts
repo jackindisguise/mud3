@@ -6789,6 +6789,22 @@ export class Mob extends Movable {
 			return 0; // Target not in same room
 		}
 
+		// Check for Pure Power passive ability
+		// Pure Power increases attack power from +0% at 0% proficiency to +200% at 100% proficiency
+		let purePowerMultiplier = 1;
+		if (this.knowsAbility("pure-power")) {
+			const proficiency = this.learnedAbilities.get("pure-power") || 0;
+			// Formula: 1 + (proficiency / 100) * 2
+			// At 0%: 1 + 0 = 1.0 (no change)
+			// At 50%: 1 + 1 = 2.0 (+100%)
+			// At 100%: 1 + 2 = 3.0 (+200%)
+			purePowerMultiplier = 1 + (proficiency / 100) * 2;
+		}
+
+		// Combine Pure Power multiplier with provided multiplier
+		const finalAttackPowerMultiplier =
+			attackPowerMultiplier * purePowerMultiplier;
+
 		// Check if attack hits (accuracy vs avoidance)
 		// Skip miss check if guaranteedHit is true
 		if (!guaranteedHit) {
@@ -6832,7 +6848,7 @@ export class Mob extends Movable {
 			: baseAttackPower;
 
 		// Apply attack power bonus and multiplier (from abilities, etc.)
-		damage = (damage + attackPowerBonus) * attackPowerMultiplier;
+		damage = (damage + attackPowerBonus) * finalAttackPowerMultiplier;
 
 		// Apply defense reduction
 		const defenseReduction = target.defense * 0.1; // 10% damage reduction per defense point

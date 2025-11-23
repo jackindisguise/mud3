@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Archetype File",
+  "type": "object",
+  "required": ["archetype"],
+  "properties": {
+    "archetype": {
+      "type": "object",
+      "required": ["id", "name", "description", "isStarter"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "isStarter": { "type": "boolean" },
+        "startingAttributes": { "$ref": "#/definitions/primaryAttributes" },
+        "attributeGrowthPerLevel": {
+          "$ref": "#/definitions/primaryAttributes"
+        },
+        "startingResourceCaps": { "$ref": "#/definitions/resourceCaps" },
+        "resourceGrowthPerLevel": { "$ref": "#/definitions/resourceCaps" },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "level"],
+            "properties": {
+              "id": { "type": "string" },
+              "level": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "passives": { "type": "array", "items": { "type": "string" } },
+        "growthModifier": {
+          "type": "object",
+          "required": ["base", "perLevel"],
+          "properties": {
+            "base": { "type": "number" },
+            "perLevel": { "type": "number" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "primaryAttributes": {
+      "type": "object",
+      "properties": {
+        "strength": { "type": "integer", "minimum": 0 },
+        "agility": { "type": "integer", "minimum": 0 },
+        "intelligence": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "resourceCaps": {
+      "type": "object",
+      "properties": {
+        "maxHealth": { "type": "integer", "minimum": 0 },
+        "maxMana": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

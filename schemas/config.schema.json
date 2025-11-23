@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Config",
+  "type": "object",
+  "required": ["game", "server", "security"],
+  "properties": {
+    "game": {
+      "type": "object",
+      "required": ["name", "creator"],
+      "properties": {
+        "name": { "type": "string" },
+        "creator": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "server": {
+      "type": "object",
+      "required": ["port", "inactivity_timeout"],
+      "properties": {
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "inactivity_timeout": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "required": ["password_salt"],
+      "properties": { "password_salt": { "type": "string" } },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -7,13 +7,27 @@
  * @module commands/_movement
  */
 
-import { CommandContext } from "../command.js";
+import { CommandContext, PRIORITY } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Room, DIRECTION, dir2text } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 export const DEFAULT_COMMAND_VALUES: Partial<CommandObject> = {
-	cooldown: 300,
+	priority: PRIORITY.HIGH,
+	cooldown: (context: CommandContext, args: Map<string, any>) => {
+		const { actor, room } = context;
+		const direction = args.get("direction") as DIRECTION;
+		if (!room) {
+			return 0;
+		}
+		if (actor.isInCombat()) {
+			return 0;
+		}
+		if (!actor.canStep(direction)) {
+			return 0;
+		}
+		return 300;
+	},
 };
 
 /**

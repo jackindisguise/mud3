@@ -1,5 +1,5 @@
 game:
-  name: mud3
+  name: "mud3"
   creator: jackindisguise
 server:
   port: 23

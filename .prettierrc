@@ -1,3 +1,17 @@
 {
-	"useTabs": true
+	"useTabs": true,
+	"overrides": [
+		{
+			"files": "*.json",
+			"options": {
+				"useTabs": false
+			}
+		},
+		{
+			"files": "*.yaml",
+			"options": {
+				"useTabs": false
+			}
+		}
+	]
 }

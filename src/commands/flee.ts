@@ -23,9 +23,19 @@ import { act } from "../act.js";
 
 export default {
 	pattern: "flee~",
-	aliases: ["run~"],
+	aliases: ["run~", "escape~"],
 	priority: PRIORITY.HIGH,
-	cooldown: 5000, // 5 seconds
+	cooldown: (context: CommandContext, args: Map<string, any>) => {
+		const { actor } = context;
+		if (!actor.isInCombat()) {
+			return 0;
+		}
+		const validDirections: DIRECTION[] = [];
+		for (const dir of DIRECTIONS)
+			if (actor.canStep(dir)) validDirections.push(dir);
+		if (validDirections.length === 0) return 0;
+		return 5000;
+	},
 	execute(context: CommandContext): void {
 		const { actor, room } = context;
 

@@ -21,6 +21,7 @@ export default {
 	...DEFAULT_COMMAND_VALUES,
 	pattern: "northwest~",
 	aliases: ["nw"],
+	priority: PRIORITY.LOW,
 	execute(context: CommandContext): void {
 		executeMovement(context, DIRECTION.NORTHWEST);
 	},

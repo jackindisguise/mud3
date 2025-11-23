@@ -25,9 +25,25 @@ export const ability: Ability = {
 	description: "A spinning attack that hits all nearby enemies in the room.",
 };
 
+const COOLDOWN_MS = 1000;
+
 export const command: CommandObject = {
-	pattern: "whirlwind",
-	cooldown: 1000,
+	pattern: "whirlwind~",
+	cooldown(context: CommandContext, args: Map<string, any>) {
+		const { actor, room } = context;
+		const character = actor.character;
+		if (!actor.knowsAbility(ABILITY_ID)) {
+			return 0;
+		}
+		if (!room) {
+			return 0;
+		}
+		if (actor.health <= 0) {
+			return 0;
+		}
+		return COOLDOWN_MS;
+	},
+
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor, room } = context;
 		const character = actor.character;

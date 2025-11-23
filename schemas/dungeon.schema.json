@@ -1,133 +1,133 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Dungeon",
-  "type": "object",
-  "required": ["dungeon"],
-  "properties": {
-    "dungeon": {
-      "type": "object",
-      "required": ["id", "name", "dimensions", "grid", "rooms"],
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "resetMessage": { "type": "string" },
-        "dimensions": {
-          "type": "object",
-          "required": ["width", "height", "layers"],
-          "properties": {
-            "width": { "type": "integer", "minimum": 1 },
-            "height": { "type": "integer", "minimum": 1 },
-            "layers": { "type": "integer", "minimum": 1 }
-          },
-          "additionalProperties": false
-        },
-        "grid": {
-          "type": "array",
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "array",
-              "items": { "type": ["integer", "null"] }
-            }
-          }
-        },
-        "rooms": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["display"],
-            "properties": {
-              "display": { "type": "string" },
-              "description": { "type": "string" },
-              "roomDescription": { "type": "string" },
-              "keywords": { "type": "string" },
-              "mapText": { "type": "string" },
-              "mapColor": { "type": "integer" },
-              "allowedExits": { "type": "integer" },
-              "dense": { "type": "boolean" },
-              "roomLinks": {
-                "type": "object",
-                "patternProperties": {
-                  "^(north|south|east|west|up|down|northeast|northwest|southeast|southwest)$": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "templates": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "type", "display"],
-            "properties": {
-              "id": { "type": "string" },
-              "type": { "type": "string" },
-              "display": { "type": "string" },
-              "description": { "type": "string" },
-              "roomDescription": { "type": "string" },
-              "keywords": { "type": "string" },
-              "mapText": { "type": "string" },
-              "mapColor": { "type": "integer" },
-              "slot": { "type": "string" },
-              "hitType": { "type": "string" },
-              "attackPower": { "type": "integer" },
-              "defense": { "type": "integer" },
-              "race": { "type": "string" },
-              "job": { "type": "string" },
-              "level": { "type": "integer", "minimum": 0 },
-              "behaviors": {
-                "type": "object",
-                "additionalProperties": { "type": "boolean" }
-              },
-              "attributeBonuses": {
-                "type": "object",
-                "additionalProperties": { "type": "integer" }
-              },
-              "resourceCaps": {
-                "type": "object",
-                "additionalProperties": { "type": "integer" }
-              },
-              "secondaryAttributes": {
-                "type": "object",
-                "additionalProperties": { "type": "integer" }
-              }
-            },
-            "additionalProperties": true
-          }
-        },
-        "resets": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["templateId", "roomRef"],
-            "properties": {
-              "templateId": { "type": "string" },
-              "roomRef": {
-                "type": "string",
-                "pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
-              },
-              "minCount": { "type": "integer", "minimum": 0 },
-              "maxCount": { "type": "integer", "minimum": 0 },
-              "equipped": { "type": "array", "items": { "type": "string" } },
-              "inventory": { "type": "array", "items": { "type": "string" } }
-            },
-            "additionalProperties": false
-          }
-        },
-        "exitOverrides": {
-          "type": "object",
-          "patternProperties": {
-            "^[0-9]+,[0-9]+,[0-9]+$": { "type": "integer" }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": true
-    }
-  },
-  "additionalProperties": false
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Dungeon",
+	"type": "object",
+	"required": ["dungeon"],
+	"properties": {
+		"dungeon": {
+			"type": "object",
+			"required": ["id", "name", "dimensions", "grid", "rooms"],
+			"properties": {
+				"id": { "type": "string" },
+				"name": { "type": "string" },
+				"resetMessage": { "type": "string" },
+				"dimensions": {
+					"type": "object",
+					"required": ["width", "height", "layers"],
+					"properties": {
+						"width": { "type": "integer", "minimum": 1 },
+						"height": { "type": "integer", "minimum": 1 },
+						"layers": { "type": "integer", "minimum": 1 }
+					},
+					"additionalProperties": false
+				},
+				"grid": {
+					"type": "array",
+					"items": {
+						"type": "array",
+						"items": {
+							"type": "array",
+							"items": { "type": ["integer", "null"] }
+						}
+					}
+				},
+				"rooms": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["display"],
+						"properties": {
+							"display": { "type": "string" },
+							"description": { "type": "string" },
+							"roomDescription": { "type": "string" },
+							"keywords": { "type": "string" },
+							"mapText": { "type": "string" },
+							"mapColor": { "type": "integer" },
+							"allowedExits": { "type": "integer" },
+							"dense": { "type": "boolean" },
+							"roomLinks": {
+								"type": "object",
+								"patternProperties": {
+									"^(north|south|east|west|up|down|northeast|northwest|southeast|southwest)$": {
+										"type": "string"
+									}
+								},
+								"additionalProperties": false
+							}
+						},
+						"additionalProperties": false
+					}
+				},
+				"templates": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["id", "type", "display"],
+						"properties": {
+							"id": { "type": "string" },
+							"type": { "type": "string" },
+							"display": { "type": "string" },
+							"description": { "type": "string" },
+							"roomDescription": { "type": "string" },
+							"keywords": { "type": "string" },
+							"mapText": { "type": "string" },
+							"mapColor": { "type": "integer" },
+							"slot": { "type": "string" },
+							"hitType": { "type": "string" },
+							"attackPower": { "type": "integer" },
+							"defense": { "type": "integer" },
+							"race": { "type": "string" },
+							"job": { "type": "string" },
+							"level": { "type": "integer", "minimum": 0 },
+							"behaviors": {
+								"type": "object",
+								"additionalProperties": { "type": "boolean" }
+							},
+							"attributeBonuses": {
+								"type": "object",
+								"additionalProperties": { "type": "integer" }
+							},
+							"resourceCaps": {
+								"type": "object",
+								"additionalProperties": { "type": "integer" }
+							},
+							"secondaryAttributes": {
+								"type": "object",
+								"additionalProperties": { "type": "integer" }
+							}
+						},
+						"additionalProperties": true
+					}
+				},
+				"resets": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": ["templateId", "roomRef"],
+						"properties": {
+							"templateId": { "type": "string" },
+							"roomRef": {
+								"type": "string",
+								"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
+							},
+							"minCount": { "type": "integer", "minimum": 0 },
+							"maxCount": { "type": "integer", "minimum": 0 },
+							"equipped": { "type": "array", "items": { "type": "string" } },
+							"inventory": { "type": "array", "items": { "type": "string" } }
+						},
+						"additionalProperties": false
+					}
+				},
+				"exitOverrides": {
+					"type": "object",
+					"patternProperties": {
+						"^[0-9]+,[0-9]+,[0-9]+$": { "type": "integer" }
+					},
+					"additionalProperties": false
+				}
+			},
+			"additionalProperties": true
+		}
+	},
+	"additionalProperties": false
 }

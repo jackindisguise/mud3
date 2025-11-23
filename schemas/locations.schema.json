@@ -1,12 +1,12 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Locations",
-  "type": "object",
-  "patternProperties": {
-    "^[A-Za-z0-9_-]+$": {
-      "type": "string",
-      "pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
-    }
-  },
-  "additionalProperties": false
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Locations",
+	"type": "object",
+	"patternProperties": {
+		"^[A-Za-z0-9_-]+$": {
+			"type": "string",
+			"pattern": "^@[A-Za-z0-9_-]+\\{-?[0-9]+,-?[0-9]+,-?[0-9]+\\}$"
+		}
+	},
+	"additionalProperties": false
 }

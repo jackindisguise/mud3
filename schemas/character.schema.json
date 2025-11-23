@@ -1,87 +1,87 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Character",
-  "type": "object",
-  "required": ["credentials", "settings", "stats", "mob"],
-  "properties": {
-    "credentials": {
-      "type": "object",
-      "required": [
-        "characterId",
-        "username",
-        "passwordHash",
-        "createdAt",
-        "lastLogin",
-        "isActive",
-        "isBanned",
-        "isAdmin"
-      ],
-      "properties": {
-        "characterId": { "type": "integer" },
-        "username": { "type": "string" },
-        "passwordHash": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "lastLogin": { "type": "string", "format": "date-time" },
-        "isActive": { "type": "boolean" },
-        "isBanned": { "type": "boolean" },
-        "isAdmin": { "type": "boolean" }
-      },
-      "additionalProperties": false
-    },
-    "settings": {
-      "type": "object",
-      "properties": {
-        "receiveOOC": { "type": "boolean" },
-        "verboseMode": { "type": "boolean" },
-        "prompt": { "type": "string" },
-        "colorEnabled": { "type": "boolean" },
-        "autoLook": { "type": "boolean" },
-        "briefMode": { "type": "boolean" },
-        "echoMode": { "type": "string" },
-        "defaultColor": { "type": "string" },
-        "channels": { "type": "array", "items": { "type": "string" } },
-        "blockedUsers": { "type": "array", "items": { "type": "string" } }
-      },
-      "additionalProperties": false
-    },
-    "stats": {
-      "type": "object",
-      "properties": {
-        "playtime": { "type": "integer", "minimum": 0 },
-        "deaths": { "type": "integer", "minimum": 0 },
-        "kills": { "type": "integer", "minimum": 0 }
-      },
-      "additionalProperties": false
-    },
-    "mob": {
-      "type": "object",
-      "required": [
-        "oid",
-        "keywords",
-        "display",
-        "race",
-        "job",
-        "health",
-        "mana"
-      ],
-      "properties": {
-        "oid": { "type": "integer" },
-        "keywords": { "type": "string" },
-        "display": { "type": "string" },
-        "location": { "type": "string" },
-        "level": { "type": "integer", "minimum": 1 },
-        "experience": { "type": "integer", "minimum": 0 },
-        "race": { "type": "string" },
-        "job": { "type": "string" },
-        "health": { "type": "integer" },
-        "mana": { "type": "integer" },
-        "learnedAbilities": {
-          "type": "object",
-          "additionalProperties": { "type": "integer", "minimum": 0 }
-        }
-      },
-      "additionalProperties": true
-    }
-  },
-  "additionalProperties": false
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Character",
+	"type": "object",
+	"required": ["credentials", "settings", "stats", "mob"],
+	"properties": {
+		"credentials": {
+			"type": "object",
+			"required": [
+				"characterId",
+				"username",
+				"passwordHash",
+				"createdAt",
+				"lastLogin",
+				"isActive",
+				"isBanned",
+				"isAdmin"
+			],
+			"properties": {
+				"characterId": { "type": "integer" },
+				"username": { "type": "string" },
+				"passwordHash": { "type": "string" },
+				"createdAt": { "type": "string", "format": "date-time" },
+				"lastLogin": { "type": "string", "format": "date-time" },
+				"isActive": { "type": "boolean" },
+				"isBanned": { "type": "boolean" },
+				"isAdmin": { "type": "boolean" }
+			},
+			"additionalProperties": false
+		},
+		"settings": {
+			"type": "object",
+			"properties": {
+				"receiveOOC": { "type": "boolean" },
+				"verboseMode": { "type": "boolean" },
+				"prompt": { "type": "string" },
+				"colorEnabled": { "type": "boolean" },
+				"autoLook": { "type": "boolean" },
+				"briefMode": { "type": "boolean" },
+				"echoMode": { "type": "string" },
+				"defaultColor": { "type": "string" },
+				"channels": { "type": "array", "items": { "type": "string" } },
+				"blockedUsers": { "type": "array", "items": { "type": "string" } }
+			},
+			"additionalProperties": false
+		},
+		"stats": {
+			"type": "object",
+			"properties": {
+				"playtime": { "type": "integer", "minimum": 0 },
+				"deaths": { "type": "integer", "minimum": 0 },
+				"kills": { "type": "integer", "minimum": 0 }
+			},
+			"additionalProperties": false
+		},
+		"mob": {
+			"type": "object",
+			"required": [
+				"oid",
+				"keywords",
+				"display",
+				"race",
+				"job",
+				"health",
+				"mana"
+			],
+			"properties": {
+				"oid": { "type": "integer" },
+				"keywords": { "type": "string" },
+				"display": { "type": "string" },
+				"location": { "type": "string" },
+				"level": { "type": "integer", "minimum": 1 },
+				"experience": { "type": "integer", "minimum": 0 },
+				"race": { "type": "string" },
+				"job": { "type": "string" },
+				"health": { "type": "integer" },
+				"mana": { "type": "integer" },
+				"learnedAbilities": {
+					"type": "object",
+					"additionalProperties": { "type": "integer", "minimum": 0 }
+				}
+			},
+			"additionalProperties": true
+		}
+	},
+	"additionalProperties": false
 }

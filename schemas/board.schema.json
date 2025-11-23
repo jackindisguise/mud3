@@ -1,22 +1,22 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Board",
-  "type": "object",
-  "required": [
-    "name",
-    "displayName",
-    "description",
-    "permanent",
-    "nextMessageId"
-  ],
-  "properties": {
-    "name": { "type": "string" },
-    "displayName": { "type": "string" },
-    "description": { "type": "string" },
-    "permanent": { "type": "boolean" },
-    "expirationMs": { "type": "integer", "minimum": 0 },
-    "writePermission": { "type": "string" },
-    "nextMessageId": { "type": "integer", "minimum": 0 }
-  },
-  "additionalProperties": false
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Board",
+	"type": "object",
+	"required": [
+		"name",
+		"displayName",
+		"description",
+		"permanent",
+		"nextMessageId"
+	],
+	"properties": {
+		"name": { "type": "string" },
+		"displayName": { "type": "string" },
+		"description": { "type": "string" },
+		"permanent": { "type": "boolean" },
+		"expirationMs": { "type": "integer", "minimum": 0 },
+		"writePermission": { "type": "string" },
+		"nextMessageId": { "type": "integer", "minimum": 0 }
+	},
+	"additionalProperties": false
 }

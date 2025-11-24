@@ -651,7 +651,7 @@ export class Character {
 			finalText = stickyColor(text, this.settings.defaultColor);
 		}
 
-		client.send(finalText, this.settings.colorEnabled);
+		client.send(finalText, this.settings.colorEnabled ?? true);
 	}
 
 	/**

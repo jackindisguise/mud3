@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>MUD Client</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&family=Source+Code+Pro:wght@400&family=Roboto+Mono:wght@400&family=Inconsolata:wght@400&family=JetBrains+Mono:wght@400&display=swap"
+			rel="stylesheet"
+		/>
+		<link rel="stylesheet" href="/style.css" />
+	</head>
+	<body>
+		<div id="matrix-rain" class="theme-effect hidden"></div>
+		<div id="cyberpunk-lines" class="theme-effect hidden"></div>
+		<div id="topbar">
+			<div class="topbar-section">
+				<button id="themes-btn" class="topbar-btn">Themes</button>
+				<div id="themes-menu" class="dropdown-menu hidden">
+					<div class="theme-option" data-theme="dark">
+						<span class="theme-name">Dark</span>
+					</div>
+					<div class="theme-option" data-theme="light">
+						<span class="theme-name">Light</span>
+					</div>
+					<div class="theme-option" data-theme="solarized-dark">
+						<span class="theme-name">Solarized Dark</span>
+					</div>
+					<div class="theme-option" data-theme="solarized-light">
+						<span class="theme-name">Solarized Light</span>
+					</div>
+					<div class="theme-option" data-theme="neon-dark">
+						<span class="theme-name">Neon Dark</span>
+					</div>
+					<div class="theme-option" data-theme="neon-light">
+						<span class="theme-name">Neon Light</span>
+					</div>
+					<div class="theme-option" data-theme="cyberpunk">
+						<span class="theme-name">Cyberpunk</span>
+					</div>
+					<div class="theme-option" data-theme="matrix">
+						<span class="theme-name">Matrix</span>
+					</div>
+					<div class="theme-option" data-theme="ocean">
+						<span class="theme-name">Ocean</span>
+					</div>
+					<div class="theme-option" data-theme="fire">
+						<span class="theme-name">Fire</span>
+					</div>
+					<div class="theme-option" data-theme="purple-haze">
+						<span class="theme-name">Purple Haze</span>
+					</div>
+					<div class="theme-option" data-theme="amber">
+						<span class="theme-name">Amber</span>
+					</div>
+				</div>
+			</div>
+			<div class="topbar-section">
+				<button id="fonts-btn" class="topbar-btn">Fonts</button>
+				<div id="fonts-menu" class="dropdown-menu hidden">
+					<div class="font-option" data-font="'Courier New', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Courier New', monospace"
+							>Courier New</span
+						>
+					</div>
+					<div class="font-option" data-font="'Consolas', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Consolas', monospace"
+							>Consolas</span
+						>
+					</div>
+					<div class="font-option" data-font="'Monaco', monospace">
+						<span class="font-preview" style="font-family: 'Monaco', monospace"
+							>Monaco</span
+						>
+					</div>
+					<div class="font-option" data-font="'Menlo', monospace">
+						<span class="font-preview" style="font-family: 'Menlo', monospace"
+							>Menlo</span
+						>
+					</div>
+					<div class="font-option" data-font="'Lucida Console', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Lucida Console', monospace"
+							>Lucida Console</span
+						>
+					</div>
+					<div class="font-option" data-font="'DejaVu Sans Mono', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'DejaVu Sans Mono', monospace"
+							>DejaVu Sans Mono</span
+						>
+					</div>
+					<div class="font-option" data-font="'Liberation Mono', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Liberation Mono', monospace"
+							>Liberation Mono</span
+						>
+					</div>
+					<div class="font-option" data-font="'Fira Code', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Fira Code', monospace"
+							>Fira Code</span
+						>
+					</div>
+					<div class="font-option" data-font="'Source Code Pro', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Source Code Pro', monospace"
+							>Source Code Pro</span
+						>
+					</div>
+					<div class="font-option" data-font="'Roboto Mono', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Roboto Mono', monospace"
+							>Roboto Mono</span
+						>
+					</div>
+					<div class="font-option" data-font="'Inconsolata', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'Inconsolata', monospace"
+							>Inconsolata</span
+						>
+					</div>
+					<div class="font-option" data-font="'JetBrains Mono', monospace">
+						<span
+							class="font-preview"
+							style="font-family: 'JetBrains Mono', monospace"
+							>JetBrains Mono</span
+						>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="status" class="disconnected">Disconnected</div>
+		<div id="output"></div>
+		<div id="input-container">
+			<input
+				type="text"
+				id="input"
+				placeholder="Type commands here..."
+				autocomplete="off"
+			/>
+		</div>
+		<script src="/client.js"></script>
+	</body>
+</html>

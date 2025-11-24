@@ -59,7 +59,7 @@ import { getHelpfile, searchHelpfiles } from "./package/help.js";
 import { LINEBREAK } from "./telnet.js";
 import { processCombatRound } from "./combat.js";
 import { processWanderBehaviors } from "./behavior.js";
-import { connect } from "net";
+import { WebClientServer } from "./web-client.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -135,11 +135,8 @@ export class Game {
 	private wanderTimer?: number;
 	private nextConnectionId = 1;
 
-	/** Copyover data by username (set during copyover recovery) */
-	private copyoverByUsername?: Map<
-		string,
-		{ clientId: string; username: string }
-	>;
+	/** Web client server (optional) */
+	private webClientServer?: WebClientServer;
 
 	/** Static singleton instance of the Game */
 	public static game?: Game;
@@ -172,7 +169,8 @@ export class Game {
 			logger.info(`Disconnecting ${name} due to inactivity`);
 			try {
 				session.client.sendLine(
-					"You have been disconnected due to inactivity."
+					"You have been disconnected due to inactivity.",
+					false
 				);
 			} catch {}
 			// Closing the client triggers server 'disconnection' which cleans up the session
@@ -207,26 +205,21 @@ export class Game {
 			this.handleDisconnection(client);
 		});
 
-		// Determine which port to use
-		// If running under instance manager, use internal port
-		const port =
-			process.env.GAME_INTERNAL_PORT !== undefined
-				? parseInt(process.env.GAME_INTERNAL_PORT, 10)
-				: this.config.server.port;
-
-		// If running under instance manager, bind to localhost only
-		// This ensures the game server is not publicly accessible
-		const host =
-			process.env.INSTANCE_MANAGER_MODE === "true" ? "127.0.0.1" : undefined;
-
 		// Start the server
-		await this.server.start(port, host);
+		await this.server.start(this.config.server.port);
 
-		// If running under instance manager, request copyover data
-		if (process.env.INSTANCE_MANAGER_MODE === "true") {
-			// Wait a moment for server to be ready
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			await this.requestCopyoverDataFromInstanceManager();
+		// Start web client server if enabled in config
+		const webClientEnabled = true;
+		if (webClientEnabled) {
+			const webClientPort = 8080;
+			this.webClientServer = new WebClientServer(webClientPort);
+			this.webClientServer.on("connection", (client: MudClient) => {
+				this.handleNewConnection(client);
+			});
+			this.webClientServer.on("disconnection", (client: MudClient) => {
+				this.handleDisconnection(client);
+			});
+			await this.webClientServer.start();
 		}
 
 		// Set up auto-save timer
@@ -339,6 +332,12 @@ export class Game {
 		logger.debug("All sessions ended, saving boards");
 		// Save all boards before shutting down
 		await this.saveAllBoards();
+
+		// Stop web client server if running
+		if (this.webClientServer) {
+			await this.webClientServer.stop();
+			this.webClientServer = undefined;
+		}
 
 		logger.debug("All boards saved, stopping server");
 		// Stop the server (this will trigger disconnection events, but sessions are already cleared)
@@ -691,31 +690,6 @@ export class Game {
 
 				username = trimmed; // save username
 
-				// Check for copyover data first
-				if (self.hasCopyoverData(trimmed)) {
-					logger.info(
-						`Found copyover data for ${trimmed}, restoring character...`
-					);
-					// Remove from pending
-					if (self.copyoverByUsername) {
-						self.copyoverByUsername.delete(trimmed.toLowerCase());
-					}
-					// Load character from disk (it was saved before copyover)
-					const loadedCharacter = await loadCharacterFile(trimmed);
-					if (!loadedCharacter) {
-						sendLine("Error: Could not restore character after copyover.");
-						return askName();
-					}
-					// Get the saved location reference from the serialized data
-					const serializedCharacter = loadedCharacter.serialize();
-					const savedLocationRef = serializedCharacter.mob.location as
-						| string
-						| undefined;
-					sendLine("Reconnecting after copyover...");
-					MOTD(loadedCharacter, savedLocationRef);
-					return;
-				}
-
 				// new name, start making a character
 				if (!(await characterExists(trimmed))) {
 					return confirmCharacterCreation();
@@ -839,7 +813,6 @@ export class Game {
 
 		logger.debug(`calling askName() to start login process for ${client}`);
 
-		// Check for copyover data first
 		// We check by username after they enter it, or we can check immediately
 		// For now, we'll check after they enter their name
 		askName();
@@ -1272,7 +1245,7 @@ export class Game {
 		for (const session of this.loginSessions) {
 			try {
 				if (session.character) session.character.sendLine(text);
-				else session.client.sendLine(text);
+				else session.client.sendLine(text, false);
 			} catch (error) {
 				logger.error(`Failed to send broadcast to client: ${error}`);
 			}
@@ -1320,233 +1293,6 @@ export class Game {
 		} catch (error) {
 			logger.error(`Failed to save game state: ${error}`);
 		}
-	}
-
-	/**
-	 * Prepare copyover data: save all characters and create client/character pairs.
-	 * This is called before a copyover to preserve all connected players.
-	 *
-	 * @returns Copyover data containing client/character pairs
-	 */
-	public async prepareCopyover(): Promise<
-		Array<{
-			clientId: string;
-			username: string;
-		}>
-	> {
-		logger.info("Preparing copyover data...");
-
-		// Save all characters first
-		await this.saveAllCharacters();
-
-		// Create client/character pairs for all playing characters
-		const pairs: Array<{
-			clientId: string;
-			username: string;
-		}> = [];
-
-		for (const session of this.loginSessions) {
-			if (session.character && session.state === LOGIN_STATE.PLAYING) {
-				const character = session.character;
-				const clientId = session.client.getAddress();
-
-				pairs.push({
-					clientId,
-					username: character.credentials.username,
-				});
-
-				logger.debug(
-					`Added copyover pair for ${character.credentials.username} (${clientId})`
-				);
-			}
-		}
-
-		logger.info(`Prepared copyover data for ${pairs.length} character(s)`);
-		return pairs;
-	}
-
-	/**
-	 * Restore characters from copyover data and reconnect clients.
-	 * This is called after a copyover to restore all players to their previous state.
-	 *
-	 * @param pairs Array of client/character pairs from copyover
-	 */
-	public async restoreFromCopyover(
-		pairs: Array<{
-			clientId: string;
-			username: string;
-		}>
-	): Promise<void> {
-		logger.info(`Restoring ${pairs.length} character(s) from copyover...`);
-
-		// Store pairs by username for quick lookup when clients reconnect
-		if (!this.copyoverByUsername) {
-			this.copyoverByUsername = new Map();
-		}
-		for (const pair of pairs) {
-			this.copyoverByUsername.set(pair.username.toLowerCase(), pair);
-		}
-
-		logger.info("Copyover pairs stored, waiting for clients to reconnect...");
-	}
-
-	/**
-	 * Check if a username has copyover data.
-	 * This should be called during the login process.
-	 *
-	 * @param username The username to check
-	 * @returns true if the username has copyover data, false otherwise
-	 */
-	public hasCopyoverData(username: string): boolean {
-		if (!this.copyoverByUsername) return false;
-
-		return this.copyoverByUsername.has(username.toLowerCase());
-	}
-
-	/**
-	 * Connect to instance manager and set up copyover data listener.
-	 * This is called on startup if running under instance manager mode.
-	 */
-	public async requestCopyoverDataFromInstanceManager(): Promise<void> {
-		const controlPort = process.env.INSTANCE_MANAGER_CONTROL_PORT;
-		if (!controlPort) {
-			// Not running under instance manager
-			return;
-		}
-
-		logger.info("Setting up copyover data listener with instance manager...");
-
-		// Set up a persistent connection to receive copyover data for clients
-		this.setupCopyoverDataListener(parseInt(controlPort, 10));
-	}
-
-	/**
-	 * Set up a listener for copyover data from instance manager
-	 */
-	private setupCopyoverDataListener(controlPort: number): void {
-		const socket = connect(controlPort, "127.0.0.1");
-
-		socket.on("connect", () => {
-			logger.info("Connected to instance manager control server");
-		});
-
-		let buffer = "";
-		socket.on("data", (data: Buffer) => {
-			buffer += data.toString();
-			const lines = buffer.split("\n");
-			buffer = lines.pop() || "";
-
-			for (const line of lines) {
-				const trimmed = line.trim();
-				if (!trimmed) continue;
-
-				try {
-					const command = JSON.parse(trimmed);
-					if (command.type === "clientConnectedWithCopyover") {
-						// Instance manager is notifying us that a client with copyover data has connected
-						const pair = command.pair;
-						logger.info(
-							`Received copyover data for client ${command.proxyClientAddress} (${pair.username})`
-						);
-						// Store by username for matching when client logs in
-						if (!this.copyoverByUsername) {
-							this.copyoverByUsername = new Map();
-						}
-						this.copyoverByUsername.set(pair.username.toLowerCase(), pair);
-
-						// Acknowledge
-						const ack = {
-							type: "clientConnectedWithCopyover",
-							proxyClientAddress: command.proxyClientAddress,
-						};
-						socket.write(JSON.stringify(ack) + "\n");
-					}
-				} catch (err) {
-					logger.error(`Error parsing copyover command: ${err}`);
-				}
-			}
-		});
-
-		socket.on("error", (err: Error) => {
-			logger.error(
-				`Error with instance manager control connection: ${err.message}`
-			);
-			// Try to reconnect after a delay
-			setTimeout(() => {
-				if (process.env.INSTANCE_MANAGER_MODE === "true") {
-					this.setupCopyoverDataListener(controlPort);
-				}
-			}, 5000);
-		});
-
-		socket.on("close", () => {
-			logger.debug("Instance manager control connection closed");
-			// Try to reconnect if still in instance manager mode
-			if (process.env.INSTANCE_MANAGER_MODE === "true") {
-				setTimeout(() => {
-					this.setupCopyoverDataListener(controlPort);
-				}, 5000);
-			}
-		});
-	}
-
-	/**
-	 * Initiate a copyover operation.
-	 * This saves all characters, creates client/character pairs, and signals
-	 * the instance manager to restart the game.
-	 */
-	public async initiateCopyover(): Promise<void> {
-		logger.info("Initiating copyover...");
-
-		// Prepare copyover data
-		const pairs = await this.prepareCopyover();
-
-		// Send copyover data to instance manager
-		const controlPort = process.env.INSTANCE_MANAGER_CONTROL_PORT;
-		if (!controlPort) {
-			throw new Error("Not running under instance manager - cannot copyover");
-		}
-
-		return new Promise((resolve, reject) => {
-			const socket = connect(parseInt(controlPort, 10), "127.0.0.1");
-
-			socket.on("connect", () => {
-				const command = {
-					type: "initiateCopyover",
-					data: { pairs },
-				};
-				socket.write(JSON.stringify(command) + "\n");
-			});
-
-			socket.on("data", (data: Buffer) => {
-				try {
-					const response = JSON.parse(data.toString().trim());
-					if (response.type === "ack") {
-						logger.info("Copyover initiated, shutting down...");
-						socket.end();
-						// Stop the game - instance manager will restart it
-						this.stop().then(() => {
-							resolve();
-						});
-					}
-				} catch (err) {
-					logger.error(`Error parsing copyover response: ${err}`);
-				}
-			});
-
-			socket.on("error", (err: Error) => {
-				logger.error(`Error connecting to instance manager: ${err.message}`);
-				reject(err);
-			});
-
-			// Timeout after 10 seconds
-			setTimeout(() => {
-				if (!socket.destroyed) {
-					socket.destroy();
-					reject(new Error("Copyover initiation timeout"));
-				}
-			}, 10000);
-		});
 	}
 }
 

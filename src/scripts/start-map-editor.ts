@@ -6,10 +6,10 @@
  */
 
 import { loadPackage } from "package-loader";
-import { createMapEditorServer } from "./map-editor-server.js";
-import logger from "./logger.js";
-import dungeon from "./package/dungeon.js";
-import archetype from "./package/archetype.js";
+import { createMapEditorServer } from "../map-editor-server.js";
+import logger from "../logger.js";
+import dungeon from "../package/dungeon.js";
+import archetype from "../package/archetype.js";
 
 const server = createMapEditorServer();
 

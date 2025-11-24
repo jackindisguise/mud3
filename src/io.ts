@@ -43,6 +43,41 @@ import { string } from "mud-ext";
 import { colorize as _colorize, stripColors } from "./color.js";
 import { LINEBREAK } from "./telnet.js";
 
+export interface MudClient {
+	send(text: string, colorize?: boolean): void;
+	sendLine(text: string, colorize?: boolean): void;
+	close(): void;
+	ask(
+		question: string,
+		callback: (line: string) => void,
+		colorize: boolean
+	): void;
+	yesno(
+		question: string,
+		callback: (yesorno: boolean | undefined) => void,
+		_default?: boolean | undefined
+	): void;
+	getAddress(): string;
+	isConnected(): boolean;
+	isLocalhost(): boolean;
+	on(event: "input", listener: (line: string) => void): this;
+	on(event: "close", listener: () => void): this;
+	on(event: "error", listener: (err: Error) => void): this;
+	on(event: string, listener: (...args: any[]) => void): this;
+	once(event: "input", listener: (line: string) => void): this;
+	once(event: "close", listener: () => void): this;
+	once(event: "error", listener: (err: Error) => void): this;
+	once(event: string, listener: (...args: any[]) => void): this;
+	emit(event: "input", line: string): boolean;
+	emit(event: "close"): boolean;
+	emit(event: "error", err: Error): boolean;
+	emit(event: string, ...args: any[]): boolean;
+	off(event: "input", listener: (line: string) => void): this;
+	off(event: "close", listener: () => void): this;
+	off(event: "error", listener: (err: Error) => void): this;
+	off(event: string, listener: (...args: any[]) => void): this;
+}
+
 /**
  * Represents a connected MUD client.
  *
@@ -58,7 +93,7 @@ import { LINEBREAK } from "./telnet.js";
  * });
  * ```
  */
-export class MudClient extends EventEmitter {
+export class StandardMudClient extends EventEmitter implements MudClient {
 	private socket: Socket;
 	private buffer: string = "";
 	// Optional single-shot callback used by Game.nanny() style prompts
@@ -170,7 +205,8 @@ export class MudClient extends EventEmitter {
 	 */
 	public send(text: string, colorize: boolean = false): void {
 		const escaped = colorize ? _colorize(text) : stripColors(text);
-		if (!this.socket.destroyed) this.socket.write(escaped);
+		if (!this.socket.destroyed && this.socket.writable)
+			this.socket.write(escaped);
 	}
 
 	/**
@@ -387,7 +423,7 @@ export class MudServer extends EventEmitter {
 	}
 
 	private handleConnection(socket: Socket): void {
-		const client = new MudClient(socket);
+		const client = new StandardMudClient(socket);
 		this.clients.add(client);
 
 		logger.info(
@@ -500,7 +536,7 @@ export class MudServer extends EventEmitter {
 	 */
 	public broadcast(text: string): void {
 		for (const client of this.clients) {
-			client.send(text);
+			client.send(text, false);
 		}
 	}
 
@@ -510,7 +546,7 @@ export class MudServer extends EventEmitter {
 	 */
 	public broadcastLine(text: string): void {
 		for (const client of this.clients) {
-			client.sendLine(text);
+			client.sendLine(text, false);
 		}
 	}
 }

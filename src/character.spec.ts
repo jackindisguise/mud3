@@ -847,8 +847,10 @@ suite("character.ts", () => {
 
 		character.showPrompt();
 
-		const history = mockClient.sendHistory.map((line) => stripColorCodes(line));
-		const queueLine = history.find((line) => line.includes("[QUEUE]"));
+		const history = mockClient.sendHistory.map((line: string) =>
+			stripColorCodes(line)
+		);
+		const queueLine = history.find((line: string) => line.includes("[QUEUE]"));
 		assert.ok(
 			queueLine,
 			`Expected queued action line before prompt, got history: ${history.join(

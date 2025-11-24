@@ -1,5 +1,72 @@
 # Changelog
 
+## [1.18.0](https://github.com/jackindisguise/mud3/compare/v1.17.0...v1.18.0) (2025-11-24)
+
+
+### Features
+
+* add pure power passive and movement cooldown gating ([f954deb](https://github.com/jackindisguise/mud3/commit/f954debc4a78ce765e9f565f8a368435b1d4d15f))
+* added Ability interface in src/ability.ts ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added ability loader in src/package/abilities.ts that loads TypeScript abilities from dist/src/abilities ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added ability system with learned abilities and dynamic command loading ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added AbilityCommand class that requires actor to know ability before matching ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added abilityName option to oneHit for custom damage messages ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added attackPowerBonus and attackPowerMultiplier options to oneHit for dynamic damage scaling ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added change tracking system and improved map editor UX ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added change tracking system with history panel ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added expandable metadata details when selecting history entries ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added knowsAbility, addAbility, and removeAbility helper methods to Mob class ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added learned abilities Map to Mob class with proficiency tracking (0-100) ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* added Pure Power passive ability and applied multiplier in Mob attacks ([f954deb](https://github.com/jackindisguise/mud3/commit/f954debc4a78ce765e9f565f8a368435b1d4d15f))
+* added schemas for data files ([1598b97](https://github.com/jackindisguise/mud3/commit/1598b97b083835b42e8fa377cd1fb2aff7d1b2f8))
+* added selection bounds and shape metadata to placement operations ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* added status bar at bottom of editor showing template, tool, mode, position, history, and changes ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* added theme system and improved map editor UI ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* added triangle arrow indicators for UP and DOWN exits on grid cells ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* added visual indicators and status bar improvements ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* added weaponType field with default to shortsword ([5c70a99](https://github.com/jackindisguise/mud3/commit/5c70a99d611ba0742e9a6d1a4565003600ab7ac4))
+* changed exit override indicator from lightning bolt to warning triangle symbol ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* created example whirlwind ability in src/abilities/whirlwind.ts ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* created learn command in src/commands/learn.ts for learning abilities ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* exit overrides can now add roomlinks as well as the allowed exits ([96df8a3](https://github.com/jackindisguise/mud3/commit/96df8a3cc43bbd9af42fcf700b1456ffef10a746))
+* gated movement and flee cooldowns and set directional commands to low priority ([f954deb](https://github.com/jackindisguise/mud3/commit/f954debc4a78ce765e9f565f8a368435b1d4d15f))
+* implemented edge-line selection tool to create frame around line with two parallel lines and connecting segments ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* implemented flood fill paint mode for mobs and objects ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* mapped YAML data to JSON schemas and added VS Code schema associations ([f954deb](https://github.com/jackindisguise/mud3/commit/f954debc4a78ce765e9f565f8a368435b1d4d15f))
+* **minimap:** replaced up/down exit text with ^ and V arrows in minimap grid ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* registered ability loader in package system (index.ts) ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* required whirlwind command to be known, alive, and in-room before cooldown applied ([f954deb](https://github.com/jackindisguise/mud3/commit/f954debc4a78ce765e9f565f8a368435b1d4d15f))
+* **theme:** added dark and light theme system with toggle button ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **theme:** added spin animation for theme toggle button ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **theme:** added theme-init.js for CSP-compliant theme loading ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **theme:** created dark.css and light.css with futuristic styling ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **theme:** implemented theme persistence using localStorage ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **ui:** added styling for add/edit exit override button ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **ui:** disabled text highlighting globally while preserving input functionality ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **ui:** improved reset editor modal with min/max count on same line ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **ui:** improved template info box colors for light theme ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **ui:** updated exit override modal to show capitalized direction names ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* **ui:** updated help box with theme and reset action documentation ([79e9f98](https://github.com/jackindisguise/mud3/commit/79e9f98d3a098d65ccf9696fd8e73ecbeb9164b7))
+* updated CommandRegistry.execute to skip ability commands if actor doesn't know the ability ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* updated Mob serialize and deserialize methods to persist learned abilities ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* updated SerializedMob interface to include learnedAbilities field ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* updated whirlwind ability to use abilityName and attackPowerMultiplier ([711198d](https://github.com/jackindisguise/mud3/commit/711198d7692eea1d313597ecaa69b78757f9dda1))
+* working on web-client ([c5aa68f](https://github.com/jackindisguise/mud3/commit/c5aa68fff20b3d47555068ee54eb180eea2735ce))
+
+
+### Bug Fixes
+
+* added filledCount metadata to paint flood-fill change history ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* cleared selection tools when switching to paint flood-fill mode ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* corrected paint mode history tracking for mobs and objects to only record when cells are actually painted ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* corrected selection clearing behavior to clear previous selection when starting new selection with any tool ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* corrected status bar template check to handle template ID 0 correctly ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* ensured edge-line selection always includes start and end cells of original line ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+* fixed dungeon test, proficiency at uses, and reciprocal combat ([c1c50eb](https://github.com/jackindisguise/mud3/commit/c1c50eb232ffd79d151ddfc437e7ccbd6df16412))
+* improved minimap display and web client UX ([4700301](https://github.com/jackindisguise/mud3/commit/470030135b0ac8553be0821379b99a1e947b694f))
+* removed misuse of newParameters/oldParameters in selection placements ([89daaf3](https://github.com/jackindisguise/mud3/commit/89daaf3ea402fadc827d8b3d81093e092e0a006a))
+* updated status bar to show selected template and tool, not active usage state ([26bbf41](https://github.com/jackindisguise/mud3/commit/26bbf413ceb623fed30346a029600c409672b352))
+
 ## [1.17.0](https://github.com/jackindisguise/mud3/compare/v1.16.0...v1.17.0) (2025-11-21)
 
 

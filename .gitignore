@@ -19,9 +19,6 @@ logs/*.log
 # hide guides
 guides
 
-# hide commit message template
-commit-message.md
-
 # hide electron error logs
 electron-errors.log
 
@@ -34,5 +31,5 @@ build
 # hide data files we don't want committed
 data/.lock
 
-# don't save todo
-todo.md
+# don't save markdown files
+*.md

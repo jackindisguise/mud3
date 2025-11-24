@@ -19,7 +19,7 @@ import {
 	getJobById,
 	getRaceById,
 } from "./package/archetype.js";
-import { Mob } from "./dungeon.js";
+import { Mob, WEAPON_TYPES } from "./dungeon.js";
 import {
 	COMMON_HIT_TYPES,
 	MAGICAL_DAMAGE_TYPE,
@@ -212,6 +212,12 @@ export class MapEditorService {
 			hitTypes,
 			physicalDamageTypes: PHYSICAL_DAMAGE_TYPE,
 			magicalDamageTypes: MAGICAL_DAMAGE_TYPE,
+		};
+	}
+
+	public async getWeaponTypes(): Promise<{ weaponTypes: string[] }> {
+		return {
+			weaponTypes: [...WEAPON_TYPES],
 		};
 	}
 

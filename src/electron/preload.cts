@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 const api = {
 	getHitTypes: () => ipcRenderer.invoke("map-editor:get-hit-types"),
+	getWeaponTypes: () => ipcRenderer.invoke("map-editor:get-weapon-types"),
 	getRaces: () => ipcRenderer.invoke("map-editor:get-races"),
 	getJobs: () => ipcRenderer.invoke("map-editor:get-jobs"),
 	listDungeons: () => ipcRenderer.invoke("map-editor:list-dungeons"),
@@ -24,4 +25,3 @@ declare global {
 		mapEditorAPI: typeof api;
 	}
 }
-

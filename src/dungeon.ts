@@ -1862,6 +1862,7 @@ export interface SerializedWeapon extends SerializedDungeonObject {
 	slot: EQUIPMENT_SLOT;
 	attackPower: number;
 	hitType?: HitType;
+	weaponType?: WeaponType;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
 	resourceBonuses?: Partial<ResourceCapacities>;
 	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
@@ -2013,6 +2014,7 @@ export interface WeaponTemplate extends EquipmentTemplate {
 	type: "Weapon";
 	attackPower: number;
 	hitType?: HitType | string;
+	weaponType?: WeaponType;
 }
 
 /**
@@ -3251,6 +3253,7 @@ export function createFromTemplate(
 				slot: weaponTemplate.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
 				attackPower: weaponTemplate.attackPower ?? 0,
 				hitType: weaponTemplate.hitType,
+				type: weaponTemplate.weaponType ?? "shortsword",
 				attributeBonuses: weaponTemplate.attributeBonuses,
 				resourceBonuses: weaponTemplate.resourceBonuses,
 				secondaryAttributeBonuses: weaponTemplate.secondaryAttributeBonuses,
@@ -4252,6 +4255,78 @@ export class Item extends Movable {
  * mob.equip(shield);
  * ```
  */
+
+/**
+ * Weapon type identifiers used to associate weapons with weapon skills.
+ * The user's weapon skill for a specific type determines accuracy when using that weapon.
+ */
+export type WeaponType =
+	| "shortsword"
+	| "longsword"
+	| "bastard sword"
+	| "claymore"
+	| "rapier"
+	| "spear"
+	| "halberd"
+	| "trident"
+	| "club"
+	| "greatclub"
+	| "warhammer"
+	| "maul"
+	| "morningstar"
+	| "whip"
+	| "tonfa"
+	| "nunchaka"
+	| "tessen"
+	| "jutte"
+	| "swordbreaker"
+	| "chain-sickle"
+	| "tanto"
+	| "wakizashi"
+	| "katana"
+	| "tachi"
+	| "uchigatana"
+	| "naginata"
+	| "nagamaki"
+	| "sai"
+	| "flail";
+
+/**
+ * Array of all valid weapon types.
+ * Used for validation and UI dropdowns.
+ */
+export const WEAPON_TYPES: readonly WeaponType[] = [
+	"shortsword",
+	"longsword",
+	"bastard sword",
+	"claymore",
+	"rapier",
+	"spear",
+	"halberd",
+	"trident",
+	"club",
+	"greatclub",
+	"warhammer",
+	"maul",
+	"morningstar",
+	"whip",
+	"tonfa",
+	"nunchaka",
+	"tessen",
+	"jutte",
+	"swordbreaker",
+	"chain-sickle",
+	"tanto",
+	"wakizashi",
+	"katana",
+	"tachi",
+	"uchigatana",
+	"naginata",
+	"nagamaki",
+	"sai",
+	"flail",
+] as const;
+
 export enum EQUIPMENT_SLOT {
 	HEAD = "head",
 	NECK = "neck",
@@ -4769,6 +4844,8 @@ export interface WeaponOptions extends EquipmentOptions {
 	attackPower?: number;
 	/** Hit type for this weapon (verb and damage type). If not provided, uses default hit type. */
 	hitType?: HitType | string;
+	/** Weapon type identifier for skill association. Required for weapon templates. */
+	type?: WeaponType;
 }
 
 /**
@@ -4799,10 +4876,12 @@ export interface WeaponOptions extends EquipmentOptions {
 export class Weapon extends Equipment {
 	private _attackPower: number;
 	private _hitType: HitType;
+	private _type?: WeaponType;
 
 	constructor(options?: WeaponOptions) {
 		super(options);
 		this._attackPower = options?.attackPower ?? 0;
+		this._type = options?.type ?? "shortsword";
 
 		// Resolve hit type
 		if (options?.hitType) {
@@ -4848,6 +4927,16 @@ export class Weapon extends Equipment {
 	}
 
 	/**
+	 * Gets the weapon type identifier for this weapon.
+	 * Used to associate the weapon with a weapon skill.
+	 *
+	 * @returns The weapon type identifier, or undefined if not set
+	 */
+	public get type(): WeaponType | undefined {
+		return this._type;
+	}
+
+	/**
 	 * Serialize this Weapon instance to a serializable format.
 	 * Returns SerializedWeapon with type "Weapon" and attackPower.
 	 * Defense is explicitly set to 0.
@@ -4865,6 +4954,7 @@ export class Weapon extends Equipment {
 			slot: this._slot,
 			attackPower: this._attackPower,
 			hitType: this._hitType,
+			weaponType: this._type,
 		};
 		return options?.compress
 			? (compressSerializedObject(
@@ -4905,6 +4995,7 @@ export class Weapon extends Equipment {
 			slot: weaponData.slot,
 			attackPower: weaponData.attackPower ?? 0,
 			hitType: weaponData.hitType,
+			type: weaponData.weaponType ?? "shortsword",
 			attributeBonuses: weaponData.attributeBonuses,
 			resourceBonuses: weaponData.resourceBonuses,
 			secondaryAttributeBonuses: weaponData.secondaryAttributeBonuses,
@@ -4920,7 +5011,7 @@ export class Weapon extends Equipment {
 
 	/**
 	 * Override applyTemplate to handle Weapon-specific properties.
-	 * Applies the attackPower and hitType values from the template if present.
+	 * Applies the attackPower, hitType, and type values from the template if present.
 	 *
 	 * @param template - Template object containing weapon properties
 	 */
@@ -4945,6 +5036,9 @@ export class Weapon extends Equipment {
 			} else {
 				this._hitType = weaponTemplate.hitType;
 			}
+		}
+		if (weaponTemplate.weaponType !== undefined) {
+			this._type = weaponTemplate.weaponType;
 		}
 	}
 }
@@ -7598,6 +7692,7 @@ export function serializedToOptions(
 				}) as EquipmentOptions),
 				attackPower: w.attackPower,
 				hitType: w.hitType,
+				type: w.weaponType,
 			});
 			return opts;
 		}

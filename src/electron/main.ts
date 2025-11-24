@@ -119,6 +119,7 @@ function createMainWindow(): BrowserWindow {
 
 function registerHandlers() {
 	ipcMain.handle("map-editor:get-hit-types", () => service.getHitTypes());
+	ipcMain.handle("map-editor:get-weapon-types", () => service.getWeaponTypes());
 	ipcMain.handle("map-editor:get-races", () => service.getRaces());
 	ipcMain.handle("map-editor:get-jobs", () => service.getJobs());
 	ipcMain.handle("map-editor:list-dungeons", () => service.listDungeons());

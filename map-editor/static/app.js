@@ -51,6 +51,7 @@ class MapEditor {
 		this.yamlData = null;
 		this.races = [];
 		this.jobs = [];
+		this.weaponTypes = [];
 		this.hitTypes = null; // COMMON_HIT_TYPES data from API
 		this.physicalDamageTypes = null;
 		this.magicalDamageTypes = null;
@@ -90,6 +91,17 @@ class MapEditor {
 		const response = await fetch("/api/hit-types");
 		if (!response.ok) {
 			throw new Error(`Failed to load hit types: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async fetchWeaponTypesData() {
+		if (this.api?.getWeaponTypes) {
+			return this.api.getWeaponTypes();
+		}
+		const response = await fetch("/api/weapon-types");
+		if (!response.ok) {
+			throw new Error(`Failed to load weapon types: ${response.statusText}`);
 		}
 		return response.json();
 	}
@@ -504,14 +516,16 @@ class MapEditor {
 
 	async loadRacesAndJobs() {
 		try {
-			const [racesData, jobsData] = await Promise.all([
+			const [racesData, jobsData, weaponTypesData] = await Promise.all([
 				this.fetchRacesData(),
 				this.fetchJobsData(),
+				this.fetchWeaponTypesData(),
 			]);
 			this.races = racesData?.races || [];
 			this.jobs = jobsData?.jobs || [];
+			this.weaponTypes = weaponTypesData?.weaponTypes || [];
 		} catch (error) {
-			console.error("Failed to load races/jobs:", error);
+			console.error("Failed to load races/jobs/weapon types:", error);
 		}
 	}
 
@@ -3346,6 +3360,20 @@ class MapEditor {
 				</div>
 				</div>
 				<div id="weapon-fields" style="display: ${isWeapon ? "block" : "none"};">
+					<div class="form-group">
+						<label>Weapon Type</label>
+						<select id="template-weapon-type">
+							${this.weaponTypes
+								.map((wt) => {
+									const selectedWeaponType =
+										template.weaponType || "shortsword";
+									const isSelected =
+										wt === selectedWeaponType ? "selected" : "";
+									return `<option value="${wt}" ${isSelected} style="color: #ffffff; background: #1a1a1a;">${wt}</option>`;
+								})
+								.join("")}
+						</select>
+					</div>
 					${hitTypeSelector}
 					<div class="form-group">
 						<label>Attack Power</label>
@@ -3848,10 +3876,16 @@ class MapEditor {
 
 			// Add weapon-specific fields
 			if (templateType === "Weapon") {
+				const weaponType = document.getElementById(
+					"template-weapon-type"
+				)?.value;
 				const hitType = document.getElementById("template-hit-type")?.value;
 				const attackPower = document.getElementById(
 					"template-attack-power"
 				)?.value;
+				if (weaponType) {
+					newTemplate.weaponType = weaponType;
+				}
 				if (hitType) {
 					newTemplate.hitType = hitType;
 				}
@@ -3976,6 +4010,7 @@ class MapEditor {
 				if (templateType !== "Weapon" && oldTemplate.type === "Weapon") {
 					delete updated.hitType;
 					delete updated.attackPower;
+					delete updated.weaponType;
 				}
 				// Remove armor-specific fields if type changed away from Armor
 				if (templateType !== "Armor" && oldTemplate.type === "Armor") {
@@ -3995,6 +4030,10 @@ class MapEditor {
 				// Remove attackPower if empty
 				if (templateType === "Weapon" && updated.attackPower === undefined) {
 					delete updated.attackPower;
+				}
+				// Remove weaponType if empty
+				if (templateType === "Weapon" && updated.weaponType === undefined) {
+					delete updated.weaponType;
 				}
 				// Remove defense if empty
 				if (templateType === "Armor" && updated.defense === undefined) {

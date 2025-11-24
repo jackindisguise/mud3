@@ -137,6 +137,11 @@ class MapEditorServerImpl implements MapEditorServer {
 				return;
 			}
 
+			if (path === "/api/weapon-types" && req.method === "GET") {
+				await this.getWeaponTypes(res);
+				return;
+			}
+
 			// 404
 			res.writeHead(404, { "Content-Type": "text/plain" });
 			res.end("Not Found");
@@ -324,6 +329,18 @@ class MapEditorServerImpl implements MapEditorServer {
 			res.end(JSON.stringify(data));
 		} catch (error) {
 			logger.error(`Failed to get hit types: ${error}`);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: String(error) }));
+		}
+	}
+
+	private async getWeaponTypes(res: ServerResponse): Promise<void> {
+		try {
+			const data = await this.service.getWeaponTypes();
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(data));
+		} catch (error) {
+			logger.error(`Failed to get weapon types: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}

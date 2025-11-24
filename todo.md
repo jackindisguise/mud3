@@ -1,3 +1,0 @@
-# Copyover
-
-# Shopkeeper

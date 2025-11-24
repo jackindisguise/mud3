@@ -33,3 +33,6 @@ build
 
 # hide data files we don't want committed
 data/.lock
+
+# don't save todo
+todo.md

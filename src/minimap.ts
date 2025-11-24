@@ -49,7 +49,9 @@ export function blocksVision(
  * Checks if there's a clear line of sight from the center room to a target cell.
  * Traces the path from center to target and checks for blocking cells.
  * Dense rooms and non-existent rooms block vision of rooms behind them.
+ * Directions without allowed exits or room links also block vision.
  * @param dungeon The dungeon to check
+ * @param fromRoom The source room (for checking exits/links)
  * @param fromX Starting X coordinate
  * @param fromY Starting Y coordinate
  * @param toX Target X coordinate
@@ -119,11 +121,14 @@ export function generateMinimap(
 	if (!dungeon) return undefined;
 
 	const coords = room.coordinates;
-	const gridSize = size * 2 + 1;
+	const gridWidth = size * 2 + 1;
+	const gridHeight = (size - 2) * 2 + 1;
 	const lines: string[] = [];
 
 	// Build the grid from top to bottom (north to south)
-	for (let y = coords.y - size; y <= coords.y + size; y++) {
+	// Height is reduced: (size - 2) * 2 + 1 instead of size * 2 + 1
+	const heightSize = size - 2;
+	for (let y = coords.y - heightSize; y <= coords.y + heightSize; y++) {
 		const row: string[] = [];
 		for (let x = coords.x - size; x <= coords.x + size; x++) {
 			let mapText = " ";
@@ -211,7 +216,7 @@ export function generateMinimap(
 
 	const box = string.box({
 		input: lines,
-		width: gridSize + 2,
+		width: gridWidth + 2,
 		sizer: SIZER,
 		style: {
 			...string.BOX_STYLES.PLAIN,

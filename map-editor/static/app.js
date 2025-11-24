@@ -1278,19 +1278,26 @@ class MapEditor {
 				const override = dungeon.exitOverrides[coordKey];
 				// Handle both number (allowedExits only) and object (allowedExits and/or roomLinks) formats
 				let allowedExitsOverride = room.allowedExits;
+				let roomLinksOverride = room.roomLinks || {};
 				if (typeof override === "number") {
 					allowedExitsOverride = override;
-				} else if (
-					typeof override === "object" &&
-					override !== null &&
-					"allowedExits" in override
-				) {
-					allowedExitsOverride = override.allowedExits ?? room.allowedExits;
+				} else if (typeof override === "object" && override !== null) {
+					if ("allowedExits" in override) {
+						allowedExitsOverride = override.allowedExits ?? room.allowedExits;
+					}
+					if ("roomLinks" in override) {
+						// Merge roomLinks from override with base room's roomLinks
+						roomLinksOverride = {
+							...(room.roomLinks || {}),
+							...(override.roomLinks || {}),
+						};
+					}
 				}
 				// Return a copy with the override applied
 				return {
 					...room,
 					allowedExits: allowedExitsOverride,
+					roomLinks: roomLinksOverride,
 				};
 			}
 
@@ -1589,16 +1596,24 @@ class MapEditor {
 				// Check for UP and DOWN exits and add arrow indicators
 				// Use getRoomAt to get the room with exit overrides applied
 				const roomAtCell = this.getRoomAt(dungeon, x, y, this.currentLayer);
-				if (roomAtCell && roomAtCell.allowedExits) {
+				if (roomAtCell) {
 					const UP = 1 << 8;
 					const DOWN = 1 << 9;
-					if (roomAtCell.allowedExits & UP) {
+					// Check both allowedExits flags and roomLinks for UP/DOWN
+					const hasUpExit =
+						roomAtCell.allowedExits && roomAtCell.allowedExits & UP;
+					const hasUpLink = roomAtCell.roomLinks && roomAtCell.roomLinks.up;
+					const hasDownExit =
+						roomAtCell.allowedExits && roomAtCell.allowedExits & DOWN;
+					const hasDownLink = roomAtCell.roomLinks && roomAtCell.roomLinks.down;
+
+					if (hasUpExit || hasUpLink) {
 						const upArrow = document.createElement("span");
 						upArrow.className = "exit-arrow exit-arrow-up";
 						upArrow.textContent = "▲";
 						cell.appendChild(upArrow);
 					}
-					if (roomAtCell.allowedExits & DOWN) {
+					if (hasDownExit || hasDownLink) {
 						const downArrow = document.createElement("span");
 						downArrow.className = "exit-arrow exit-arrow-down";
 						downArrow.textContent = "▼";

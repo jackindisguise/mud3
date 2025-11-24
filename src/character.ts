@@ -642,7 +642,7 @@ export class Character {
 		const client = session.client;
 
 		if (session.lastMessageGroup === MESSAGE_GROUP.PROMPT) {
-			client.send(LINEBREAK, false);
+			client.sendLine(" ", false);
 			session.lastMessageGroup = undefined;
 		}
 
@@ -659,7 +659,22 @@ export class Character {
 	 * If no client is connected, this is a no-op.
 	 */
 	public sendLine(text: string) {
-		this.send(`${text}${LINEBREAK}`);
+		if (!this.session?.client) return;
+
+		const session = this.session;
+		const client = session.client;
+
+		if (session.lastMessageGroup === MESSAGE_GROUP.PROMPT) {
+			client.sendLine(" ", false);
+			session.lastMessageGroup = undefined;
+		}
+
+		let finalText = text;
+		if (this.settings.defaultColor !== undefined) {
+			finalText = stickyColor(text, this.settings.defaultColor);
+		}
+
+		client.sendLine(finalText, this.settings.colorEnabled ?? true);
 	}
 
 	/**
@@ -737,7 +752,7 @@ export class Character {
 
 		const last = session.lastMessageGroup;
 		if (last && last !== group && last !== MESSAGE_GROUP.PROMPT) {
-			this.sendLine("");
+			this.sendLine(" ");
 		}
 
 		this.sendLine(text);
@@ -750,7 +765,7 @@ export class Character {
 		if (!session || !client || !client.isConnected()) return;
 
 		const promptText = this.settings.prompt ?? "> ";
-		this.sendLine("");
+		this.sendLine(" ");
 		const queuedLine = this.formatQueuedActionLine();
 		if (queuedLine) {
 			this.sendLine(queuedLine);

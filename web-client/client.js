@@ -275,5 +275,15 @@ window.addEventListener("resize", () => {
 // Auto-focus input
 input.focus();
 
+// Focus input when clicking on output window
+output.addEventListener("click", () => {
+	input.focus();
+});
+
+// Focus input when window regains focus (e.g., tabbing back into it)
+window.addEventListener("focus", () => {
+	input.focus();
+});
+
 // Connect on load
 connect();

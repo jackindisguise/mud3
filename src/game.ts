@@ -678,14 +678,17 @@ export class Game {
 				}
 
 				// can't login to character that's online
-				if (isCharacterActive(trimmed))
-					return sendLine("That character is already playing.");
+				if (isCharacterActive(trimmed)) {
+					sendLine("That character is already playing.");
+					return askName();
+				}
 
 				// Check if name is currently being created by someone else
 				if (self.namesInCreation.has(trimmed.toLowerCase())) {
-					return sendLine(
+					sendLine(
 						"That name is currently in use. Please choose another name."
 					);
+					return askName();
 				}
 
 				username = trimmed; // save username

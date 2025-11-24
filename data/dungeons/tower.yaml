@@ -703,5 +703,5 @@ dungeon:
     9,1,2: 271
     9,1,3: 527
     10,8,0:
-      allowedExits: 15
+      allowedExits: 1
       roomLinks: {down: '@tower{0,0,0}'}

@@ -62,20 +62,26 @@ const HTML_COLOR_MAP: Record<string, string> = {
 /**
  * Convert {letter color codes to HTML spans for web clients
  * Format: {letter (no closing brace)
+ *
+ * Every color code colors until the NEXT color code OR until the end of the string OR until a reset color code.
+ * Reset color codes should not produce anything (just close the current span).
+ *
+ * Example: "{Rthis is {ca string." becomes
+ * "<span class='color-crimson'>this is </span><span class='color-teal'>a string.</span>"
  */
 function colorizeForWeb(text: string): string {
 	const colorMap = HTML_COLOR_MAP;
 
 	let result = "";
 	let i = 0;
-	const spanStack: Array<{ classes: string[]; text: string }> = [];
+	let currentSpan: { className: string; text: string } | null = null;
 
 	while (i < text.length) {
 		if (text[i] === COLOR_ESCAPE) {
 			// Check for escaped {{ (two consecutive {)
 			if (i + 1 < text.length && text[i + 1] === COLOR_ESCAPE) {
-				if (spanStack.length > 0) {
-					spanStack[spanStack.length - 1].text += COLOR_ESCAPE;
+				if (currentSpan) {
+					currentSpan.text += COLOR_ESCAPE;
 				} else {
 					result += COLOR_ESCAPE;
 				}
@@ -86,8 +92,8 @@ function colorizeForWeb(text: string): string {
 			// Get the next character (the color code letter)
 			if (i + 1 >= text.length) {
 				// No character after {, treat as literal
-				if (spanStack.length > 0) {
-					spanStack[spanStack.length - 1].text += text[i];
+				if (currentSpan) {
+					currentSpan.text += text[i];
 				} else {
 					result += text[i];
 				}
@@ -98,32 +104,26 @@ function colorizeForWeb(text: string): string {
 			const code = text[i + 1];
 			const className = colorMap[code];
 
+			// Close current span if it exists
+			if (currentSpan) {
+				result += `<span class="${currentSpan.className}">${currentSpan.text}</span>`;
+				currentSpan = null;
+			}
+
 			if (className === "") {
-				// Reset code - close current span
-				if (spanStack.length > 0) {
-					const span = spanStack.pop()!;
-					const classes = span.classes.join(" ");
-					const html = `<span${classes ? ` class="${classes}"` : ""}>${
-						span.text
-					}</span>`;
-					if (spanStack.length > 0) {
-						spanStack[spanStack.length - 1].text += html;
-					} else {
-						result += html;
-					}
-				}
+				// Reset code - don't start a new span, just close the previous one
+				// (already closed above)
 			} else if (className) {
 				// Valid color/style code - start new span
-				const newSpan = { classes: [className], text: "" };
-				spanStack.push(newSpan);
+				currentSpan = { className, text: "" };
 			}
 			// Unknown codes are ignored
 
 			i += 2; // Skip both { and the letter
 		} else {
 			// Regular character
-			if (spanStack.length > 0) {
-				spanStack[spanStack.length - 1].text += text[i];
+			if (currentSpan) {
+				currentSpan.text += text[i];
 			} else {
 				result += text[i];
 			}
@@ -131,18 +131,9 @@ function colorizeForWeb(text: string): string {
 		}
 	}
 
-	// Close any remaining spans
-	while (spanStack.length > 0) {
-		const span = spanStack.pop()!;
-		const classes = span.classes.join(" ");
-		const html = `<span${classes ? ` class="${classes}"` : ""}>${
-			span.text
-		}</span>`;
-		if (spanStack.length > 0) {
-			spanStack[spanStack.length - 1].text += html;
-		} else {
-			result += html;
-		}
+	// Close any remaining span
+	if (currentSpan) {
+		result += `<span class="${currentSpan.className}">${currentSpan.text}</span>`;
 	}
 
 	return result;

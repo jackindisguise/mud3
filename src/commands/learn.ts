@@ -46,14 +46,15 @@ export default {
 		// Check if already learned
 		if (actor.knowsAbility(abilityId)) {
 			const proficiency = actor.learnedAbilities.get(abilityId) || 0;
+			const uses = actor.getAbilityUses(abilityId);
 			actor.sendMessage(
-				`You already know ${ability.name} (proficiency: ${proficiency}%).`,
+				`You already know ${ability.name} (${uses} uses, ${proficiency}% proficiency).`,
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;
 		}
 
-		// Learn the ability with default proficiency of 0
+		// Learn the ability with 0 uses
 		actor.addAbility(abilityId, 0);
 		actor.sendMessage(
 			`You have learned ${ability.name}! ${ability.description}`,
@@ -71,4 +72,3 @@ export default {
 		}
 	},
 } satisfies CommandObject;
-

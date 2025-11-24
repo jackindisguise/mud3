@@ -3527,11 +3527,13 @@ suite("dungeon.ts", () => {
 			});
 
 			// Override sendMessage to track messages
-			const originalSendMessage = character.sendMessage.bind(character);
+			// Don't call the original since test characters don't have sessions/clients
+			// Store messageHistory on the character so it can be accessed and cleared
 			(character as any).messageHistory = messageHistory;
-			character.sendMessage = (text: string, group: any) => {
-				messageHistory.push({ text, group });
-				originalSendMessage(text, group);
+			character.sendMessage = function (text: string, group: any) {
+				(
+					(this as any).messageHistory as Array<{ text: string; group: any }>
+				).push({ text, group });
 			};
 
 			return character as Character & {
@@ -3593,10 +3595,10 @@ suite("dungeon.ts", () => {
 		});
 
 		test("should use ability name in damage messages when abilityName is provided", () => {
-			// Clear message history
-			(attackerCharacter as any).messageHistory = [];
-			(targetCharacter as any).messageHistory = [];
-			(observerCharacter as any).messageHistory = [];
+			// Clear message history (clear the array, don't reassign)
+			(attackerCharacter as any).messageHistory.length = 0;
+			(targetCharacter as any).messageHistory.length = 0;
+			(observerCharacter as any).messageHistory.length = 0;
 
 			// Perform hit with ability name
 			const damage = attacker.oneHit({
@@ -3732,9 +3734,9 @@ suite("dungeon.ts", () => {
 		});
 
 		test("should use ability name with attack power modifiers", () => {
-			// Clear message history
-			(attackerCharacter as any).messageHistory = [];
-			(targetCharacter as any).messageHistory = [];
+			// Clear message history (clear the array, don't reassign)
+			(attackerCharacter as any).messageHistory.length = 0;
+			(targetCharacter as any).messageHistory.length = 0;
 
 			// Perform hit with ability name and modifiers
 			const damage = attacker.oneHit({

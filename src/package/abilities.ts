@@ -42,7 +42,7 @@ import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import logger from "../logger.js";
-import { Ability } from "../ability.js";
+import { Ability, generateProficiencyTable } from "../ability.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { access, constants } from "fs/promises";
 
@@ -178,6 +178,17 @@ async function loadAbilities() {
 						continue;
 					}
 
+					// Validate proficiencyCurve is provided
+					if (!ability.proficiencyCurve) {
+						logger.warn(
+							`Ability file ${relative(
+								ROOT_DIRECTORY,
+								filePath
+							)} is missing required proficiencyCurve`
+						);
+						continue;
+					}
+
 					// Ensure ability.id matches ABILITY_ID
 					if (ability.id !== abilityId) {
 						logger.warn(
@@ -190,6 +201,9 @@ async function loadAbilities() {
 						);
 						ability.id = abilityId;
 					}
+
+					// Always generate proficiency table at runtime (ignore any supplied table)
+					ability.proficiencyTable = generateProficiencyTable(ability);
 
 					// Register the ability
 					ABILITY_REGISTRY.set(abilityId, ability);

@@ -459,6 +459,7 @@ dungeon:
       hitType: smite
       attributeBonuses: {strength: 20, agility: 20, intelligence: 20}
       roomDescription: The Guardian Force is lying here, humming with violence.
+      weaponType: maul
     - id: tower-helmet
       type: Armor
       keywords: helmet head armor
@@ -466,6 +467,15 @@ dungeon:
       description: A sturdy steel helmet that provides protection for the head.
       slot: head
       defense: 3
+    - id: zombie
+      type: Mob
+      display: a zombie
+      description: A zombie that needs to be killed.
+      roomDescription: There is a shambling zombie here, ready to eat.
+      keywords: zombie shambling undead
+      race: nobility
+      job: warrior
+      level: 1
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{13,16,1}'
@@ -687,6 +697,10 @@ dungeon:
       roomRef: '@tower{13,16,0}'
       minCount: 1
       maxCount: 3
+    - templateId: zombie
+      roomRef: '@tower{9,18,0}'
+      minCount: 20
+      maxCount: 100
   exitOverrides:
     7,17,0: 271
     5,4,0: 271

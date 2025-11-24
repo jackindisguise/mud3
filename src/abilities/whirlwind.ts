@@ -23,6 +23,7 @@ export const ability: Ability = {
 	id: ABILITY_ID,
 	name: "Whirlwind",
 	description: "A spinning attack that hits all nearby enemies in the room.",
+	proficiencyCurve: [100, 200, 400, 800],
 };
 
 const COOLDOWN_MS = 1000;
@@ -120,5 +121,7 @@ export const command: CommandObject = {
 				hitEnemies.push(enemy);
 			}
 		}
+
+		actor.useAbilityById(ABILITY_ID, hitCount);
 	},
 };

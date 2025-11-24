@@ -78,6 +78,7 @@ import {
 	removeFromCombatQueue,
 	handleDeath,
 	initiateCombat,
+	addToCombatQueue,
 } from "./combat.js";
 import { processAggressiveBehavior } from "./behavior.js";
 import { damageMessage } from "./act.js";
@@ -94,6 +95,8 @@ import {
 	DamageTypeRelationships,
 	getThirdPersonVerb,
 } from "./damage-types.js";
+import { getAbilityById } from "./package/abilities.js";
+import { getProficiencyAtUses } from "./ability.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -120,6 +123,7 @@ import {
 	createSecondaryAttributesView,
 	createResourceCapsView,
 } from "./attribute.js";
+import { ability as PURE_POWER } from "./abilities/pure-power.js";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
@@ -1804,7 +1808,7 @@ export interface SerializedMob extends SerializedDungeonObject {
 	>;
 	/** Behavior flags serialized as strings (enum values) */
 	behaviors?: Record<string, boolean>;
-	/** Learned abilities map (ability id -> proficiency 0-100) */
+	/** Learned abilities map (ability id -> number of uses) */
 	learnedAbilities?: Record<string, number>;
 }
 
@@ -5112,7 +5116,7 @@ export interface MobOptions extends DungeonObjectOptions {
 	exhaustion?: number;
 	/** Behavior flags for NPCs (mobs without a character) */
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
-	/** Learned abilities map (ability id -> proficiency 0-100) */
+	/** Learned abilities map (ability id -> number of uses) */
 	learnedAbilities?: Record<string, number>;
 }
 
@@ -5153,7 +5157,7 @@ export interface SerializedMob extends SerializedDungeonObject {
 	>;
 	/** Behavior flags serialized as strings (enum values) */
 	behaviors?: Record<string, boolean>;
-	/** Learned abilities map (ability id -> proficiency 0-100) */
+	/** Learned abilities map (ability id -> number of uses) */
 	learnedAbilities?: Record<string, number>;
 }
 
@@ -5239,7 +5243,10 @@ export class Mob extends Movable {
 	private _combatTarget?: Mob;
 	private _threatTable?: Map<Mob, number>;
 	private _behaviors: Map<BEHAVIOR, boolean>;
+	/** Map of ability ID to number of uses */
 	private _learnedAbilities: Map<string, number>;
+	/** Map of ability ID to cached proficiency (0-100) */
+	private _proficiencySnapshot: Map<string, number>;
 	constructor(options?: MobOptions) {
 		super(options);
 
@@ -5288,14 +5295,19 @@ export class Mob extends Movable {
 			}
 		}
 
-		// Initialize learned abilities map (ability id -> proficiency 0-100)
+		// Initialize learned abilities map (ability id -> uses)
 		this._learnedAbilities = new Map<string, number>();
+		this._proficiencySnapshot = new Map<string, number>();
 		if (options?.learnedAbilities) {
-			for (const [abilityId, proficiency] of Object.entries(
+			// Legacy support: if learnedAbilities contains proficiency values, convert to uses
+			// For now, we'll treat old proficiency values as uses (backward compatibility)
+			// In the future, this should be migrated to proper uses
+			for (const [abilityId, value] of Object.entries(
 				options.learnedAbilities
 			)) {
-				const prof = Math.max(0, Math.min(100, Number(proficiency)));
-				this._learnedAbilities.set(abilityId, prof);
+				const uses = Math.max(0, Number(value));
+				this._learnedAbilities.set(abilityId, uses);
+				this._updateProficiencySnapshot(abilityId);
 			}
 		}
 
@@ -5583,19 +5595,56 @@ export class Mob extends Movable {
 	/**
 	 * Gets the learned abilities map for this mob.
 	 * Returns a readonly view of the abilities (ability id -> proficiency 0-100).
+	 * Proficiency is calculated from uses based on the ability's proficiency curve.
 	 *
-	 * @returns Readonly map of learned abilities
+	 * @returns Readonly map of learned abilities with proficiency values
 	 *
 	 * @example
 	 * ```typescript
 	 * const mob = new Mob();
-	 * mob.addAbility("whirlwind", 50);
+	 * mob.addAbility("whirlwind", 250); // 250 uses
 	 * const abilities = mob.learnedAbilities;
-	 * console.log(abilities.get("whirlwind")); // 50
+	 * console.log(abilities.get("whirlwind")); // 50 (proficiency at 250 uses)
 	 * ```
 	 */
 	public get learnedAbilities(): ReadonlyMap<string, number> {
-		return this._learnedAbilities;
+		return this._proficiencySnapshot;
+	}
+
+	/**
+	 * Gets the number of uses for a specific ability.
+	 *
+	 * @param abilityId The ability ID to check
+	 * @returns The number of uses, or 0 if the ability is not learned
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.addAbility("whirlwind", 100);
+	 * console.log(mob.getAbilityUses("whirlwind")); // 100
+	 * ```
+	 */
+	public getAbilityUses(abilityId: string): number {
+		return this._learnedAbilities.get(abilityId) ?? 0;
+	}
+
+	/**
+	 * Updates the proficiency snapshot for an ability based on its current uses.
+	 * This is called automatically when uses change.
+	 *
+	 * @param abilityId The ability ID to update
+	 * @private
+	 */
+	private _updateProficiencySnapshot(abilityId: string): void {
+		const uses = this._learnedAbilities.get(abilityId) ?? 0;
+		const ability = getAbilityById(abilityId);
+		if (ability) {
+			const proficiency = getProficiencyAtUses(ability, uses);
+			this._proficiencySnapshot.set(abilityId, proficiency);
+		} else {
+			// If ability not found, set proficiency to 0
+			this._proficiencySnapshot.set(abilityId, 0);
+		}
 	}
 
 	/**
@@ -5618,21 +5667,65 @@ export class Mob extends Movable {
 
 	/**
 	 * Adds or updates an ability for this mob.
-	 * Proficiency is clamped to 0-100.
+	 * Sets the number of uses for the ability and updates the proficiency snapshot.
 	 *
 	 * @param abilityId The ability ID to add or update
-	 * @param proficiency Proficiency rating from 0 to 100 (defaults to 0)
+	 * @param uses Number of times the ability has been used (defaults to 0)
 	 *
 	 * @example
 	 * ```typescript
 	 * const mob = new Mob();
-	 * mob.addAbility("whirlwind", 50);
-	 * mob.addAbility("fireball", 100); // Max proficiency
+	 * mob.addAbility("whirlwind", 250); // 250 uses
+	 * // Proficiency will be calculated based on the ability's curve
 	 * ```
 	 */
-	public addAbility(abilityId: string, proficiency: number = 0): void {
-		const prof = Math.max(0, Math.min(100, Number(proficiency)));
-		this._learnedAbilities.set(abilityId, prof);
+	public addAbility(abilityId: string, uses: number = 0): void {
+		const useCount = Math.max(0, Number(uses));
+		this._learnedAbilities.set(abilityId, useCount);
+		this._updateProficiencySnapshot(abilityId);
+	}
+
+	/**
+	 * Increments the use count for an ability and updates the proficiency snapshot.
+	 * This should be called whenever an ability is used.
+	 * Notifies the mob when proficiency increases.
+	 *
+	 * @param abilityId The ability ID to increment uses for
+	 * @param amount The amount to increment by (defaults to 1)
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.addAbility("whirlwind", 0);
+	 * mob.incrementAbilityUses("whirlwind"); // Now has 1 use
+	 * mob.incrementAbilityUses("whirlwind", 5); // Now has 6 uses
+	 * ```
+	 */
+	public useAbilityById(abilityId: string, amount: number = 1): void {
+		if (!this._learnedAbilities.has(abilityId)) {
+			// If ability not learned, add it with the increment amount
+			this.addAbility(abilityId, amount);
+			return;
+		}
+
+		// Get old proficiency before updating
+		const oldProficiency = this._proficiencySnapshot.get(abilityId) ?? 0;
+
+		const currentUses = this._learnedAbilities.get(abilityId) ?? 0;
+		const newUses = Math.max(0, currentUses + amount);
+		this._learnedAbilities.set(abilityId, newUses);
+		this._updateProficiencySnapshot(abilityId);
+
+		// Get new proficiency and check if it increased
+		const newProficiency = this._proficiencySnapshot.get(abilityId) ?? 0;
+		if (newProficiency > oldProficiency) {
+			const ability = getAbilityById(abilityId);
+			const abilityName = ability?.name ?? abilityId;
+			this.sendMessage(
+				`Your proficiency with ${abilityName} has increased to ${newProficiency}%!`,
+				MESSAGE_GROUP.SYSTEM
+			);
+		}
 	}
 
 	/**
@@ -5644,13 +5737,17 @@ export class Mob extends Movable {
 	 * @example
 	 * ```typescript
 	 * const mob = new Mob();
-	 * mob.addAbility("whirlwind", 50);
+	 * mob.addAbility("whirlwind", 250);
 	 * mob.removeAbility("whirlwind"); // Returns true
 	 * mob.removeAbility("fireball"); // Returns false (not learned)
 	 * ```
 	 */
 	public removeAbility(abilityId: string): boolean {
-		return this._learnedAbilities.delete(abilityId);
+		const removed = this._learnedAbilities.delete(abilityId);
+		if (removed) {
+			this._proficiencySnapshot.delete(abilityId);
+		}
+		return removed;
 	}
 
 	/**
@@ -6836,6 +6933,30 @@ export class Mob extends Movable {
 		// Handle death
 		if (this.health <= 0) {
 			handleDeath(this, attacker);
+			return; // Don't initiate combat if target died
+		}
+
+		// Initiate combat if both mobs are in the same room and both alive
+		const room = this.location;
+		if (
+			room instanceof Room &&
+			attacker.location === room &&
+			attacker.health > 0 &&
+			this.health > 0
+		) {
+			// If attacker is not in combat, engage with target
+			if (!attacker.isInCombat()) {
+				initiateCombat(attacker, this, room);
+			} else if (!this.isInCombat()) {
+				// Attacker is already in combat, but target is not - make target engage
+				// Set target's combat target to attacker and add to queue
+				this.combatTarget = attacker;
+				addToCombatQueue(this);
+				// If target is an NPC, add threat
+				if (!this.character && this.threatTable) {
+					this.addThreat(attacker, 1);
+				}
+			}
 		}
 	}
 
@@ -6886,13 +7007,14 @@ export class Mob extends Movable {
 		// Check for Pure Power passive ability
 		// Pure Power increases attack power from +0% at 0% proficiency to +200% at 100% proficiency
 		let purePowerMultiplier = 1;
-		if (this.knowsAbility("pure-power")) {
-			const proficiency = this.learnedAbilities.get("pure-power") || 0;
+		if (this.knowsAbility(PURE_POWER.id)) {
+			const proficiency = this.learnedAbilities.get(PURE_POWER.id) || 0;
 			// Formula: 1 + (proficiency / 100) * 2
 			// At 0%: 1 + 0 = 1.0 (no change)
 			// At 50%: 1 + 1 = 2.0 (+100%)
 			// At 100%: 1 + 2 = 3.0 (+200%)
 			purePowerMultiplier = 1 + (proficiency / 100) * 2;
+			this.useAbilityById(PURE_POWER.id, 1);
 		}
 
 		// Combine Pure Power multiplier with provided multiplier
@@ -7019,7 +7141,7 @@ export class Mob extends Movable {
 			{ messageGroup: MESSAGE_GROUP.COMBAT }
 		);
 
-		// Deal the damage (this handles threat generation and death)
+		// Deal the damage (this handles threat generation, death, and combat initiation)
 		target.damage(this, finalDamage);
 
 		return finalDamage;

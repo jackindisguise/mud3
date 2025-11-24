@@ -112,14 +112,6 @@ dungeon:
       mapText: ''''
       allowedExits: 15
   templates:
-    - id: qweqweqew
-      type: Weapon
-      display: qweqwe
-      description: qweqwewqe
-      roomDescription: qweqwe
-      keywords: qweqwe
-      hitType: drench
-      attackPower: 55
     - id: bubblegum-cannon
       type: Weapon
       display: Bubble-Gum Cannon
@@ -128,4 +120,5 @@ dungeon:
       keywords: bazooka candy bubblegum bubble gum cannon
       hitType: blast
       attackPower: 12
+      weaponType: club
   resets: []

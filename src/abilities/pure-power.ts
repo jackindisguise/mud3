@@ -4,6 +4,12 @@
  * This passive ability increases attack power from +0% at 0% proficiency
  * to +200% at 100% proficiency.
  *
+ * Proficiency curve:
+ * - 25% proficiency at 75 uses
+ * - 50% proficiency at 250 uses
+ * - 75% proficiency at 500 uses
+ * - 100% proficiency at 1000 uses
+ *
  * @example
  * ```
  * // Automatically applied when mob knows this ability
@@ -21,4 +27,5 @@ export const ability: Ability = {
 	name: "Pure Power",
 	description:
 		"A passive ability that increases your attack power based on proficiency.",
+	proficiencyCurve: [100, 500, 1000, 5000],
 };

@@ -1,6 +1,6 @@
 # mud3
 
-A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.js. This project provides a complete, extensible MUD game engine with a rich dungeon system, character progression, combat mechanics, and social features.
+A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.js. This project provides a complete, extensible MUD game engine with a rich dungeon system, character progression, combat mechanics, ability system, and social features.
 
 ## Features
 
@@ -13,6 +13,7 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Template System**: Define reusable room and object templates for efficient dungeon creation
 - **Serialization**: Full save/load support with template-aware compression for efficient storage
 - **Reset System**: Automatically respawn mobs and items based on templates and room references
+- **Minimap**: Visual minimap display showing surrounding rooms with vision blocking and directional indicators
 
 ### Character & Combat System
 
@@ -20,21 +21,32 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Races & Jobs**: Configurable race and job archetypes with attribute bonuses
 - **Attributes**: Primary attributes (Strength, Agility, Intelligence) and derived secondary attributes
 - **Equipment System**: Slotted equipment (Armor, Weapons, Accessories) with attribute bonuses
+- **Weapon Types**: Configurable weapon types (shortsword, longsword, etc.) with type-specific properties
 - **Combat**: Turn-based combat with attack power, defense, accuracy, crit rates, and damage types
+- **Reciprocal Combat**: Automatic combat engagement when damage is dealt between mobs in the same room
 - **Threat System**: Aggro management for NPCs with threat tables
 - **Resources**: Health, Mana, and Exhaustion with automatic recovery
+
+### Ability System
+
+- **Learnable Abilities**: Players can learn and use special abilities (e.g., Whirlwind, Pure Power)
+- **Proficiency System**: Abilities improve with use through configurable proficiency curves
+- **Proficiency Tracking**: Four breakpoint system (25%, 50%, 75%, 100%) with linear interpolation
+- **Ability Commands**: `learn <ability>` to learn new abilities, `abilities` to view all learned abilities with proficiency
+- **Proficiency Notifications**: Automatic notifications when ability proficiency increases
 
 ### Commands & Interaction
 
 - **Flexible Command System**: Pattern-based command parsing with priority levels (HIGH, NORMAL, LOW)
 - **Command Aliases**: Multiple patterns per command for natural language processing
 - **Error Handling**: Built-in error responses and user-friendly feedback
+- **Comprehensive Command Set**: Movement, combat, inventory, equipment, social, and administrative commands
 
 ### Communication
 
 - **Channels**: Configurable communication channels (OOC, Gossip, Say, Newbie, Trade) with customizable message patterns
 - **Message Boards**: Persistent message boards with targeting (@mentions), read tracking, and interactive editing
-- **Color Support**: ANSI color codes throughout the interface
+- **Color Support**: ANSI color codes throughout the interface with web client HTML conversion
 
 ### Objects & Items
 
@@ -43,18 +55,26 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Weight System**: Items have weight that affects carrying capacity
 - **Keywords & Matching**: Flexible object identification by keywords
 
+### Client Support
+
+- **Telnet Server**: Traditional telnet protocol support for classic MUD clients
+- **Web Client**: WebSocket-based web client for playing in a browser with HTML color rendering
+- **Auto-Focus**: Web client automatically focuses command input on interaction for improved UX
+
 ### Persistence
 
 - **YAML-Based Storage**: All game data (characters, dungeons, boards) stored in YAML files
 - **Auto-Save**: Periodic automatic saves of game state
-- **Package System**: Modular loading system for commands, configs, archetypes, and more
+- **Package System**: Modular loading system for commands, configs, archetypes, abilities, and more
 
 ## Technology Stack
 
 - **TypeScript**: Full type safety throughout the codebase
 - **Node.js**: Runtime environment with ES modules
 - **Telnet Server**: Custom telnet implementation for client connections
+- **WebSocket**: WebSocket support for web-based clients
 - **YAML**: Human-readable data storage format
+- **Electron**: Cross-platform desktop application framework for the dungeon editor
 
 ## Dungeon Editor
 
@@ -71,6 +91,8 @@ The Electron shell loads the bundled `map-editor` frontend, talks directly to th
 - Exit/link editing with validation
 - Template-aware dungeon creation and duplication
 - Attribute calculators for race/job combinations
+- Weapon template editing with weapon type selection
+- Mob template editing with ability configuration
 
 You can also create distributable builds:
 - `npm run electron:mac` – build a signed DMG for macOS (ARM64)
@@ -124,7 +146,18 @@ npm run electron:win:portable
 ## Project Structure
 
 - `src/` - Source code (TypeScript)
+  - `commands/` - Game commands (movement, combat, social, etc.)
+  - `abilities/` - Ability definitions (Whirlwind, Pure Power, etc.)
+  - `electron/` - Electron main process and preload scripts
+  - `package/` - Package loaders (commands, abilities, configs, etc.)
 - `data/` - Game data files (characters, dungeons, configs, help files)
+  - `dungeons/` - Dungeon definitions
+  - `characters/` - Player character data
+  - `boards/` - Message board data
+  - `races/` - Race archetype definitions
+  - `jobs/` - Job archetype definitions
+- `map-editor/` - Electron-based dungeon editor frontend
+- `web-client/` - WebSocket-based web client frontend
 - `dist/` - Compiled JavaScript output
 - `docs/` - Generated TypeScript documentation
 - `coverage/` - Test coverage reports

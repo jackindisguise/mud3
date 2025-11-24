@@ -1,14 +1,35 @@
+# hide node modules
 node_modules
+
+# hide compiled files
 dist
+
+# hide coverage reports
 coverage
+
+# hide logs
 logs/*.log
+
+# hide temporary files
 **/*.tmp
+
+# hide cursor files
 .cursor
+
+# hide guides
 guides
+
+# hide commit message template
 commit-message.md
-mud3-dungeon-editor
-build
+
+# hide electron error logs
 electron-errors.log
+
+# hide electron build artifacts
+build
 *.exe
 *.dmg
 *.app
+
+# hide data files we don't want committed
+data/.lock

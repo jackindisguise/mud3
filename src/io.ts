@@ -413,8 +413,9 @@ export class MudServer extends EventEmitter {
 	/**
 	 * Start the server on the specified port
 	 * @param port The port number to listen on
+	 * @param host Optional host to bind to (defaults to all interfaces, use "127.0.0.1" for localhost only)
 	 */
-	public start(port: number): Promise<void> {
+	public start(port: number, host?: string): Promise<void> {
 		return new Promise((resolve, reject) => {
 			if (this.isListening) {
 				reject(new Error("Server is already listening"));
@@ -423,8 +424,10 @@ export class MudServer extends EventEmitter {
 
 			this.port = port;
 			this.server.once("error", reject);
-			this.server.listen(port, () => {
+			this.server.listen(port, host, () => {
 				this.server.removeListener("error", reject);
+				const bindInfo = host ? `${host}:${port}` : `port ${port}`;
+				logger.info(`MUD server listening on ${bindInfo}`);
 				resolve();
 			});
 		});

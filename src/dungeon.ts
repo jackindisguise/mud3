@@ -98,6 +98,7 @@ import {
 } from "./damage-types.js";
 import { getAbilityById } from "./package/abilities.js";
 import { getProficiencyAtUses } from "./ability.js";
+import { addToRegenerationSet } from "./regeneration.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -4926,6 +4927,7 @@ export class Weapon extends Equipment {
 				this._hitType = common ?? {
 					verb: options.hitType,
 					damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+					color: COLOR.WHITE,
 				};
 			} else {
 				this._hitType = options.hitType;
@@ -5067,6 +5069,7 @@ export class Weapon extends Equipment {
 				this._hitType = common ?? {
 					verb: weaponTemplate.hitType,
 					damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+					color: COLOR.WHITE,
 				};
 			} else {
 				this._hitType = weaponTemplate.hitType;
@@ -6500,6 +6503,16 @@ export class Mob extends Movable {
 	}
 
 	/**
+	 * Gets the spirit secondary attribute.
+	 * Does not scale with primary attributes, only modified by bonuses.
+	 *
+	 * @returns Spirit value
+	 */
+	public get spirit(): number {
+		return this._secondaryAttributesView.spirit;
+	}
+
+	/**
 	 * Gets the runtime attribute bonuses for this mob.
 	 * These are runtime-only bonuses (e.g., from temporary effects) that are excluded
 	 * from serialization and must be rebuilt after login. Equipment bonuses are handled
@@ -6621,6 +6634,10 @@ export class Mob extends Movable {
 	 */
 	public set health(value: number) {
 		this._health = this.clampResourceValue(value, this.maxHealth);
+		// Add to regeneration set if health decreased
+		if (this._health < this.maxHealth) {
+			addToRegenerationSet(this);
+		}
 	}
 
 	/**
@@ -6648,6 +6665,10 @@ export class Mob extends Movable {
 	 */
 	public set mana(value: number) {
 		this._mana = this.clampResourceValue(value, this.maxMana);
+		// Add to regeneration set if mana decreased
+		if (this._mana < this.maxMana) {
+			addToRegenerationSet(this);
+		}
 	}
 
 	/**
@@ -6668,6 +6689,10 @@ export class Mob extends Movable {
 	 */
 	public set exhaustion(value: number) {
 		this._exhaustion = clampNumber(value, 0, MAX_EXHAUSTION);
+		// Add to regeneration set if exhaustion increased
+		if (this._exhaustion > 0) {
+			addToRegenerationSet(this);
+		}
 	}
 
 	/**
@@ -6677,6 +6702,40 @@ export class Mob extends Movable {
 	 */
 	public get maxExhaustion(): number {
 		return MAX_EXHAUSTION;
+	}
+
+	/**
+	 * Gains exhaustion, adding the specified amount to the current exhaustion level.
+	 * The exhaustion is automatically clamped to the maximum (100).
+	 * The mob is automatically added to the regeneration set.
+	 *
+	 * @param amount The amount of exhaustion to gain (must be >= 0)
+	 * @returns The actual amount of exhaustion gained (may be less if already at max)
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob();
+	 * mob.exhaustion = 50;
+	 * const gained = mob.gainExhaustion(30);
+	 * console.log(mob.exhaustion); // 80
+	 * console.log(gained); // 30
+	 *
+	 * // If already at max, no exhaustion is gained
+	 * mob.exhaustion = 100;
+	 * const gained2 = mob.gainExhaustion(20);
+	 * console.log(mob.exhaustion); // 100 (clamped)
+	 * console.log(gained2); // 0
+	 * ```
+	 */
+	public gainExhaustion(amount: number): number {
+		const numeric = Number(amount);
+		if (!Number.isFinite(numeric) || numeric < 0) {
+			return 0;
+		}
+
+		const oldExhaustion = this._exhaustion;
+		this.exhaustion = oldExhaustion + numeric;
+		return this._exhaustion - oldExhaustion;
 	}
 
 	/**
@@ -7201,8 +7260,13 @@ export class Mob extends Movable {
 		const damageStrPlain = String(finalDamage);
 
 		// Get verb forms for different perspectives
-		const verb = hitType.verb; // First person: "You punch"
-		const verbThirdPerson = getThirdPersonVerb(hitType); // Third person: "punches"
+		const verbBase = hitType.verb; // First person: "You punch"
+		const verbThirdPersonBase = getThirdPersonVerb(hitType); // Third person: "punches"
+
+		// Color the verbs based on hit type color (default to WHITE)
+		const verbColor = hitType.color ?? COLOR.WHITE;
+		const verb = color(verbBase, verbColor);
+		const verbThirdPerson = color(verbThirdPersonBase, verbColor);
 
 		// Get weapon name if provided
 		const weaponName = weapon ? weapon.display : undefined;

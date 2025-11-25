@@ -363,6 +363,7 @@ class MapEditor {
 			"spellPower",
 			"wisdom",
 			"resilience",
+			"spirit",
 		];
 		// Resource capacities
 		const capacities = ["maxHealth", "maxMana"];
@@ -3944,6 +3945,7 @@ class MapEditor {
 					"spellPower",
 					"wisdom",
 					"resilience",
+					"spirit",
 				];
 				const secondaryAttributeBonuses = {};
 				let hasSecondaryBonuses = false;
@@ -5153,6 +5155,9 @@ class MapEditor {
 							2
 						)}</span></div>
 						<div class="attribute-item"><span class="attr-label">Resilience:</span> <span class="attr-value">${secondary.resilience.toFixed(
+							2
+						)}</span></div>
+						<div class="attribute-item"><span class="attr-label">Spirit:</span> <span class="attr-value">${secondary.spirit.toFixed(
 							2
 						)}</span></div>
 					</div>

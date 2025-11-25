@@ -78,6 +78,7 @@ export interface SecondaryAttributeSet {
 	spellPower: number;
 	wisdom: number;
 	resilience: number;
+	spirit: number;
 }
 
 /**
@@ -150,6 +151,7 @@ export const SECONDARY_ATTRIBUTE_FACTORS: Readonly<
 	spellPower: { intelligence: 0.5 },
 	wisdom: { intelligence: 0.5 },
 	resilience: { intelligence: 0.5 },
+	spirit: {}, // Spirit does not scale with primary attributes
 });
 
 /**
@@ -168,6 +170,7 @@ export const SECONDARY_ATTRIBUTE_BASE: Readonly<
 	spellPower: 0,
 	wisdom: 0,
 	resilience: 0,
+	spirit: 0,
 });
 
 /**
@@ -276,6 +279,7 @@ export function sumSecondaryAttributes(
 		spellPower: 0,
 		wisdom: 0,
 		resilience: 0,
+		spirit: 0,
 	};
 	for (const part of components) {
 		if (!part) continue;
@@ -289,6 +293,7 @@ export function sumSecondaryAttributes(
 		result.spellPower += Number(part.spellPower ?? 0);
 		result.wisdom += Number(part.wisdom ?? 0);
 		result.resilience += Number(part.resilience ?? 0);
+		result.spirit += Number(part.spirit ?? 0);
 	}
 	return result;
 }
@@ -438,6 +443,7 @@ export function computeSecondaryAttributes(
 		spellPower: 0,
 		wisdom: 0,
 		resilience: 0,
+		spirit: 0,
 	};
 
 	(
@@ -496,6 +502,7 @@ export function createSecondaryAttributesView(
 		spellPower: toFinite(source.spellPower),
 		wisdom: toFinite(source.wisdom),
 		resilience: toFinite(source.resilience),
+		spirit: toFinite(source.spirit),
 	});
 }
 

@@ -60,11 +60,15 @@ import { LINEBREAK } from "./telnet.js";
 import { processCombatRound } from "./combat.js";
 import { processWanderBehaviors } from "./behavior.js";
 import { WebClientServer } from "./web-client.js";
+import {
+	processRegeneration,
+	REGENERATION_INTERVAL_MS,
+} from "./regeneration.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 3 * 1000; // 3 seconds
+export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 4 * 1000; // 4 seconds
 export const DEFAULT_WANDER_INTERVAL_MS = 30 * 1000; // 30 seconds
 export const DEFAULT_BOARD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -136,6 +140,7 @@ export class Game {
 	private dungeonResetTimer?: number;
 	private combatTimer?: number;
 	private wanderTimer?: number;
+	private regenerationTimer?: number;
 	private nextConnectionId = 1;
 
 	/** Web client server (optional) */
@@ -259,6 +264,11 @@ export class Game {
 		this.wanderTimer = setAbsoluteInterval(() => {
 			processWanderBehaviors();
 		}, DEFAULT_WANDER_INTERVAL_MS);
+
+		// Set up regeneration timer (every 30 seconds)
+		this.regenerationTimer = setAbsoluteInterval(() => {
+			processRegeneration();
+		}, REGENERATION_INTERVAL_MS);
 	}
 
 	/**
@@ -307,6 +317,13 @@ export class Game {
 			clearCustomInterval(this.wanderTimer);
 			this.wanderTimer = undefined;
 			logger.debug("Wander timer cleared");
+		}
+
+		// Clear regeneration timer
+		if (this.regenerationTimer !== undefined) {
+			clearCustomInterval(this.regenerationTimer);
+			this.regenerationTimer = undefined;
+			logger.debug("Regeneration timer cleared");
 		}
 
 		// Save game state before shutdown

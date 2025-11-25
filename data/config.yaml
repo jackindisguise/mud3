@@ -1,8 +1,8 @@
 game:
-  name: "mud3"
+  name: mud3
   creator: jackindisguise
 server:
   port: 23
   inactivity_timeout: 1800
 security:
-  password_salt: kickEEwinTI
+  password_salt: changeme_default_salt_12345

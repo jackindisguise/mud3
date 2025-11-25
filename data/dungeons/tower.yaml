@@ -476,6 +476,7 @@ dungeon:
       race: nobility
       job: warrior
       level: 1
+      behaviors: {aggressive: true}
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{13,16,1}'

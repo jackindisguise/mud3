@@ -16,6 +16,7 @@ import { Character, MESSAGE_GROUP } from "./character.js";
 import { color, COLOR } from "./color.js";
 import { LINEBREAK } from "./telnet.js";
 import logger from "./logger.js";
+import { getLocation, LOCATION } from "./package/locations.js";
 import {
 	act,
 	damageMessage,
@@ -29,6 +30,7 @@ import {
 	HitType,
 	getThirdPersonVerb,
 } from "./damage-types.js";
+import { showRoom } from "./commands/look.js";
 
 /**
  * Combat queue containing all mobs currently engaged in combat.
@@ -41,6 +43,33 @@ const combatQueue = new Set<Mob>();
  * A new attacker must have 10% more threat than the current target to cause a switch.
  */
 const THREAT_GRACE_WINDOW = 1.1;
+
+/**
+ * Gets the mob with the highest threat that is in the same room as the NPC.
+ * Returns undefined if no valid target is found in the room.
+ *
+ * @param npc The NPC to check threat for
+ * @param room The room to check for targets in
+ * @returns The mob with highest threat in the room, or undefined
+ */
+function getHighestThreatInRoom(npc: Mob, room: Room): Mob | undefined {
+	if (!npc.threatTable || npc.threatTable.size === 0) {
+		return undefined;
+	}
+
+	let highestThreat = -1;
+	let highestThreatMob: Mob | undefined;
+
+	for (const [mob, entry] of npc.threatTable.entries()) {
+		// Only consider mobs that are in the same room
+		if (mob.location === room && entry.value > highestThreat) {
+			highestThreat = entry.value;
+			highestThreatMob = mob;
+		}
+	}
+
+	return highestThreatMob;
+}
 
 /**
  * Adds a mob to the combat queue.
@@ -86,75 +115,60 @@ export function getCombatQueue(): ReadonlyArray<Mob> {
 /**
  * Processes threat-based target switching for NPCs.
  * NPCs will switch targets if a new attacker has 10% more threat than the current target.
+ * Only switches if the new target is in the same room as the NPC.
  *
  * @param npc The NPC mob to process threat switching for
  */
-function processThreatSwitching(npc: Mob): void {
+export function processThreatSwitching(npc: Mob): void {
 	if (!npc.threatTable || npc.character) {
+		return;
+	}
+
+	const npcRoom = npc.location;
+	if (!(npcRoom instanceof Room)) {
+		npc.combatTarget = undefined;
 		return;
 	}
 
 	const currentTarget = npc.combatTarget;
 	if (!currentTarget) {
-		// No current target, pick highest threat
-		const highestThreat = npc.getHighestThreatTarget();
+		// No current target, pick highest threat that's in the same room
+		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
 		if (highestThreat) {
-			npc.combatTarget = highestThreat;
+			// Use initiateCombat to properly set up combat with new target
+			initiateCombat(npc, highestThreat, npcRoom);
 		}
 		return;
 	}
 
-	const currentThreat = npc.getThreat(currentTarget);
-	const highestThreatMob = npc.getHighestThreatTarget();
+	// Check if current target is still in the same room
+	if (currentTarget.location !== npcRoom) {
+		// Current target left the room, find a new target that's actually in the room
+		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
+		if (highestThreat) {
+			// Use initiateCombat to properly set up combat with new target
+			initiateCombat(npc, highestThreat, npcRoom);
+		} else {
+			// No valid target in room, clear target and remove from combat queue
+			npc.combatTarget = undefined;
+		}
+		return;
+	}
 
+	const highestThreatMob = getHighestThreatInRoom(npc, npcRoom);
 	if (!highestThreatMob || highestThreatMob === currentTarget) {
 		return;
 	}
 
+	const currentThreat = npc.getThreat(currentTarget);
 	const highestThreat = npc.getThreat(highestThreatMob);
 	const graceThreshold = currentThreat * THREAT_GRACE_WINDOW;
 
 	if (highestThreat >= graceThreshold) {
-		npc.combatTarget = highestThreatMob;
+		// Switch targets - we're already in combat, so just update the target
+		// Don't use initiateCombat here as it would send engagement messages again
+		initiateCombat(npc, highestThreatMob, npcRoom);
 	}
-}
-
-/**
- * Calculates damage dealt by an attacker to a defender.
- * This function assumes the attack has already hit - accuracy checks should be done before calling.
- * Takes into account attack power, defense, critical hits, and damage type relationships.
- *
- * @param attacker The mob dealing damage
- * @param defender The mob receiving damage
- * @param damageType The type of damage being dealt
- * @returns The damage amount (always >= 0)
- */
-function calculateDamage(
-	attacker: Mob,
-	defender: Mob,
-	damageType: DAMAGE_TYPE
-): number {
-	// Calculate base damage
-	let damage = attacker.attackPower;
-
-	// Apply defense reduction
-	const defenseReduction = defender.defense * 0.1; // 10% damage reduction per defense point
-	damage = Math.max(1, damage - defenseReduction);
-
-	// Check for critical hit
-	if (Math.random() * 100 < attacker.critRate) {
-		damage *= 2;
-	}
-
-	// Apply damage type relationships (resist, immune, vulnerable)
-	const defenderRelationships = defender.getDamageRelationships();
-	const damageMultiplier = getDamageMultiplier(
-		damageType,
-		defenderRelationships
-	);
-	damage *= damageMultiplier;
-
-	return Math.floor(damage);
 }
 
 /**
@@ -179,7 +193,6 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 
 	// Remove from combat
 	deadMob.combatTarget = undefined;
-	removeFromCombatQueue(deadMob);
 
 	// Clear threat table
 	deadMob.clearThreatTable();
@@ -194,27 +207,57 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	// Send death messages
 	act(
 		{
-			user: "{User} has been slain!",
+			user: "You have been slain by {target}!",
 			room: "{User} has been slain!",
 		},
 		{
 			user: deadMob,
+			target: killer,
 			room: room,
 		},
-		{ messageGroup: MESSAGE_GROUP.COMBAT, excludeUser: true }
+		{
+			messageGroup: MESSAGE_GROUP.COMBAT,
+			excludeUser: true,
+			excludeTarget: true,
+		}
 	);
 
 	// Award experience to killer if present
-	if (killer && killer.character) {
-		// Only players gain experience
-		const experienceGained = killer.awardKillExperience(deadMob.level);
-		if (experienceGained > 0) {
-			// Send experience message to the killer
-			killer.character.sendMessage(
-				`You gain ${experienceGained} experience!`,
-				MESSAGE_GROUP.INFO
-			);
+	if (killer) {
+		if (!killer.character) {
+			processThreatSwitching(killer);
+		} else {
+			if (killer.combatTarget === deadMob) killer.combatTarget = undefined;
+			killer.sendMessage(`You have slain ${deadMob}!`, MESSAGE_GROUP.COMBAT);
+			// Only players gain experience
+			const experienceGained = killer.awardKillExperience(deadMob.level);
+			if (experienceGained > 0) {
+				// Send experience message to the killer
+				killer.character.sendMessage(
+					`You gain ${experienceGained} experience!`,
+					MESSAGE_GROUP.INFO
+				);
+			}
 		}
+	}
+
+	// delete NPCs
+	if (!deadMob.character) {
+		deadMob.destroy();
+		return;
+	}
+
+	// preserve characters
+	// move mob to graveyard and set HP to 1
+	try {
+		const graveyard = getLocation(LOCATION.GRAVEYARD);
+		if (graveyard) {
+			deadMob.move(graveyard);
+			deadMob.resetResources();
+			showRoom(deadMob, graveyard);
+		}
+	} catch (error) {
+		logger.warn(`Failed to move ${deadMob.display} to graveyard: ${error}`);
 	}
 
 	// TODO: Handle loot, etc.
@@ -227,40 +270,38 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
  * @param mob The mob to process a combat round for
  */
 function processMobCombatRound(mob: Mob): void {
-	const target = mob.combatTarget;
-	if (!target) {
-		removeFromCombatQueue(mob);
+	if (mob.health <= 0) {
+		mob.combatTarget = undefined;
+		return;
+	}
+
+	if (!mob.location || !(mob.location instanceof Room)) {
+		mob.combatTarget = undefined;
+		return;
+	}
+
+	if (!mob.combatTarget) {
+		mob.combatTarget = undefined;
 		return;
 	}
 
 	// Check if target is still in the same room
-	const mobRoom = mob.location;
-	if (!mobRoom || !(mobRoom instanceof Room)) {
-		removeFromCombatQueue(mob);
+	if (mob.combatTarget.location !== mob.location) {
 		mob.combatTarget = undefined;
-		return;
-	}
-
-	if (target.location !== mobRoom) {
-		// Target left the room, disengage
-		mob.combatTarget = undefined;
-		removeFromCombatQueue(mob);
 		return;
 	}
 
 	// Check if target is dead
-	if (target.health <= 0) {
+	if (mob.combatTarget.health <= 0) {
 		mob.combatTarget = undefined;
-		removeFromCombatQueue(mob);
 		return;
 	}
 
 	// Process threat switching for NPCs
 	if (!mob.character) {
 		processThreatSwitching(mob);
-		const newTarget = mob.combatTarget;
-		if (newTarget !== target) {
-			// Target switched, skip this round
+		if (!mob.combatTarget) {
+			removeFromCombatQueue(mob);
 			return;
 		}
 	}
@@ -268,7 +309,12 @@ function processMobCombatRound(mob: Mob): void {
 	// Perform the hit (oneHit handles accuracy checks, damage calculation, messages, and damage dealing)
 	const mainHand = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
 	const weapon = mainHand instanceof Weapon ? mainHand : undefined;
-	mob.oneHit({ target, weapon });
+	mob.oneHit({ target: mob.combatTarget, weapon });
+
+	// extra hit when dual wielding
+	const offHand = mob.getEquipped(EQUIPMENT_SLOT.OFF_HAND);
+	const weaponOff = offHand instanceof Weapon ? offHand : undefined;
+	if (weaponOff) mob.oneHit({ target: mob.combatTarget, weapon: weaponOff });
 }
 
 /**
@@ -284,14 +330,7 @@ export function processCombatRound(): void {
 
 	// Process each mob's combat round
 	for (const mob of sortedMobs) {
-		// Check if mob is still valid (not destroyed, still in a room)
-		if (mob.location instanceof Room && mob.isInCombat()) {
-			processMobCombatRound(mob);
-		} else {
-			// Mob is invalid, remove from queue
-			removeFromCombatQueue(mob);
-			mob.combatTarget = undefined;
-		}
+		processMobCombatRound(mob);
 	}
 }
 
@@ -306,33 +345,16 @@ export function processCombatRound(): void {
 export function initiateCombat(attacker: Mob, defender: Mob, room: Room): void {
 	// Set attacker's target
 	attacker.combatTarget = defender;
-	addToCombatQueue(attacker);
 
 	// If defender is an NPC, add threat and potentially switch target
-	if (!defender.character && defender.threatTable) {
+	// addThreat will call processThreatSwitching, which will set defender's target if needed
+	if (!defender.character && defender.getThreat(attacker) === 0) {
 		// Initial threat from engagement
 		defender.addThreat(attacker, 1);
-		processThreatSwitching(defender);
 	}
 
-	// If defender doesn't have a target, set attacker as target
+	// If defender doesn't have a target (e.g., defender is a player character), set attacker as target
 	if (!defender.combatTarget) {
-		defender.combatTarget = attacker;
-		addToCombatQueue(defender);
+		initiateCombat(defender, attacker, room);
 	}
-
-	// Send engagement messages
-	act(
-		{
-			user: "You engage {target} in combat!",
-			target: "{User} engages you in combat!",
-			room: "{User} engages {target} in combat!",
-		},
-		{
-			user: attacker,
-			target: defender,
-			room: room,
-		},
-		{ messageGroup: MESSAGE_GROUP.COMBAT }
-	);
 }

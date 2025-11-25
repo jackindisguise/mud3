@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.19.0](https://github.com/jackindisguise/mud3/compare/v1.18.0...v1.19.0) (2025-11-25)
+
+
+### Features
+
+* added busy mode system for message queuing ([93f0fc7](https://github.com/jackindisguise/mud3/commit/93f0fc7fa2e3d715b9db1ba2992560396b9ec080))
+* **combat:** improved death handling and player mob combat ([94dddf6](https://github.com/jackindisguise/mud3/commit/94dddf692ace2b43a3b9d0f7749bb2443e0e7f3d))
+
 ## [1.18.0](https://github.com/jackindisguise/mud3/compare/v1.17.0...v1.18.0) (2025-11-24)
 
 

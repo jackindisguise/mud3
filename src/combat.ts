@@ -249,7 +249,25 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 			processThreatSwitching(killer);
 		} else {
 			if (killer.combatTarget === deadMob) killer.combatTarget = undefined;
-			killer.sendMessage(`You have slain ${deadMob}!`, MESSAGE_GROUP.COMBAT);
+
+			// Create ASCII art for "SLAIN" (3 lines tall)
+			const slainArt = [
+				color(".-. .   .-. .-. . .", COLOR.CRIMSON),
+				color("`-. |   |-|  |  |\\|", COLOR.CRIMSON),
+				color("`-' `-' ` ' `-' ' `", COLOR.CRIMSON),
+			];
+
+			// Build the message with "You have" on the left and mob name on the right of middle line
+			const leftText = "You have ";
+			const rightText = ` ${deadMob}!`;
+
+			// Create the message lines
+			const messageLines: string[] = [];
+			messageLines.push(" ".repeat(leftText.length) + slainArt[0]); // Top line
+			messageLines.push(leftText + slainArt[1] + rightText); // Middle line with text
+			messageLines.push(" ".repeat(leftText.length) + slainArt[2]); // Bottom line
+
+			killer.sendMessage(messageLines.join("\n"), MESSAGE_GROUP.COMBAT);
 			// Only players gain experience
 			const experienceGained = killer.awardKillExperience(deadMob.level);
 			if (experienceGained > 0) {
@@ -291,11 +309,6 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
  * @param mob The mob to process a combat round for
  */
 function processMobCombatRound(mob: Mob): void {
-	if (mob.health <= 0) {
-		mob.combatTarget = undefined;
-		return;
-	}
-
 	if (!mob.location || !(mob.location instanceof Room)) {
 		mob.combatTarget = undefined;
 		return;
@@ -308,12 +321,6 @@ function processMobCombatRound(mob: Mob): void {
 
 	// Check if target is still in the same room
 	if (mob.combatTarget.location !== mob.location) {
-		mob.combatTarget = undefined;
-		return;
-	}
-
-	// Check if target is dead
-	if (mob.combatTarget.health <= 0) {
 		mob.combatTarget = undefined;
 		return;
 	}
@@ -350,6 +357,14 @@ export function processCombatRound(): void {
 	});
 
 	// Process each mob's combat round
+	const characters = sortedMobs.filter((mob) => mob.character);
+	characters.forEach(
+		(mob) =>
+			!mob.isInCombat() ||
+			mob.character!.sendLine(
+				`${LINEBREAK}` + color("[COMBAT ROUND]", COLOR.YELLOW)
+			)
+	);
 	for (const mob of sortedMobs) {
 		processMobCombatRound(mob);
 	}

@@ -58,6 +58,7 @@ export interface HitTypesResponse {
 			verb: string;
 			verbThirdPerson?: string;
 			damageType: string;
+			color?: number;
 		}
 	>;
 	physicalDamageTypes: typeof PHYSICAL_DAMAGE_TYPE;
@@ -206,6 +207,7 @@ export class MapEditorService {
 				verb: hitType.verb,
 				verbThirdPerson: hitType.verbThirdPerson,
 				damageType: hitType.damageType,
+				color: hitType.color,
 			};
 		}
 		return {

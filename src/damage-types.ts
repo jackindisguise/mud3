@@ -60,6 +60,8 @@ export type DamageTypeRelationships = Partial<
 	Record<DAMAGE_TYPE, DAMAGE_RELATIONSHIP>
 >;
 
+import { COLOR } from "./color.js";
+
 /**
  * Hit type definition.
  * Associates a verb word with a damage type.
@@ -67,6 +69,7 @@ export type DamageTypeRelationships = Partial<
  * @property verb - The verb in base form for first person ("You punch")
  * @property verbThirdPerson - Optional third person singular form ("punches"). If not provided, auto-conjugates by adding 's' or 'es'.
  * @property damageType - The damage type associated with this hit type
+ * @property color - Optional color for the verb in combat messages. Defaults to COLOR.WHITE if not specified.
  */
 export interface HitType {
 	/** The verb in base form for first person ("You punch") */
@@ -75,6 +78,8 @@ export interface HitType {
 	verbThirdPerson?: string;
 	/** The damage type associated with this hit type */
 	damageType: DAMAGE_TYPE;
+	/** Optional color for the verb in combat messages. Defaults to COLOR.WHITE if not specified. */
+	color?: COLOR;
 }
 
 /**
@@ -104,6 +109,7 @@ export const DEFAULT_HIT_TYPE: HitType = {
 	verb: "punch",
 	verbThirdPerson: "punches",
 	damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+	color: COLOR.WHITE,
 };
 
 /**
@@ -128,6 +134,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "slash",
 			verbThirdPerson: "slashes",
 			damageType: PHYSICAL_DAMAGE_TYPE.SLASH,
+			color: COLOR.WHITE,
 		},
 	],
 	[
@@ -136,6 +143,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "stab",
 			verbThirdPerson: "stabs",
 			damageType: PHYSICAL_DAMAGE_TYPE.STAB,
+			color: COLOR.WHITE,
 		},
 	],
 	[
@@ -144,6 +152,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "cut",
 			verbThirdPerson: "cuts",
 			damageType: PHYSICAL_DAMAGE_TYPE.SLASH,
+			color: COLOR.WHITE,
 		},
 	],
 	[
@@ -152,6 +161,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "crush",
 			verbThirdPerson: "crushes",
 			damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+			color: COLOR.WHITE,
 		},
 	],
 	[
@@ -160,6 +170,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "bludgeon",
 			verbThirdPerson: "bludgeons",
 			damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+			color: COLOR.WHITE,
 		},
 	],
 	[
@@ -168,6 +179,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "bite",
 			verbThirdPerson: "bites",
 			damageType: PHYSICAL_DAMAGE_TYPE.EXOTIC,
+			color: COLOR.WHITE,
 		},
 	],
 	[
@@ -176,6 +188,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "sting",
 			verbThirdPerson: "stings",
 			damageType: PHYSICAL_DAMAGE_TYPE.EXOTIC,
+			color: COLOR.WHITE,
 		},
 	],
 	// Magical hit types
@@ -185,6 +198,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "burn",
 			verbThirdPerson: "burns",
 			damageType: MAGICAL_DAMAGE_TYPE.FIRE,
+			color: COLOR.CRIMSON,
 		},
 	],
 	[
@@ -193,6 +207,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "singe",
 			verbThirdPerson: "singes",
 			damageType: MAGICAL_DAMAGE_TYPE.FIRE,
+			color: COLOR.CRIMSON,
 		},
 	],
 	[
@@ -201,6 +216,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "scorch",
 			verbThirdPerson: "scorches",
 			damageType: MAGICAL_DAMAGE_TYPE.FIRE,
+			color: COLOR.CRIMSON,
 		},
 	],
 	[
@@ -209,6 +225,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "freeze",
 			verbThirdPerson: "freezes",
 			damageType: MAGICAL_DAMAGE_TYPE.ICE,
+			color: COLOR.CYAN,
 		},
 	],
 	[
@@ -217,6 +234,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "shock",
 			verbThirdPerson: "shocks",
 			damageType: MAGICAL_DAMAGE_TYPE.ELECTRIC,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -225,6 +243,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "zap",
 			verbThirdPerson: "zaps",
 			damageType: MAGICAL_DAMAGE_TYPE.ELECTRIC,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -233,6 +252,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "drench",
 			verbThirdPerson: "drenches",
 			damageType: MAGICAL_DAMAGE_TYPE.WATER,
+			color: COLOR.LIGHT_BLUE,
 		},
 	],
 	[
@@ -241,6 +261,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "melt",
 			verbThirdPerson: "melts",
 			damageType: MAGICAL_DAMAGE_TYPE.ACID,
+			color: COLOR.OLIVE,
 		},
 	],
 	[
@@ -249,6 +270,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "dissolve",
 			verbThirdPerson: "dissolves",
 			damageType: MAGICAL_DAMAGE_TYPE.ACID,
+			color: COLOR.OLIVE,
 		},
 	],
 	// Radiant damage types
@@ -258,6 +280,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "smite",
 			verbThirdPerson: "smites",
 			damageType: MAGICAL_DAMAGE_TYPE.RADIANT,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -266,6 +289,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "purify",
 			verbThirdPerson: "purifies",
 			damageType: MAGICAL_DAMAGE_TYPE.RADIANT,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -274,6 +298,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "sear",
 			verbThirdPerson: "sears",
 			damageType: MAGICAL_DAMAGE_TYPE.RADIANT,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -282,6 +307,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "illuminate",
 			verbThirdPerson: "illuminates",
 			damageType: MAGICAL_DAMAGE_TYPE.RADIANT,
+			color: COLOR.YELLOW,
 		},
 	],
 	// Necrotic damage types
@@ -291,6 +317,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "wither",
 			verbThirdPerson: "withers",
 			damageType: MAGICAL_DAMAGE_TYPE.NECROTIC,
+			color: COLOR.PURPLE,
 		},
 	],
 	[
@@ -299,6 +326,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "decay",
 			verbThirdPerson: "decays",
 			damageType: MAGICAL_DAMAGE_TYPE.NECROTIC,
+			color: COLOR.PURPLE,
 		},
 	],
 	[
@@ -307,6 +335,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "drain",
 			verbThirdPerson: "drains",
 			damageType: MAGICAL_DAMAGE_TYPE.NECROTIC,
+			color: COLOR.PURPLE,
 		},
 	],
 	[
@@ -315,6 +344,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "corrupt",
 			verbThirdPerson: "corrupts",
 			damageType: MAGICAL_DAMAGE_TYPE.NECROTIC,
+			color: COLOR.PURPLE,
 		},
 	],
 	[
@@ -323,6 +353,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "blight",
 			verbThirdPerson: "blights",
 			damageType: MAGICAL_DAMAGE_TYPE.NECROTIC,
+			color: COLOR.PURPLE,
 		},
 	],
 	// Psychic damage types
@@ -332,6 +363,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "assault",
 			verbThirdPerson: "assaults",
 			damageType: MAGICAL_DAMAGE_TYPE.PSYCHIC,
+			color: COLOR.PINK,
 		},
 	],
 	[
@@ -340,6 +372,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "scour",
 			verbThirdPerson: "scours",
 			damageType: MAGICAL_DAMAGE_TYPE.PSYCHIC,
+			color: COLOR.PINK,
 		},
 	],
 	[
@@ -348,6 +381,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "rend",
 			verbThirdPerson: "rends",
 			damageType: MAGICAL_DAMAGE_TYPE.PSYCHIC,
+			color: COLOR.PINK,
 		},
 	],
 	[
@@ -356,6 +390,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "pierce",
 			verbThirdPerson: "pierces",
 			damageType: MAGICAL_DAMAGE_TYPE.PSYCHIC,
+			color: COLOR.PINK,
 		},
 	],
 	[
@@ -364,6 +399,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "shatter",
 			verbThirdPerson: "shatters",
 			damageType: MAGICAL_DAMAGE_TYPE.PSYCHIC,
+			color: COLOR.PINK,
 		},
 	],
 	// Force damage types
@@ -373,6 +409,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "pummel",
 			verbThirdPerson: "pummels",
 			damageType: MAGICAL_DAMAGE_TYPE.FORCE,
+			color: COLOR.GREY,
 		},
 	],
 	[
@@ -381,6 +418,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "strike",
 			verbThirdPerson: "strikes",
 			damageType: MAGICAL_DAMAGE_TYPE.FORCE,
+			color: COLOR.GREY,
 		},
 	],
 	[
@@ -389,6 +427,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "impact",
 			verbThirdPerson: "impacts",
 			damageType: MAGICAL_DAMAGE_TYPE.FORCE,
+			color: COLOR.GREY,
 		},
 	],
 	[
@@ -397,6 +436,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "blast",
 			verbThirdPerson: "blasts",
 			damageType: MAGICAL_DAMAGE_TYPE.FORCE,
+			color: COLOR.GREY,
 		},
 	],
 	// Thunder damage types
@@ -406,6 +446,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "resonate",
 			verbThirdPerson: "resonates",
 			damageType: MAGICAL_DAMAGE_TYPE.THUNDER,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -414,6 +455,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "echo",
 			verbThirdPerson: "echoes",
 			damageType: MAGICAL_DAMAGE_TYPE.THUNDER,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -422,6 +464,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "boom",
 			verbThirdPerson: "booms",
 			damageType: MAGICAL_DAMAGE_TYPE.THUNDER,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -430,6 +473,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "thunder",
 			verbThirdPerson: "thunders",
 			damageType: MAGICAL_DAMAGE_TYPE.THUNDER,
+			color: COLOR.YELLOW,
 		},
 	],
 	[
@@ -438,6 +482,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "concuss",
 			verbThirdPerson: "concusses",
 			damageType: MAGICAL_DAMAGE_TYPE.THUNDER,
+			color: COLOR.YELLOW,
 		},
 	],
 	// Poison damage types
@@ -447,6 +492,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "venom",
 			verbThirdPerson: "venoms",
 			damageType: MAGICAL_DAMAGE_TYPE.POISON,
+			color: COLOR.LIME,
 		},
 	],
 	[
@@ -455,6 +501,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "toxify",
 			verbThirdPerson: "toxifies",
 			damageType: MAGICAL_DAMAGE_TYPE.POISON,
+			color: COLOR.LIME,
 		},
 	],
 	[
@@ -463,6 +510,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "poison",
 			verbThirdPerson: "poisons",
 			damageType: MAGICAL_DAMAGE_TYPE.POISON,
+			color: COLOR.LIME,
 		},
 	],
 	[
@@ -471,6 +519,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "taint",
 			verbThirdPerson: "taints",
 			damageType: MAGICAL_DAMAGE_TYPE.POISON,
+			color: COLOR.LIME,
 		},
 	],
 	// Acid damage types
@@ -480,6 +529,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "corrode",
 			verbThirdPerson: "corrodes",
 			damageType: MAGICAL_DAMAGE_TYPE.ACID,
+			color: COLOR.OLIVE,
 		},
 	],
 	[
@@ -488,6 +538,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "erode",
 			verbThirdPerson: "erodes",
 			damageType: MAGICAL_DAMAGE_TYPE.ACID,
+			color: COLOR.OLIVE,
 		},
 	],
 	[
@@ -496,6 +547,7 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 			verb: "eat",
 			verbThirdPerson: "eats",
 			damageType: MAGICAL_DAMAGE_TYPE.ACID,
+			color: COLOR.OLIVE,
 		},
 	],
 ]);

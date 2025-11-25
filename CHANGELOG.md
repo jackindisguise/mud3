@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.20.0](https://github.com/jackindisguise/mud3/compare/v1.19.0...v1.20.0) (2025-11-25)
+
+
+### Features
+
+* added regeneration system with Spirit attribute and rest command ([078c5a5](https://github.com/jackindisguise/mud3/commit/078c5a50b8fb7928013c218458318a1b907a3b3b))
+* enhanced combat messages with colored verbs and ASCII art kill messages ([7445bae](https://github.com/jackindisguise/mud3/commit/7445bae342afee8be661ba38ad3ec0c43bdab99e))
+
+
+### Bug Fixes
+
+* **map-editor:** improved dropdown menu readability in dark theme ([0b3eee4](https://github.com/jackindisguise/mud3/commit/0b3eee4dfbe5f769d258b9c82fae28fd6444ddbd))
+
 ## [1.19.0](https://github.com/jackindisguise/mud3/compare/v1.18.0...v1.19.0) (2025-11-25)
 
 

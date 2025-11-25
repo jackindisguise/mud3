@@ -234,6 +234,11 @@ header h1 {
 	box-shadow: var(--shadow-md);
 }
 
+.header-controls select option {
+	background: var(--base02);
+	color: var(--base2);
+}
+
 .header-controls select:hover,
 .header-controls button:hover {
 	background: var(--bg-button-hover);
@@ -712,6 +717,11 @@ header h1 {
 	min-width: 110px;
 }
 
+.layer-controls select option {
+	background: var(--base02);
+	color: var(--base2);
+}
+
 .toolbox-label {
 	color: var(--base0);
 	font-size: 0.85rem;
@@ -1081,6 +1091,19 @@ header h1 {
 	-ms-user-select: text;
 }
 
+/* Dropdown option styling for better readability */
+select option {
+	background: var(--base02);
+	color: var(--base2);
+	padding: 0.5rem;
+}
+
+select option:hover,
+select option:focus {
+	background: var(--base01);
+	color: var(--base3);
+}
+
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
@@ -1109,16 +1132,19 @@ header h1 {
 #template-hit-type option {
 	padding: 0.5rem;
 	font-weight: 500;
-	background: var(--base03);
+	background: var(--base02);
+	color: var(--base2);
 	text-transform: uppercase;
 }
 
 #template-hit-type option:hover {
-	background: var(--base02);
+	background: var(--base01);
+	color: var(--base3);
 }
 
 #template-hit-type option:checked {
-	background: var(--base02);
+	background: var(--base01);
+	color: var(--base3);
 	font-weight: 600;
 }
 
@@ -1150,11 +1176,13 @@ header h1 {
 .color-selector option {
 	padding: 0.5rem;
 	font-weight: 500;
+	background: var(--base02);
+	color: var(--base2);
 }
 
 .color-selector option[value=""] {
-	background: var(--base03);
-	color: var(--base0);
+	background: var(--base02);
+	color: var(--base2);
 }
 
 .form-group textarea {
@@ -1180,6 +1208,11 @@ header h1 {
 	border: 1px solid var(--base01);
 	color: var(--base1);
 	border-radius: 4px;
+}
+
+.room-link-item select option {
+	background: var(--base02);
+	color: var(--base2);
 }
 
 .room-link-item input {

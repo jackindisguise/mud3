@@ -79,6 +79,20 @@ export enum MESSAGE_GROUP {
 }
 
 /**
+ * Dictionary mapping MESSAGE_GROUP enum values to their lowercase string names.
+ * Used for command parsing and display.
+ */
+export const MESSAGE_GROUP_NAMES: Record<MESSAGE_GROUP, string> = {
+	[MESSAGE_GROUP.INFO]: "info",
+	[MESSAGE_GROUP.COMBAT]: "combat",
+	[MESSAGE_GROUP.COMMAND_RESPONSE]: "command-response",
+	[MESSAGE_GROUP.SYSTEM]: "system",
+	[MESSAGE_GROUP.CHANNELS]: "channels",
+	[MESSAGE_GROUP.ACTION]: "action",
+	[MESSAGE_GROUP.PROMPT]: "prompt",
+};
+
+/**
  * Player-specific settings and configuration.
  */
 export type EchoMode = "client" | "server" | "off";
@@ -104,6 +118,14 @@ export interface PlayerSettings {
 	defaultColor?: COLOR;
 	/** Input echo preference */
 	echoMode?: EchoMode;
+	/** Whether busy mode is enabled */
+	busyModeEnabled?: boolean;
+	/** Whether combat busy mode is enabled */
+	combatBusyModeEnabled?: boolean;
+	/** Message groups to forward to answering machine in busy mode */
+	busyForwardedGroups?: Set<MESSAGE_GROUP>;
+	/** Message groups to forward to answering machine in combat busy mode */
+	combatBusyForwardedGroups?: Set<MESSAGE_GROUP>;
 }
 
 /**
@@ -144,6 +166,10 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	autoLook: true,
 	briefMode: false,
 	echoMode: "client",
+	busyModeEnabled: false,
+	combatBusyModeEnabled: true,
+	busyForwardedGroups: new Set([MESSAGE_GROUP.CHANNELS]),
+	combatBusyForwardedGroups: new Set([MESSAGE_GROUP.CHANNELS]),
 } as const;
 
 /**
@@ -231,6 +257,12 @@ export const DEFAULT_PLAYER_STATS: PlayerStats = {
 /**
  * Current session information (runtime data, not persisted).
  */
+export interface QueuedMessage {
+	text: string;
+	group: MESSAGE_GROUP;
+	timestamp: Date;
+}
+
 export interface PlayerSession {
 	/** When the current session started */
 	startTime: Date;
@@ -240,6 +272,8 @@ export interface PlayerSession {
 	client: MudClient;
 	/** Last message group received in this session */
 	lastMessageGroup?: MESSAGE_GROUP;
+	/** Queued messages waiting to be read (busy mode) */
+	queuedMessages?: QueuedMessage[];
 }
 
 /**
@@ -318,6 +352,14 @@ export interface SerializedPlayerSettings {
 	blockedUsers?: string[];
 	/** Default terminal color for all messages sent to this character (serialized as number) */
 	defaultColor?: number;
+	/** Whether busy mode is enabled */
+	busyModeEnabled?: boolean;
+	/** Whether combat busy mode is enabled */
+	combatBusyModeEnabled?: boolean;
+	/** Message groups to forward to answering machine in busy mode (serialized as array) */
+	busyForwardedGroups?: MESSAGE_GROUP[];
+	/** Message groups to forward to answering machine in combat busy mode (serialized as array) */
+	combatBusyForwardedGroups?: MESSAGE_GROUP[];
 }
 
 export interface SerializedCharacter {
@@ -750,6 +792,20 @@ export class Character {
 		const client = session?.client;
 		if (!session || !client || !client.isConnected()) return;
 
+		// Check if busy mode is active
+		const isBusy = this.isBusyModeActive();
+		const forwardedGroups = this.getActiveForwardedGroups();
+
+		// If busy mode is active and this message group should be forwarded, queue it
+		if (isBusy && forwardedGroups.has(group)) {
+			if (!session.queuedMessages) {
+				session.queuedMessages = [];
+			}
+			session.queuedMessages.push({ text, group, timestamp: new Date() });
+			return;
+		}
+
+		// Otherwise, send immediately
 		const last = session.lastMessageGroup;
 		if (last && last !== group && last !== MESSAGE_GROUP.PROMPT) {
 			this.sendLine(" ");
@@ -769,6 +825,10 @@ export class Character {
 		const queuedLine = this.formatQueuedActionLine();
 		if (queuedLine) {
 			this.sendLine(queuedLine);
+		}
+		const callWaitingLine = this.formatCallWaitingLine();
+		if (callWaitingLine) {
+			this.sendLine(callWaitingLine);
 		}
 		this.send(this.formatPrompt(promptText));
 		session.lastMessageGroup = MESSAGE_GROUP.PROMPT;
@@ -796,6 +856,94 @@ export class Character {
 			)}`,
 			COLOR.OLIVE
 		);
+	}
+
+	private formatCallWaitingLine(): string | undefined {
+		const session = this.session;
+		if (!session?.queuedMessages || session.queuedMessages.length === 0) {
+			return undefined;
+		}
+
+		return stickyColor(
+			`[CALL WAITING - type ${color("busy read", COLOR.WHITE)} to read it]`,
+			COLOR.OLIVE
+		);
+	}
+
+	/**
+	 * Checks if busy mode is currently active.
+	 * Regular busy mode is active if enabled.
+	 * Combat busy mode is active if enabled and the mob is in combat.
+	 */
+	private isBusyModeActive(): boolean {
+		if (this.settings.busyModeEnabled) {
+			return true;
+		}
+
+		if (
+			this.settings.combatBusyModeEnabled &&
+			this.mob &&
+			this.mob.isInCombat()
+		) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Gets the set of message groups that should be forwarded in the currently active busy mode.
+	 */
+	private getActiveForwardedGroups(): Set<MESSAGE_GROUP> {
+		// If combat busy mode is active, use combat busy forwarded groups
+		if (
+			this.settings.combatBusyModeEnabled &&
+			this.mob &&
+			this.mob.isInCombat()
+		) {
+			return this.settings.combatBusyForwardedGroups ?? new Set();
+		}
+
+		// Otherwise use regular busy forwarded groups
+		return this.settings.busyForwardedGroups ?? new Set();
+	}
+
+	/**
+	 * Reads and sends all queued messages, then clears the queue.
+	 */
+	public readQueuedMessages(): QueuedMessage[] {
+		const session = this.session;
+		if (!session?.queuedMessages || session.queuedMessages.length === 0) {
+			return [];
+		}
+
+		const messages = [...session.queuedMessages];
+		session.queuedMessages = [];
+
+		// Send all queued messages
+		const now = new Date();
+		for (const msg of messages) {
+			const last = session.lastMessageGroup;
+			if (last && last !== msg.group && last !== MESSAGE_GROUP.PROMPT) {
+				this.sendLine(" ");
+			}
+			const diffMs = now.getTime() - msg.timestamp.getTime();
+			const diffSeconds = Math.floor(diffMs / 1000);
+			let timestamp: string;
+			if (diffSeconds < 60) {
+				timestamp = `${diffSeconds}s ago`;
+			} else {
+				const diffMinutes = Math.floor(diffSeconds / 60);
+				timestamp = `${diffMinutes}min ago`;
+			}
+			const timestampedText = `${color(`[${timestamp}]`, COLOR.SILVER)} ${
+				msg.text
+			}`;
+			this.sendLine(stickyColor(timestampedText, COLOR.PURPLE));
+			session.lastMessageGroup = msg.group;
+		}
+
+		return messages;
 	}
 
 	/**
@@ -1074,6 +1222,12 @@ export class Character {
 			blockedUsers: this.settings.blockedUsers
 				? Array.from(this.settings.blockedUsers)
 				: [],
+			busyForwardedGroups: this.settings.busyForwardedGroups
+				? Array.from(this.settings.busyForwardedGroups)
+				: [],
+			combatBusyForwardedGroups: this.settings.combatBusyForwardedGroups
+				? Array.from(this.settings.combatBusyForwardedGroups)
+				: [],
 		};
 
 		// Serialize mob and remove 'type' field
@@ -1137,6 +1291,14 @@ export class Character {
 				data.settings.blockedUsers !== undefined
 					? new Set(data.settings.blockedUsers)
 					: new Set<string>(),
+			busyForwardedGroups:
+				data.settings.busyForwardedGroups !== undefined
+					? new Set(data.settings.busyForwardedGroups)
+					: new Set([MESSAGE_GROUP.CHANNELS]),
+			combatBusyForwardedGroups:
+				data.settings.combatBusyForwardedGroups !== undefined
+					? new Set(data.settings.combatBusyForwardedGroups)
+					: new Set([MESSAGE_GROUP.CHANNELS]),
 		};
 
 		if (data.settings.defaultColor !== undefined) {

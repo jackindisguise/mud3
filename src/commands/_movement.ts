@@ -12,11 +12,13 @@ import { MESSAGE_GROUP } from "../character.js";
 import { Room, DIRECTION, dir2text } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
-export const DEFAULT_COMMAND_VALUES: Partial<CommandObject> = {
-	priority: PRIORITY.HIGH,
-	cooldown: (context: CommandContext, args: Map<string, any>) => {
+const DEFAULT_COOLDOWN_MS = 100;
+
+export function getCooldownFunctionForDirection(
+	direction: DIRECTION
+): (context: CommandContext, args: Map<string, any>) => number {
+	return (context: CommandContext, args: Map<string, any>): number => {
 		const { actor, room } = context;
-		const direction = args.get("direction") as DIRECTION;
 		if (!room) {
 			return 0;
 		}
@@ -26,8 +28,12 @@ export const DEFAULT_COMMAND_VALUES: Partial<CommandObject> = {
 		if (!actor.canStep(direction)) {
 			return 0;
 		}
-		return 300;
-	},
+		return DEFAULT_COOLDOWN_MS;
+	};
+}
+
+export const DEFAULT_COMMAND_VALUES: Partial<CommandObject> = {
+	priority: PRIORITY.HIGH,
 };
 
 /**
@@ -75,6 +81,10 @@ export function executeMovement(
 		return;
 	}
 
+	actor.sendMessage(
+		`You leave to the ${directionText}.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
 	actor.step(direction);
 	return;
 }

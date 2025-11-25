@@ -106,6 +106,7 @@ export default {
 		);
 
 		// Attempt to move in that direction (bypasses combat check)
+		actor.combatTarget = undefined;
 		actor.step(randomDirection);
 	},
 } satisfies CommandObject;

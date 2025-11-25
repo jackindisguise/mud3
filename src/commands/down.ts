@@ -15,10 +15,15 @@
 import { CommandContext, PRIORITY } from "../command.js";
 import { DIRECTION } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { DEFAULT_COMMAND_VALUES, executeMovement } from "./_movement.js";
+import {
+	DEFAULT_COMMAND_VALUES,
+	executeMovement,
+	getCooldownFunctionForDirection,
+} from "./_movement.js";
 
 export default {
 	...DEFAULT_COMMAND_VALUES,
+	cooldown: getCooldownFunctionForDirection(DIRECTION.DOWN),
 	pattern: "down~",
 	aliases: ["d"],
 	priority: PRIORITY.HIGH,

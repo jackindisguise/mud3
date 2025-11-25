@@ -6791,13 +6791,13 @@ export class Mob extends Movable {
 		if (sourceRoom) {
 			act(
 				{
-					user: `You leave to the ${directionText}.`,
 					room: `{User} leaves to the ${directionText}.`,
 				},
 				{
 					user: this,
 					room: sourceRoom,
-				}
+				},
+				{ excludeUser: true }
 			);
 		}
 

@@ -86,11 +86,32 @@ export function addToCombatQueue(mob: Mob): void {
 /**
  * Removes a mob from the combat queue.
  * Called automatically when a mob disengages from combat.
+ * For player characters with combat busy mode enabled, this will dump queued messages.
  *
  * @param mob The mob to remove from combat
  */
 export function removeFromCombatQueue(mob: Mob): void {
+	const wasInCombat = combatQueue.has(mob);
 	combatQueue.delete(mob);
+
+	// If this is a player character that just exited combat and has combat busy mode enabled,
+	// dump their queued messages
+	if (
+		mob.character &&
+		wasInCombat &&
+		!mob.isInCombat() &&
+		mob.character.settings.combatBusyModeEnabled
+	) {
+		const messages = mob.character.readQueuedMessages();
+		if (messages.length > 0) {
+			mob.character.sendMessage(
+				`Combat ended. ${messages.length} queued message${
+					messages.length === 1 ? "" : "s"
+				} dumped.`,
+				MESSAGE_GROUP.SYSTEM
+			);
+		}
+	}
 }
 
 /**

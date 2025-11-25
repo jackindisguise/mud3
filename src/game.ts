@@ -127,6 +127,9 @@ export class Game {
 	/** Names currently being created (to prevent simultaneous creation conflicts) */
 	private namesInCreation = new Set<string>();
 
+	/** Track last command time per character to detect rapid successive commands */
+	private lastCommandTime = new Map<Character, number>();
+
 	private saveTimer?: number;
 	private boardCleanupTimer?: number;
 	private gameStateSaveTimer?: number;
@@ -833,12 +836,23 @@ export class Game {
 			return;
 		}
 
+		const now = Date.now();
+		const lastTime = this.lastCommandTime.get(character);
+		const BATCH_WINDOW_MS = 10; // Commands within 100ms are considered rapid succession
+		const isRapidSuccession =
+			lastTime !== undefined && now - lastTime < BATCH_WINDOW_MS;
+
+		// Track this command time
+		this.lastCommandTime.set(character, now);
+
 		const echoMode = character.settings.echoMode ?? "client";
-		if (echoMode === "client" || echoMode === "server") {
-			const session = character.session;
-			if (session) session.lastMessageGroup = undefined;
+		if (echoMode === "client" || echoMode === "server" || isRapidSuccession) {
+			const charSession = character.session;
+			if (charSession) charSession.lastMessageGroup = undefined;
 			if (echoMode === "server" && character.session?.client) {
-				session?.client?.sendLine(input);
+				charSession?.client?.sendLine(input);
+			} else if (isRapidSuccession) {
+				character.send(LINEBREAK);
 			}
 		}
 
@@ -1125,6 +1139,9 @@ export class Game {
 
 		// Clean up tracking
 		this.activeCharacters.delete(session.character);
+
+		// Clean up command tracking
+		this.lastCommandTime.delete(session.character);
 
 		// Remove from character package registry (local lock)
 		unregisterActiveCharacter(session.character);

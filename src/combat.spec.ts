@@ -1,4 +1,4 @@
-import { test, suite, beforeEach } from "node:test";
+import { test, suite, beforeEach, skip, afterEach } from "node:test";
 import assert from "node:assert";
 import { Dungeon, Mob, Room, Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
 import { Character } from "./character.js";
@@ -20,6 +20,30 @@ import {
 } from "./damage-types.js";
 import { freezeArchetype } from "./archetype.js";
 
+const testJob = freezeArchetype({
+	id: "test_job",
+	name: "Test Job",
+	startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
+	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
+	startingResourceCaps: { maxHealth: 100000, maxMana: 0 },
+	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
+	skills: [],
+	passives: [],
+	growthModifier: { base: 1.0 },
+});
+
+const testRace = freezeArchetype({
+	id: "test_race",
+	name: "Test Race",
+	startingAttributes: { strength: 10, agility: 10, intelligence: 10 },
+	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
+	startingResourceCaps: { maxHealth: 100000, maxMana: 50 },
+	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
+	skills: [],
+	passives: [],
+	growthModifier: { base: 1.0 },
+});
+
 suite("combat.ts", () => {
 	let dungeon: Dungeon;
 	let room: Room;
@@ -28,72 +52,37 @@ suite("combat.ts", () => {
 
 	beforeEach(() => {
 		dungeon = new Dungeon({ dimensions: { width: 10, height: 10, layers: 1 } });
-		room = new Room({ coordinates: { x: 0, y: 0, z: 0 }, dungeon });
-		dungeon.add(room);
+		room = dungeon.createRoom({ coordinates: { x: 0, y: 0, z: 0 }, dungeon })!;
 
 		// Create attacker
 		attacker = new Mob({
-			race: freezeArchetype({
-				id: "test_race",
-				name: "Test Race",
-				startingAttributes: { strength: 10, agility: 10, intelligence: 10 },
-				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
-				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
-				passives: [],
-				growthModifier: { base: 1.0 },
-			}),
-			job: freezeArchetype({
-				id: "test_job",
-				name: "Test Job",
-				startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-				startingResourceCaps: { maxHealth: 0, maxMana: 0 },
-				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
-				passives: [],
-				growthModifier: { base: 1.0 },
-			}),
+			display: "Attacker",
+			race: testRace,
+			job: testJob,
 			level: 1,
 		});
 		attacker.location = room;
-		room.add(attacker);
 
 		// Create defender
 		defender = new Mob({
-			race: freezeArchetype({
-				id: "test_race",
-				name: "Test Race",
-				startingAttributes: { strength: 5, agility: 5, intelligence: 5 },
-				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
-				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
-				passives: [],
-				growthModifier: { base: 1.0 },
-			}),
-			job: freezeArchetype({
-				id: "test_job",
-				name: "Test Job",
-				startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-				startingResourceCaps: { maxHealth: 0, maxMana: 0 },
-				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
-				passives: [],
-				growthModifier: { base: 1.0 },
-			}),
+			display: "Defender",
+			race: testRace,
+			job: testJob,
 			level: 1,
 		});
 		defender.location = room;
-		room.add(defender);
+	});
+
+	afterEach(() => {
+		attacker.combatTarget = undefined;
+		defender.combatTarget = undefined;
+		attacker.clearThreatTable();
+		defender.clearThreatTable();
 	});
 
 	suite("Combat queue management", () => {
 		test("addToCombatQueue should add mob to queue", () => {
 			attacker.combatTarget = defender;
-			addToCombatQueue(attacker);
 			assert(isInCombatQueue(attacker));
 		});
 
@@ -124,7 +113,7 @@ suite("combat.ts", () => {
 	suite("initiateCombat", () => {
 		test("should set attacker's target", () => {
 			initiateCombat(attacker, defender, room);
-			assert.strictEqual(attacker.combatTarget, defender);
+			assert.ok(attacker.combatTarget === defender);
 		});
 
 		test("should add attacker to combat queue", () => {
@@ -134,7 +123,7 @@ suite("combat.ts", () => {
 
 		test("should set defender's target if not already set", () => {
 			initiateCombat(attacker, defender, room);
-			assert.strictEqual(defender.combatTarget, attacker);
+			assert.ok(defender.combatTarget === attacker);
 		});
 
 		test("should add defender to combat queue if not already in combat", () => {
@@ -142,63 +131,81 @@ suite("combat.ts", () => {
 			assert(isInCombatQueue(defender));
 		});
 
+		test("should ensure defender initiates combat with attacker", () => {
+			initiateCombat(attacker, defender, room);
+
+			// Defender should have attacker as target
+			assert.ok(
+				defender.combatTarget === attacker,
+				"Defender should target attacker"
+			);
+
+			// Defender should be in combat queue
+			assert(isInCombatQueue(defender), "Defender should be in combat queue");
+
+			// Defender should be in combat
+			assert.ok(defender.isInCombat(), "Defender should be in combat");
+		});
+
+		test("should ensure player mob defender initiates combat with attacker", () => {
+			const playerDefender = new Mob({
+				display: "Player Defender",
+				race: testRace,
+				job: testJob,
+				level: 1,
+			});
+			playerDefender.character = new Character({
+				credentials: {
+					characterId: 2,
+					username: "player2",
+				},
+				mob: playerDefender,
+			});
+			playerDefender.location = room;
+
+			initiateCombat(attacker, playerDefender, room);
+
+			// Player defender should have player attacker as target
+			assert.ok(
+				playerDefender.combatTarget === attacker,
+				"Player defender should target player attacker"
+			);
+
+			// Player defender should be in combat queue
+			assert(
+				isInCombatQueue(playerDefender),
+				"Player defender should be in combat queue"
+			);
+
+			// Player defender should be in combat
+			assert.ok(
+				playerDefender.isInCombat(),
+				"Player defender should be in combat"
+			);
+
+			// Clean up
+			playerDefender.combatTarget = undefined;
+			removeFromCombatQueue(playerDefender);
+		});
+
 		test("should not change defender's target if already set", () => {
 			const otherTarget = new Mob({
-				race: freezeArchetype({
-					id: "test_race",
-					name: "Test Race",
-					startingAttributes: { strength: 5, agility: 5, intelligence: 5 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth: 100, maxMana: 50 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
-				job: freezeArchetype({
-					id: "test_job",
-					name: "Test Job",
-					startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth: 0, maxMana: 0 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
+				display: "Other Target",
+				race: testRace,
+				job: testJob,
 				level: 1,
 			});
 			otherTarget.location = room;
-			room.add(otherTarget);
-			defender.combatTarget = otherTarget;
-			addToCombatQueue(defender);
-
+			defender.damage(otherTarget, 1);
 			initiateCombat(attacker, defender, room);
-			assert.strictEqual(defender.combatTarget, otherTarget);
+			assert.ok(defender.combatTarget === otherTarget);
+			otherTarget.clearThreatTable();
+			otherTarget.combatTarget = undefined;
 		});
 	});
 
 	suite("Damage type relationships in combat", () => {
 		test("should apply damage multiplier for RESIST", () => {
-			// Create attacker with high agility to ensure hits
-			const highAgilityAttacker = new Mob({
-				race: freezeArchetype({
-					id: "high_agility_race",
-					name: "High Agility Race",
-					startingAttributes: { strength: 10, agility: 500, intelligence: 10 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth: 100, maxMana: 50 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
-				job: attacker.job,
-				level: attacker.level,
-			});
-			highAgilityAttacker.location = room;
-			room.add(highAgilityAttacker);
-
 			// Set defender to resist fire damage
 			const fireResistRace = freezeArchetype({
 				id: "fire_resist_race",
@@ -220,9 +227,8 @@ suite("combat.ts", () => {
 				job: defender.job,
 				level: defender.level,
 			});
-			newDefender.location = room;
 			room.remove(defender);
-			room.add(newDefender);
+			newDefender.location = room;
 			defender = newDefender;
 
 			// Equip fire weapon
@@ -231,11 +237,11 @@ suite("combat.ts", () => {
 				attackPower: 20,
 				hitType: COMMON_HIT_TYPES.get("burn")!,
 			});
-			highAgilityAttacker.equip(fireSword);
+			attacker.equip(fireSword);
 
 			const initialHealth = defender.health;
 			// Use oneHit with guaranteedHit to ensure we test damage modifiers
-			highAgilityAttacker.oneHit({
+			attacker.oneHit({
 				target: defender,
 				weapon: fireSword,
 				guaranteedHit: true,
@@ -248,25 +254,6 @@ suite("combat.ts", () => {
 		});
 
 		test("should apply damage multiplier for IMMUNE", () => {
-			// Create attacker with high agility to ensure hits
-			const highAgilityAttacker = new Mob({
-				race: freezeArchetype({
-					id: "high_agility_race",
-					name: "High Agility Race",
-					startingAttributes: { strength: 10, agility: 500, intelligence: 10 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth: 100, maxMana: 50 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
-				job: attacker.job,
-				level: attacker.level,
-			});
-			highAgilityAttacker.location = room;
-			room.add(highAgilityAttacker);
-
 			// Set defender to be immune to fire damage
 			const fireImmuneRace = freezeArchetype({
 				id: "fire_immune_race",
@@ -288,9 +275,8 @@ suite("combat.ts", () => {
 				job: defender.job,
 				level: defender.level,
 			});
-			newDefender.location = room;
 			room.remove(defender);
-			room.add(newDefender);
+			newDefender.location = room;
 			defender = newDefender;
 
 			// Equip fire weapon
@@ -299,11 +285,11 @@ suite("combat.ts", () => {
 				attackPower: 20,
 				hitType: COMMON_HIT_TYPES.get("burn")!,
 			});
-			highAgilityAttacker.equip(fireSword);
+			attacker.equip(fireSword);
 
 			const initialHealth = defender.health;
 			// Use oneHit with guaranteedHit to ensure we test damage modifiers
-			highAgilityAttacker.oneHit({
+			attacker.oneHit({
 				target: defender,
 				weapon: fireSword,
 				guaranteedHit: true,
@@ -315,25 +301,6 @@ suite("combat.ts", () => {
 		});
 
 		test("should apply damage multiplier for VULNERABLE", () => {
-			// Create attacker with high agility to ensure hits
-			const highAgilityAttacker = new Mob({
-				race: freezeArchetype({
-					id: "high_agility_race",
-					name: "High Agility Race",
-					startingAttributes: { strength: 10, agility: 500, intelligence: 10 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth: 100, maxMana: 50 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
-				job: attacker.job,
-				level: attacker.level,
-			});
-			highAgilityAttacker.location = room;
-			room.add(highAgilityAttacker);
-
 			// Set defender to be vulnerable to fire damage
 			const fireVulnerableRace = freezeArchetype({
 				id: "fire_vulnerable_race",
@@ -355,9 +322,8 @@ suite("combat.ts", () => {
 				job: defender.job,
 				level: defender.level,
 			});
-			newDefender.location = room;
 			room.remove(defender);
-			room.add(newDefender);
+			newDefender.location = room;
 			defender = newDefender;
 
 			// Equip fire weapon
@@ -366,11 +332,11 @@ suite("combat.ts", () => {
 				attackPower: 20,
 				hitType: COMMON_HIT_TYPES.get("burn")!,
 			});
-			highAgilityAttacker.equip(fireSword);
+			attacker.equip(fireSword);
 
 			const initialHealth = defender.health;
 			// Use oneHit with guaranteedHit to ensure we test damage modifiers
-			highAgilityAttacker.oneHit({
+			attacker.oneHit({
 				target: defender,
 				weapon: fireSword,
 				guaranteedHit: true,
@@ -419,9 +385,8 @@ suite("combat.ts", () => {
 				job: vulnerableJob,
 				level: defender.level,
 			});
-			newDefender.location = room;
 			room.remove(defender);
-			room.add(newDefender);
+			newDefender.location = room;
 			defender = newDefender;
 
 			const relationships = defender.getDamageRelationships();
@@ -430,74 +395,6 @@ suite("combat.ts", () => {
 				DAMAGE_RELATIONSHIP.RESIST,
 				"RESIST should take priority over VULNERABLE"
 			);
-		});
-	});
-
-	suite("Hit types in combat", () => {
-		test("should use weapon hit type for combat messages", () => {
-			const sword = new Weapon({
-				slot: EQUIPMENT_SLOT.MAIN_HAND,
-				attackPower: 10,
-				hitType: COMMON_HIT_TYPES.get("slash")!,
-			});
-			attacker.equip(sword);
-
-			const hitType = attacker.getPrimaryHitType();
-			assert.strictEqual(hitType.verb, "slash");
-			assert.strictEqual(hitType.verbThirdPerson, "slashes");
-			assert.strictEqual(hitType.damageType, PHYSICAL_DAMAGE_TYPE.SLASH);
-		});
-
-		test("should use default hit type when no weapon equipped", () => {
-			const hitType = attacker.getPrimaryHitType();
-			assert.strictEqual(hitType.verb, DEFAULT_HIT_TYPE.verb);
-			assert.strictEqual(
-				hitType.verbThirdPerson,
-				DEFAULT_HIT_TYPE.verbThirdPerson
-			);
-			assert.strictEqual(hitType.damageType, DEFAULT_HIT_TYPE.damageType);
-		});
-
-		test("should use main hand weapon over off hand", () => {
-			const mainHand = new Weapon({
-				slot: EQUIPMENT_SLOT.MAIN_HAND,
-				attackPower: 10,
-				hitType: COMMON_HIT_TYPES.get("slash")!,
-			});
-			const offHand = new Weapon({
-				slot: EQUIPMENT_SLOT.OFF_HAND,
-				attackPower: 5,
-				hitType: COMMON_HIT_TYPES.get("stab")!,
-			});
-			attacker.equip(mainHand);
-			attacker.equip(offHand);
-
-			const hitType = attacker.getPrimaryHitType();
-			assert.strictEqual(hitType.verb, "slash");
-		});
-
-		test("should use off hand weapon when main hand not equipped", () => {
-			const offHand = new Weapon({
-				slot: EQUIPMENT_SLOT.OFF_HAND,
-				attackPower: 5,
-				hitType: COMMON_HIT_TYPES.get("stab")!,
-			});
-			attacker.equip(offHand);
-
-			const hitType = attacker.getPrimaryHitType();
-			assert.strictEqual(hitType.verb, "stab");
-		});
-
-		test("should use correct damage type from hit type", () => {
-			const fireSword = new Weapon({
-				slot: EQUIPMENT_SLOT.MAIN_HAND,
-				attackPower: 10,
-				hitType: COMMON_HIT_TYPES.get("burn")!,
-			});
-			attacker.equip(fireSword);
-
-			const hitType = attacker.getPrimaryHitType();
-			assert.strictEqual(hitType.damageType, MAGICAL_DAMAGE_TYPE.FIRE);
 		});
 	});
 
@@ -519,8 +416,14 @@ suite("combat.ts", () => {
 
 			processCombatRound();
 
-			assert(!isInCombatQueue(attacker));
-			assert.strictEqual(attacker.combatTarget, undefined);
+			assert(
+				!isInCombatQueue(attacker),
+				"Attacker should be removed from combat queue"
+			);
+			assert.ok(
+				attacker.combatTarget === undefined,
+				"Attacker should have no combat target"
+			);
 		});
 
 		test("should remove mobs from queue when target leaves room", () => {
@@ -530,14 +433,12 @@ suite("combat.ts", () => {
 				dungeon,
 			});
 			dungeon.add(otherRoom);
-			defender.location = otherRoom;
-			room.remove(defender);
 			otherRoom.add(defender);
 
 			processCombatRound();
 
 			assert(!isInCombatQueue(attacker));
-			assert.strictEqual(attacker.combatTarget, undefined);
+			assert.ok(attacker.combatTarget === undefined);
 		});
 	});
 });

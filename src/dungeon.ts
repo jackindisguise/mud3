@@ -79,8 +79,9 @@ import {
 	handleDeath,
 	initiateCombat,
 	addToCombatQueue,
+	processThreatSwitching,
 } from "./combat.js";
-import { processAggressiveBehavior } from "./behavior.js";
+import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
 import { getNextObjectIdSync } from "./package/gamestate.js";
@@ -127,6 +128,12 @@ import { ability as PURE_POWER } from "./abilities/pure-power.js";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
+
+/**
+ * Threat expiration interval in milliseconds.
+ * Threat entries expire every 10 seconds.
+ */
+const THREAT_EXPIRATION_INTERVAL_MS = 10 * 1000; // 10 seconds
 
 /**
  * Enum for handling directional movement in the dungeon.
@@ -3188,7 +3195,7 @@ export class DungeonObject {
 
 		// Clear all properties to help with garbage collection
 		this.keywords = "";
-		this.display = "";
+		this.display = "<DESTROYED OBJECT>";
 		this.description = undefined;
 		this.roomDescription = undefined;
 		this.mapText = undefined;
@@ -3710,9 +3717,22 @@ export class Room extends DungeonObject {
 			for (const obj of this.contents) {
 				if (!(obj instanceof Mob)) continue;
 				if (obj === enterer) continue;
-				const mob = obj as Mob;
-				if (mob.hasBehavior(BEHAVIOR.AGGRESSIVE))
-					processAggressiveBehavior(mob, this, enterer);
+				const inhabitant = obj;
+
+				// Check threat table: if entering mob is in this mob's threat table, process threat switching
+				if (inhabitant.threatTable && inhabitant.threatTable.get(enterer)) {
+					processThreatSwitching(inhabitant);
+				}
+
+				// Process aggressive behavior: generates threat instead of directly attacking
+				if (inhabitant.hasBehavior(BEHAVIOR.AGGRESSIVE) && enterer.character) {
+					inhabitant.addThreat(enterer, 1);
+				}
+
+				// Also check if the entering mob is aggressive - it should generate threat for character mobs in the room
+				if (enterer.hasBehavior(BEHAVIOR.AGGRESSIVE) && inhabitant.character) {
+					enterer.addThreat(inhabitant, 1);
+				}
 			}
 		}
 	}
@@ -4125,6 +4145,17 @@ export class Movable extends DungeonObject {
 	 */
 	onStep(direction: DIRECTION, destinationRoom: Room): void {}
 
+	move(dobj: DungeonObject | undefined, triggerEvents: boolean = true) {
+		const oldLocation = this.location;
+		if (triggerEvents && oldLocation instanceof Room) {
+			oldLocation.onExit(this);
+		}
+		super.move(dobj);
+		if (triggerEvents && this.location === dobj && dobj instanceof Room) {
+			dobj.onEnter(this);
+		}
+	}
+
 	/**
 	 * Moves this object one room in the specified direction.
 	 * The move only occurs if canStep() returns true for that direction.
@@ -4160,7 +4191,7 @@ export class Movable extends DungeonObject {
 		if (!this.canStep(dir)) return false;
 		const exit = this.getStep(dir);
 		if (this.location instanceof Room) this.location.onExit(this, dir);
-		this.move(exit);
+		this.move(exit, false);
 		if (this.location instanceof Room) {
 			this.location.onEnter(this, dir2reverse(dir));
 			// Call onStep hook after successful movement
@@ -5102,6 +5133,17 @@ export enum BEHAVIOR {
 	WANDER = "wander",
 }
 
+/**
+ * Threat entry in a mob's threat table.
+ * Tracks the threat value and whether it should expire in the next cycle.
+ */
+export interface ThreatEntry {
+	/** The threat value for this entry */
+	value: number;
+	/** Whether this threat should expire in the next cycle */
+	shouldExpire: boolean;
+}
+
 export interface MobOptions extends DungeonObjectOptions {
 	/** Resolved race definition to use for this mob. */
 	race?: Race;
@@ -5241,7 +5283,8 @@ export class Mob extends Movable {
 	private _exhaustion!: number;
 	private _equipped: Map<EQUIPMENT_SLOT, Equipment>;
 	private _combatTarget?: Mob;
-	private _threatTable?: Map<Mob, number>;
+	private _threatTable?: Map<Mob, ThreatEntry>;
+	private _threatExpirationTimer?: number;
 	private _behaviors: Map<BEHAVIOR, boolean>;
 	/** Map of ability ID to number of uses */
 	private _learnedAbilities: Map<string, number>;
@@ -5368,21 +5411,10 @@ export class Mob extends Movable {
 			char.mob = this;
 		}
 
-		// Manage threat table based on character presence
-		// Only NPCs (mobs without a character) have threat tables
+		// Remove from wandering cache when mob becomes player-controlled
 		if (char) {
-			// Player-controlled mob: clear threat table
-			if (this._threatTable) {
-				this._threatTable.clear();
-				this._threatTable = undefined;
-			}
-			// Remove from wandering cache when mob becomes player-controlled
 			SAFE_WANDERING_MOBS.delete(this);
 		} else {
-			// NPC: initialize threat table if not already present
-			if (!this._threatTable) {
-				this._threatTable = new Map<Mob, number>();
-			}
 			// Add back to wandering cache if mob has wander behavior
 			if (this.hasBehavior(BEHAVIOR.WANDER)) {
 				SAFE_WANDERING_MOBS.add(this);
@@ -5408,6 +5440,8 @@ export class Mob extends Movable {
 	 */
 	public set combatTarget(target: Mob | undefined) {
 		this._combatTarget = target;
+		if (!target) removeFromCombatQueue(this);
+		else addToCombatQueue(this);
 	}
 
 	/**
@@ -5417,7 +5451,7 @@ export class Mob extends Movable {
 	 *
 	 * @returns The threat table Map or undefined
 	 */
-	public get threatTable(): ReadonlyMap<Mob, number> | undefined {
+	public get threatTable(): ReadonlyMap<Mob, ThreatEntry> | undefined {
 		return this._threatTable;
 	}
 
@@ -5425,17 +5459,40 @@ export class Mob extends Movable {
 	 * Adds threat to the threat table for a specific attacker.
 	 * Only works for NPCs (mobs without a character).
 	 * The threat amount is added to any existing threat for that attacker.
+	 * Sets the expiration flag to false (don't expire next cycle) and starts
+	 * the threat expiration cycle if it's not already running.
 	 *
 	 * @param attacker The mob that generated the threat
 	 * @param amount The amount of threat to add (typically damage dealt)
 	 */
 	public addThreat(attacker: Mob, amount: number): void {
-		if (!this._threatTable || this.character) {
+		// Only NPCs (mobs without a character) can have threat tables
+		if (this.character) {
 			return;
 		}
 
-		const current = this._threatTable.get(attacker) ?? 0;
-		this._threatTable.set(attacker, current + amount);
+		// Initialize threat table if it doesn't existnpm
+		if (!this._threatTable) {
+			this._threatTable = new Map<Mob, ThreatEntry>();
+		}
+
+		let currentEntry = this._threatTable.get(attacker);
+		if (!currentEntry) {
+			currentEntry = {
+				value: 0,
+				shouldExpire: false,
+			};
+			this._threatTable.set(attacker, currentEntry);
+		} else currentEntry.shouldExpire = false;
+
+		// Add the amount to the current threat value
+		currentEntry.value += amount;
+
+		// Start threat expiration cycle if not already running
+		this._startThreatExpirationCycle();
+
+		// Process threat switching to potentially switch target
+		processThreatSwitching(this);
 	}
 
 	/**
@@ -5449,7 +5506,8 @@ export class Mob extends Movable {
 		if (!this._threatTable) {
 			return 0;
 		}
-		return this._threatTable.get(attacker) ?? 0;
+		const entry = this._threatTable.get(attacker);
+		return entry?.value ?? 0;
 	}
 
 	/**
@@ -5466,9 +5524,9 @@ export class Mob extends Movable {
 		let maxThreat = -1;
 		let maxThreatMob: Mob | undefined;
 
-		for (const [mob, threat] of this._threatTable.entries()) {
-			if (threat > maxThreat) {
-				maxThreat = threat;
+		for (const [mob, entry] of this._threatTable.entries()) {
+			if (entry.value > maxThreat) {
+				maxThreat = entry.value;
 				maxThreatMob = mob;
 			}
 		}
@@ -5482,7 +5540,7 @@ export class Mob extends Movable {
 	 * @returns True if the mob has a combat target
 	 */
 	public isInCombat(): boolean {
-		return this._combatTarget !== undefined;
+		return !!this._combatTarget;
 	}
 
 	/**
@@ -5492,6 +5550,102 @@ export class Mob extends Movable {
 	public clearThreatTable(): void {
 		if (this._threatTable) {
 			this._threatTable.clear();
+		}
+		this._stopThreatExpirationCycle();
+	}
+
+	/**
+	 * Start the threat expiration cycle for this mob if it's not already running.
+	 * Only works for NPCs (mobs without a character) with a threat table.
+	 */
+	private _startThreatExpirationCycle(): void {
+		// Only NPCs have threat tables
+		if (this.character || !this._threatTable) {
+			return;
+		}
+
+		// Only start if not already running
+		if (this._threatExpirationTimer !== undefined) {
+			return;
+		}
+
+		this._threatExpirationTimer = setAbsoluteInterval(() => {
+			this._processThreatExpiration();
+		}, THREAT_EXPIRATION_INTERVAL_MS);
+	}
+
+	/**
+	 * Stop the threat expiration cycle for this mob.
+	 */
+	private _stopThreatExpirationCycle(): void {
+		if (this._threatExpirationTimer !== undefined) {
+			clearCustomInterval(this._threatExpirationTimer);
+			this._threatExpirationTimer = undefined;
+		}
+	}
+
+	/**
+	 * Process threat expiration for this mob's threat table.
+	 * This is called every 10 seconds by the threat expiration timer.
+	 *
+	 * For each threat entry:
+	 * 1. Remove destroyed mobs from threat table
+	 * 2. Skip current combat target
+	 * 3. If threat is not set to expire, set it to expire next cycle
+	 * 4. If threat is set to expire, reduce by 33%
+	 * 5. If threat < 100, remove from table
+	 * 6. If table is empty, stop the cycle
+	 */
+	private _processThreatExpiration(): void {
+		// Only NPCs have threat tables
+		if (this.character || !this._threatTable) {
+			this._stopThreatExpirationCycle();
+			return;
+		}
+
+		const threatTable = this._threatTable;
+		const currentTarget = this._combatTarget;
+
+		// Process each threat entry
+		const entriesToRemove: Mob[] = [];
+
+		for (const [threatMob, entry] of threatTable.entries()) {
+			// 1. Remove destroyed mobs (check if mob is no longer in a dungeon)
+			if (!threatMob.dungeon) {
+				entriesToRemove.push(threatMob);
+				continue;
+			}
+
+			// 2. Skip current combat target
+			if (threatMob === currentTarget) {
+				continue;
+			}
+
+			// 3. If threat is not set to expire, set it to expire next cycle
+			if (!entry.shouldExpire) {
+				entry.shouldExpire = true;
+				continue;
+			}
+
+			// 4. If threat is set to expire, reduce by 33%
+			const newValue = Math.floor(entry.value * 0.67); // Reduce by 33%
+
+			// 5. If threat < 100, remove from table
+			if (newValue < 100) {
+				entriesToRemove.push(threatMob);
+			} else {
+				entry.value = newValue;
+			}
+		}
+
+		// Remove entries marked for removal
+		for (const mobToRemove of entriesToRemove) {
+			threatTable.delete(mobToRemove);
+		}
+
+		// 6. If table is empty, stop the cycle
+		if (threatTable.size === 0) {
+			this._stopThreatExpirationCycle();
 		}
 	}
 
@@ -5986,7 +6140,7 @@ export class Mob extends Movable {
 		this.recalculateDerivedAttributes(ratios);
 	}
 
-	private resolveGrowthModifier(): number {
+	public resolveGrowthModifier(): number {
 		const raceModifier = evaluateGrowthModifier(
 			this._race.growthModifier,
 			this._level
@@ -6848,37 +7002,6 @@ export class Mob extends Movable {
 	}
 
 	/**
-	 * Gets the primary weapon's hit type for combat messages.
-	 * Checks main hand first, then off hand. Returns default hit type if no weapon is equipped.
-	 *
-	 * @returns The hit type to use for combat messages
-	 *
-	 * @example
-	 * ```typescript
-	 * const mob = new Mob();
-	 * const sword = new Weapon({
-	 *   slot: EQUIPMENT_SLOT.MAIN_HAND,
-	 *   attackPower: 15,
-	 *   hitType: "slash"
-	 * });
-	 * mob.equip(sword);
-	 * const hitType = mob.getPrimaryHitType();
-	 * console.log(hitType.verb); // "slash"
-	 * ```
-	 */
-	public getPrimaryHitType(): Readonly<HitType> {
-		const mainHand = this.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
-		if (mainHand instanceof Weapon) {
-			return mainHand.hitType;
-		}
-		const offHand = this.getEquipped(EQUIPMENT_SLOT.OFF_HAND);
-		if (offHand instanceof Weapon) {
-			return offHand.hitType;
-		}
-		return DEFAULT_HIT_TYPE;
-	}
-
-	/**
 	 * Gets the merged damage type relationships for this mob.
 	 * Merges damage relationships from race and job with priority:
 	 * IMMUNE > RESIST > VULNERABLE
@@ -6926,37 +7049,20 @@ export class Mob extends Movable {
 		this.health = Math.max(0, this.health - amount);
 
 		// Generate threat for NPCs
-		if (!this.character && this.threatTable) {
+		if (!this.character) {
 			this.addThreat(attacker, amount);
+		} else if (
+			!this.isInCombat() &&
+			attacker.location === this.location &&
+			this.location instanceof Room
+		) {
+			initiateCombat(this, attacker, this.location);
 		}
 
 		// Handle death
 		if (this.health <= 0) {
 			handleDeath(this, attacker);
 			return; // Don't initiate combat if target died
-		}
-
-		// Initiate combat if both mobs are in the same room and both alive
-		const room = this.location;
-		if (
-			room instanceof Room &&
-			attacker.location === room &&
-			attacker.health > 0 &&
-			this.health > 0
-		) {
-			// If attacker is not in combat, engage with target
-			if (!attacker.isInCombat()) {
-				initiateCombat(attacker, this, room);
-			} else if (!this.isInCombat()) {
-				// Attacker is already in combat, but target is not - make target engage
-				// Set target's combat target to attacker and add to queue
-				this.combatTarget = attacker;
-				addToCombatQueue(this);
-				// If target is an NPC, add threat
-				if (!this.character && this.threatTable) {
-					this.addThreat(attacker, 1);
-				}
-			}
 		}
 	}
 
@@ -7293,8 +7399,12 @@ export class Mob extends Movable {
 	 * Override destroy to handle Mob-specific cleanup:
 	 * - Clear character reference
 	 * - Clear equipped items
+	 * - Stop threat expiration timer
 	 */
 	override destroy(destroyContents: boolean = true): void {
+		// Stop threat expiration timer
+		this._stopThreatExpirationCycle();
+
 		// Clear character reference (this will also clear character.mob)
 		this.character = undefined;
 

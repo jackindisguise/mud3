@@ -14,21 +14,28 @@ import {
 	WANDERING_MOBS,
 	BEHAVIOR,
 } from "./dungeon.js";
-import { initiateCombat, removeFromCombatQueue } from "./combat.js";
+import {
+	initiateCombat,
+	removeFromCombatQueue,
+	processThreatSwitching,
+} from "./combat.js";
 import { act } from "./act.js";
 import { MESSAGE_GROUP } from "./character.js";
 import { findPathAStar } from "./pathfinding.js";
 import logger from "./logger.js";
 
 /**
- * Process aggressive behavior: attack any mobs that enter the room.
+ * Process aggressive behavior: generate threat when mobs enter rooms.
  * Called when a mob enters a room.
+ *
+ * - If an aggressive mob enters a room, it generates 1 threat for every character mob in the room.
+ * - If a character mob enters a room with an aggressive mob, it generates 1 threat for that character mob.
  *
  * @param aggressiveMob The aggressive mob that should check for targets
  * @param room The room where the mob entered
  * @param enteringMob The mob that just entered (may be the aggressive mob itself)
  */
-export function processAggressiveBehavior(
+function processAggressiveBehavior(
 	aggressiveMob: Mob,
 	room: Room,
 	enteringMob: Mob
@@ -43,30 +50,36 @@ export function processAggressiveBehavior(
 		return;
 	}
 
-	// Don't attack self
-	if (aggressiveMob === enteringMob) {
-		return;
-	}
-
-	// Don't attack if already in combat
-	if (aggressiveMob.isInCombat()) {
-		return;
-	}
-
-	// Don't attack if dead
+	// Don't process if dead
 	if (aggressiveMob.health <= 0) {
 		return;
 	}
 
-	// Don't attack if entering mob is dead
-	if (enteringMob.health <= 0) {
+	// Case 1: Aggressive mob enters a room - generate 1 threat for every character mob in the room
+	if (aggressiveMob === enteringMob) {
+		for (const obj of room.contents) {
+			if (!(obj instanceof Mob)) continue;
+			const characterMob = obj as Mob;
+			if (characterMob === aggressiveMob) continue;
+			if (!characterMob.character) continue; // Only generate threat for character mobs
+			if (characterMob.health <= 0) continue; // Don't generate threat for dead mobs
+
+			// generate 0 threat for this character mob
+			// puts it on the threat table
+			aggressiveMob.addThreat(characterMob, 0);
+		}
+		// Process threat switching to potentially engage
+		processThreatSwitching(aggressiveMob);
 		return;
 	}
 
-	// Aggressive mobs attack any characters that enter their room
-	if (aggressiveMob.hasBehavior(BEHAVIOR.WANDER)) {
-		// Aggressive wanderers only attack characters
-		if (enteringMob.character) initiateCombat(aggressiveMob, enteringMob, room);
+	// Case 2: Character mob enters a room with an aggressive mob - generate 1 threat for that character
+	// (The aggressive mob is already in the room, and a character mob just entered)
+	if (enteringMob.character && enteringMob.health > 0) {
+		// Generate 0 threat for the entering character mob
+		aggressiveMob.addThreat(enteringMob, 0);
+		// Process threat switching to potentially engage
+		processThreatSwitching(aggressiveMob);
 	}
 }
 
@@ -98,19 +111,19 @@ function checkAggressiveBehaviorInRoom(aggressiveMob: Mob, room: Room): void {
 		return;
 	}
 
-	// Look for character mobs in the room to attack
+	// Look for character mobs in the room and generate threat
 	for (const obj of room.contents) {
 		if (!(obj instanceof Mob)) continue;
 		const target = obj as Mob;
-		if (target === aggressiveMob) continue; // Don't attack self
-		if (!target.character) continue; // Only attack character mobs
-		if (target.health <= 0) continue; // Don't attack dead mobs
+		if (target === aggressiveMob) continue; // Don't process self
+		if (!target.character) continue; // Only generate threat for character mobs
+		if (target.health <= 0) continue; // Don't generate threat for dead mobs
 
-		// Found a character mob to attack - initiate combat
-		initiateCombat(aggressiveMob, target, room);
-		// Only attack the first valid target
-		break;
+		// Generate 1 threat for this character mob
+		aggressiveMob.addThreat(target, 1);
 	}
+	// Process threat switching to potentially engage
+	processThreatSwitching(aggressiveMob);
 }
 
 /**

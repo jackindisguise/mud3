@@ -36,7 +36,10 @@ export default {
 
 		const mob = character.mob;
 		const oldLevel = mob.level;
-		const experienceGained = mob.gainExperience(EXPERIENCE_THRESHOLD);
+		const remainingExperience = EXPERIENCE_THRESHOLD - mob.experience;
+		const growth = mob.resolveGrowthModifier();
+		const ceiledExperience = Math.ceil(remainingExperience * growth);
+		const experienceGained = mob.gainExperience(ceiledExperience);
 		const newLevel = mob.level;
 
 		if (newLevel > oldLevel) {

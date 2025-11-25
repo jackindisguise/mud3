@@ -17,7 +17,6 @@
  * @module package/locations
  */
 import { Package } from "package-loader";
-import dungeonPkg from "./dungeon.js";
 import { getRoomByRef, Room } from "../dungeon.js";
 import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
@@ -208,7 +207,6 @@ export async function loadLocations() {
 
 export default {
 	name: "locations",
-	dependencies: [dungeonPkg],
 	loader: async () => {
 		// read locations.yaml
 		await logger.block("locations", async () => {

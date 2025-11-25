@@ -412,7 +412,7 @@ suite("combat.ts", () => {
 
 		test("should remove mobs from queue when target is dead", () => {
 			initiateCombat(attacker, defender, room);
-			defender.health = 0;
+			defender.damage(attacker, defender.health);
 
 			processCombatRound();
 

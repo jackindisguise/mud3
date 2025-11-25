@@ -57,24 +57,6 @@ export default {
 			return;
 		}
 
-		// Check if target is dead
-		if (target.health <= 0) {
-			actor.sendMessage(
-				`${target.display} is already dead.`,
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Check if actor is dead
-		if (actor.health <= 0) {
-			actor.sendMessage(
-				"You are dead and cannot attack.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
 		// Initiate combat
 		initiateCombat(actor, target, room);
 	},

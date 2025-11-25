@@ -50,11 +50,6 @@ function processAggressiveBehavior(
 		return;
 	}
 
-	// Don't process if dead
-	if (aggressiveMob.health <= 0) {
-		return;
-	}
-
 	// Case 1: Aggressive mob enters a room - generate 1 threat for every character mob in the room
 	if (aggressiveMob === enteringMob) {
 		for (const obj of room.contents) {
@@ -62,7 +57,6 @@ function processAggressiveBehavior(
 			const characterMob = obj as Mob;
 			if (characterMob === aggressiveMob) continue;
 			if (!characterMob.character) continue; // Only generate threat for character mobs
-			if (characterMob.health <= 0) continue; // Don't generate threat for dead mobs
 
 			// generate 0 threat for this character mob
 			// puts it on the threat table
@@ -106,18 +100,12 @@ function checkAggressiveBehaviorInRoom(aggressiveMob: Mob, room: Room): void {
 		return;
 	}
 
-	// Don't attack if dead
-	if (aggressiveMob.health <= 0) {
-		return;
-	}
-
 	// Look for character mobs in the room and generate threat
 	for (const obj of room.contents) {
 		if (!(obj instanceof Mob)) continue;
 		const target = obj as Mob;
 		if (target === aggressiveMob) continue; // Don't process self
 		if (!target.character) continue; // Only generate threat for character mobs
-		if (target.health <= 0) continue; // Don't generate threat for dead mobs
 
 		// Generate 1 threat for this character mob
 		aggressiveMob.addThreat(target, 1);
@@ -234,12 +222,6 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 	// Don't wander if in combat
 	if (wanderingMob.isInCombat()) {
 		logger.debug(`Wander: ${wanderingMob.display} skipping - in combat`);
-		return false;
-	}
-
-	// Don't wander if dead
-	if (wanderingMob.health <= 0) {
-		logger.debug(`Wander: ${wanderingMob.display} skipping - dead`);
 		return false;
 	}
 

@@ -415,6 +415,7 @@ suite("attribute.ts", () => {
 				spellPower: 4.4,
 				wisdom: 3.1,
 				resilience: 2.9,
+				spirit: 0,
 			};
 			const result = createSecondaryAttributesView(source);
 			assert.strictEqual(result.attackPower, 10);
@@ -434,6 +435,7 @@ suite("attribute.ts", () => {
 				spellPower: 4,
 				wisdom: 3,
 				resilience: 2,
+				spirit: 0,
 			};
 			const result = createSecondaryAttributesView(source);
 			assert.throws(() => {

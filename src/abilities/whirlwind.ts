@@ -39,9 +39,6 @@ export const command: CommandObject = {
 		if (!room) {
 			return 0;
 		}
-		if (actor.health <= 0) {
-			return 0;
-		}
 		return COOLDOWN_MS;
 	},
 
@@ -62,15 +59,6 @@ export const command: CommandObject = {
 		if (!room) {
 			actor.sendMessage(
 				"You are not in a room.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Check if actor is dead
-		if (actor.health <= 0) {
-			actor.sendMessage(
-				"You are dead and cannot use abilities.",
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

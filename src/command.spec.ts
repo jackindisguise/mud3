@@ -1,4 +1,4 @@
-import { suite, test } from "node:test";
+import { suite, test, before } from "node:test";
 import assert from "node:assert";
 import {
 	Command,
@@ -9,6 +9,8 @@ import {
 	PRIORITY,
 } from "./command.js";
 import { JavaScriptCommandAdapter } from "./package/commands.js";
+import { createMob } from "./package/dungeon.js";
+import archetypePkg from "./package/archetype.js";
 import { Dungeon, DungeonObject, DIRECTION, Room } from "./dungeon.js";
 import { Mob } from "./dungeon.js";
 import { Character } from "./character.js";
@@ -26,6 +28,10 @@ const attachCharacterToMob = (mob: Mob, username = "tester") =>
 	});
 
 suite("command.ts", () => {
+	before(async () => {
+		await archetypePkg.loader();
+	});
+
 	suite("Command", () => {
 		test("should parse simple text command", () => {
 			let executed = false;
@@ -43,7 +49,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -63,7 +69,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result1 = command.parse("look north", context);
@@ -80,7 +86,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const doubleQuoted = command.parse('look "north east"', context);
@@ -98,7 +104,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("drop 5 gold coins", context);
@@ -117,7 +123,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			room?.add(actor);
 			room?.add(sword);
@@ -134,7 +140,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			actor.add(sword);
 			const context: CommandContext = { actor };
@@ -154,7 +160,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			const coin = new DungeonObject({ keywords: "gold coin" });
 			const bag = new DungeonObject({ keywords: "leather bag" });
 
@@ -180,8 +186,8 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
-			const target = new Mob({ keywords: "bob" });
+			const actor = createMob({ keywords: "player" });
+			const target = createMob({ keywords: "bob" });
 			room?.add(actor);
 			room?.add(target);
 			const context: CommandContext = { actor, room };
@@ -201,7 +207,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("say", context);
@@ -219,7 +225,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 			const result = command.parse("get sword", context);
@@ -241,7 +247,7 @@ suite("command.ts", () => {
 				},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("say", context);
@@ -266,7 +272,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Test single character autocomplete
@@ -291,7 +297,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Test non-matching prefix
@@ -309,7 +315,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Test single character autocomplete
@@ -337,7 +343,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Should match with space
@@ -356,7 +362,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Should match without space
@@ -376,7 +382,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Test with optional argument provided
@@ -401,7 +407,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Test uppercase input
@@ -440,7 +446,7 @@ suite("command.ts", () => {
 
 			CommandRegistry.default.register(command);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = CommandRegistry.default.execute("test hello", context);
@@ -458,7 +464,7 @@ suite("command.ts", () => {
 				CommandRegistry.default.unregister(cmd)
 			);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = CommandRegistry.default.execute(
@@ -490,7 +496,7 @@ suite("command.ts", () => {
 
 			CommandRegistry.default.register(command);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = CommandRegistry.default.execute("say", context);
@@ -529,7 +535,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(cmd1);
 			CommandRegistry.default.register(cmd2);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			CommandRegistry.default.execute("cmd2 test", context);
@@ -601,7 +607,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(normalCommand);
 			CommandRegistry.default.register(highCommand);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// "test" should match HIGH priority first (even though it was registered last)
@@ -659,7 +665,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(shortCommand);
 			CommandRegistry.default.register(longCommand);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// "test hello world more" should match "test~ <arg1:word> <arg2:word> <arg3:text>" (longer pattern) first
@@ -710,7 +716,7 @@ suite("command.ts", () => {
 			CommandRegistry.default.register(cmd1);
 			CommandRegistry.default.register(cmd2);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			// Both have same priority and length, so order is preserved
@@ -744,7 +750,7 @@ suite("command.ts", () => {
 			const command = new ActionCommand();
 			registry.register(command);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const character = attachCharacterToMob(actor, "worker");
 			assert.ok(character === actor.character);
 			const context: CommandContext = { actor };
@@ -788,7 +794,7 @@ suite("command.ts", () => {
 			});
 			const roomA = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
 			const roomB = dungeon.getRoom({ x: 1, y: 0, z: 0 })!;
-			const actor = new Mob();
+			const actor = createMob();
 			const character = attachCharacterToMob(actor, "gatherer");
 			assert.ok(character === actor.character);
 			roomA.add(actor);
@@ -829,7 +835,7 @@ suite("command.ts", () => {
 			registry.register(work);
 			registry.register(cancelAdapter);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const character = attachCharacterToMob(actor, "canceler");
 			assert.ok(character === actor.character);
 			const context: CommandContext = { actor };
@@ -867,7 +873,7 @@ suite("command.ts", () => {
 			registry.register(work);
 			registry.register(cancelAdapter);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const character = attachCharacterToMob(actor, "canceler-all");
 			assert.ok(character === actor.character);
 			const context: CommandContext = { actor };
@@ -906,7 +912,7 @@ suite("command.ts", () => {
 			registry.register(task);
 			registry.register(queueAdapter);
 
-			const actor = new Mob();
+			const actor = createMob();
 			const character = attachCharacterToMob(actor, "queue-test");
 			assert.ok(character === actor.character);
 			const captured: string[] = [];
@@ -952,7 +958,7 @@ suite("command.ts", () => {
 				},
 			});
 
-			const actor = new Mob({ display: "Player" });
+			const actor = createMob({ display: "Player" });
 			const context: CommandContext = { actor };
 
 			const result = command.parse("ooc Hello everyone!", context);
@@ -978,7 +984,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob();
+			const actor = createMob();
 			const sword = new DungeonObject({ keywords: "steel sword" });
 
 			room?.add(actor);
@@ -1007,7 +1013,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob();
+			const actor = createMob();
 			const chest = new DungeonObject({ keywords: "wooden chest" });
 			const coin = new DungeonObject({ keywords: "gold coin" });
 
@@ -1039,7 +1045,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob();
+			const actor = createMob();
 			const goblin = new DungeonObject({ keywords: "goblin monster" });
 
 			room?.add(actor);
@@ -1061,7 +1067,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("say", context);
@@ -1075,7 +1081,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("greet", context);
@@ -1089,7 +1095,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("give notanumber", context);
@@ -1108,7 +1114,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1128,7 +1134,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1148,7 +1154,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1164,7 +1170,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("go sideways", context);
@@ -1178,7 +1184,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("look", context);
@@ -1192,7 +1198,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("look invalid", context);
@@ -1211,7 +1217,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 
 			const context: CommandContext = {
@@ -1231,7 +1237,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("shout hello", context);
@@ -1245,7 +1251,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = new Mob();
+			const actor = createMob();
 			const context: CommandContext = { actor };
 
 			const result = command.parse("give 10 silver", context);

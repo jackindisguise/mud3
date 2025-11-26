@@ -1,22 +1,27 @@
-import { describe, it } from "node:test";
+import { suite, it, before } from "node:test";
 import assert from "node:assert";
 import { access, unlink } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
 import { Character } from "../character.js";
-import { Mob } from "../dungeon.js";
 import { saveCharacter, loadCharacter } from "./character.js";
+import { createMob } from "./dungeon.js";
+import archetypePkg from "./archetype.js";
 
 function filePathFor(username: string): string {
 	return join(process.cwd(), "data", "characters", `${username}.yaml`);
 }
 
-describe("package/character.ts", () => {
+suite("package/character.ts", () => {
+	before(async () => {
+		await archetypePkg.loader();
+	});
+
 	it("saves and loads a character round-trip via YAML", async () => {
 		const username = `specuser_${Date.now()}`;
 		const password = "specPassword123";
 
-		const mob = new Mob();
+		const mob = createMob();
 		mob.keywords = username;
 		mob.display = username;
 
@@ -74,8 +79,8 @@ describe("package/character.ts", () => {
 		assert.strictEqual(loaded!.stats.kills, 7);
 
 		// Mob basics round-trip
-		assert.strictEqual(loaded!.mob.display, username);
-		assert.ok(loaded!.mob.character === loaded);
+		assert.strictEqual(loaded!.mob!.display, username);
+		assert.ok(loaded!.mob!.character === loaded);
 
 		// Clean up - delete the test file
 		await unlink(filePathFor(username));

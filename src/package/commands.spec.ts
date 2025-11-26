@@ -1,12 +1,14 @@
 import { suite, test, before, after, beforeEach } from "node:test";
 import assert from "node:assert";
 import { writeFile, unlink, mkdir, rm } from "fs/promises";
+import archetypePkg from "./archetype.js";
 import { join } from "path";
 import { existsSync } from "fs";
 import commandsPackage, { JavaScriptCommandAdapter } from "./commands.js";
 import { CommandRegistry, CommandContext } from "../command.js";
 import { Dungeon } from "../dungeon.js";
 import { Mob } from "../dungeon.js";
+import { createMob } from "./dungeon.js";
 
 const COMMANDS_DIR = join(process.cwd(), "data", "commands");
 
@@ -20,6 +22,7 @@ suite("package/commands.ts", () => {
 		}
 		// Store initial command count
 		initialCommandCount = CommandRegistry.default.getCommands().length;
+		await archetypePkg.loader();
 	});
 
 	beforeEach(() => {
@@ -83,7 +86,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 			const args = new Map();
@@ -115,7 +118,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 
@@ -142,7 +145,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 
@@ -183,7 +186,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = new Mob({ keywords: "player" });
+			const actor = createMob({ keywords: "player" });
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 

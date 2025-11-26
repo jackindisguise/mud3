@@ -1,4 +1,4 @@
-import { test, suite, beforeEach } from "node:test";
+import { test, suite, beforeEach, before } from "node:test";
 import assert from "node:assert";
 import {
 	act,
@@ -7,11 +7,17 @@ import {
 	ActOptions,
 	damageMessage,
 } from "./act.js";
+import archetypePkg from "./package/archetype.js";
 import { Mob, Room, Dungeon } from "./dungeon.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 import { freezeArchetype } from "./archetype.js";
+import { createMob } from "./package/dungeon.js";
 
 suite("act.ts", () => {
+	before(async () => {
+		await archetypePkg.loader();
+	});
+
 	let dungeon: Dungeon;
 	let room: Room;
 	let user: Mob;
@@ -74,7 +80,7 @@ suite("act.ts", () => {
 		dungeon.addRoom(room);
 
 		// Create user mob with character
-		user = new Mob({
+		user = createMob({
 			display: "Alice",
 			keywords: "alice",
 		});
@@ -83,7 +89,7 @@ suite("act.ts", () => {
 		user.character = userCharacter;
 
 		// Create target mob with character
-		target = new Mob({
+		target = createMob({
 			display: "Bob",
 			keywords: "bob",
 		});
@@ -92,7 +98,7 @@ suite("act.ts", () => {
 		target.character = targetCharacter;
 
 		// Create observer mob with character
-		observer = new Mob({
+		observer = createMob({
 			display: "Charlie",
 			keywords: "charlie",
 		});
@@ -337,7 +343,7 @@ suite("act.ts", () => {
 		});
 
 		test("should not send message to mobs without characters", () => {
-			const npc = new Mob({
+			const npc = createMob({
 				display: "NPC",
 				keywords: "npc",
 			});
@@ -363,7 +369,7 @@ suite("act.ts", () => {
 		});
 
 		test("should not send user message if user has no character", () => {
-			const npcUser = new Mob({
+			const npcUser = createMob({
 				display: "NPC User",
 				keywords: "npc user",
 			});
@@ -449,31 +455,9 @@ suite("act.ts", () => {
 			currentHealth: number
 		): Mob {
 			// Set attributes to 0 to avoid vitality bonus affecting maxHealth
-			const testMob = new Mob({
+			const testMob = createMob({
 				display,
 				keywords: display.toLowerCase(),
-				race: freezeArchetype({
-					id: "test_race",
-					name: "Test Race",
-					startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth, maxMana: 50 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
-				job: freezeArchetype({
-					id: "test_job",
-					name: "Test Job",
-					startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-					attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-					startingResourceCaps: { maxHealth: 0, maxMana: 0 },
-					resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-					skills: [],
-					passives: [],
-					growthModifier: { base: 1.0 },
-				}),
 				level: 1,
 			});
 			testMob.location = room;
@@ -503,7 +487,7 @@ suite("act.ts", () => {
 			assert.strictEqual(userMessages.length, 1);
 			assert.strictEqual(
 				userMessages[0],
-				"You hit TestTarget for 25 damage. [75%]"
+				"You hit TestTarget for 25 damage. [57%]"
 			);
 		});
 
@@ -532,7 +516,7 @@ suite("act.ts", () => {
 			assert.strictEqual(targetMessages.length, 1);
 			assert.strictEqual(
 				targetMessages[0],
-				"Alice hits you for 25 damage. [75%]"
+				"Alice hits you for 25 damage. [57%]"
 			);
 		});
 

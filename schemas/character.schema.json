@@ -100,6 +100,46 @@
 					"type": "array",
 					"description": "List of usernames this character has blocked from communication.",
 					"items": { "type": "string" }
+				},
+				"busyModeEnabled": {
+					"type": "boolean",
+					"description": "Whether busy mode is enabled. When enabled, messages from forwarded groups are queued instead of displayed immediately."
+				},
+				"combatBusyModeEnabled": {
+					"type": "boolean",
+					"description": "Whether combat busy mode is enabled. When enabled and the character is in combat, messages from forwarded groups are queued instead of displayed immediately."
+				},
+				"busyForwardedGroups": {
+					"type": "array",
+					"description": "List of message groups to forward to the answering machine when busy mode is active. Valid values: INFO, COMBAT, COMMAND_RESPONSE, SYSTEM, CHANNELS, ACTION, PROMPT.",
+					"items": {
+						"type": "string",
+						"enum": [
+							"INFO",
+							"COMBAT",
+							"COMMAND_RESPONSE",
+							"SYSTEM",
+							"CHANNELS",
+							"ACTION",
+							"PROMPT"
+						]
+					}
+				},
+				"combatBusyForwardedGroups": {
+					"type": "array",
+					"description": "List of message groups to forward to the answering machine when combat busy mode is active. Valid values: INFO, COMBAT, COMMAND_RESPONSE, SYSTEM, CHANNELS, ACTION, PROMPT.",
+					"items": {
+						"type": "string",
+						"enum": [
+							"INFO",
+							"COMBAT",
+							"COMMAND_RESPONSE",
+							"SYSTEM",
+							"CHANNELS",
+							"ACTION",
+							"PROMPT"
+						]
+					}
 				}
 			},
 			"additionalProperties": false

@@ -19,7 +19,7 @@
 
 import { CommandContext, ParseResult } from "../command.js";
 import { CommandObject } from "../package/commands.js";
-import { searchHelpfiles } from "../package/help.js";
+import { searchHelpfiles } from "../registry/help.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { LINEBREAK } from "../telnet.js";
 

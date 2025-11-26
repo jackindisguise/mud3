@@ -3,14 +3,15 @@ import assert from "node:assert";
 import { writeFile, mkdir, rm, readdir, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { getSafeRootDirectory } from "../utils/path.js";
-import helpPkg, {
+import {
 	getHelpfile,
 	getAllHelpKeywords,
-	clearHelpfiles,
-	getHelpfileCount,
 	autocompleteHelpfile,
 	searchHelpfiles,
-} from "./help.js";
+	clearHelpfiles,
+	getHelpfileCount,
+} from "../registry/help.js";
+import helpPkg from "./help.js";
 
 const TEST_HELP_DIR = join(getSafeRootDirectory(), "data", "help");
 const TEST_FILE_COMBAT = "zztest_combat.yaml";

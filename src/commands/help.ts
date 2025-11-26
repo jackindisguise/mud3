@@ -24,11 +24,9 @@
 
 import { CommandContext, ParseResult } from "../command.js";
 import { CommandObject } from "../package/commands.js";
-import {
-	getHelpfile,
-	autocompleteHelpfile,
-	Helpfile,
-} from "../package/help.js";
+import { getHelpfile } from "../registry/help.js";
+import { Helpfile } from "../help.js";
+import { autocompleteHelpfile } from "../registry/help.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Mob } from "../dungeon.js";
 import { LINEBREAK } from "../telnet.js";

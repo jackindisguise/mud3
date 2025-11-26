@@ -2,27 +2,24 @@
  * Package: archetype - YAML loader for race and job archetypes.
  *
  * Loads archetype definitions from `data/races` and `data/jobs`, normalizes
- * them into immutable archetype definitions, and registers them in runtime
- * registries with default fallbacks.
+ * them into immutable archetype definitions, and registers them in the global
+ * archetype registry.
  *
- * Registry helpers exported from this module are used by gameplay systems to
- * look up archetypes at runtime (e.g., mob deserialization).
+ * Registry helpers are exported from `src/registry/archetype.ts` and are used
+ * by gameplay systems to look up archetypes at runtime (e.g., mob deserialization).
  *
  * @module package/archetype
  */
 import { extname, join, relative } from "path";
-import { mkdir, readdir, readFile } from "fs/promises";
+import { readdir, readFile } from "fs/promises";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import {
 	BaseArchetypeDefinition,
-	Job,
 	GrowthModifierCurve,
-	Race,
 	ArchetypeSkillDefinition,
-	freezeArchetype,
 } from "../archetype.js";
 import { PrimaryAttributeSet, ResourceCapacities } from "../attribute.js";
 import {
@@ -32,6 +29,12 @@ import {
 	MAGICAL_DAMAGE_TYPE,
 	DAMAGE_TYPE,
 } from "../damage-types.js";
+import {
+	registerRace,
+	registerJob,
+	getRaceCount,
+	getJobCount,
+} from "../registry/archetype.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -70,9 +73,6 @@ type RawArchetypeFile = {
 		isStarter?: unknown;
 	};
 };
-
-const raceRegistry: Map<string, Race> = new Map();
-const jobRegistry: Map<string, Job> = new Map();
 
 function shouldProcessFile(fileName: string): boolean {
 	if (!fileName) return false;
@@ -253,26 +253,6 @@ function parseArchetypeFile(
 	}
 }
 
-function registerArchetype(
-	type: ArchetypeType,
-	definition: BaseArchetypeDefinition
-): Readonly<BaseArchetypeDefinition> {
-	const frozen = freezeArchetype(definition);
-	const registry = type === "race" ? raceRegistry : jobRegistry;
-	const previous = registry.get(frozen.id);
-	if (previous) {
-		logger.warn(`Overriding existing ${type} archetype with id "${frozen.id}"`);
-	}
-	registry.set(frozen.id, frozen);
-	return frozen;
-}
-
-function getRegistry(
-	type: ArchetypeType
-): Map<string, Readonly<BaseArchetypeDefinition>> {
-	return type === "race" ? raceRegistry : jobRegistry;
-}
-
 async function loadDirectory(
 	directory: string,
 	type: ArchetypeType
@@ -293,7 +273,11 @@ async function loadDirectory(
 		if (!parsed) continue;
 
 		logger.debug(`Loaded ${parsed.definition.name} archetype`);
-		registerArchetype(type, parsed.definition);
+		if (type === "race") {
+			registerRace(parsed.definition);
+		} else {
+			registerJob(parsed.definition);
+		}
 		count++;
 	}
 
@@ -301,90 +285,11 @@ async function loadDirectory(
 }
 
 function logSummary(): void {
-	const raceCount = raceRegistry.size;
-	const jobCount = jobRegistry.size;
+	const raceCount = getRaceCount();
+	const jobCount = getJobCount();
 	logger.info(
 		`Loaded ${raceCount} race archetype(s) and ${jobCount} job archetype(s).`
 	);
-}
-
-function resolveArchetype(
-	type: ArchetypeType,
-	id: string
-): Race | Job | undefined {
-	const registry = getRegistry(type);
-	const archetype = registry.get(id);
-	if (!archetype) {
-		logger.warn(
-			`Requested ${type} '${id}' not found. Falling back to default.`
-		);
-		return;
-	}
-	return archetype;
-}
-
-export function getRaceById(id: string): Race | undefined {
-	return resolveArchetype("race", id);
-}
-
-export function getJobById(id: string): Job | undefined {
-	return resolveArchetype("job", id);
-}
-
-export function getAllRaces(): ReadonlyArray<Race> {
-	return Array.from(raceRegistry.values());
-}
-
-export function getStarterRaces(): ReadonlyArray<Race> {
-	const starters = getAllRaces().filter((race) => race.isStarter);
-	return starters.length > 0 ? starters : getAllRaces();
-}
-
-export function getAllJobs(): ReadonlyArray<Job> {
-	return Array.from(jobRegistry.values());
-}
-
-export function getStarterJobs(): ReadonlyArray<Job> {
-	const starters = getAllJobs().filter((job) => job.isStarter);
-	return starters.length > 0 ? starters : getAllJobs();
-}
-
-export function getDefaultRace(): Race {
-	const starters = getStarterRaces();
-	const firstRace = starters[0] ?? getAllRaces()[0];
-	if (!firstRace) {
-		throw new Error(
-			"Cannot get default race: archetype package not loaded or no races available. Call archetypePkg.loader() first."
-		);
-	}
-	return firstRace;
-}
-
-export function getDefaultJob(): Job {
-	const starters = getStarterJobs();
-	const firstJob = starters[0] ?? getAllJobs()[0];
-	if (!firstJob) {
-		throw new Error(
-			"Cannot get default job: archetype package not loaded or no jobs available. Call archetypePkg.loader() first."
-		);
-	}
-	return firstJob;
-}
-
-export function registerRace(
-	definition: BaseArchetypeDefinition,
-	options: { isDefault?: boolean } = {}
-): Race {
-	const result = registerArchetype("race", definition);
-	return result as Race;
-}
-
-export function registerJob(
-	definition: BaseArchetypeDefinition,
-	options: { isDefault?: boolean } = {}
-): Job {
-	const result = registerArchetype("job", definition);
-	return result as Job;
 }
 
 export default {

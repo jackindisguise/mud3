@@ -132,12 +132,12 @@ export function createMob(
 }
 
 /**
- * Factory function to create a Room with an auto-generated OID.
+ * Factory function to create a Room.
+ * Note: Rooms do not use OIDs as they are identified by coordinates.
  */
 export function createRoom(options: Omit<RoomOptions, "oid">): Room {
 	return new Room({
 		...options,
-		oid: getNextObjectId(),
 	});
 }
 
@@ -306,7 +306,8 @@ export function createFromTemplateWithOid(
 }
 
 /**
- * Factory function to create a Room from a template with an auto-generated OID.
+ * Factory function to create a Room from a template.
+ * Note: Rooms do not use OIDs as they are identified by coordinates.
  */
 export function createRoomFromTemplate(
 	template: RoomTemplate,
@@ -315,7 +316,6 @@ export function createRoomFromTemplate(
 	const room = new Room({
 		coordinates,
 		templateId: template.id,
-		oid: getNextObjectId(),
 	});
 	room.applyTemplate(template);
 	return room;
@@ -1085,8 +1085,10 @@ export function deserializeRoom(data: SerializedRoom): Room {
 	// allowedExits is mandatory, but handle legacy data that might not have it
 	const defaultExits =
 		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+	// Remove oid if present - Rooms don't use OIDs (identified by coordinates)
+	const { oid, ...roomData } = norm;
 	const room = new Room({
-		...norm,
+		...roomData,
 		allowedExits: norm.allowedExits ?? defaultExits,
 	});
 	if (norm.contents && Array.isArray(norm.contents)) {

@@ -3585,8 +3585,10 @@ export class Room extends DungeonObject {
 	 */
 	serialize(options?: { compress?: boolean }): SerializedRoom {
 		const baseData = super.serialize(options);
+		// Remove oid from serialization - Rooms are identified by coordinates, not OIDs
+		const { oid, ...baseDataWithoutOid } = baseData;
 		const result: SerializedRoom = {
-			...baseData,
+			...baseDataWithoutOid,
 			type: "Room" as const,
 			coordinates: this.coordinates,
 			allowedExits: this.allowedExits, // Mandatory field

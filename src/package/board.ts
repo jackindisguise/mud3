@@ -12,14 +12,18 @@
  * - On load, returns `undefined` if either board file doesn't exist
  * - Uses atomic writes (temp file + rename) to prevent corruption
  *
+ * Registry helpers are exported from `src/registry/board.ts` and are used
+ * by gameplay systems to look up boards at runtime.
+ *
  * @example
- * import boardPkg, { saveBoard, loadBoard, getAllBoards } from './package/board.js';
+ * import boardPkg, { saveBoard, loadBoard } from './package/board.js';
  * import { Board } from '../board.js';
+ * import { getBoard, getAllBoards } from './registry/board.js';
  * await boardPkg.loader();
  * const board = new Board('general', 'General', 'General discussion', true);
  * await saveBoard(board);
  * const reloaded = await loadBoard('general');
- * const allBoards = await getAllBoards();
+ * const allBoards = getAllBoards();
  *
  * @module package/board
  */
@@ -36,17 +40,18 @@ import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
 import {
 	Board,
+	SerializedBoard,
 	SerializedBoardConfig,
 	SerializedBoardMessages,
 } from "../board.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
+import { registerBoard, getBoard } from "../registry/board.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const BOARD_DIR = join(DATA_DIRECTORY, "boards");
-const BOARD_REGISTRY = new Map<string, Board>();
 
 function sanitizeBoardName(name: string): string {
 	// Allow alphanumerics, underscore, hyphen. Replace others with underscore.
@@ -66,10 +71,6 @@ function getBoardMessagesFilePath(name: string): string {
 	return join(BOARD_DIR, `${safe}.messages.yaml`);
 }
 
-function getRegistryKey(name: string): string {
-	return sanitizeBoardName(name);
-}
-
 async function fileExists(path: string): Promise<boolean> {
 	try {
 		await access(path, FS_CONSTANTS.F_OK);
@@ -85,7 +86,6 @@ async function fileExists(path: string): Promise<boolean> {
  * Saves board configuration and messages to separate files.
  */
 export async function saveBoard(board: Board): Promise<void> {
-	registerBoard(board);
 	const configPath = getBoardConfigFilePath(board.name);
 	const messagesPath = getBoardMessagesFilePath(board.name);
 	const configTempPath = `${configPath}.tmp`;
@@ -143,18 +143,77 @@ export async function saveBoard(board: Board): Promise<void> {
 	}
 }
 
-export function registerBoard(board: Board): Board {
-	BOARD_REGISTRY.set(getRegistryKey(board.name), board);
-	logger.debug(`Registered board "${board.name}" in registry`);
+/**
+ * Deserialize a Board from serialized data.
+ * This is the package-layer deserializer that handles all package dependencies.
+ *
+ * @param data The serialized board data
+ * @returns New Board instance
+ */
+export function deserializeBoard(data: SerializedBoard): Board {
+	const board = new Board(
+		data.name,
+		data.displayName,
+		data.description,
+		data.permanent,
+		data.expirationMs,
+		data.writePermission || "all"
+	);
+	board.setMessages(data.messages);
+	board.setNextMessageId(data.nextMessageId);
 	return board;
 }
 
-export function getBoard(name: string): Board | undefined {
-	return BOARD_REGISTRY.get(getRegistryKey(name));
+/**
+ * Deserialize a Board from separate config and messages data.
+ * This is the package-layer deserializer that handles all package dependencies.
+ *
+ * @param config The serialized board configuration
+ * @param messages The serialized board messages
+ * @returns New Board instance
+ */
+export function deserializeBoardFromSeparate(
+	config: SerializedBoardConfig,
+	messages: SerializedBoardMessages
+): Board {
+	const board = new Board(
+		config.name,
+		config.displayName,
+		config.description,
+		config.permanent,
+		config.expirationMs,
+		config.writePermission || "all"
+	);
+	// Ensure all messages have a subject (for backward compatibility)
+	board.setMessages(messages.messages);
+	board.setNextMessageId(config.nextMessageId);
+	return board;
 }
 
-export function getBoards(): Board[] {
-	return Array.from(BOARD_REGISTRY.values());
+/**
+ * Marks a message as read by a character ID and saves the board.
+ * This is the package-layer function that handles persistence.
+ *
+ * @param board The board containing the message
+ * @param messageId The message ID to mark as read
+ * @param characterId The character ID that read the message
+ * @returns True if the message was found and marked, false otherwise
+ */
+export async function markMessageAsReadAndSave(
+	board: Board,
+	messageId: number,
+	characterId: number
+): Promise<boolean> {
+	const marked = board.markMessageAsRead(messageId, characterId);
+	if (marked) {
+		// Save the board to persist the read status
+		await saveBoard(board).catch((err) => {
+			logger.error(
+				`Failed to save board after marking message as read: ${err}`
+			);
+		});
+	}
+	return marked;
 }
 
 /**
@@ -190,7 +249,7 @@ export async function loadBoard(name: string): Promise<Board | undefined> {
 			messages = { messages: [] };
 		}
 
-		const board = Board.deserializeFromSeparate(config, messages);
+		const board = deserializeBoardFromSeparate(config, messages);
 		const messageCount = board.getMessageCount();
 		logger.debug(
 			`Loaded board "${name}" with ${messageCount} message(s) from ${relative(

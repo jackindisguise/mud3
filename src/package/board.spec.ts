@@ -15,12 +15,11 @@ import { Board } from "../board.js";
 import boardPkg, {
 	saveBoard,
 	loadBoard,
-	getBoard,
-	getBoards,
 	boardExists,
 	getAllBoardNames,
 	loadBoards,
 } from "./board.js";
+import { getBoard, getBoards } from "../registry/board.js";
 
 const DATA_DIR = join(process.cwd(), "data");
 const BOARDS_DIR = join(DATA_DIR, "boards");

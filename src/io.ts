@@ -404,9 +404,9 @@ export class MudServer extends EventEmitter {
 	}
 
 	private setupServerHandlers(): void {
-		this.server.on("listening", () => {
+		this.server.on("listening", (port: number, host: string) => {
 			this.isListening = true;
-			logger.info(`MUD server listening on port ${this.port}`);
+			logger.info(`MUD server listening on ${host}:${this.port}`);
 			this.emit("listening");
 		});
 
@@ -463,7 +463,6 @@ export class MudServer extends EventEmitter {
 			this.server.listen(port, host, () => {
 				this.server.removeListener("error", reject);
 				const bindInfo = host ? `${host}:${port}` : `port ${port}`;
-				logger.info(`MUD server listening on ${bindInfo}`);
 				resolve();
 			});
 		});

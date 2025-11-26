@@ -19,7 +19,7 @@ import boardPkg, {
 	getAllBoardNames,
 	loadBoards,
 } from "./board.js";
-import { getBoard, getBoards } from "../registry/board.js";
+import { getBoard, getBoards, registerBoard } from "../registry/board.js";
 
 const DATA_DIR = join(process.cwd(), "data");
 const BOARDS_DIR = join(DATA_DIR, "boards");
@@ -141,6 +141,7 @@ suite("package/board.ts", () => {
 		test("should return board from registry", async () => {
 			const board = new Board("test_registry", "Test", "Test", true);
 			await saveBoard(board);
+			registerBoard(board);
 
 			const retrieved = getBoard("test_registry");
 			assert.ok(retrieved);

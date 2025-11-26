@@ -8,6 +8,7 @@
 		"moduleResolution": "nodenext",
 		"forceConsistentCasingInFileNames": true,
 		"strict": true,
-		"declaration": true
+		"declaration": true,
+		"sourceMap": true
 	}
 }

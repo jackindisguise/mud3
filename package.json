@@ -9,14 +9,19 @@
 	"scripts": {
 		"prebuild": "rimraf dist",
 		"build": "tsc",
+		"build:ts": "tsc --noEmit",
 		"pretest": "npm run build",
 		"test": "node scripts/test.js",
+		"pretest:ts": "npm run build",
+		"test:ts": "node scripts/test-ts.js",
 		"test:compiled": "node --test --test-reporter=spec \"dist/**/*.spec.js\"",
 		"coverage": "npx c8 --reporter=html --reporter=text-summary npm run test:compiled",
 		"doc": "npx typedoc",
 		"deploy": "npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
+		"start:ts": "node --import tsx/esm ./index.ts",
 		"rerun": "npm run test && npm run start",
+		"rerun:ts": "npm run test:ts && npm run start:ts",
 		"post-changelog": "node scripts/post-changelog-to-board.js",
 		"mapeditor": "node mud3-dungeon-editor/dist/start-map-editor.js",
 		"update-mapeditor": "cd mud3-dungeon-editor && git pull origin && npm run build",
@@ -37,6 +42,7 @@
 		"sharp": "^0.33.5",
 		"smol-toml": "^1.4.2",
 		"ts-node": "^10.9.2",
+		"tsx": "^4.20.6",
 		"typedoc": "^0.28.14",
 		"typescript": "^5.9.3"
 	},
@@ -87,11 +93,13 @@
 		}
 	},
 	"dependencies": {
+		"@types/ws": "^8.18.1",
 		"accurate-intervals": "github:jackindisguise/accurate-intervals",
 		"js-yaml": "^4.1.0",
 		"mud-ext": "github:jackindisguise/mud-ext#v2.12.1",
 		"node-test-reporter": "^1.2.0",
 		"package-loader": "github:jackindisguise/package-loader",
-		"winston": "^3.18.3"
+		"winston": "^3.18.3",
+		"ws": "^8.18.3"
 	}
 }

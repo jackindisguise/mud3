@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.21.0](https://github.com/jackindisguise/mud3/compare/v1.20.0...v1.21.0) (2025-11-26)
+
+
+### Features
+
+* **package-loader:** added automated package discovery and loading ([94dbb2f](https://github.com/jackindisguise/mud3/commit/94dbb2f8f6d65ddf0dbdb444ba6e9de43341b813))
+* **schema:** added busy mode fields to character schema ([55666b6](https://github.com/jackindisguise/mud3/commit/55666b6e3b61fc080539e1791cf6effdd2dc7c54))
+* **testing:** added script to run individual test files ([2588bca](https://github.com/jackindisguise/mud3/commit/2588bca82decc31448939c2f16ada1d05a5db36a))
+* **testing:** added TypeScript test runner with source maps ([4f7d0f8](https://github.com/jackindisguise/mud3/commit/4f7d0f8c3caef72d30bdf41ccea08806475311ce))
+* **utils:** added DeepReadonly utility type ([28ab965](https://github.com/jackindisguise/mud3/commit/28ab9655f226758d6a2677f0bbfd89fae57eb055))
+
+
+### Bug Fixes
+
+* **character:** added validation for mob when saving character ([b108db2](https://github.com/jackindisguise/mud3/commit/b108db26af1837bc741df3ba172b207a1cbca7b0))
+* **io:** removed duplicate server listening log message ([efbb51c](https://github.com/jackindisguise/mud3/commit/efbb51cd658782104f775a50a743764aa91b7b4b))
+* **pathfinding:** registered dungeons in test suite ([637ba57](https://github.com/jackindisguise/mud3/commit/637ba57e6aa3c4820beff1e26244802845bd2fe0))
+
 ## [1.20.0](https://github.com/jackindisguise/mud3/compare/v1.19.0...v1.20.0) (2025-11-25)
 
 

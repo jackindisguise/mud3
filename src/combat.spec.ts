@@ -1,7 +1,7 @@
 import { test, suite, beforeEach, skip, afterEach } from "node:test";
 import assert from "node:assert";
-import { Dungeon, Mob, Room, Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
-import { Character } from "./character.js";
+import { Dungeon, Mob, Room, Weapon, EQUIPMENT_SLOT } from "./core/dungeon.js";
+import { Character } from "./core/character.js";
 import {
 	initiateCombat,
 	addToCombatQueue,
@@ -17,8 +17,8 @@ import {
 	HitType,
 	DEFAULT_HIT_TYPE,
 	COMMON_HIT_TYPES,
-} from "./damage-types.js";
-import { freezeArchetype } from "./archetype.js";
+} from "./core/damage-types.js";
+import { freezeArchetype } from "./core/archetype.js";
 
 const testJob = freezeArchetype({
 	id: "test_job",

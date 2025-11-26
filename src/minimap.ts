@@ -17,9 +17,9 @@ import {
 	isSouthward,
 	isEastward,
 	isWestward,
-} from "./dungeon.js";
-import { Mob } from "./dungeon.js";
-import { COLOR, color, SIZER } from "./color.js";
+} from "./core/dungeon.js";
+import { Mob } from "./core/dungeon.js";
+import { COLOR, color, SIZER } from "./core/color.js";
 import { string } from "mud-ext";
 
 const ALTERNATING_MINIMAP_CHARS = [",", "'"];

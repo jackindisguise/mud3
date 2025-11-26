@@ -31,8 +31,8 @@
  * @module act
  */
 
-import { Mob, Room } from "./dungeon.js";
-import { MESSAGE_GROUP } from "./character.js";
+import { Mob, Room } from "./core/dungeon.js";
+import { MESSAGE_GROUP } from "./core/character.js";
 
 /**
  * Message templates for an action from different perspectives.

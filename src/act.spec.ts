@@ -8,9 +8,9 @@ import {
 	damageMessage,
 } from "./act.js";
 import archetypePkg from "./package/archetype.js";
-import { Mob, Room, Dungeon } from "./dungeon.js";
-import { Character, MESSAGE_GROUP } from "./character.js";
-import { freezeArchetype } from "./archetype.js";
+import { Mob, Room, Dungeon } from "./core/dungeon.js";
+import { Character, MESSAGE_GROUP } from "./core/character.js";
+import { freezeArchetype } from "./core/archetype.js";
 import { createMob } from "./package/dungeon.js";
 
 suite("act.ts", () => {

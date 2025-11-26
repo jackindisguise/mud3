@@ -28,13 +28,17 @@
  * @module game
  */
 
-import { MudServer, MudClient } from "./io.js";
-import { CommandContext, CommandRegistry } from "./command.js";
-import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
-import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
+import { MudServer, MudClient } from "./core/io.js";
+import { CommandContext, CommandRegistry } from "./core/command.js";
+import {
+	Character,
+	SerializedCharacter,
+	MESSAGE_GROUP,
+} from "./core/character.js";
+import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./core/dungeon.js";
 import { isNameBlocked } from "./registry/reserved-names.js";
 import { createMob } from "./package/dungeon.js";
-import { Race, Job } from "./archetype.js";
+import { Race, Job } from "./core/archetype.js";
 import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./registry/config.js";
 import {
@@ -51,14 +55,14 @@ import {
 } from "./package/character.js";
 import { loadBoards, saveBoard } from "./package/board.js";
 import { getBoards } from "./registry/board.js";
-import { Board } from "./board.js";
+import { Board } from "./core/board.js";
 import { saveGameState, getNextCharacterId } from "./package/gamestate.js";
 import { executeAllDungeonResets } from "./package/dungeon.js";
-import { color, COLOR } from "./color.js";
+import { color, COLOR } from "./core/color.js";
 import logger from "./logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
-import { LINEBREAK } from "./telnet.js";
+import { LINEBREAK } from "./core/telnet.js";
 import { searchHelpfiles } from "./registry/help.js";
 import { processCombatRound } from "./combat.js";
 import { processWanderBehaviors } from "./behavior.js";
@@ -1054,7 +1058,7 @@ export class Game {
 					// Check if message is targeted at this user
 					if (message.targets && message.targets.length > 0) {
 						const isTarget = message.targets.some(
-							(target) => target.toLowerCase() === username
+							(target: string) => target.toLowerCase() === username
 						);
 						if (isTarget) {
 							directMessages.push({

@@ -1,9 +1,9 @@
 import { test, suite, beforeEach, skip, afterEach } from "node:test";
 import assert from "node:assert";
-import { Dungeon, Mob, Room, BEHAVIOR, ThreatEntry } from "./dungeon.js";
-import { Character } from "./character.js";
+import { Dungeon, Mob, Room, BEHAVIOR, ThreatEntry } from "./core/dungeon.js";
+import { Character } from "./core/character.js";
 import { processThreatSwitching } from "./combat.js";
-import { freezeArchetype, Job, Race } from "./archetype.js";
+import { freezeArchetype, Job, Race } from "./core/archetype.js";
 
 const testRace: Race = {
 	id: "test_race",

@@ -11,10 +11,10 @@
  * @module combat
  */
 
-import { Mob, Room, Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
-import { MESSAGE_GROUP } from "./character.js";
-import { color, COLOR } from "./color.js";
-import { LINEBREAK } from "./telnet.js";
+import { Mob, Room, Weapon, EQUIPMENT_SLOT } from "./core/dungeon.js";
+import { MESSAGE_GROUP } from "./core/character.js";
+import { color, COLOR } from "./core/color.js";
+import { LINEBREAK } from "./core/telnet.js";
 import logger from "./logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { act } from "./act.js";

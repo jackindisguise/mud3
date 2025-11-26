@@ -13,7 +13,7 @@ import {
 	DIRECTIONS,
 	WANDERING_MOBS,
 	BEHAVIOR,
-} from "./dungeon.js";
+} from "./core/dungeon.js";
 import { removeWanderingMob } from "./registry/dungeon.js";
 import {
 	initiateCombat,
@@ -21,7 +21,7 @@ import {
 	processThreatSwitching,
 } from "./combat.js";
 import { act } from "./act.js";
-import { MESSAGE_GROUP } from "./character.js";
+import { MESSAGE_GROUP } from "./core/character.js";
 import { findPathAStar } from "./pathfinding.js";
 import logger from "./logger.js";
 

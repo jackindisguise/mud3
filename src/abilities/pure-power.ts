@@ -18,7 +18,7 @@
  * ```
  */
 
-import { Ability } from "../ability.js";
+import { Ability } from "../core/ability.js";
 
 export const ABILITY_ID = "pure-power";
 

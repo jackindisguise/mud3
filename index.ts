@@ -4,7 +4,7 @@ import {
 	buildDungeonGraph,
 	findDirectionsBetweenRooms,
 } from "./src/pathfinding.js";
-import { DUNGEON_REGISTRY, DIRECTIONS } from "./src/dungeon.js";
+import { DUNGEON_REGISTRY, DIRECTIONS } from "./src/core/dungeon.js";
 import { startGame } from "./src/game.js";
 
 await logger.block("packages", async () => {

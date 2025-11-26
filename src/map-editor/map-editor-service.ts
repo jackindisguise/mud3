@@ -19,13 +19,13 @@ import {
 	getJobById,
 	getRaceById,
 } from "../registry/archetype.js";
-import { Mob, WEAPON_TYPES } from "../dungeon.js";
+import { Mob, WEAPON_TYPES } from "../core/dungeon.js";
 import { createMob } from "../package/dungeon.js";
 import {
 	COMMON_HIT_TYPES,
 	MAGICAL_DAMAGE_TYPE,
 	PHYSICAL_DAMAGE_TYPE,
-} from "../damage-types.js";
+} from "../core/damage-types.js";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 

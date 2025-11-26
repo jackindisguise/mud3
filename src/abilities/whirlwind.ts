@@ -10,11 +10,11 @@
  * ```
  */
 
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../dungeon.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { Ability } from "../ability.js";
+import { Ability } from "../core/ability.js";
 import { act, damageMessage } from "../act.js";
 
 export const ABILITY_ID = "whirlwind";

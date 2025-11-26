@@ -3,6 +3,6 @@ game:
   creator: jackindisguise
 server:
   port: 23
-  inactivity_timeout: 1800
+  inactivity_timeout: 60
 security:
   password_salt: changeme_default_salt_12345

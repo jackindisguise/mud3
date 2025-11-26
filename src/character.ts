@@ -12,7 +12,7 @@
  * - Defaults: `DEFAULT_PLAYER_SETTINGS`, `DEFAULT_PLAYER_CREDENTIALS`, `DEFAULT_PLAYER_STATS`
  * - Types: `PlayerSettings`, `PlayerCredentials`, `PlayerStats`, `PlayerSession`,
  *   `CharacterOptions`, `SerializedCharacter`, and related helpers
- * - Utilities: `Character.hashPassword()`, `character.serialize()` and `Character.deserialize()`
+ * - Utilities: `character.serialize()` and `Character.deserialize()`
  *
  * Typical usage
  * ```ts
@@ -27,7 +27,8 @@
  * });
  *
  * // 2) Set a password (stored as a salted SHA-256 hash)
- * hero.setPassword("super-secret");
+ * import { setCharacterPassword } from "./package/character.js";
+ * setCharacterPassword(hero, "super-secret");
  *
  * // 3) Start a session when a client connects
  * // const client: MudClient = ... (created by the game server)
@@ -54,15 +55,11 @@
  */
 
 import { Mob, SerializedMob } from "./dungeon.js";
-import { createHash } from "crypto";
-import { CONFIG } from "./registry/config.js";
 import type { MudClient } from "./io.js";
 import { CHANNEL, formatChannelMessage } from "./channel.js";
-import { LINEBREAK } from "./telnet.js";
 import { formatPlaytime } from "./time.js";
 import { color, COLOR, stickyColor } from "./color.js";
 import type { ActionState } from "./command.js";
-import { Ability } from "./ability.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.
@@ -393,7 +390,8 @@ export interface SerializedCharacter {
  *   credentials: { username: "playerOne" },
  *   mob: new Mob(),
  * });
- * c.setPassword("secretPassword");
+ * import { setCharacterPassword } from "./package/character.js";
+ * setCharacterPassword(c, "secretPassword");
  *
  * // Typically called by the Game when a client connects
  * // c.startSession(1, client);
@@ -466,7 +464,8 @@ export class Character {
 	 * });
 	 *
 	 * // Set a password (stored as a salted SHA-256 hash)
-	 * character.setPassword("super-secret");
+	 * import { setCharacterPassword } from "./package/character.js";
+	 * setCharacterPassword(character, "super-secret");
 	 *
 	 * // Optional: customize settings/stats on creation
 	 * const c2 = new Character({
@@ -997,18 +996,20 @@ export class Character {
 	}
 
 	/**
-	 * Updates the character's password.
-	 * Automatically hashes the new password before storing.
+	 * Updates the character's password hash.
+	 * Note: This method sets the hash directly. Use setCharacterPassword from package/character
+	 * to hash a plain text password.
 	 *
-	 * @param newPassword The new plain text password
+	 * @param passwordHash The hashed password to store
 	 *
 	 * @example
 	 * ```typescript
-	 * character.setPassword("newSecurePassword123");
+	 * import { setCharacterPassword } from "./package/character.js";
+	 * setCharacterPassword(character, "newSecurePassword123");
 	 * ```
 	 */
-	public setPassword(newPassword: string): void {
-		this.credentials.passwordHash = Character.hashPassword(newPassword);
+	public setPasswordHash(passwordHash: string): void {
+		this.credentials.passwordHash = passwordHash;
 	}
 
 	/**
@@ -1148,39 +1149,23 @@ export class Character {
 	}
 
 	/**
-	 * Verifies if the provided password matches the stored password.
-	 * Hashes the input password and compares it to the stored hash.
+	 * Verifies a password hash against the character's stored password hash.
+	 * Note: This method compares hashes directly. Use verifyCharacterPassword from package/character
+	 * to verify a plain text password.
 	 *
-	 * @param password The plain text password to verify
-	 * @returns true if the password matches
+	 * @param passwordHash The hashed password to verify
+	 * @returns true if the hash matches
 	 *
 	 * @example
 	 * ```typescript
-	 * if (character.verifyPassword("userInputPassword")) {
+	 * import { verifyCharacterPassword } from "./package/character.js";
+	 * if (verifyCharacterPassword(character, "userInputPassword")) {
 	 *   console.log("Password correct!");
-	 * } else {
-	 *   console.log("Invalid password");
 	 * }
 	 * ```
 	 */
-	public verifyPassword(password: string): boolean {
-		return this.credentials.passwordHash === Character.hashPassword(password);
-	}
-
-	/**
-	 * Hashes a password using SHA256 with the configured salt.
-	 *
-	 * @param password The plain text password to hash
-	 * @returns The SHA256 hash of the salted password
-	 *
-	 * @example
-	 * ```typescript
-	 * const hashedPassword = Character.hashPassword("myPassword123");
-	 * ```
-	 */
-	public static hashPassword(password: string): string {
-		const saltedPassword = password + CONFIG.security.password_salt;
-		return createHash("sha256").update(saltedPassword).digest("hex");
+	public verifyPasswordHash(passwordHash: string): boolean {
+		return this.credentials.passwordHash === passwordHash;
 	}
 
 	/**

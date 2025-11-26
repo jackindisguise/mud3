@@ -48,6 +48,7 @@ import {
 	unlink,
 } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
+import { createHash } from "crypto";
 import logger from "../logger.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "../character.js";
 import { SerializedMob } from "../dungeon.js";
@@ -56,10 +57,66 @@ import { deserializeMob } from "./dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
+import { CONFIG } from "../registry/config.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const CHAR_DIR = join(DATA_DIRECTORY, "characters");
+
+/**
+ * Hashes a password using SHA256 with the configured salt.
+ *
+ * @param password The plain text password to hash
+ * @returns The SHA256 hash of the salted password
+ *
+ * @example
+ * ```typescript
+ * const hashedPassword = hashPassword("myPassword123");
+ * ```
+ */
+export function hashPassword(password: string): string {
+	const saltedPassword = password + CONFIG.security.password_salt;
+	return createHash("sha256").update(saltedPassword).digest("hex");
+}
+
+/**
+ * Sets a password on a character by hashing it and storing the hash.
+ *
+ * @param character The character to set the password for
+ * @param password The plain text password to set
+ *
+ * @example
+ * ```typescript
+ * setCharacterPassword(character, "newSecurePassword123");
+ * ```
+ */
+export function setCharacterPassword(
+	character: Character,
+	password: string
+): void {
+	character.credentials.passwordHash = hashPassword(password);
+}
+
+/**
+ * Verifies a password against a character's stored password hash.
+ *
+ * @param character The character to verify the password for
+ * @param password The plain text password to verify
+ * @returns true if the password matches, false otherwise
+ *
+ * @example
+ * ```typescript
+ * if (verifyCharacterPassword(character, "myPassword")) {
+ *   console.log("Password is correct");
+ * }
+ * ```
+ */
+export function verifyCharacterPassword(
+	character: Character,
+	password: string
+): boolean {
+	return character.credentials.passwordHash === hashPassword(password);
+}
 
 // --- Active character registry (local lock) ---
 type ActiveEntry = { character: Character; since: Date };
@@ -210,7 +267,7 @@ export async function checkCharacterPassword(
 	const raw = YAML.load(content) as SerializedCharacter;
 
 	// Hash the input password and compare with stored hash
-	const hashedPassword = Character.hashPassword(password);
+	const hashedPassword = hashPassword(password);
 	if (raw.credentials.passwordHash !== hashedPassword) {
 		logger.debug(`Password mismatch for user: ${username}`);
 		return undefined;

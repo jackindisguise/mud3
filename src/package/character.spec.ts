@@ -4,7 +4,7 @@ import { access, unlink } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
 import { Character } from "../character.js";
-import { saveCharacter, loadCharacter } from "./character.js";
+import { saveCharacter, loadCharacter, hashPassword } from "./character.js";
 import { createMob } from "./dungeon.js";
 import archetypePkg from "./archetype.js";
 
@@ -29,7 +29,7 @@ suite("package/character.ts", () => {
 			credentials: {
 				characterId: 1,
 				username,
-				passwordHash: Character.hashPassword(password),
+				passwordHash: hashPassword(password),
 				createdAt: new Date(),
 				lastLogin: new Date(),
 				isActive: true,
@@ -61,7 +61,7 @@ suite("package/character.ts", () => {
 		assert.strictEqual(loaded!.credentials.username, username);
 		assert.strictEqual(
 			loaded!.credentials.passwordHash,
-			Character.hashPassword(password)
+			hashPassword(password)
 		);
 		// Dates parsed
 		assert.ok(loaded!.credentials.createdAt instanceof Date);

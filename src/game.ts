@@ -47,6 +47,7 @@ import {
 	checkCharacterPassword,
 	loadCharacterFromSerialized,
 	saveCharacter,
+	setCharacterPassword,
 } from "./package/character.js";
 import { loadBoards, saveBoard } from "./package/board.js";
 import { getBoards } from "./registry/board.js";
@@ -822,7 +823,7 @@ export class Game {
 						credentials: { username, characterId },
 						mob,
 					});
-					character.setPassword(password);
+					setCharacterPassword(character, password);
 					saveCharacterFile(character);
 					// Remove name from in-creation set now that character is created
 					self.unblockName(username);

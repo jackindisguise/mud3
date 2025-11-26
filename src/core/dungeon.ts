@@ -63,7 +63,7 @@
 
 import { string } from "mud-ext";
 import { color, COLOR } from "./color.js";
-import logger from "./logger.js";
+import logger from "../logger.js";
 import {
 	addRoomLink,
 	removeRoomLink,
@@ -71,21 +71,21 @@ import {
 	getRoomByRef,
 	getDungeonById,
 	DUNGEON_REGISTRY,
-} from "./registry/dungeon.js";
-import { Race, Job, evaluateGrowthModifier } from "./archetype.js";
-import { Character, MESSAGE_GROUP } from "./character.js";
-import { act } from "./act.js";
-import { Game } from "./game.js";
+} from "../registry/dungeon.js";
+import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
+import { Character, MESSAGE_GROUP } from "../core/character.js";
+import { act } from "../act.js";
+import { Game } from "../game.js";
 import {
 	removeFromCombatQueue,
 	handleDeath,
 	initiateCombat,
 	addToCombatQueue,
 	processThreatSwitching,
-} from "./combat.js";
+} from "../combat.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
-import { damageMessage } from "./act.js";
-import { showRoom } from "./commands/look.js";
+import { damageMessage } from "../act.js";
+import { showRoom } from "../commands/look.js";
 import {
 	HitType,
 	DEFAULT_HIT_TYPE,
@@ -99,7 +99,7 @@ import {
 } from "./damage-types.js";
 import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
-import { addToRegenerationSet } from "./regeneration.js";
+import { addToRegenerationSet } from "../regeneration.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -126,7 +126,7 @@ import {
 	createSecondaryAttributesView,
 	createResourceCapsView,
 } from "./attribute.js";
-import { ability as PURE_POWER } from "./abilities/pure-power.js";
+import { ability as PURE_POWER } from "../abilities/pure-power.js";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
@@ -812,7 +812,7 @@ export {
 	getRoomByRef,
 	getRegisteredDungeonIds,
 	getAllDungeons,
-} from "./registry/dungeon.js";
+} from "../registry/dungeon.js";
 
 /**
  * The main container class that manages a three-dimensional map..

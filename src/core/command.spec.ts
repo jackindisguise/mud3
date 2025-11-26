@@ -4,18 +4,17 @@ import {
 	Command,
 	CommandContext,
 	CommandRegistry,
-	ARGUMENT_TYPE,
 	ParseResult,
 	PRIORITY,
 } from "./command.js";
-import { JavaScriptCommandAdapter } from "./package/commands.js";
-import { createMob } from "./package/dungeon.js";
-import archetypePkg from "./package/archetype.js";
-import { Dungeon, DungeonObject, DIRECTION, Room } from "./dungeon.js";
-import { Mob } from "./dungeon.js";
-import { Character } from "./character.js";
-import cancelCommand from "./commands/cancel.js";
-import queueCommand from "./commands/queue.js";
+import { JavaScriptCommandAdapter } from "../package/commands.js";
+import { createMob } from "../package/dungeon.js";
+import archetypePkg from "../package/archetype.js";
+import { Dungeon, DungeonObject, Room } from "../core/dungeon.js";
+import { Mob } from "../core/dungeon.js";
+import { Character } from "../core/character.js";
+import cancelCommand from "../commands/cancel.js";
+import queueCommand from "../commands/queue.js";
 
 let nextTestCharacterId = 1;
 const attachCharacterToMob = (mob: Mob, username = "tester") =>

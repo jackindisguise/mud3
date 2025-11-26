@@ -47,8 +47,8 @@
 import { DungeonObject, Item, Room, DIRECTION, text2dir } from "./dungeon.js";
 import { Mob, Equipment } from "./dungeon.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
-import { Game } from "./game.js";
-import logger from "./logger.js";
+import { Game } from "../game.js";
+import logger from "../logger.js";
 
 /**
  * Context provided to command execution.

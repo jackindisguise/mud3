@@ -1,7 +1,7 @@
 import { test, suite } from "node:test";
 import assert from "node:assert";
 import { Board, BoardMessage, SerializedBoard } from "./board.js";
-import { deserializeBoard } from "./package/board.js";
+import { deserializeBoard } from "../package/board.js";
 
 suite("board.ts", () => {
 	suite("Board constructor", () => {

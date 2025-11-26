@@ -7,7 +7,7 @@
  * @module board
  */
 
-import { Game } from "./game.js";
+import { Game } from "../game.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 
 export interface BoardMessage {

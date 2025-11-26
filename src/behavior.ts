@@ -14,6 +14,7 @@ import {
 	WANDERING_MOBS,
 	BEHAVIOR,
 } from "./dungeon.js";
+import { removeWanderingMob } from "./registry/dungeon.js";
 import {
 	initiateCombat,
 	removeFromCombatQueue,
@@ -206,11 +207,15 @@ export function processWimpyBehavior(wimpyMob: Mob, room: Room): boolean {
 export function processWanderBehavior(wanderingMob: Mob): boolean {
 	// Only NPCs can wander
 	if (wanderingMob.character) {
+		// Remove from wandering registry if it became player-controlled
+		removeWanderingMob(wanderingMob);
 		return false;
 	}
 
 	// Check if mob has wander behavior
 	if (!wanderingMob.hasBehavior(BEHAVIOR.WANDER)) {
+		// Remove from wandering registry if behavior was disabled
+		removeWanderingMob(wanderingMob);
 		return false;
 	}
 

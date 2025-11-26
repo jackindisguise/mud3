@@ -64,6 +64,14 @@
 import { string } from "mud-ext";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
+import {
+	addRoomLink,
+	removeRoomLink,
+	ROOM_LINKS,
+	getRoomByRef,
+	getDungeonById,
+	DUNGEON_REGISTRY,
+} from "./registry/dungeon.js";
 import { Race, Job, evaluateGrowthModifier } from "./archetype.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 import { act } from "./act.js";
@@ -795,102 +803,16 @@ export interface DungeonOptions {
 	description?: string;
 }
 
-/**
- * Registry of dungeons by their optional persistent ID.
- * Use `getDungeonById(id)` to look up a registered dungeon.
- *
- * Note: only dungeons with an assigned `id` are present in this map.
- */
-const SAFE_DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
-export const DUNGEON_REGISTRY: ReadonlyMap<string, Dungeon> =
-	SAFE_DUNGEON_REGISTRY;
-
-/**
- * Global cache of mobs that have the WANDER behavior enabled.
- * This cache is maintained automatically when behaviors are toggled.
- * Used to efficiently find all mobs that need to wander periodically.
- *
- * @example
- * ```typescript
- * import { WANDERING_MOBS, BEHAVIOR } from "./dungeon.js";
- *
- * // Iterate through all wandering mobs
- * for (const mob of WANDERING_MOBS) {
- *   processWanderBehavior(mob);
- * }
- * ```
- */
-const SAFE_WANDERING_MOBS: Set<Mob> = new Set();
-export const WANDERING_MOBS: ReadonlySet<Mob> = SAFE_WANDERING_MOBS;
-
-/**
- * Lookup a dungeon previously registered with an ID.
- *
- * Only dungeons that were created with an `id` option or had their `id`
- * property set will be present in the registry. This function provides a
- * global lookup mechanism for retrieving dungeon instances by their unique
- * identifier, which is useful for serialization, room references, and
- * cross-dungeon navigation.
- *
- * @param id The dungeon id to look up
- * @returns The Dungeon instance or undefined when not found
- *
- * @example
- * ```typescript
- * // Create a dungeon with an ID
- * const dungeon = new Dungeon({
- *   id: "midgar",
- *   dimensions: { width: 10, height: 10, layers: 3 }
- * });
- *
- * // Look it up later from anywhere
- * const found = getDungeonById("midgar");
- * console.log(found === dungeon); // true
- * ```
- */
-export function getDungeonById(id: string) {
-	return DUNGEON_REGISTRY.get(id);
-}
-
-/**
- * Parse a room reference string and return the corresponding Room.
- * The format is `@dungeon-id{x,y,z}` where dungeon-id is the registered
- * dungeon identifier and x,y,z are the numeric coordinates.
- *
- * @param roomRef The room reference string in format `@dungeon-id{x,y,z}`
- * @returns The Room instance if found, undefined if the format is invalid,
- *          the dungeon doesn't exist, or the coordinates are out of bounds
- *
- * @example
- * ```typescript
- * // Register a dungeon with an id
- * const dungeon = Dungeon.generateEmptyDungeon({
- *   id: "midgar",
- *   dimensions: { width: 10, height: 10, layers: 3 }
- * });
- *
- * // Look up a room using the reference format
- * const room = getRoomByRef("@midgar{5,3,1}");
- * if (room) {
- *   console.log(`Found room at ${room.x},${room.y},${room.z}`);
- * }
- * ```
- */
-export function getRoomByRef(roomRef: string): Room | undefined {
-	// Match pattern: @dungeon-id{x,y,z}
-	const match = roomRef.match(/^@([^{]+)\{(\d+),(\d+),(\d+)\}$/);
-	if (!match) return undefined;
-
-	const [, dungeonId, xStr, yStr, zStr] = match;
-	const dungeon = getDungeonById(dungeonId);
-	if (!dungeon) return undefined;
-
-	const x = parseInt(xStr, 10);
-	const y = parseInt(yStr, 10);
-	const z = parseInt(zStr, 10);
-
-	return dungeon.getRoom(x, y, z);
-}
+// Re-export registry functions for backward compatibility
+export {
+	DUNGEON_REGISTRY,
+	WANDERING_MOBS,
+	ROOM_LINKS,
+	getDungeonById,
+	getRoomByRef,
+	getRegisteredDungeonIds,
+	getAllDungeons,
+} from "./registry/dungeon.js";
 
 /**
  * The main container class that manages a three-dimensional map..
@@ -1049,23 +971,11 @@ export class Dungeon {
 	}
 
 	/**
-	 * Set the persistent dungeon id. Setting to `undefined`
-	 * will unregister the dungeon. Setting to a string will register it or
-	 * throw if the id is already in use by another dungeon.
+	 * Set the persistent dungeon id.
+	 * Note: Registration is handled by the package layer, not the core class.
 	 */
 	private set id(id: string) {
-		if (DUNGEON_REGISTRY.has(id))
-			throw new Error(`Dungeon id "${id}" is already in use`);
 		this._id = id;
-		SAFE_DUNGEON_REGISTRY.set(id, this);
-
-		const roomCount =
-			this._dimensions.width *
-			this._dimensions.height *
-			this._dimensions.layers;
-		logger.debug(
-			`Registered dungeon "${id}" with ${roomCount} cells (${this._dimensions.width}x${this._dimensions.height}x${this._dimensions.layers})`
-		);
 	}
 
 	/**
@@ -1287,11 +1197,8 @@ export class Dungeon {
 			link.remove();
 		}
 
-		// Unregister from global registry
-		if (this._id) {
-			SAFE_DUNGEON_REGISTRY.delete(this._id);
-			this._id = undefined;
-		}
+		// Note: Unregistration is handled by the package layer if needed
+		this._id = undefined;
 
 		// Remove all objects from contents
 		// Make a copy to avoid modifying array during iteration
@@ -5056,15 +4963,7 @@ export class Mob extends Movable {
 			char.mob = this;
 		}
 
-		// Remove from wandering cache when mob becomes player-controlled
-		if (char) {
-			SAFE_WANDERING_MOBS.delete(this);
-		} else {
-			// Add back to wandering cache if mob has wander behavior
-			if (this.hasBehavior(BEHAVIOR.WANDER)) {
-				SAFE_WANDERING_MOBS.add(this);
-			}
-		}
+		// Note: Wandering mob registration is handled by the package layer
 	}
 
 	/**
@@ -5378,16 +5277,8 @@ export class Mob extends Movable {
 		}
 		if (value) {
 			this._behaviors.set(behavior, true);
-			// Add to wandering cache when wander behavior is enabled
-			if (behavior === BEHAVIOR.WANDER) {
-				SAFE_WANDERING_MOBS.add(this);
-			}
 		} else {
 			this._behaviors.delete(behavior);
-			// Remove from wandering cache when wander behavior is disabled
-			if (behavior === BEHAVIOR.WANDER) {
-				SAFE_WANDERING_MOBS.delete(this);
-			}
 		}
 	}
 
@@ -7176,23 +7067,12 @@ export class Mob extends Movable {
 			this._threatTable.clear();
 		}
 
-		// Remove from wandering cache
-		SAFE_WANDERING_MOBS.delete(this);
+		// Note: Wandering mob removal is handled by the package layer
 
 		// Call parent destroy
 		super.destroy(destroyContents);
 	}
 }
-
-/**
- * Global registry of created RoomLink instances.
- *
- * This array is intentionally module-level so the application can iterate
- * and persist links across dungeons. Links created by `RoomLink.createTunnel`
- * are pushed here; `RoomLink.remove()` removes links from this array.
- */
-const SAFE_ROOM_LINKS: RoomLink[] = [];
-export const ROOM_LINKS: ReadonlyArray<RoomLink> = [];
 
 /**
  * Represents a bidirectional portal between two rooms.
@@ -7325,7 +7205,7 @@ export class RoomLink {
 		// Register with the "to" room only for two-way links
 		if (!link._oneWay) link._to.room.addLink(link);
 		// Register in the global link registry for persistence/inspection
-		SAFE_ROOM_LINKS.push(link);
+		addRoomLink(link);
 
 		const fromRef =
 			fromRoom.getRoomRef() || `${fromRoom.x},${fromRoom.y},${fromRoom.z}`;
@@ -7433,8 +7313,7 @@ export class RoomLink {
 		this._to.room.removeLink(this);
 
 		// Remove from the global registry if present
-		const index = ROOM_LINKS.indexOf(this);
-		if (index !== -1) SAFE_ROOM_LINKS.splice(index, 1);
+		removeRoomLink(this);
 	}
 }
 

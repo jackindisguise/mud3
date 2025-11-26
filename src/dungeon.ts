@@ -65,12 +65,6 @@ import { string } from "mud-ext";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 import { Race, Job, evaluateGrowthModifier } from "./archetype.js";
-import {
-	getDefaultRace,
-	getDefaultJob,
-	getRaceById,
-	getJobById,
-} from "./package/archetype.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 import { act } from "./act.js";
 import { Game } from "./game.js";
@@ -84,7 +78,6 @@ import {
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
-import { getNextObjectIdSync } from "./package/gamestate.js";
 import {
 	HitType,
 	DEFAULT_HIT_TYPE,
@@ -96,7 +89,7 @@ import {
 	DamageTypeRelationships,
 	getThirdPersonVerb,
 } from "./damage-types.js";
-import { getAbilityById } from "./package/abilities.js";
+import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
 import { addToRegenerationSet } from "./regeneration.js";
 import {
@@ -1130,7 +1123,7 @@ export class Dungeon {
 		group: MESSAGE_GROUP = MESSAGE_GROUP.SYSTEM
 	): void {
 		Game.game!.forEachCharacter((character) => {
-			if (character.mob.dungeon !== this) return;
+			if (character.mob!.dungeon !== this) return;
 			character.sendMessage(message, group);
 		});
 	}
@@ -1630,21 +1623,8 @@ export class Dungeon {
 	 * ```
 	 */
 	addTemplate(template: DungeonObjectTemplate): void {
-		// Populate baseSerialized snapshot if missing so compression/normalization
-		// can diff against the template even outside of this registry.
-		if (!template.baseSerialized) {
-			if (template.type === "Room") {
-				const room = Room.createFromTemplate(template as RoomTemplate, {
-					x: 0,
-					y: 0,
-					z: 0,
-				});
-				template.baseSerialized = room.serialize();
-			} else {
-				const obj = createFromTemplate(template);
-				template.baseSerialized = obj.serialize();
-			}
-		}
+		// baseSerialized is populated by the package layer during dungeon loading
+		// Core layer just stores the template
 		this._templates.set(template.id, template);
 	}
 
@@ -1679,10 +1659,12 @@ export class Dungeon {
 	 * console.log(`Spawned ${spawned} objects`);
 	 * ```
 	 */
-	executeResets(): number {
+	executeResets(
+		createFn?: (template: DungeonObjectTemplate, oid?: number) => DungeonObject
+	): number {
 		let totalSpawned = 0;
 		for (const reset of this._resets) {
-			const spawned = reset.execute(this._templates);
+			const spawned = reset.execute(this._templates, createFn);
 			totalSpawned += spawned.length;
 		}
 		if (this.resetMessage) this.broadcast(this.resetMessage);
@@ -1873,7 +1855,7 @@ export interface SerializedWeapon extends SerializedDungeonObject {
 	type: "Weapon";
 	slot: EQUIPMENT_SLOT;
 	attackPower: number;
-	hitType?: HitType;
+	hitType?: string;
 	weaponType?: WeaponType;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
 	resourceBonuses?: Partial<ResourceCapacities>;
@@ -2025,7 +2007,7 @@ export interface ArmorTemplate extends EquipmentTemplate {
 export interface WeaponTemplate extends EquipmentTemplate {
 	type: "Weapon";
 	attackPower: number;
-	hitType?: HitType | string;
+	hitType?: string;
 	weaponType?: WeaponType;
 }
 
@@ -2212,8 +2194,15 @@ export class Reset {
 	 * @returns Array of newly spawned objects (empty if none were spawned)
 	 */
 	execute(
-		templateRegistry: Map<string, DungeonObjectTemplate>
+		templateRegistry: Map<string, DungeonObjectTemplate>,
+		createFn?: (template: DungeonObjectTemplate, oid?: number) => DungeonObject
 	): DungeonObject[] {
+		if (!createFn) {
+			throw new Error(
+				"Reset.execute() requires a createFn parameter. Use package layer factory functions."
+			);
+		}
+		const create = createFn;
 		// Get the target room
 		const targetRoom = getRoomByRef(this.roomRef);
 		if (!targetRoom) {
@@ -2254,7 +2243,7 @@ export class Reset {
 		const spawned: DungeonObject[] = [];
 		const toSpawn = Math.min(needed, canSpawn);
 		for (let i = 0; i < toSpawn; i++) {
-			const obj = createFromTemplate(template);
+			const obj = create(template);
 			// Track which reset spawned this object BEFORE adding to room
 			// This ensures spawnedByReset is set before location changes
 			targetRoom.add(obj);
@@ -2288,9 +2277,7 @@ export class Reset {
 							continue;
 						}
 
-						const equipment = createFromTemplate(
-							equipmentTemplate
-						) as Equipment;
+						const equipment = create(equipmentTemplate) as Equipment;
 						obj.equip(equipment);
 					}
 				}
@@ -2308,7 +2295,7 @@ export class Reset {
 							continue;
 						}
 
-						const item = createFromTemplate(itemTemplate);
+						const item = create(itemTemplate);
 						obj.add(item);
 					}
 				}
@@ -2535,13 +2522,15 @@ export class DungeonObject {
 	 * ```
 	 */
 	constructor(options?: DungeonObjectOptions) {
-		// Assign unique object ID (OID) - use provided oid if deserializing, otherwise generate new one
+		// Assign unique object ID (OID) - use provided oid if deserializing, otherwise default to -1
+		// Package layer should provide OID via factory functions for new objects
 		if (options?.oid !== undefined) {
 			this.oid = options.oid;
 		} else if (IS_TEST_MODE) {
 			this.oid = testObjectIdCounter--;
 		} else {
-			this.oid = getNextObjectIdSync();
+			// Default to -1 - package layer will provide OID via factory functions
+			this.oid = -1;
 		}
 
 		if (!options) return;
@@ -2981,58 +2970,6 @@ export class DungeonObject {
 	 * // are not automatically added to dungeons during deserialization
 	 * ```
 	 */
-	public static deserialize(data: AnySerializedDungeonObject): DungeonObject {
-		const typed = data as SerializedDungeonObject;
-		const type: SerializedDungeonObjectType =
-			(typed.type as SerializedDungeonObjectType | undefined) ??
-			"DungeonObject";
-
-		// Normalize compressed data by overlaying onto the base serialization for the type.
-		// This ensures compressed and uncompressed inputs deserialize identically.
-		const normalized = normalizeSerializedData(data);
-
-		/** shortcut support */
-		switch (type) {
-			case "Room":
-				// Delegate to Room-specific deserializer
-				return Room.deserialize(normalized as SerializedRoom);
-			case "Mob":
-				return Mob.deserialize(normalized as SerializedMob);
-			case "Equipment":
-				return Equipment.deserialize(normalized as SerializedEquipment);
-			case "Armor":
-				return Armor.deserialize(normalized as SerializedArmor);
-			case "Weapon":
-				return Weapon.deserialize(normalized as SerializedWeapon);
-			case "Movable":
-				return Movable.deserialize(normalized as SerializedMovable);
-			case "Item":
-				return Item.deserialize(normalized as SerializedItem);
-			case "Prop":
-				return Prop.deserialize(normalized as SerializedProp);
-			case "DungeonObject":
-				// handled in main body
-				break;
-			default: // type is not recognized or not set
-				// we never get to the main body!
-				throw new Error(`no valid type to deserialize: ${String(type)}`);
-		}
-
-		// DungeonObjects in particular
-		let obj: DungeonObject = new DungeonObject(
-			typed as unknown as DungeonObjectOptions
-		);
-
-		// Handle contents for all object types
-		if (typed.contents) {
-			for (const contentData of typed.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				obj.add(contentObj);
-			}
-		}
-
-		return obj;
-	}
 
 	/**
 	 * Gets the serialized form of a base/default object of this type.
@@ -3205,102 +3142,6 @@ export class DungeonObject {
 }
 
 /**
- * Creates a new DungeonObject instance from a template.
- *
- * @param template - The template to create an object from
- * @returns A new DungeonObject instance with template properties applied
- *
- * @example
- * ```typescript
- * const template: DungeonObjectTemplate = {
- *   id: "sword-basic",
- *   type: "Item",
- *   display: "Iron Sword",
- *   description: "A sword."
- * };
- * const obj = createFromTemplate(template);
- * ```
- */
-export function createFromTemplate(
-	template: DungeonObjectTemplate
-): DungeonObject {
-	let obj: DungeonObject;
-
-	// Create the appropriate object type
-	switch (template.type) {
-		case "Room":
-			throw new Error(
-				"Room templates require coordinates - use Room.createFromTemplate() instead"
-			);
-		case "Mob":
-			obj = new Mob({ templateId: template.id });
-			break;
-		case "Equipment": {
-			const equipmentTemplate = template as EquipmentTemplate;
-			obj = new Equipment({
-				templateId: template.id,
-				slot: equipmentTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
-				attributeBonuses: equipmentTemplate.attributeBonuses,
-				resourceBonuses: equipmentTemplate.resourceBonuses,
-				secondaryAttributeBonuses: equipmentTemplate.secondaryAttributeBonuses,
-			});
-			break;
-		}
-		case "Armor": {
-			const armorTemplate = template as ArmorTemplate;
-			obj = new Armor({
-				templateId: template.id,
-				slot: armorTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
-				defense: armorTemplate.defense ?? 0,
-				attributeBonuses: armorTemplate.attributeBonuses,
-				resourceBonuses: armorTemplate.resourceBonuses,
-				secondaryAttributeBonuses: armorTemplate.secondaryAttributeBonuses,
-			});
-			break;
-		}
-		case "Weapon": {
-			const weaponTemplate = template as WeaponTemplate;
-			obj = new Weapon({
-				templateId: template.id,
-				slot: weaponTemplate.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
-				attackPower: weaponTemplate.attackPower ?? 0,
-				hitType: weaponTemplate.hitType,
-				type: weaponTemplate.weaponType ?? "shortsword",
-				attributeBonuses: weaponTemplate.attributeBonuses,
-				resourceBonuses: weaponTemplate.resourceBonuses,
-				secondaryAttributeBonuses: weaponTemplate.secondaryAttributeBonuses,
-			});
-			break;
-		}
-		case "Movable":
-			obj = new Movable({ templateId: template.id });
-			break;
-		case "Item":
-			obj = new Item({ templateId: template.id });
-			break;
-		case "Prop":
-			obj = new Prop({ templateId: template.id });
-			break;
-		case "DungeonObject":
-		default:
-			obj = new DungeonObject({ templateId: template.id });
-			break;
-	}
-
-	// Apply template properties
-	obj.applyTemplate(template);
-
-	// Populate global cache and template snapshot for baseline compression
-	try {
-		const baseline = obj.serialize();
-		SAFE_TEMPLATE_BASE_CACHE.set(template.id, baseline);
-		template.baseSerialized = template.baseSerialized ?? baseline;
-	} catch {}
-
-	return obj;
-}
-
-/**
  * Represents a position in the three-dimensional dungeon space.
  * Used for room positioning and movement calculations.
  *
@@ -3464,27 +3305,6 @@ export class Room extends DungeonObject {
 	}
 
 	/**
-	 * Deserialize a SerializedRoom into a Room instance.
-	 */
-	public static deserialize(data: SerializedRoom): Room {
-		const norm = normalizeSerializedData(data) as SerializedRoom;
-		// allowedExits is mandatory, but handle legacy data that might not have it
-		const defaultExits =
-			DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
-		const room = new Room({
-			...norm,
-			allowedExits: norm.allowedExits ?? defaultExits,
-		});
-		if (norm.contents && Array.isArray(norm.contents)) {
-			for (const contentData of norm.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				room.add(contentObj);
-			}
-		}
-		return room;
-	}
-
-	/**
 	 * Applies a room template to this room, setting only the fields specified in the template.
 	 * Fields not in the template remain unchanged.
 	 *
@@ -3510,53 +3330,6 @@ export class Room extends DungeonObject {
 		if (template.dense !== undefined) {
 			this.dense = template.dense;
 		}
-	}
-
-	/**
-	 * Creates a new Room instance from a template with the specified coordinates.
-	 * Rooms require coordinates for positioning in the dungeon grid, so this method
-	 * is used instead of the generic `createFromTemplate()` function.
-	 *
-	 * @param template - The room template to create a room from
-	 * @param coordinates - The position of the room in the dungeon
-	 * @returns A new Room instance with template properties applied
-	 *
-	 * @example
-	 * ```typescript
-	 * const template: RoomTemplate = {
-	 *   id: "start-room",
-	 *   type: "Room",
-	 *   display: "Starting Room",
-	 *   description: "You are in the starting room.",
-	 *   allowedExits: DIRECTION.NORTH | DIRECTION.UP
-	 * };
-	 * const room = Room.createFromTemplate(template, { x: 0, y: 0, z: 0 });
-	 * ```
-	 */
-	public static createFromTemplate(
-		template: RoomTemplate,
-		coordinates: Coordinates
-	): Room {
-		const room = new Room({
-			coordinates,
-			templateId: template.id,
-		});
-		room.applyTemplate(template);
-
-		// Store a neutral-coordinate baseline (0,0,0) to ensure compressed rooms
-		// include actual coordinates as diffs.
-		try {
-			const neutral = new Room({
-				coordinates: { x: 0, y: 0, z: 0 },
-				templateId: template.id,
-			});
-			neutral.applyTemplate(template);
-			const baseline = neutral.serialize();
-			SAFE_TEMPLATE_BASE_CACHE.set(template.id, baseline);
-			template.baseSerialized = template.baseSerialized ?? baseline;
-		} catch {}
-
-		return room;
 	}
 
 	/**
@@ -3927,21 +3700,6 @@ export class Movable extends DungeonObject {
 	private _coordinates: Coordinates | undefined;
 
 	/**
-	 * Deserialize a SerializedMovable into a Movable instance.
-	 */
-	public static deserialize(data: AnySerializedDungeonObject): Movable {
-		const norm = normalizeSerializedData(data) as unknown as SerializedMovable;
-		const movable = new Movable(norm as SerializedMovable);
-		if (norm.contents && Array.isArray(norm.contents)) {
-			for (const contentData of norm.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				movable.add(contentObj);
-			}
-		}
-		return movable;
-	}
-
-	/**
 	 * Set the location (container) of this movable object.
 	 * Also caches the room coordinates when the object is placed in a `Room`.
 	 *
@@ -4207,42 +3965,12 @@ export class Movable extends DungeonObject {
  * They will be used to generate extra descriptions for the room, or they might
  * be a sign that is in the room that can be read.
  */
-export class Prop extends DungeonObject {
-	/**
-	 * Deserialize a SerializedProp into a Prop instance.
-	 */
-	public static deserialize(data: SerializedProp): Prop {
-		const norm = normalizeSerializedData(data) as SerializedProp;
-		const prop = new Prop(norm);
-		if (norm.contents && Array.isArray(norm.contents)) {
-			for (const contentData of norm.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				prop.add(contentObj);
-			}
-		}
-		return prop;
-	}
-}
+export class Prop extends DungeonObject {}
 
 /**
  * There are items. They are the things that mobs pick up, equip, use, drop, throw, etc.
  */
 export class Item extends Movable {
-	/**
-	 * Deserialize a SerializedItem into an Item instance.
-	 */
-	public static deserialize(data: AnySerializedDungeonObject): Item {
-		const norm = normalizeSerializedData(data) as unknown as SerializedItem;
-		const item = new Item(norm as SerializedItem);
-		if (norm.contents && Array.isArray(norm.contents)) {
-			for (const contentData of norm.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				item.add(contentObj);
-			}
-		}
-		return item;
-	}
-
 	/**
 	 * Set the location (container) of this item.
 	 * When an item's location changes, it clears reset tracking.
@@ -4621,48 +4349,6 @@ export class Equipment extends Item {
 	}
 
 	/**
-	 * Deserialize a SerializedEquipment into an Equipment instance.
-	 * Restores all equipment properties including slot, bonuses, and nested contents.
-	 *
-	 * @param data - Serialized equipment data
-	 * @returns New Equipment instance with restored properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const serialized: SerializedEquipment = {
-	 *   type: "Equipment",
-	 *   slot: EQUIPMENT_SLOT.FINGER,
-	 *   keywords: "ring",
-	 *   display: "Ring",
-	 *   defense: 0,
-	 *   attributeBonuses: { strength: 5 }
-	 * };
-	 *
-	 * const equipment = Equipment.deserialize(serialized);
-	 * console.log(equipment.slot); // EQUIPMENT_SLOT.FINGER
-	 * ```
-	 */
-	public static deserialize(data: SerializedEquipment): Equipment {
-		const { type, ...equipmentData } = normalizeSerializedData(
-			data
-		) as SerializedEquipment;
-		const equipment = new Equipment({
-			...equipmentData,
-			slot: equipmentData.slot,
-			attributeBonuses: equipmentData.attributeBonuses,
-			resourceBonuses: equipmentData.resourceBonuses,
-			secondaryAttributeBonuses: equipmentData.secondaryAttributeBonuses,
-		});
-		if (equipmentData.contents && Array.isArray(equipmentData.contents)) {
-			for (const contentData of equipmentData.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				equipment.add(contentObj);
-			}
-		}
-		return equipment;
-	}
-
-	/**
 	 * Override applyTemplate to handle Equipment-specific properties.
 	 * Applies slot, attributeBonuses, resourceBonuses, and secondaryAttributeBonuses
 	 * from the template.
@@ -4821,24 +4507,6 @@ export class Armor extends Equipment {
 	 * console.log(armor.defense); // 5
 	 * ```
 	 */
-	public static deserialize(data: SerializedArmor): Armor {
-		const armorData = normalizeSerializedData(data) as SerializedArmor;
-		const armor = new Armor({
-			...armorData,
-			slot: armorData.slot,
-			defense: armorData.defense ?? 0,
-			attributeBonuses: armorData.attributeBonuses,
-			resourceBonuses: armorData.resourceBonuses,
-			secondaryAttributeBonuses: armorData.secondaryAttributeBonuses,
-		});
-		if (armorData.contents && Array.isArray(armorData.contents)) {
-			for (const contentData of armorData.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				armor.add(contentObj);
-			}
-		}
-		return armor;
-	}
 
 	/**
 	 * Override applyTemplate to handle Armor-specific properties.
@@ -4990,7 +4658,7 @@ export class Weapon extends Equipment {
 			type: "Weapon",
 			slot: this._slot,
 			attackPower: this._attackPower,
-			hitType: this._hitType,
+			hitType: this._hitType.verb,
 			weaponType: this._type,
 		};
 		return options?.compress
@@ -5023,28 +4691,6 @@ export class Weapon extends Equipment {
 	 * console.log(weapon.attackPower); // 15
 	 * ```
 	 */
-	public static deserialize(data: SerializedWeapon): Weapon {
-		const weaponData = normalizeSerializedData(
-			data
-		) as unknown as SerializedWeapon;
-		const weapon = new Weapon({
-			...weaponData,
-			slot: weaponData.slot,
-			attackPower: weaponData.attackPower ?? 0,
-			hitType: weaponData.hitType,
-			type: weaponData.weaponType ?? "shortsword",
-			attributeBonuses: weaponData.attributeBonuses,
-			resourceBonuses: weaponData.resourceBonuses,
-			secondaryAttributeBonuses: weaponData.secondaryAttributeBonuses,
-		});
-		if (weaponData.contents && Array.isArray(weaponData.contents)) {
-			for (const contentData of weaponData.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				weapon.add(contentObj);
-			}
-		}
-		return weapon;
-	}
 
 	/**
 	 * Override applyTemplate to handle Weapon-specific properties.
@@ -5149,9 +4795,9 @@ export interface ThreatEntry {
 
 export interface MobOptions extends DungeonObjectOptions {
 	/** Resolved race definition to use for this mob. */
-	race?: Race;
+	race: Race;
 	/** Resolved job definition to use for this mob. */
-	job?: Job;
+	job: Job;
 	level?: number;
 	experience?: number;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
@@ -5161,8 +4807,8 @@ export interface MobOptions extends DungeonObjectOptions {
 	exhaustion?: number;
 	/** Behavior flags for NPCs (mobs without a character) */
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
-	/** Learned abilities map (ability id -> number of uses) */
-	learnedAbilities?: Record<string, number>;
+	/** Learned abilities map (Ability object -> number of uses) */
+	learnedAbilities?: Map<Ability, number>;
 }
 
 const MAX_EXHAUSTION = 100;
@@ -5284,16 +4930,18 @@ export class Mob extends Movable {
 	private _health!: number;
 	private _mana!: number;
 	private _exhaustion!: number;
-	private _equipped: Map<EQUIPMENT_SLOT, Equipment>;
+	protected _equipped: Map<EQUIPMENT_SLOT, Equipment>;
 	private _combatTarget?: Mob;
 	private _threatTable?: Map<Mob, ThreatEntry>;
 	private _threatExpirationTimer?: number;
 	private _behaviors: Map<BEHAVIOR, boolean>;
-	/** Map of ability ID to number of uses */
-	private _learnedAbilities: Map<string, number>;
+	/** Map of Ability objects to number of uses */
+	/** @internal - Public for package deserializers */
+	public _learnedAbilities: Map<Ability, number>;
 	/** Map of ability ID to cached proficiency (0-100) */
-	private _proficiencySnapshot: Map<string, number>;
-	constructor(options?: MobOptions) {
+	/** @internal - Public for package deserializers */
+	public _proficiencySnapshot: Map<string, number>;
+	constructor(options: MobOptions) {
 		super(options);
 
 		this._equipped = new Map<EQUIPMENT_SLOT, Equipment>();
@@ -5312,9 +4960,8 @@ export class Mob extends Movable {
 		this._resourceCaps = sumResourceCaps();
 		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
 
-		this._race = options?.race ?? getDefaultRace();
-		this._job = options?.job ?? getDefaultJob();
-
+		this._race = options.race;
+		this._job = options.job;
 		const providedLevel = Math.floor(Number(options?.level ?? 1));
 		this._level = providedLevel > 0 ? providedLevel : 1;
 		this._experience = 0;
@@ -5342,18 +4989,15 @@ export class Mob extends Movable {
 		}
 
 		// Initialize learned abilities map (ability id -> uses)
-		this._learnedAbilities = new Map<string, number>();
+		this._learnedAbilities = new Map<Ability, number>();
 		this._proficiencySnapshot = new Map<string, number>();
+		// Note: learnedAbilities from options should be provided as Map<Ability, number>
+		// For deserialization, abilities are resolved in package layer
 		if (options?.learnedAbilities) {
-			// Legacy support: if learnedAbilities contains proficiency values, convert to uses
-			// For now, we'll treat old proficiency values as uses (backward compatibility)
-			// In the future, this should be migrated to proper uses
-			for (const [abilityId, value] of Object.entries(
-				options.learnedAbilities
-			)) {
-				const uses = Math.max(0, Number(value));
-				this._learnedAbilities.set(abilityId, uses);
-				this._updateProficiencySnapshot(abilityId);
+			// Copy the map if provided
+			for (const [ability, uses] of options.learnedAbilities) {
+				this._learnedAbilities.set(ability, uses);
+				this._updateProficiencySnapshot(ability);
 			}
 		}
 
@@ -5401,13 +5045,9 @@ export class Mob extends Movable {
 	 */
 	public set character(char: Character | undefined) {
 		if (this.character === char) return;
-		const ochar = this.character;
-		this._character = char;
+		if (this.character && this.character.mob) this.character.mob = undefined;
 
-		// If we're clearing or there was no change for the new character, still detach previous owner
-		if (ochar && ochar.mob === this) {
-			ochar.mob = new Mob();
-		}
+		this._character = char;
 
 		// Ensure the new character points to this mob
 		if (char && char.mob !== this) {
@@ -5782,7 +5422,8 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public getAbilityUses(abilityId: string): number {
-		return this._learnedAbilities.get(abilityId) ?? 0;
+		const ability = this._findAbilityById(abilityId);
+		return ability ? this._learnedAbilities.get(ability) ?? 0 : 0;
 	}
 
 	/**
@@ -5792,16 +5433,10 @@ export class Mob extends Movable {
 	 * @param abilityId The ability ID to update
 	 * @private
 	 */
-	private _updateProficiencySnapshot(abilityId: string): void {
-		const uses = this._learnedAbilities.get(abilityId) ?? 0;
-		const ability = getAbilityById(abilityId);
-		if (ability) {
-			const proficiency = getProficiencyAtUses(ability, uses);
-			this._proficiencySnapshot.set(abilityId, proficiency);
-		} else {
-			// If ability not found, set proficiency to 0
-			this._proficiencySnapshot.set(abilityId, 0);
-		}
+	private _updateProficiencySnapshot(ability: Ability): void {
+		const uses = this._learnedAbilities.get(ability) ?? 0;
+		const proficiency = getProficiencyAtUses(ability, uses);
+		this._proficiencySnapshot.set(ability.id, proficiency);
 	}
 
 	/**
@@ -5818,8 +5453,31 @@ export class Mob extends Movable {
 	 * console.log(mob.knowsAbility("fireball")); // false
 	 * ```
 	 */
-	public knowsAbility(abilityId: string): boolean {
-		return this._learnedAbilities.has(abilityId);
+	/**
+	 * Helper method to find an ability by ID in the learned abilities map.
+	 * @private
+	 */
+	private _findAbility(
+		predicate: (ability: Ability, uses: number) => boolean
+	): Ability | undefined {
+		for (const [ability, uses] of this._learnedAbilities.entries()) {
+			if (predicate(ability, uses)) {
+				return ability;
+			}
+		}
+		return undefined;
+	}
+
+	private _findAbilityById(abilityId: string): Ability | undefined {
+		return this._findAbility((ability) => ability.id === abilityId);
+	}
+
+	public knowsAbilityById(abilityId: string): boolean {
+		return this._findAbilityById(abilityId) !== undefined;
+	}
+
+	public knowsAbility(ability: Ability): boolean {
+		return this._findAbility((ability) => ability === ability) !== undefined;
 	}
 
 	/**
@@ -5836,10 +5494,43 @@ export class Mob extends Movable {
 	 * // Proficiency will be calculated based on the ability's curve
 	 * ```
 	 */
-	public addAbility(abilityId: string, uses: number = 0): void {
+	/**
+	 * Adds or updates an ability for this mob.
+	 * Sets the number of uses for the ability and updates the proficiency snapshot.
+	 *
+	 * @param ability The Ability object to add or update
+	 * @param uses Number of times the ability has been used (defaults to 0)
+	 */
+	public addAbility(ability: Ability, uses: number = 0): void {
 		const useCount = Math.max(0, Number(uses));
-		this._learnedAbilities.set(abilityId, useCount);
-		this._updateProficiencySnapshot(abilityId);
+		this._learnedAbilities.set(ability, useCount);
+		this._updateProficiencySnapshot(ability);
+	}
+
+	/**
+	 * Adds or updates an ability by ID. This is a convenience method that requires
+	 * the ability to be looked up. For better performance, use addAbility(ability, uses).
+	 *
+	 * @param abilityId The ability ID to add or update
+	 * @param uses Number of times the ability has been used (defaults to 0)
+	 * @param abilityLookup Optional function to look up ability by ID (for package layer)
+	 * @deprecated Use addAbility(ability, uses) instead. This method will be removed.
+	 */
+	public addAbilityById(
+		abilityId: string,
+		uses: number = 0,
+		abilityLookup?: (id: string) => Ability | undefined
+	): void {
+		if (!abilityLookup) {
+			throw new Error(
+				"addAbilityById requires abilityLookup parameter. Use addAbility(ability, uses) instead."
+			);
+		}
+		const ability = abilityLookup(abilityId);
+		if (!ability) {
+			throw new Error(`Ability "${abilityId}" not found`);
+		}
+		this.addAbility(ability, uses);
 	}
 
 	/**
@@ -5858,31 +5549,63 @@ export class Mob extends Movable {
 	 * mob.incrementAbilityUses("whirlwind", 5); // Now has 6 uses
 	 * ```
 	 */
-	public useAbilityById(abilityId: string, amount: number = 1): void {
-		if (!this._learnedAbilities.has(abilityId)) {
+	/**
+	 * Increments the use count for an ability and updates the proficiency snapshot.
+	 * This should be called whenever an ability is used.
+	 * Notifies the mob when proficiency increases.
+	 *
+	 * @param ability The Ability object to increment uses for
+	 * @param amount The amount to increment by (defaults to 1)
+	 */
+	public useAbility(ability: Ability, amount: number = 1): void {
+		if (!this._learnedAbilities.has(ability)) {
 			// If ability not learned, add it with the increment amount
-			this.addAbility(abilityId, amount);
+			this.addAbility(ability, amount);
 			return;
 		}
 
 		// Get old proficiency before updating
-		const oldProficiency = this._proficiencySnapshot.get(abilityId) ?? 0;
+		const oldProficiency = this._proficiencySnapshot.get(ability.id) ?? 0;
 
-		const currentUses = this._learnedAbilities.get(abilityId) ?? 0;
+		const currentUses = this._learnedAbilities.get(ability) ?? 0;
 		const newUses = Math.max(0, currentUses + amount);
-		this._learnedAbilities.set(abilityId, newUses);
-		this._updateProficiencySnapshot(abilityId);
+		this._learnedAbilities.set(ability, newUses);
+		this._updateProficiencySnapshot(ability);
 
 		// Get new proficiency and check if it increased
-		const newProficiency = this._proficiencySnapshot.get(abilityId) ?? 0;
+		const newProficiency = this._proficiencySnapshot.get(ability.id) ?? 0;
 		if (newProficiency > oldProficiency) {
-			const ability = getAbilityById(abilityId);
-			const abilityName = ability?.name ?? abilityId;
 			this.sendMessage(
-				`Your proficiency with ${abilityName} has increased to ${newProficiency}%!`,
+				`Your proficiency with ${ability.name} has increased to ${newProficiency}%!`,
 				MESSAGE_GROUP.SYSTEM
 			);
 		}
+	}
+
+	/**
+	 * Increments the use count for an ability by ID. This is a convenience method.
+	 * For better performance, use useAbility(ability, amount).
+	 *
+	 * @param abilityId The ability ID to increment uses for
+	 * @param amount The amount to increment by (defaults to 1)
+	 * @param abilityLookup Optional function to look up ability by ID (for package layer)
+	 * @deprecated Use useAbility(ability, amount) instead. This method will be removed.
+	 */
+	public useAbilityById(
+		abilityId: string,
+		amount: number = 1,
+		abilityLookup?: (id: string) => Ability | undefined
+	): void {
+		if (!abilityLookup) {
+			throw new Error(
+				"useAbilityById requires abilityLookup parameter. Use useAbility(ability, amount) instead."
+			);
+		}
+		const ability = abilityLookup(abilityId);
+		if (!ability) {
+			throw new Error(`Ability "${abilityId}" not found`);
+		}
+		this.useAbility(ability, amount);
 	}
 
 	/**
@@ -5899,12 +5622,32 @@ export class Mob extends Movable {
 	 * mob.removeAbility("fireball"); // Returns false (not learned)
 	 * ```
 	 */
-	public removeAbility(abilityId: string): boolean {
-		const removed = this._learnedAbilities.delete(abilityId);
+	/**
+	 * Removes an ability from this mob.
+	 *
+	 * @param ability The Ability object to remove
+	 * @returns True if the ability was removed, false if it wasn't learned
+	 */
+	public removeAbility(ability: Ability): boolean {
+		const removed = this._learnedAbilities.delete(ability);
 		if (removed) {
-			this._proficiencySnapshot.delete(abilityId);
+			this._proficiencySnapshot.delete(ability.id);
 		}
 		return removed;
+	}
+
+	/**
+	 * Removes an ability by ID. This is a convenience method.
+	 *
+	 * @param abilityId The ability ID to remove
+	 * @returns True if the ability was removed, false if it wasn't learned
+	 */
+	public removeAbilityById(abilityId: string): boolean {
+		const ability = this._findAbilityById(abilityId);
+		if (!ability) {
+			return false;
+		}
+		return this.removeAbility(ability);
 	}
 
 	/**
@@ -5939,19 +5682,18 @@ export class Mob extends Movable {
 
 		// Handle Mob-specific properties
 		const mobTemplate = template as MobTemplate;
+		// Note: race and job from templates are applied as-is (they should be Race/Job objects, not IDs)
+		// If a template provides race/job as IDs, they need to be resolved before calling applyTemplate
+		// This is handled in the package layer when creating objects from templates
 		if (mobTemplate.race !== undefined) {
-			const race = getRaceById(mobTemplate.race);
-			if (race) {
-				this._race = race;
-				this.recalculateDerivedAttributes(this.captureResourceRatios());
-			}
+			// Template should provide Race object, not ID string
+			this._race = mobTemplate.race as any;
+			this.recalculateDerivedAttributes(this.captureResourceRatios());
 		}
 		if (mobTemplate.job !== undefined) {
-			const job = getJobById(mobTemplate.job);
-			if (job) {
-				this._job = job;
-				this.recalculateDerivedAttributes(this.captureResourceRatios());
-			}
+			// Template should provide Job object, not ID string
+			this._job = mobTemplate.job as any;
+			this.recalculateDerivedAttributes(this.captureResourceRatios());
 		}
 		if (mobTemplate.level !== undefined) {
 			this.level = mobTemplate.level;
@@ -5985,7 +5727,8 @@ export class Mob extends Movable {
 		}
 	}
 
-	private captureResourceRatios(): {
+	/** @internal - Public for package deserializers */
+	public captureResourceRatios(): {
 		healthRatio?: number;
 		manaRatio?: number;
 	} {
@@ -6005,7 +5748,8 @@ export class Mob extends Movable {
 		return Math.floor(clampNumber(value, 0, maxValue));
 	}
 
-	private recalculateDerivedAttributes(
+	/** @internal - Public for package deserializers */
+	public recalculateDerivedAttributes(
 		opts: { bootstrap?: boolean; healthRatio?: number; manaRatio?: number } = {}
 	): void {
 		const race = this._race;
@@ -7172,14 +6916,14 @@ export class Mob extends Movable {
 		// Check for Pure Power passive ability
 		// Pure Power increases attack power from +0% at 0% proficiency to +200% at 100% proficiency
 		let purePowerMultiplier = 1;
-		if (this.knowsAbility(PURE_POWER.id)) {
+		if (this.knowsAbilityById(PURE_POWER.id)) {
 			const proficiency = this.learnedAbilities.get(PURE_POWER.id) || 0;
 			// Formula: 1 + (proficiency / 100) * 2
 			// At 0%: 1 + 0 = 1.0 (no change)
 			// At 50%: 1 + 1 = 2.0 (+100%)
 			// At 100%: 1 + 2 = 3.0 (+200%)
 			purePowerMultiplier = 1 + (proficiency / 100) * 2;
-			this.useAbilityById(PURE_POWER.id, 1);
+			this.useAbility(PURE_POWER, 1);
 		}
 
 		// Combine Pure Power multiplier with provided multiplier
@@ -7278,20 +7022,20 @@ export class Mob extends Movable {
 
 		if (abilityName) {
 			// With ability: ability is the subject, always use "hits"
-			userMsg = `Your ${abilityName} hits {target} for ${damageStr} damage!`;
-			targetMsg = `{User}'s ${abilityName} hits you for ${damageStr} damage!`;
+			userMsg = `{RYour{x ${abilityName} hits {target} for ${damageStr} damage!`;
+			targetMsg = `{User}'s ${abilityName} hits {Ryou{x for ${damageStr} damage!`;
 			roomMsg = `{User}'s ${abilityName} hits {target} for ${damageStrPlain} damage!`;
 		} else if (weaponName) {
 			// With weapon: weapon is the subject, so always use third person
-			userMsg = `Your ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
-			targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} you for ${damageStr} damage!`;
+			userMsg = `{RYour{x ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+			targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
 			roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
 		} else {
 			// Without weapon: user is the subject
 			// First person (user sees): "You punch"
-			userMsg = `You ${verb} {target} for ${damageStr} damage!`;
+			userMsg = `{RYou{x ${verb} {target} for ${damageStr} damage!`;
 			// Third person (target/room see): "{User} punches"
-			targetMsg = `{User} ${verbThirdPerson} you for ${damageStr} damage!`;
+			targetMsg = `{User} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
 			roomMsg = `{User} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
 		}
 
@@ -7390,7 +7134,9 @@ export class Mob extends Movable {
 			...(this._learnedAbilities.size > 0
 				? {
 						learnedAbilities: Object.fromEntries(
-							Array.from(this._learnedAbilities.entries())
+							Array.from(this._learnedAbilities.entries()).map(
+								([ability, uses]) => [ability.id, uses]
+							)
 						) as Record<string, number>,
 				  }
 				: {}),
@@ -7404,59 +7150,6 @@ export class Mob extends Movable {
 		}
 
 		return full;
-	}
-
-	/**
-	 * Deserialize a SerializedMob into a Mob instance.
-	 */
-	public static deserialize(data: SerializedMob): Mob {
-		const {
-			race: raceId,
-			job: jobId,
-			equipped,
-			...rest
-		} = normalizeSerializedData(data) as SerializedMob;
-		const race = getRaceById(raceId);
-		const job = getJobById(jobId);
-		const mob = new Mob({
-			race,
-			job,
-			...rest,
-		});
-		if (data.contents && Array.isArray(data.contents)) {
-			for (const contentData of data.contents) {
-				const contentObj = DungeonObject.deserialize(contentData);
-				mob.add(contentObj);
-			}
-		}
-		// Restore equipped items
-		if (equipped) {
-			for (const [slotStr, equipmentData] of Object.entries(equipped)) {
-				const slot = slotStr as EQUIPMENT_SLOT;
-				// Handle both single items and arrays (for backward compatibility)
-				if (Array.isArray(equipmentData)) {
-					// Legacy format - take first item only
-					const equipment = DungeonObject.deserialize(
-						equipmentData[0] as unknown as AnySerializedDungeonObject
-					) as Equipment;
-					mob._equipped.set(slot, equipment);
-					if (!mob.contains(equipment)) {
-						mob.add(equipment);
-					}
-				} else {
-					const equipment = DungeonObject.deserialize(
-						equipmentData as unknown as AnySerializedDungeonObject
-					) as Equipment;
-					mob._equipped.set(slot, equipment);
-					if (!mob.contains(equipment)) {
-						mob.add(equipment);
-					}
-				}
-			}
-			// Recalculate attributes with equipment bonuses
-			mob.recalculateDerivedAttributes(mob.captureResourceRatios());
-		}
-		return mob;
 	}
 
 	/**
@@ -7747,7 +7440,35 @@ const baseSerializedTypes: Partial<
 	Record<SerializedDungeonObjectType, SerializedDungeonObject>
 > = {
 	Movable: new Movable({ oid: -1 }).serialize(),
-	Mob: new Mob({ oid: -1 }).serialize(),
+	Mob: new Mob({
+		race: {
+			id: "race",
+			name: "Race",
+			startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
+			attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
+			startingResourceCaps: { maxHealth: 0, maxMana: 0 },
+			resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
+			skills: [],
+			passives: [],
+			growthModifier: {
+				base: 1.0,
+			},
+		},
+		job: {
+			id: "job",
+			name: "Job",
+			startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
+			attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
+			startingResourceCaps: { maxHealth: 0, maxMana: 0 },
+			resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
+			skills: [],
+			passives: [],
+			growthModifier: {
+				base: 1.0,
+			},
+		},
+		oid: -1,
+	}).serialize(),
 	Equipment: new Equipment({ oid: -1 }).serialize(),
 	Armor: new Armor({ oid: -1 }).serialize(),
 	Weapon: new Weapon({ oid: -1 }).serialize(),
@@ -7778,16 +7499,10 @@ function getCompressionBaseline(
 		if (t) {
 			if (t.baseSerialized) {
 				base = t.baseSerialized;
-			} else if (t.type === "Room") {
-				const tmp = Room.createFromTemplate(t as RoomTemplate, {
-					x: 0,
-					y: 0,
-					z: 0,
-				});
-				base = tmp.serialize();
 			} else {
-				const tmp = createFromTemplate(t);
-				base = tmp.serialize();
+				// baseSerialized should be set by package layer during template loading
+				// If missing, fall back to type defaults
+				base = baseSerializedTypes[type];
 			}
 		} else {
 			const cached = SAFE_TEMPLATE_BASE_CACHE.get(templateId);
@@ -7856,8 +7571,10 @@ function resolveTemplateById(id: string): DungeonObjectTemplate | undefined {
  * Creates a normalized, uncompressed serialized object by overlaying the provided
  * data on top of the base serialization for its declared type. Contents are normalized
  * recursively. The original input is not mutated.
+ *
+ * Exported for use by package layer deserializers.
  */
-function normalizeSerializedData<T extends AnySerializedDungeonObject>(
+export function normalizeSerializedData<T extends AnySerializedDungeonObject>(
 	data: T
 ): T {
 	const hasTemplate = data.templateId;
@@ -7869,17 +7586,12 @@ function normalizeSerializedData<T extends AnySerializedDungeonObject>(
 			if (t.baseSerialized) {
 				base = { ...t.baseSerialized } as Record<string, unknown>;
 			} else {
-				if (t.type === "Room") {
-					const tmp = Room.createFromTemplate(t as RoomTemplate, {
-						x: 0,
-						y: 0,
-						z: 0,
-					});
-					base = tmp.serialize() as unknown as Record<string, unknown>;
-				} else {
-					const tmp = createFromTemplate(t);
-					base = tmp.serialize() as unknown as Record<string, unknown>;
-				}
+				// baseSerialized should be set by package layer during template loading
+				// If missing, fall back to type defaults
+				base = (baseSerializedTypes[t.type] ?? {}) as unknown as Record<
+					string,
+					unknown
+				>;
 			}
 		} else {
 			// Fallback to global cache when not in registry
@@ -8005,20 +7717,23 @@ export function serializedToOptions(
 								.map(([key, value]) => [key as BEHAVIOR, !!value])
 					  )
 					: undefined;
-			const opts: MobOptions = pruneUndefined({
+			// Note: race and job are kept as string IDs here - they will be resolved in package layer
+			// This function is used by normalizeSerializedData which is in core, so it can't use package functions
+			const opts = pruneUndefined({
 				...base,
 				level: m.level,
 				experience: m.experience,
-				race: getRaceById(m.race),
-				job: getJobById(m.job),
+				race: m.race, // Keep as string ID - resolved in package layer
+				job: m.job, // Keep as string ID - resolved in package layer
 				attributeBonuses: m.attributeBonuses,
 				resourceBonuses: m.resourceBonuses,
 				health: m.health,
 				mana: m.mana,
 				exhaustion: m.exhaustion,
 				behaviors,
-				learnedAbilities: m.learnedAbilities,
-			});
+				// learnedAbilities will be handled separately during deserialization
+				// (not passed through options since it needs Ability objects, not IDs)
+			}) as any;
 			return opts;
 		}
 		case "Item":

@@ -49,8 +49,10 @@ import {
 } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
-import { Character, SerializedCharacter } from "../character.js";
-import archetypePkg, { getRaceById, getJobById } from "../package/archetype.js";
+import { Character, SerializedCharacter, MESSAGE_GROUP } from "../character.js";
+import { SerializedMob } from "../dungeon.js";
+import archetypePkg from "../package/archetype.js";
+import { deserializeMob } from "./dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
@@ -217,6 +219,68 @@ export async function checkCharacterPassword(
 }
 
 /**
+ * Deserialize a SerializedCharacter into a Character instance.
+ * This is the package-layer deserializer that handles all package dependencies.
+ *
+ * @param data The serialized character data
+ * @returns New Character instance
+ */
+export function deserializeCharacter(data: SerializedCharacter): Character {
+	const mobDataWithType: SerializedMob = { ...data.mob!, type: "Mob" };
+	// Deserialize the mob using the package deserializer
+	const mob = deserializeMob(mobDataWithType);
+
+	// Handle backward compatibility: if characterId is missing, assign a temporary one
+	const characterId = data.credentials.characterId ?? Number.MAX_SAFE_INTEGER;
+
+	const creds = {
+		characterId,
+		username: data.credentials.username,
+		passwordHash: data.credentials.passwordHash,
+		email: data.credentials.email,
+		createdAt: new Date(data.credentials.createdAt),
+		lastLogin: new Date(data.credentials.lastLogin),
+		isActive: data.credentials.isActive,
+		isBanned: data.credentials.isBanned,
+		isAdmin: data.credentials.isAdmin,
+	};
+
+	// Convert channels and blockedUsers arrays back to Sets
+	const settings = {
+		...data.settings,
+		channels:
+			data.settings.channels !== undefined
+				? new Set(data.settings.channels)
+				: new Set(),
+		blockedUsers:
+			data.settings.blockedUsers !== undefined
+				? new Set(data.settings.blockedUsers)
+				: undefined,
+		busyForwardedGroups:
+			data.settings.busyForwardedGroups !== undefined
+				? new Set(data.settings.busyForwardedGroups)
+				: new Set([MESSAGE_GROUP.CHANNELS]),
+		combatBusyForwardedGroups:
+			data.settings.combatBusyForwardedGroups !== undefined
+				? new Set(data.settings.combatBusyForwardedGroups)
+				: new Set([MESSAGE_GROUP.CHANNELS]),
+	};
+
+	if (data.settings.defaultColor !== undefined) {
+		(settings as any).defaultColor = data.settings.defaultColor;
+	}
+
+	const character = new Character({
+		credentials: creds,
+		settings: settings as any,
+		stats: data.stats,
+		mob,
+	});
+
+	return character;
+}
+
+/**
  * Load a character from serialized data and register it as active.
  *
  * @param data The serialized character data
@@ -225,7 +289,7 @@ export async function checkCharacterPassword(
 export function loadCharacterFromSerialized(
 	data: SerializedCharacter
 ): Character {
-	const character = Character.deserialize(data);
+	const character = deserializeCharacter(data);
 	// Auto-register as active upon successful load
 	registerActiveCharacter(character);
 	return character;
@@ -255,7 +319,7 @@ export async function loadCharacter(
 	const content = await readFile(filePath, "utf-8");
 	const raw = YAML.load(content) as SerializedCharacter;
 
-	const character = Character.deserialize(raw);
+	const character = deserializeCharacter(raw);
 	// Auto-register as active upon successful load
 	registerActiveCharacter(character);
 	return character;

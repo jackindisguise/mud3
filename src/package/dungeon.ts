@@ -27,7 +27,15 @@
  *
  * @module package/dungeon
  */
-import archetypePkg from "./archetype.js";
+import archetypePkg, {
+	getRaceById,
+	getJobById,
+	getDefaultRace,
+	getDefaultJob,
+} from "./archetype.js";
+import type { Race, Job } from "../archetype.js";
+import { getAbilityById } from "./abilities.js";
+import { Ability, getProficiencyAtUses } from "../ability.js";
 import { join, relative } from "path";
 import {
 	mkdir,
@@ -47,6 +55,7 @@ import {
 	Coordinates,
 	DungeonObjectTemplate,
 	RoomTemplate,
+	MobTemplate,
 	DIRECTION,
 	Reset,
 	ResetOptions,
@@ -58,15 +67,268 @@ import {
 	RoomLink,
 	getRoomByRef,
 	getDungeonById,
+	DungeonObject,
+	DungeonObjectOptions,
+	Mob,
+	MobOptions,
+	Item,
+	Prop,
+	Equipment,
+	EquipmentOptions,
+	Armor,
+	ArmorOptions,
+	Weapon,
+	WeaponOptions,
+	RoomOptions,
+	Movable,
+	AnySerializedDungeonObject,
+	SerializedDungeonObject,
+	SerializedDungeonObjectType,
+	SerializedRoom,
+	SerializedMovable,
+	SerializedMob,
+	SerializedItem,
+	SerializedProp,
+	SerializedEquipment,
+	SerializedArmor,
+	SerializedWeapon,
+	EQUIPMENT_SLOT,
+	normalizeSerializedData,
+	type EquipmentTemplate,
+	type ArmorTemplate,
+	type WeaponTemplate,
 } from "../dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getSafeRootDirectory } from "../utils/path.js";
+import { getNextObjectIdSync } from "./gamestate.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const DUNGEON_DIR = join(DATA_DIRECTORY, "dungeons");
+
+/**
+ * Factory function to create a DungeonObject with an auto-generated OID.
+ * This is the preferred way to create objects in package modules.
+ */
+export function createDungeonObject(
+	options?: Omit<DungeonObjectOptions, "oid">
+): DungeonObject {
+	return new DungeonObject({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create a Mob with an auto-generated OID.
+ */
+export function createMob(
+	options?: Omit<MobOptions, "oid" | "race" | "job"> & {
+		race?: Race;
+		job?: Job;
+	}
+): Mob {
+	const race = options?.race ?? getDefaultRace();
+	const job = options?.job ?? getDefaultJob();
+	return new Mob({
+		...options,
+		race,
+		job,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create a Room with an auto-generated OID.
+ */
+export function createRoom(options: Omit<RoomOptions, "oid">): Room {
+	return new Room({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create an Item with an auto-generated OID.
+ */
+export function createItem(options?: Omit<DungeonObjectOptions, "oid">): Item {
+	return new Item({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create a Prop with an auto-generated OID.
+ */
+export function createProp(options?: Omit<DungeonObjectOptions, "oid">): Prop {
+	return new Prop({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create Equipment with an auto-generated OID.
+ */
+export function createEquipment(
+	options?: Omit<EquipmentOptions, "oid">
+): Equipment {
+	return new Equipment({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create Armor with an auto-generated OID.
+ */
+export function createArmor(options?: Omit<ArmorOptions, "oid">): Armor {
+	return new Armor({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Factory function to create Weapon with an auto-generated OID.
+ */
+export function createWeapon(options?: Omit<WeaponOptions, "oid">): Weapon {
+	return new Weapon({
+		...options,
+		oid: getNextObjectIdSync(),
+	});
+}
+
+/**
+ * Creates a new DungeonObject instance from a template.
+ * This is the package-layer implementation that handles OID assignment and
+ * resolves runtime dependencies (like race/job for Mobs).
+ *
+ * @param template - The template to create an object from
+ * @param oid - Optional OID to assign. If not provided, a new OID will be generated.
+ * @returns A new DungeonObject instance with template properties applied
+ */
+function createFromTemplate(
+	template: DungeonObjectTemplate,
+	oid?: number
+): DungeonObject {
+	let obj: DungeonObject;
+	const providedOid = oid ?? getNextObjectIdSync();
+
+	// Create the appropriate object type
+	switch (template.type) {
+		case "Room":
+			throw new Error(
+				"Room templates require coordinates - use createRoomFromTemplate() instead"
+			);
+		case "Mob": {
+			const mobTemplate = template as MobTemplate;
+			// Mob templates should have race/job resolved to objects by this point
+			const race =
+				typeof mobTemplate.race === "string"
+					? getDefaultRace()
+					: mobTemplate.race ?? getDefaultRace();
+			const job =
+				typeof mobTemplate.job === "string"
+					? getDefaultJob()
+					: mobTemplate.job ?? getDefaultJob();
+			obj = new Mob({
+				templateId: template.id,
+				oid: providedOid,
+				race,
+				job,
+			});
+			break;
+		}
+		case "Equipment": {
+			const equipmentTemplate = template as EquipmentTemplate;
+			obj = new Equipment({
+				templateId: template.id,
+				oid: providedOid,
+				slot: equipmentTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
+				attributeBonuses: equipmentTemplate.attributeBonuses,
+				resourceBonuses: equipmentTemplate.resourceBonuses,
+				secondaryAttributeBonuses: equipmentTemplate.secondaryAttributeBonuses,
+			});
+			break;
+		}
+		case "Armor": {
+			const armorTemplate = template as ArmorTemplate;
+			obj = new Armor({
+				templateId: template.id,
+				oid: providedOid,
+				slot: armorTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
+				defense: armorTemplate.defense ?? 0,
+				attributeBonuses: armorTemplate.attributeBonuses,
+				resourceBonuses: armorTemplate.resourceBonuses,
+				secondaryAttributeBonuses: armorTemplate.secondaryAttributeBonuses,
+			});
+			break;
+		}
+		case "Weapon": {
+			const weaponTemplate = template as WeaponTemplate;
+			obj = new Weapon({
+				templateId: template.id,
+				oid: providedOid,
+				slot: weaponTemplate.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
+				attackPower: weaponTemplate.attackPower ?? 0,
+				hitType: weaponTemplate.hitType,
+				type: weaponTemplate.weaponType ?? "shortsword",
+				attributeBonuses: weaponTemplate.attributeBonuses,
+				resourceBonuses: weaponTemplate.resourceBonuses,
+				secondaryAttributeBonuses: weaponTemplate.secondaryAttributeBonuses,
+			});
+			break;
+		}
+		case "Movable":
+			obj = new Movable({ templateId: template.id, oid: providedOid });
+			break;
+		case "Item":
+			obj = new Item({ templateId: template.id, oid: providedOid });
+			break;
+		case "Prop":
+			obj = new Prop({ templateId: template.id, oid: providedOid });
+			break;
+		case "DungeonObject":
+		default:
+			obj = new DungeonObject({ templateId: template.id, oid: providedOid });
+			break;
+	}
+
+	// Apply template properties
+	obj.applyTemplate(template);
+
+	return obj;
+}
+
+/**
+ * Factory function to create a DungeonObject from a template with an auto-generated OID.
+ * This is the preferred way to create objects from templates in package modules.
+ */
+export function createFromTemplateWithOid(
+	template: DungeonObjectTemplate
+): DungeonObject {
+	return createFromTemplate(template, getNextObjectIdSync());
+}
+
+/**
+ * Factory function to create a Room from a template with an auto-generated OID.
+ */
+export function createRoomFromTemplate(
+	template: RoomTemplate,
+	coordinates: Coordinates
+): Room {
+	const room = new Room({
+		coordinates,
+		templateId: template.id,
+		oid: getNextObjectIdSync(),
+	});
+	room.applyTemplate(template);
+	return room;
+}
 
 /**
  * Pending room links to be processed after all dungeons are loaded.
@@ -186,14 +448,24 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 	}
 
 	try {
-		logger.debug(`Loading dungeon from ${relative(ROOT_DIRECTORY, filePath)}`);
+		logger.debug(
+			`[${id}] Stage 1: Reading dungeon file from ${relative(
+				ROOT_DIRECTORY,
+				filePath
+			)}`
+		);
 		const content = await readFile(filePath, "utf-8");
+
+		logger.debug(
+			`[${id}] Stage 2: Parsing YAML content (${content.length} bytes)`
+		);
 		const data = YAML.load(content) as SerializedDungeonFormat;
 
 		if (!data.dungeon) {
 			throw new Error("Invalid dungeon format: missing 'dungeon' key");
 		}
 
+		logger.debug(`[${id}] Stage 3: Extracting dungeon data`);
 		const {
 			dimensions,
 			grid,
@@ -207,6 +479,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		} = data.dungeon;
 
 		// Validate dimensions
+		logger.debug(`[${id}] Stage 4: Validating dimensions`);
 		if (
 			!dimensions ||
 			!dimensions.width ||
@@ -215,8 +488,12 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		) {
 			throw new Error("Invalid dungeon format: missing or invalid dimensions");
 		}
+		logger.debug(
+			`[${id}] Dimensions: ${dimensions.width}x${dimensions.height}x${dimensions.layers}`
+		);
 
 		// Validate grid
+		logger.debug(`[${id}] Stage 5: Validating grid structure`);
 		if (!grid || !Array.isArray(grid)) {
 			throw new Error("Invalid dungeon format: missing or invalid grid");
 		}
@@ -231,8 +508,12 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		if (!rooms || !Array.isArray(rooms)) {
 			throw new Error("Invalid dungeon format: missing or invalid rooms array");
 		}
+		logger.debug(
+			`[${id}] Grid validated: ${grid.length} layers, ${rooms.length} room template(s)`
+		);
 
 		// Create dungeon
+		logger.debug(`[${id}] Stage 6: Creating dungeon instance`);
 		const dungeon = new Dungeon({
 			id: data.dungeon.id || id,
 			name: name || data.dungeon.id || id,
@@ -240,12 +521,16 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			dimensions,
 			resetMessage,
 		});
+		logger.debug(`[${id}] Dungeon instance created: "${dungeon.name}"`);
 
 		// Create rooms from grid
 		// Reverse the grid array so that YAML files can have top floor first
 		// but we still assign correct z-coordinates (z=0 is ground floor)
+		logger.debug(`[${id}] Stage 7: Creating rooms from grid`);
 		const reversedGrid = [...grid].reverse();
+		let totalRoomsCreated = 0;
 		for (let z = 0; z < reversedGrid.length; z++) {
+			logger.debug(`[${id}] Processing layer ${z}/${reversedGrid.length - 1}`);
 			const layer = reversedGrid[z];
 			if (!Array.isArray(layer)) {
 				throw new Error(
@@ -316,11 +601,15 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					// Map YAML row index (top-first) to internal y coordinate (bottom-first)
 					const targetY = dimensions.height - 1 - y;
 					// Create room from template
-					const room = Room.createFromTemplate(fullTemplate, {
+					logger.debug(
+						`[${id}] Creating room at (${x},${y},${z}) from template index ${templateIndex}`
+					);
+					const room = createRoomFromTemplate(fullTemplate, {
 						x,
 						y,
 						z,
 					});
+					totalRoomsCreated++;
 
 					// Apply exit override if present (before adding to dungeon)
 					// Store roomLinks from exitOverrides to process after room is added
@@ -387,26 +676,96 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 				}
 			}
 		}
+		logger.debug(
+			`[${id}] Stage 7 complete: Created ${totalRoomsCreated} room(s)`
+		);
 
 		// Load templates if present
+		logger.debug(`[${id}] Stage 8: Loading templates`);
 		if (templates && Array.isArray(templates)) {
+			logger.debug(`[${id}] Found ${templates.length} template(s) to load`);
 			for (const template of templates) {
 				if (!template.id) {
-					logger.warn(
-						`Skipping invalid template in dungeon "${id}": missing id`
-					);
+					logger.warn(`[${id}] Skipping invalid template: missing id`);
 					continue;
 				}
+				logger.debug(
+					`[${id}] Loading template "${template.id}" (type: ${template.type})`
+				);
 				const hydrated: DungeonObjectTemplate = {
 					...template,
 					id: globalizeTemplateId(template.id, dungeon.id!),
 				};
-				dungeon.addTemplate(hydrated);
+
+				// For Mob templates, resolve race/job IDs to Race/Job objects before adding
+				if (hydrated.type === "Mob") {
+					const mobTemplate = hydrated as MobTemplate;
+					if (mobTemplate.race && typeof mobTemplate.race === "string") {
+						logger.debug(
+							`[${id}] Resolving race "${mobTemplate.race}" for template "${template.id}"`
+						);
+						const race = getRaceById(mobTemplate.race);
+						if (!race) {
+							throw new Error(
+								`Template "${template.id}": race "${mobTemplate.race}" not found in archetype registry`
+							);
+						}
+						(mobTemplate as any).race = race;
+					}
+					if (mobTemplate.job && typeof mobTemplate.job === "string") {
+						logger.debug(
+							`[${id}] Resolving job "${mobTemplate.job}" for template "${template.id}"`
+						);
+						const job = getJobById(mobTemplate.job);
+						if (!job) {
+							throw new Error(
+								`Template "${template.id}": job "${mobTemplate.job}" not found in archetype registry`
+							);
+						}
+						(mobTemplate as any).job = job;
+					}
+				}
+
+				// Generate baseSerialized for the template (package layer responsibility)
+				if (!hydrated.baseSerialized) {
+					logger.debug(
+						`[${id}] Generating baseSerialized for template "${template.id}"`
+					);
+					if (hydrated.type === "Room") {
+						const room = new Room({
+							coordinates: { x: 0, y: 0, z: 0 },
+							templateId: hydrated.id,
+							oid: -1, // Baseline serialization uses -1
+						});
+						room.applyTemplate(hydrated as RoomTemplate);
+						hydrated.baseSerialized = room.serialize();
+					} else {
+						const obj = createFromTemplate(hydrated);
+						hydrated.baseSerialized = obj.serialize();
+					}
+				}
+
+				try {
+					dungeon.addTemplate(hydrated);
+					logger.debug(`[${id}] Template "${template.id}" loaded successfully`);
+				} catch (error) {
+					logger.error(
+						`[${id}] Failed to load template "${template.id}": ${error}`
+					);
+					throw error;
+				}
 			}
+			logger.debug(
+				`[${id}] Stage 8 complete: Loaded ${templates.length} template(s)`
+			);
+		} else {
+			logger.debug(`[${id}] Stage 8 complete: No templates to load`);
 		}
 
 		// Load resets if present
+		logger.debug(`[${id}] Stage 9: Loading resets`);
 		if (resets && Array.isArray(resets)) {
+			logger.debug(`[${id}] Found ${resets.length} reset(s) to load`);
 			for (const resetData of resets) {
 				if (!resetData.templateId || !resetData.roomRef) {
 					logger.warn(
@@ -433,8 +792,14 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 				});
 				dungeon.addReset(reset);
 			}
+			logger.debug(
+				`[${id}] Stage 9 complete: Loaded ${resets.length} reset(s)`
+			);
+		} else {
+			logger.debug(`[${id}] Stage 9 complete: No resets to load`);
 		}
 
+		logger.debug(`[${id}] Stage 10: Processing room links`);
 		logger.debug(
 			`Successfully loaded dungeon "${id}" from ${relative(
 				ROOT_DIRECTORY,
@@ -641,7 +1006,8 @@ export function executeAllDungeonResets(): void {
 	let dungeonCount = 0;
 
 	for (const dungeon of DUNGEON_REGISTRY.values()) {
-		const spawned = dungeon.executeResets();
+		// Execute resets with OID assignment using factory function
+		const spawned = dungeon.executeResets(createFromTemplateWithOid);
 		totalSpawned += spawned;
 		dungeonCount++;
 	}
@@ -651,6 +1017,344 @@ export function executeAllDungeonResets(): void {
 			`Dungeon reset cycle: ${dungeonCount} dungeon(s), ${totalSpawned} object(s) spawned`
 		);
 	}
+}
+
+/**
+ * Deserialize a serialized DungeonObject back into an instance.
+ * This is the main entry point for deserializing any dungeon object type.
+ *
+ * @param data The serialized object data
+ * @returns New DungeonObject instance with restored hierarchy
+ */
+export function deserializeDungeonObject(
+	data: AnySerializedDungeonObject
+): DungeonObject {
+	const typed = data as SerializedDungeonObject;
+	const type: SerializedDungeonObjectType =
+		(typed.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
+
+	logger.debug(
+		`Deserializing ${type} object${
+			typed.keywords ? `: "${typed.keywords}"` : ""
+		}`
+	);
+
+	// Normalize compressed data by overlaying onto the base serialization for the type.
+	const normalized = normalizeSerializedData(data);
+
+	// Delegate to type-specific deserializers
+	switch (type) {
+		case "Room":
+			return deserializeRoom(normalized as SerializedRoom);
+		case "Mob":
+			return deserializeMob(normalized as SerializedMob);
+		case "Equipment":
+			return deserializeEquipment(normalized as SerializedEquipment);
+		case "Armor":
+			return deserializeArmor(normalized as SerializedArmor);
+		case "Weapon":
+			return deserializeWeapon(normalized as SerializedWeapon);
+		case "Movable":
+			return deserializeMovable(normalized as SerializedMovable);
+		case "Item":
+			return deserializeItem(normalized as SerializedItem);
+		case "Prop":
+			return deserializeProp(normalized as SerializedProp);
+		case "DungeonObject":
+			// handled in main body
+			break;
+		default:
+			throw new Error(`no valid type to deserialize: ${String(type)}`);
+	}
+
+	// DungeonObjects in particular
+	let obj: DungeonObject = new DungeonObject(
+		typed as unknown as DungeonObjectOptions
+	);
+
+	// Handle contents for all object types
+	if (typed.contents) {
+		logger.debug(
+			`Deserializing ${typed.contents.length} content object(s) for ${type}`
+		);
+		for (const contentData of typed.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			obj.add(contentObj);
+		}
+	}
+
+	return obj;
+}
+
+/**
+ * Deserialize a SerializedRoom into a Room instance.
+ */
+export function deserializeRoom(data: SerializedRoom): Room {
+	const norm = normalizeSerializedData(data) as SerializedRoom;
+	// allowedExits is mandatory, but handle legacy data that might not have it
+	const defaultExits =
+		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+	const room = new Room({
+		...norm,
+		allowedExits: norm.allowedExits ?? defaultExits,
+	});
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			room.add(contentObj);
+		}
+	}
+	return room;
+}
+
+/**
+ * Deserialize a SerializedMovable into a Movable instance.
+ */
+export function deserializeMovable(data: AnySerializedDungeonObject): Movable {
+	const norm = normalizeSerializedData(data) as unknown as SerializedMovable;
+	const movable = new Movable(norm as SerializedMovable);
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			movable.add(contentObj);
+		}
+	}
+	return movable;
+}
+
+/**
+ * Deserialize a SerializedProp into a Prop instance.
+ */
+export function deserializeProp(data: SerializedProp): Prop {
+	const norm = normalizeSerializedData(data) as SerializedProp;
+	const prop = new Prop(norm);
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			prop.add(contentObj);
+		}
+	}
+	return prop;
+}
+
+/**
+ * Deserialize a SerializedItem into an Item instance.
+ */
+export function deserializeItem(data: AnySerializedDungeonObject): Item {
+	const norm = normalizeSerializedData(data) as unknown as SerializedItem;
+	const item = new Item(norm as SerializedItem);
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			item.add(contentObj);
+		}
+	}
+	return item;
+}
+
+/**
+ * Deserialize a SerializedEquipment into an Equipment instance.
+ */
+export function deserializeEquipment(data: SerializedEquipment): Equipment {
+	const { type, ...equipmentData } = normalizeSerializedData(
+		data
+	) as SerializedEquipment;
+	const equipment = new Equipment({
+		...equipmentData,
+		slot: equipmentData.slot,
+		attributeBonuses: equipmentData.attributeBonuses,
+		resourceBonuses: equipmentData.resourceBonuses,
+		secondaryAttributeBonuses: equipmentData.secondaryAttributeBonuses,
+	});
+	if (equipmentData.contents && Array.isArray(equipmentData.contents)) {
+		for (const contentData of equipmentData.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			equipment.add(contentObj);
+		}
+	}
+	return equipment;
+}
+
+/**
+ * Deserialize a SerializedArmor into an Armor instance.
+ */
+export function deserializeArmor(data: SerializedArmor): Armor {
+	const armorData = normalizeSerializedData(data) as SerializedArmor;
+	const armor = new Armor({
+		...armorData,
+		slot: armorData.slot,
+		defense: armorData.defense ?? 0,
+		attributeBonuses: armorData.attributeBonuses,
+		resourceBonuses: armorData.resourceBonuses,
+		secondaryAttributeBonuses: armorData.secondaryAttributeBonuses,
+	});
+	if (armorData.contents && Array.isArray(armorData.contents)) {
+		for (const contentData of armorData.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			armor.add(contentObj);
+		}
+	}
+	return armor;
+}
+
+/**
+ * Deserialize a SerializedWeapon into a Weapon instance.
+ */
+export function deserializeWeapon(data: SerializedWeapon): Weapon {
+	const weaponData = normalizeSerializedData(
+		data
+	) as unknown as SerializedWeapon;
+	const weapon = new Weapon({
+		...weaponData,
+		slot: weaponData.slot,
+		attackPower: weaponData.attackPower ?? 0,
+		hitType: weaponData.hitType,
+		type: weaponData.weaponType ?? "shortsword",
+		attributeBonuses: weaponData.attributeBonuses,
+		resourceBonuses: weaponData.resourceBonuses,
+		secondaryAttributeBonuses: weaponData.secondaryAttributeBonuses,
+	});
+	if (weaponData.contents && Array.isArray(weaponData.contents)) {
+		for (const contentData of weaponData.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			weapon.add(contentObj);
+		}
+	}
+	return weapon;
+}
+
+/**
+ * Deserialize a SerializedMob into a Mob instance.
+ * This handles the special case of looking up race, job, and abilities from package modules.
+ */
+export function deserializeMob(data: SerializedMob): Mob {
+	logger.debug(
+		`Deserializing Mob${data.keywords ? `: "${data.keywords}"` : ""} (race: ${
+			data.race
+		}, job: ${data.job})`
+	);
+	const normalized = normalizeSerializedData(data) as SerializedMob;
+	const {
+		race: raceId,
+		job: jobId,
+		equipped,
+		learnedAbilities: learnedAbilitiesData,
+		type,
+		...rest
+	} = normalized;
+
+	// Explicitly remove race and job from rest to prevent string IDs from overwriting resolved objects
+	const { race: _race, job: _job, ...mobOptions } = rest as any;
+
+	logger.debug(`Looking up race "${raceId}" and job "${jobId}"`);
+	const race = getRaceById(raceId);
+	const job = getJobById(jobId);
+
+	// Validate that race and job were found
+	if (!race) {
+		logger.error(`Race "${raceId}" not found in archetype registry`);
+		throw new Error(
+			`Failed to deserialize Mob: race "${raceId}" not found in archetype registry`
+		);
+	}
+	if (!job) {
+		logger.error(`Job "${jobId}" not found in archetype registry`);
+		throw new Error(
+			`Failed to deserialize Mob: job "${jobId}" not found in archetype registry`
+		);
+	}
+	logger.debug(`Race and job resolved: race="${race.id}", job="${job.id}"`);
+
+	// Validate that race and job have startingAttributes
+	if (!race.startingAttributes) {
+		logger.error(
+			`Race "${raceId}" (id: ${race.id}) is missing startingAttributes`
+		);
+		throw new Error(
+			`Failed to deserialize Mob: race "${raceId}" (id: ${race.id}) is missing startingAttributes`
+		);
+	}
+	if (!job.startingAttributes) {
+		logger.error(
+			`Job "${jobId}" (id: ${job.id}) is missing startingAttributes`
+		);
+		throw new Error(
+			`Failed to deserialize Mob: job "${jobId}" (id: ${job.id}) is missing startingAttributes`
+		);
+	}
+
+	logger.debug(
+		`Creating Mob instance with race="${race.id}", job="${job.id}", level=${
+			mobOptions.level ?? 1
+		}`
+	);
+	const mob = new Mob({
+		race,
+		job,
+		...mobOptions,
+	});
+	logger.debug(`Mob instance created successfully`);
+
+	// Restore learned abilities if provided
+	if (learnedAbilitiesData) {
+		logger.debug(
+			`Restoring ${
+				Object.keys(learnedAbilitiesData).length
+			} learned ability/abilities`
+		);
+		const learnedAbilities = new Map<Ability, number>();
+		for (const [abilityId, uses] of Object.entries(learnedAbilitiesData)) {
+			const ability = getAbilityById(abilityId);
+			if (ability) {
+				learnedAbilities.set(ability, uses);
+				mob._proficiencySnapshot.set(
+					abilityId,
+					getProficiencyAtUses(ability, uses)
+				);
+			} else {
+				logger.warn(`Ability "${abilityId}" not found, skipping`);
+			}
+		}
+		mob._learnedAbilities = learnedAbilities;
+	}
+	if (data.contents && Array.isArray(data.contents)) {
+		logger.debug(`Restoring ${data.contents.length} content object(s)`);
+		for (const contentData of data.contents) {
+			const contentObj = deserializeDungeonObject(contentData);
+			mob.add(contentObj);
+		}
+	}
+	// Restore equipped items
+	if (equipped) {
+		logger.debug(`Restoring ${Object.keys(equipped).length} equipped item(s)`);
+		for (const [slotStr, equipmentData] of Object.entries(equipped)) {
+			const slot = slotStr as EQUIPMENT_SLOT;
+			// Handle both single items and arrays (for backward compatibility)
+			if (Array.isArray(equipmentData)) {
+				// Legacy format - take first item only
+				const equipment = deserializeDungeonObject(
+					equipmentData[0] as unknown as AnySerializedDungeonObject
+				) as Equipment;
+				(mob as any)._equipped.set(slot, equipment);
+				if (!mob.contains(equipment)) {
+					mob.add(equipment);
+				}
+			} else {
+				const equipment = deserializeDungeonObject(
+					equipmentData as unknown as AnySerializedDungeonObject
+				) as Equipment;
+				(mob as any)._equipped.set(slot, equipment);
+				if (!mob.contains(equipment)) {
+					mob.add(equipment);
+				}
+			}
+		}
+		// Recalculate attributes with equipment bonuses
+		logger.debug(`Recalculating derived attributes with equipment bonuses`);
+		mob.recalculateDerivedAttributes(mob.captureResourceRatios());
+		logger.debug(`Mob deserialization complete`);
+	}
+	return mob;
 }
 
 export default {

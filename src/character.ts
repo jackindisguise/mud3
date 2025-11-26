@@ -62,6 +62,7 @@ import { LINEBREAK } from "./telnet.js";
 import { formatPlaytime } from "./time.js";
 import { color, COLOR, stickyColor } from "./color.js";
 import type { ActionState } from "./command.js";
+import { Ability } from "./ability.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.
@@ -302,7 +303,7 @@ export interface CharacterOptions {
 	/** Optional initial stats (defaults applied if not provided) */
 	stats?: Partial<PlayerStats>;
 	/** The mob instance that represents this character in the game world */
-	mob: Mob;
+	mob?: Mob;
 }
 
 /**
@@ -370,7 +371,7 @@ export interface SerializedCharacter {
 	/** Player's gameplay statistics and progression */
 	stats: PlayerStats;
 	/** Serialized mob data for reconstructing the character's mob representation */
-	mob: Omit<SerializedMob, "type">;
+	mob?: Omit<SerializedMob, "type">;
 }
 
 /**
@@ -408,13 +409,13 @@ export class Character {
 	 * This mob will have its character field set to reference this Character instance,
 	 * creating a bidirectional relationship.
 	 */
-	private _mob!: Mob;
+	private _mob?: Mob;
 
 	/**
 	 * Gets the mob associated with this character.
 	 * @returns The Mob instance representing this character in the game world
 	 */
-	public get mob(): Mob {
+	public get mob(): Mob | undefined {
 		return this._mob;
 	}
 
@@ -422,16 +423,12 @@ export class Character {
 	 * Sets the mob associated with this character and establishes bidirectional reference.
 	 * @param mob The new Mob instance to associate with this character
 	 */
-	public set mob(mob: Mob) {
+	public set mob(mob: Mob | undefined) {
 		if (this.mob === mob) return;
 		const omob = this._mob;
-		this._mob = mob; // start be silently setting new mob
-		// this ensures other setters in the bidirectional link
-		// don't get confused and try to reset it during setting
+		this._mob = mob;
 		if (omob && omob.character === this) omob.character = undefined;
-
-		// Set up new bidirectional relationship
-		if (mob.character !== this) mob.character = this;
+		if (mob && mob.character !== this) mob.character = this;
 	}
 
 	/** Player's account credentials and authentication info */
@@ -522,11 +519,11 @@ export class Character {
 		};
 
 		// Set up the provided mob
-		this.mob = options.mob;
+		if (options.mob) this.mob = options.mob;
 	}
 
 	toString(): string {
-		return this.mob.display;
+		return this.mob?.display ?? "Unknown";
 	}
 
 	/**
@@ -1230,19 +1227,23 @@ export class Character {
 				: [],
 		};
 
-		// Serialize mob and remove 'type' field
-		const mobData: SerializedMob = {
-			...(this.mob.serialize({ compress: true }) as SerializedMob),
-		};
-
-		const { type, ...mobDataWithoutType } = mobData;
-
-		return {
+		const result: SerializedCharacter = {
 			credentials: serializedCreds,
 			settings: serializedSettings,
 			stats: this.stats,
-			mob: mobDataWithoutType,
 		};
+
+		if (this.mob) {
+			// Serialize mob and remove 'type' field
+			const mobData: SerializedMob = {
+				...(this.mob.serialize({ compress: true }) as SerializedMob),
+			};
+
+			const { type, ...mobDataWithoutType } = mobData;
+			result.mob = mobDataWithoutType;
+		}
+
+		return result;
 	}
 
 	/**
@@ -1257,64 +1258,4 @@ export class Character {
 	 * const character = Character.deserialize(saveData);
 	 * ```
 	 */
-	public static deserialize(data: SerializedCharacter): Character {
-		const mobDataWithType: SerializedMob = { ...data.mob, type: "Mob" };
-		// Deserialize the mob using the dungeon system's deserializer
-		const mob = Mob.deserialize(mobDataWithType);
-
-		// Handle backward compatibility: if characterId is missing, assign a temporary one
-		// This should only happen for old characters that were created before character IDs
-		// In production, you'd want to migrate these properly
-		const characterId = data.credentials.characterId ?? Number.MAX_SAFE_INTEGER;
-
-		const creds: PlayerCredentials = {
-			characterId,
-			username: data.credentials.username,
-			passwordHash: data.credentials.passwordHash,
-			email: data.credentials.email,
-			createdAt: new Date(data.credentials.createdAt),
-			lastLogin: new Date(data.credentials.lastLogin),
-			isActive: data.credentials.isActive,
-			isBanned: data.credentials.isBanned,
-			isAdmin: data.credentials.isAdmin,
-		};
-
-		// Convert channels and blockedUsers arrays back to Sets
-		// Convert defaultColor number back to COLOR enum if present
-		const settings: PlayerSettings = {
-			...data.settings,
-			channels:
-				data.settings.channels !== undefined
-					? new Set(data.settings.channels)
-					: new Set<CHANNEL>(),
-			blockedUsers:
-				data.settings.blockedUsers !== undefined
-					? new Set(data.settings.blockedUsers)
-					: new Set<string>(),
-			busyForwardedGroups:
-				data.settings.busyForwardedGroups !== undefined
-					? new Set(data.settings.busyForwardedGroups)
-					: new Set([MESSAGE_GROUP.CHANNELS]),
-			combatBusyForwardedGroups:
-				data.settings.combatBusyForwardedGroups !== undefined
-					? new Set(data.settings.combatBusyForwardedGroups)
-					: new Set([MESSAGE_GROUP.CHANNELS]),
-		};
-
-		if (data.settings.defaultColor !== undefined) {
-			settings.defaultColor = data.settings.defaultColor as COLOR;
-		} else if ("defaultColor" in settings) {
-			delete settings.defaultColor;
-		}
-
-		const character = new Character({
-			credentials: creds,
-			settings: settings,
-			stats: data.stats,
-			mob: mob,
-		});
-
-		// The bidirectional reference is already set up in the constructor
-		return character;
-	}
 }

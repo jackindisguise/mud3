@@ -151,6 +151,7 @@ export async function saveCharacter(character: Character) {
 	const data: SerializedCharacter = character.serialize();
 	const filePath = getCharacterFilePath(character.credentials.username);
 	const tempPath = `${filePath}.tmp`;
+	if (!data.mob) throw new Error("Character mob is required to save");
 	const yaml = YAML.dump(data as any, { noRefs: true, lineWidth: 120 });
 
 	try {

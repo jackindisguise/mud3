@@ -9,7 +9,7 @@ import archetype from "../package/archetype.js";
 import {
 	createMapEditorService,
 	MapEditorService,
-} from "../map-editor-service.js";
+} from "../map-editor/map-editor-service.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));

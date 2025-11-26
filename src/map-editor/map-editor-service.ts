@@ -12,22 +12,22 @@ import YAML from "js-yaml";
 import {
 	getAllDungeonIds,
 	SerializedDungeonFormat,
-} from "./package/dungeon.js";
+} from "../package/dungeon.js";
 import {
 	getAllJobs,
 	getAllRaces,
 	getJobById,
 	getRaceById,
-} from "./registry/archetype.js";
-import { Mob, WEAPON_TYPES } from "./dungeon.js";
-import { createMob } from "./package/dungeon.js";
+} from "../registry/archetype.js";
+import { Mob, WEAPON_TYPES } from "../dungeon.js";
+import { createMob } from "../package/dungeon.js";
 import {
 	COMMON_HIT_TYPES,
 	MAGICAL_DAMAGE_TYPE,
 	PHYSICAL_DAMAGE_TYPE,
-} from "./damage-types.js";
-import logger from "./logger.js";
-import { getSafeRootDirectory } from "./utils/path.js";
+} from "../damage-types.js";
+import logger from "../logger.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
 export interface DungeonListResponse {
 	dungeons: string[];

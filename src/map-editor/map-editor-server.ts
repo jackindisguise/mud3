@@ -13,12 +13,12 @@ import { createServer, IncomingMessage, ServerResponse } from "http";
 import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "./logger.js";
+import logger from "../logger.js";
 import {
 	createMapEditorService,
 	MapEditorService,
 } from "./map-editor-service.js";
-import { getSafeRootDirectory } from "./utils/path.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
 const PORT = 3000;
 const ROOT_DIRECTORY = getSafeRootDirectory();

@@ -1,16 +1,4 @@
-import { loadPackage } from "package-loader";
-import commands from "./src/package/commands.js";
-import config from "./src/package/config.js";
-import locations from "./src/package/locations.js";
-import archetype from "./src/package/archetype.js";
-import character from "./src/package/character.js";
-import lockfile from "./src/package/lockfile.js";
-import help from "./src/package/help.js";
-import board from "./src/package/board.js";
-import gamestate from "./src/package/gamestate.js";
-import dungeon from "./src/package/dungeon.js";
-import reservedNames from "./src/package/reservedNames.js";
-import abilities from "./src/package/ability.js";
+import { loadAllPackages } from "./package.js";
 import logger from "./src/logger.js";
 import {
 	buildDungeonGraph,
@@ -21,18 +9,7 @@ import { startGame } from "./src/game.js";
 
 await logger.block("packages", async () => {
 	logger.info("Loading packages...");
-	await loadPackage(lockfile); // always load first
-	await loadPackage(commands);
-	await loadPackage(abilities);
-	await loadPackage(config);
-	await loadPackage(archetype);
-	await loadPackage(character);
-	await loadPackage(help);
-	await loadPackage(board);
-	await loadPackage(dungeon);
-	await loadPackage(locations);
-	await loadPackage(reservedNames);
-	await loadPackage(gamestate);
+	await loadAllPackages();
 });
 
 await logger.block("pathfinding", async () => {

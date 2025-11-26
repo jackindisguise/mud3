@@ -43,7 +43,7 @@ import {
 	SerializedBoard,
 	SerializedBoardConfig,
 	SerializedBoardMessages,
-} from "../board.js";
+} from "../core/board.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";

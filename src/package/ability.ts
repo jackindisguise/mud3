@@ -40,10 +40,10 @@ import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import logger from "../logger.js";
-import { CommandRegistry, AbilityCommand } from "../command.js";
+import { CommandRegistry, AbilityCommand } from "../core/command.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { access, constants } from "fs/promises";
-import { Ability, generateProficiencyTable } from "../ability.js";
+import { Ability, generateProficiencyTable } from "../core/ability.js";
 import {
 	ABILITY_REGISTRY,
 	hasAbility,

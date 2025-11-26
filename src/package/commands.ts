@@ -30,7 +30,7 @@ import {
 	CommandContext,
 	ParseResult,
 	PRIORITY,
-} from "../command.js";
+} from "../core/command.js";
 import { Package } from "package-loader";
 import { readdir, readFile, stat } from "fs/promises";
 import { join, relative } from "path";
@@ -38,7 +38,7 @@ import { pathToFileURL } from "url";
 import { runInNewContext } from "vm";
 import YAML from "js-yaml";
 import logger from "../logger.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import { Game } from "../game.js";
 import { access } from "fs/promises";
 import { constants } from "fs";
@@ -48,7 +48,7 @@ import {
 	type SocialDefinition,
 } from "../social.js";
 import { executeSocial, onSocialError } from "../commands/_social.js";
-import { Mob } from "../dungeon.js";
+import { Mob } from "../core/dungeon.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 
 /**

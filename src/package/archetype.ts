@@ -20,15 +20,15 @@ import {
 	BaseArchetypeDefinition,
 	GrowthModifierCurve,
 	ArchetypeSkillDefinition,
-} from "../archetype.js";
-import { PrimaryAttributeSet, ResourceCapacities } from "../attribute.js";
+} from "../core/archetype.js";
+import { PrimaryAttributeSet, ResourceCapacities } from "../core/attribute.js";
 import {
 	DamageTypeRelationships,
 	DAMAGE_RELATIONSHIP,
 	PHYSICAL_DAMAGE_TYPE,
 	MAGICAL_DAMAGE_TYPE,
 	DAMAGE_TYPE,
-} from "../damage-types.js";
+} from "../core/damage-types.js";
 import {
 	registerRace,
 	registerJob,

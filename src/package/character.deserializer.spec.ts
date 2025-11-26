@@ -1,11 +1,11 @@
 import { describe, it, before } from "node:test";
 import assert from "node:assert";
 import { deserializeCharacter } from "./character.js";
-import { Character, SerializedCharacter } from "../character.js";
+import { Character, SerializedCharacter } from "../core/character.js";
 import archetypePkg from "./archetype.js";
 import abilitiesPkg from "./ability.js";
-import { CHANNEL } from "../channel.js";
-import { Mob } from "../dungeon.js";
+import { CHANNEL } from "../core/channel.js";
+import { Mob } from "../core/dungeon.js";
 import { createMob } from "./dungeon.js";
 
 describe("package/character.ts deserializer", () => {

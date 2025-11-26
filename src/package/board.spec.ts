@@ -11,7 +11,7 @@ import {
 import { join } from "path";
 import { existsSync } from "fs";
 import YAML from "js-yaml";
-import { Board } from "../board.js";
+import { Board } from "../core/board.js";
 import boardPkg, {
 	saveBoard,
 	loadBoard,

@@ -32,7 +32,7 @@ import {
 	SerializedEquipment,
 	SerializedArmor,
 	SerializedWeapon,
-} from "../dungeon.js";
+} from "../core/dungeon.js";
 import archetypePkg from "./archetype.js";
 import abilitiesPkg from "./ability.js";
 import { getAllAbilities } from "../registry/ability.js";

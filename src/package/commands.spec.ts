@@ -5,9 +5,8 @@ import archetypePkg from "./archetype.js";
 import { join } from "path";
 import { existsSync } from "fs";
 import commandsPackage, { JavaScriptCommandAdapter } from "./commands.js";
-import { CommandRegistry, CommandContext } from "../command.js";
-import { Dungeon } from "../dungeon.js";
-import { Mob } from "../dungeon.js";
+import { CommandRegistry, CommandContext } from "../core/command.js";
+import { Dungeon } from "../core/dungeon.js";
 import { createMob } from "./dungeon.js";
 
 const COMMANDS_DIR = join(process.cwd(), "data", "commands");

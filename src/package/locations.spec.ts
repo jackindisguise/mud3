@@ -4,7 +4,7 @@ import { readFile, writeFile, unlink, copyFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import YAML from "js-yaml";
-import { Dungeon, Room } from "../dungeon.js";
+import { Dungeon, Room } from "../core/dungeon.js";
 import locationsPkg from "./locations.js";
 import dungeonPkg from "./dungeon.js";
 import {

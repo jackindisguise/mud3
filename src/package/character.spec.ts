@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { access, unlink } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { join } from "path";
-import { Character } from "../character.js";
+import { Character } from "../core/character.js";
 import { saveCharacter, loadCharacter, hashPassword } from "./character.js";
 import { createMob } from "./dungeon.js";
 import archetypePkg from "./archetype.js";

@@ -35,9 +35,9 @@ import {
 	getDefaultRace,
 	getDefaultJob,
 } from "../registry/archetype.js";
-import type { Race, Job } from "../archetype.js";
+import type { Race, Job } from "../core/archetype.js";
 import { getAbilityById } from "../registry/ability.js";
-import { Ability, getProficiencyAtUses } from "../ability.js";
+import { Ability, getProficiencyAtUses } from "../core/ability.js";
 import {
 	registerDungeon,
 	hasDungeon,
@@ -97,7 +97,7 @@ import {
 	type ArmorTemplate,
 	type WeaponTemplate,
 	DungeonOptions,
-} from "../dungeon.js";
+} from "../core/dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";

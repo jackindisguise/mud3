@@ -36,7 +36,7 @@ import YAML from "js-yaml";
 import { join, extname, relative } from "node:path";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
-import { Helpfile, SerializedHelpfile } from "../help.js";
+import { Helpfile, SerializedHelpfile } from "../core/help.js";
 import { getHelpfileRegistry, registerHelpfile } from "../registry/help.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();

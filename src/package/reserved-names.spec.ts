@@ -1,6 +1,6 @@
 import { suite, test, before } from "node:test";
 import assert from "node:assert";
-import { Dungeon, DungeonObjectTemplate } from "../dungeon.js";
+import { Dungeon, DungeonObjectTemplate } from "../core/dungeon.js";
 import reservedNamesPkg from "./reserved-names.js";
 import { isNameBlocked } from "../registry/reserved-names.js";
 import dungeonPkg, { createDungeonInstance } from "./dungeon.js";

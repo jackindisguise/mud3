@@ -50,8 +50,12 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import { createHash } from "crypto";
 import logger from "../logger.js";
-import { Character, SerializedCharacter, MESSAGE_GROUP } from "../character.js";
-import { SerializedMob } from "../dungeon.js";
+import {
+	Character,
+	SerializedCharacter,
+	MESSAGE_GROUP,
+} from "../core/character.js";
+import { SerializedMob } from "../core/dungeon.js";
 import archetypePkg from "../package/archetype.js";
 import { deserializeMob } from "./dungeon.js";
 import YAML from "js-yaml";

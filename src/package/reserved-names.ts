@@ -21,7 +21,7 @@ import { Package } from "package-loader";
 import logger from "../logger.js";
 import { DUNGEON_REGISTRY } from "../registry/dungeon.js";
 import dungeonPkg from "./dungeon.js";
-import { stripColors } from "../color.js";
+import { stripColors } from "../core/color.js";
 import {
 	addBlockedName,
 	clearBlockedNames,
@@ -60,7 +60,7 @@ function buildBlockedNamesCache(): void {
 				const keywords = template.keywords
 					.toLowerCase()
 					.split(/\s+/)
-					.filter((k) => k.trim().length > 0);
+					.filter((k: string) => k.trim().length > 0);
 				for (const keyword of keywords) {
 					addBlockedName(keyword);
 					blockedNameCount++;

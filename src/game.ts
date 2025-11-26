@@ -171,57 +171,11 @@ export class Game {
 		const timeoutSeconds = this.config.server.inactivity_timeout ?? 1800; // default 30min
 		const timeoutMs = Math.max(1, timeoutSeconds) * 1000;
 
-		session.inactivityTimer = setTimeout(() => {
-			const name = session.character
-				? session.character.credentials.username
-				: session.client.getAddress();
-			logger.info(`Disconnecting ${name} due to inactivity`);
-			try {
-				session.client.sendLine(
-					"You have been disconnected due to inactivity.",
-					false
-				);
-			} catch {}
-			// Closing the client triggers server 'disconnection' which cleans up the session
-			if (session.character && session.character.mob) {
-				const character = session.character;
-				saveCharacter(character)
-					.catch((error) => {
-						logger.error(
-							`Error saving character ${character} during inactivity timeout:`,
-							error
-						);
-					})
-					.finally(() => {
-						try {
-							if (character.mob) {
-								character.mob.destroy(true);
-							}
-						} catch (error) {
-							logger.error(
-								`Error destroying mob for ${character} during inactivity timeout:`,
-								error
-							);
-						}
-						try {
-							session.client.close();
-						} catch (error) {
-							logger.error(
-								`Error closing client during inactivity timeout:`,
-								error
-							);
-						}
-					});
-			} else {
-				try {
-					session.client.close();
-				} catch (error) {
-					logger.error(
-						`Error closing client during inactivity timeout:`,
-						error
-					);
-				}
-			}
+		session.inactivityTimer = setTimeout(async () => {
+			logger.debug(
+				`Inactivity timeout for ${session.character?.credentials.username}`
+			);
+			await this.endPlayerSession(session);
 		}, timeoutMs);
 	}
 
@@ -1192,7 +1146,7 @@ export class Game {
 		session.character.endSession();
 
 		// Save character
-		await saveCharacterFile(session.character);
+		if (session.character.mob) await saveCharacterFile(session.character);
 
 		logger.info(`${session.character} has left the game`);
 		const name = session.character.toString();

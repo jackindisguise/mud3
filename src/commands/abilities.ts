@@ -16,7 +16,7 @@
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { getAbilityById } from "../package/abilities.js";
+import { getAbilityById } from "../registry/ability.js";
 import { color, COLOR, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { string } from "mud-ext";

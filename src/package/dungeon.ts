@@ -34,7 +34,7 @@ import archetypePkg, {
 	getDefaultJob,
 } from "./archetype.js";
 import type { Race, Job } from "../archetype.js";
-import { getAbilityById } from "./abilities.js";
+import { getAbilityById } from "../registry/ability.js";
 import { Ability, getProficiencyAtUses } from "../ability.js";
 import { join, relative } from "path";
 import {
@@ -58,7 +58,6 @@ import {
 	MobTemplate,
 	DIRECTION,
 	Reset,
-	ResetOptions,
 	DUNGEON_REGISTRY,
 	dir2text,
 	text2dir,
@@ -100,7 +99,6 @@ import {
 } from "../dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
-import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { getNextObjectIdSync } from "./gamestate.js";
 

@@ -16,7 +16,7 @@
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { getAbilityById } from "../package/abilities.js";
+import { getAbilityById } from "../registry/ability.js";
 
 export default {
 	pattern: "learn~ <abilityId:word>",

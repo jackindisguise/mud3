@@ -10,7 +10,7 @@ import board from "./src/package/board.js";
 import gamestate from "./src/package/gamestate.js";
 import dungeon from "./src/package/dungeon.js";
 import reservedNames from "./src/package/reservedNames.js";
-import abilities from "./src/package/abilities.js";
+import abilities from "./src/package/ability.js";
 import logger from "./src/logger.js";
 import {
 	buildDungeonGraph,

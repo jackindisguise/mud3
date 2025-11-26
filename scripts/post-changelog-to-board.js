@@ -21,8 +21,8 @@ import { execSync } from "child_process";
 import { loadBoard } from "../dist/src/package/board.js";
 import logger from "../dist/src/logger.js";
 import { string } from "mud-ext";
-import { COLOR, color, SIZER } from "../dist/src/color.js";
-import { LINEBREAK } from "../dist/src/telnet.js";
+import { COLOR, color, SIZER } from "../dist/src/core/color.js";
+import { LINEBREAK } from "../dist/src/core/telnet.js";
 
 const CHANGELOG_PATH = join(process.cwd(), "CHANGELOG.md");
 const CHANGES_BOARD_NAME = "changes";

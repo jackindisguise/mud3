@@ -9,7 +9,6 @@
 
 import { Game } from "./game.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
-import { saveBoard } from "./package/board.js";
 
 export interface BoardMessage {
 	/** Unique message ID */
@@ -194,16 +193,13 @@ export class Board {
 	/**
 	 * Marks a message as read by a character ID.
 	 * Adds the character ID to the message's readBy array if not already present.
-	 * Automatically saves the board to persist the read status.
+	 * Does not save the board - use markMessageAsReadAndSave() from package/board for persistence.
 	 *
 	 * @param messageId - The message ID to mark as read
 	 * @param characterId - The character ID that read the message
 	 * @returns True if the message was found and marked, false otherwise
 	 */
-	public async markMessageAsRead(
-		messageId: number,
-		characterId: number
-	): Promise<boolean> {
+	public markMessageAsRead(messageId: number, characterId: number): boolean {
 		const message = this.getMessage(messageId);
 		if (!message) {
 			return false;
@@ -217,10 +213,6 @@ export class Board {
 		// Add character ID if not already present
 		if (!message.readBy.includes(characterId)) {
 			message.readBy.push(characterId);
-			// Save the board to persist the read status
-			await this.save().catch((err) => {
-				// Error saving is logged by saveBoard, continue anyway
-			});
 		}
 
 		return true;
@@ -362,65 +354,22 @@ export class Board {
 	}
 
 	/**
-	 * Persists this board's current state to disk.
-	 */
-	public async save(): Promise<void> {
-		await saveBoard(this);
-	}
-
-	/**
-	 * Creates a Board instance from serialized data.
-	 *
-	 * @param data - Serialized board data
-	 * @returns New Board instance
-	 */
-	public static deserialize(data: SerializedBoard): Board {
-		const board = new Board(
-			data.name,
-			data.displayName,
-			data.description,
-			data.permanent,
-			data.expirationMs,
-			data.writePermission || "all"
-		);
-		board.setMessages(data.messages);
-		board.nextMessageId = data.nextMessageId;
-		return board;
-	}
-
-	/**
-	 * Creates a Board instance from separate config and messages data.
-	 *
-	 * @param config - Serialized board configuration
-	 * @param messages - Serialized board messages
-	 * @returns New Board instance
-	 */
-	public static deserializeFromSeparate(
-		config: SerializedBoardConfig,
-		messages: SerializedBoardMessages
-	): Board {
-		const board = new Board(
-			config.name,
-			config.displayName,
-			config.description,
-			config.permanent,
-			config.expirationMs,
-			config.writePermission || "all"
-		);
-		// Ensure all messages have a subject (for backward compatibility)
-		board.setMessages(messages.messages);
-		board.nextMessageId = config.nextMessageId;
-		return board;
-	}
-
-	/**
 	 * Sets the messages array (for deserialization only).
-	 * This is a private method to maintain encapsulation.
+	 * This method is public for use by package deserializers.
 	 *
 	 * @param messages - The messages to set
-	 * @private
 	 */
-	private setMessages(messages: BoardMessage[]): void {
+	public setMessages(messages: BoardMessage[]): void {
 		this.messages = messages;
+	}
+
+	/**
+	 * Sets the next message ID (for deserialization only).
+	 * This method is public for use by package deserializers.
+	 *
+	 * @param nextMessageId - The next message ID to set
+	 */
+	public setNextMessageId(nextMessageId: number): void {
+		this.nextMessageId = nextMessageId;
 	}
 }

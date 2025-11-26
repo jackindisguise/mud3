@@ -1,6 +1,7 @@
 import { test, suite } from "node:test";
 import assert from "node:assert";
 import { Board, BoardMessage, SerializedBoard } from "./board.js";
+import { deserializeBoard } from "./package/board.js";
 
 suite("board.ts", () => {
 	suite("Board constructor", () => {
@@ -121,7 +122,7 @@ suite("board.ts", () => {
 			const serialized = board.serialize();
 			serialized.messages.push(oldMessage);
 			serialized.nextMessageId = 2;
-			const boardWithOldMessage = Board.deserialize(serialized);
+			const boardWithOldMessage = deserializeBoard(serialized);
 			boardWithOldMessage.createMessage("bob", "Recent", "Recent content");
 
 			const removed = boardWithOldMessage.removeExpiredMessages();
@@ -152,7 +153,7 @@ suite("board.ts", () => {
 				postedAt: oldDate,
 			});
 			serialized.nextMessageId = 3;
-			const boardWithOldMessages = Board.deserialize(serialized);
+			const boardWithOldMessages = deserializeBoard(serialized);
 			boardWithOldMessages.createMessage("charlie", "Recent", "Content");
 
 			const removed = boardWithOldMessages.removeExpiredMessages();
@@ -378,7 +379,7 @@ suite("board.ts", () => {
 				nextMessageId: 2,
 			};
 
-			const board = Board.deserialize(data);
+			const board = deserializeBoard(data);
 			assert.strictEqual(board.name, "test");
 			assert.strictEqual(board.displayName, "Test Board");
 			assert.strictEqual(board.description, "Description");
@@ -399,7 +400,7 @@ suite("board.ts", () => {
 				nextMessageId: 1,
 			};
 
-			const board = Board.deserialize(data);
+			const board = deserializeBoard(data);
 			assert.strictEqual(board.permanent, false);
 			assert.strictEqual(board.expirationMs, 604800000);
 		});
@@ -414,7 +415,7 @@ suite("board.ts", () => {
 				nextMessageId: 42,
 			};
 
-			const board = Board.deserialize(data);
+			const board = deserializeBoard(data);
 			// After deserialization, next message should use the preserved ID
 			const newMessage = board.createMessage("alice", "New", "Content");
 			assert.strictEqual(newMessage.id, 42);
@@ -432,7 +433,7 @@ suite("board.ts", () => {
 			original.createMessage("bob", "Private", "Content 2", ["charlie"]);
 
 			const serialized = original.serialize();
-			const restored = Board.deserialize(serialized);
+			const restored = deserializeBoard(serialized);
 
 			assert.strictEqual(restored.name, original.name);
 			assert.strictEqual(restored.displayName, original.displayName);

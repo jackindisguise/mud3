@@ -29,7 +29,7 @@ export type Config = {
 	security: SecurityConfig;
 };
 
-const CONFIG_DEFAULT: Config = {
+export const CONFIG_DEFAULT: Config = {
 	game: {
 		name: "mud3",
 		creator: "jackindisguise",
@@ -43,20 +43,16 @@ const CONFIG_DEFAULT: Config = {
 	},
 } as const;
 
-// export a readonly version of the default config
-const READONLY_CONFIG_DEFAULT: DeepReadonly<Config> = {
-	game: { ...CONFIG_DEFAULT.game },
-	server: { ...CONFIG_DEFAULT.server },
-	security: { ...CONFIG_DEFAULT.security },
-};
-export { READONLY_CONFIG_DEFAULT as CONFIG_DEFAULT };
-
 // make a copy of the default, don't reference it directly plz
 const CONFIG: Config = {
 	game: { ...CONFIG_DEFAULT.game },
 	server: { ...CONFIG_DEFAULT.server },
 	security: { ...CONFIG_DEFAULT.security },
 };
+
+// export a readonly version of the config
+const READONLY_CONFIG: DeepReadonly<Config> = CONFIG;
+export { READONLY_CONFIG as CONFIG };
 
 /**
  * Set the config object.
@@ -67,7 +63,3 @@ export function setConfig(config: Config) {
 	CONFIG.server = config.server;
 	CONFIG.security = config.security;
 }
-
-// export a readonly version of the config
-const READONLY_CONFIG: DeepReadonly<Config> = CONFIG;
-export { READONLY_CONFIG as CONFIG };

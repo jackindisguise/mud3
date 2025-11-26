@@ -29,7 +29,7 @@ import { string } from "mud-ext";
  * @param actor - The actor to send the message to
  */
 export function showBoardsList(char: Character): void {
-	const actor = char.mob;
+	const actor = char.mob!;
 	const render = (boards: Board[]) => {
 		const lines: string[] = [];
 		if (boards.length === 0) {

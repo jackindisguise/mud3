@@ -74,34 +74,6 @@ type RawArchetypeFile = {
 const raceRegistry: Map<string, Race> = new Map();
 const jobRegistry: Map<string, Job> = new Map();
 
-const FALLBACK_RACE: Race = freezeArchetype({
-	id: "__fallback_race__",
-	name: "Fallback Race",
-	description:
-		"Internal fallback race used when no race archetypes have been loaded.",
-	startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-	startingResourceCaps: { maxHealth: 1, maxMana: 1 },
-	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-	skills: [],
-	passives: [],
-	growthModifier: { base: 1 },
-});
-
-const FALLBACK_JOB: Job = freezeArchetype({
-	id: "__fallback_job__",
-	name: "Fallback Job",
-	description:
-		"Internal fallback job used when no job archetypes have been loaded.",
-	startingAttributes: { strength: 0, agility: 0, intelligence: 0 },
-	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
-	startingResourceCaps: { maxHealth: 1, maxMana: 1 },
-	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-	skills: [],
-	passives: [],
-	growthModifier: { base: 1 },
-});
-
 function shouldProcessFile(fileName: string): boolean {
 	if (!fileName) return false;
 	if (fileName.startsWith("_")) return false;
@@ -380,13 +352,23 @@ export function getStarterJobs(): ReadonlyArray<Job> {
 export function getDefaultRace(): Race {
 	const starters = getStarterRaces();
 	const firstRace = starters[0] ?? getAllRaces()[0];
-	return firstRace ?? FALLBACK_RACE;
+	if (!firstRace) {
+		throw new Error(
+			"Cannot get default race: archetype package not loaded or no races available. Call archetypePkg.loader() first."
+		);
+	}
+	return firstRace;
 }
 
 export function getDefaultJob(): Job {
 	const starters = getStarterJobs();
 	const firstJob = starters[0] ?? getAllJobs()[0];
-	return firstJob ?? FALLBACK_JOB;
+	if (!firstJob) {
+		throw new Error(
+			"Cannot get default job: archetype package not loaded or no jobs available. Call archetypePkg.loader() first."
+		);
+	}
+	return firstJob;
 }
 
 export function registerRace(

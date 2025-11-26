@@ -20,6 +20,7 @@ import {
 	getRaceById,
 } from "./package/archetype.js";
 import { Mob, WEAPON_TYPES } from "./dungeon.js";
+import { createMob } from "./package/dungeon.js";
 import {
 	COMMON_HIT_TYPES,
 	MAGICAL_DAMAGE_TYPE,
@@ -184,7 +185,7 @@ export class MapEditorService {
 			throw new Error("Invalid race or job ID");
 		}
 
-		const mob = new Mob({
+		const mob = createMob({
 			race,
 			job,
 			level: Number.isFinite(level) ? level : 1,

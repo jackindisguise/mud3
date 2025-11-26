@@ -33,7 +33,7 @@ import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
 import { isNameBlocked } from "./package/reservedNames.js";
-import { Mob } from "./dungeon.js";
+import { createMob } from "./package/dungeon.js";
 import { Race, Job } from "./archetype.js";
 import { showRoom } from "./commands/look.js";
 import { CONFIG } from "./package/config.js";
@@ -46,6 +46,7 @@ import {
 	unregisterActiveCharacter,
 	checkCharacterPassword,
 	loadCharacterFromSerialized,
+	saveCharacter,
 } from "./package/character.js";
 import { getBoards, loadBoards } from "./package/board.js";
 import { Board } from "./board.js";
@@ -55,8 +56,8 @@ import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getStarterRaces, getStarterJobs } from "./package/archetype.js";
-import { getHelpfile, searchHelpfiles } from "./package/help.js";
 import { LINEBREAK } from "./telnet.js";
+import { searchHelpfiles } from "./registry/help.js";
 import { processCombatRound } from "./combat.js";
 import { processWanderBehaviors } from "./behavior.js";
 import { WebClientServer } from "./web-client.js";
@@ -182,7 +183,45 @@ export class Game {
 				);
 			} catch {}
 			// Closing the client triggers server 'disconnection' which cleans up the session
-			session.client.close();
+			if (session.character && session.character.mob) {
+				const character = session.character;
+				saveCharacter(character)
+					.catch((error) => {
+						logger.error(
+							`Error saving character ${character} during inactivity timeout:`,
+							error
+						);
+					})
+					.finally(() => {
+						try {
+							if (character.mob) {
+								character.mob.destroy(true);
+							}
+						} catch (error) {
+							logger.error(
+								`Error destroying mob for ${character} during inactivity timeout:`,
+								error
+							);
+						}
+						try {
+							session.client.close();
+						} catch (error) {
+							logger.error(
+								`Error closing client during inactivity timeout:`,
+								error
+							);
+						}
+					});
+			} else {
+				try {
+					session.client.close();
+				} catch (error) {
+					logger.error(
+						`Error closing client during inactivity timeout:`,
+						error
+					);
+				}
+			}
 		}, timeoutMs);
 	}
 
@@ -210,7 +249,9 @@ export class Game {
 		});
 
 		this.server.on("disconnection", (client: MudClient) => {
-			this.handleDisconnection(client);
+			this.handleDisconnection(client).catch((error) => {
+				logger.error("Error handling disconnection:", error);
+			});
 		});
 
 		// Start the server
@@ -225,7 +266,9 @@ export class Game {
 				this.handleNewConnection(client);
 			});
 			this.webClientServer.on("disconnection", (client: MudClient) => {
-				this.handleDisconnection(client);
+				this.handleDisconnection(client).catch((error) => {
+					logger.error("Error handling disconnection:", error);
+				});
 			});
 			await this.webClientServer.start();
 		}
@@ -735,12 +778,18 @@ export class Game {
 					return;
 				}
 
+				if (!serializedCharacter.mob) {
+					sendLine("Character data is corrupted. Disconnecting.");
+					client.close();
+					return;
+				}
+
 				// Load the character from serialized data
 				const loadedCharacter =
 					loadCharacterFromSerialized(serializedCharacter);
 
 				// Get the saved location reference from the serialized data
-				const savedLocationRef = serializedCharacter.mob.location as
+				const savedLocationRef = serializedCharacter.mob?.location as
 					| string
 					| undefined;
 
@@ -808,7 +857,7 @@ export class Game {
 					// Create a new character
 					isNewCharacter = true;
 					const characterId = await getNextCharacterId();
-					const mob = new Mob({
+					const mob = createMob({
 						display: username,
 						keywords: username,
 						race: selectedRace,
@@ -877,10 +926,10 @@ export class Game {
 
 		// generate the context
 		const context: CommandContext = {
-			actor: character.mob,
+			actor: character.mob!,
 			room:
-				character.mob.location instanceof Room
-					? character.mob.location
+				character.mob!.location instanceof Room
+					? character.mob!.location
 					: undefined,
 		};
 		const executed = CommandRegistry.default.execute(input, context);
@@ -988,8 +1037,8 @@ export class Game {
 
 		// Move the character to the target room and show it
 		if (targetRoom) {
-			targetRoom.add(character.mob);
-			showRoom(character.mob, targetRoom);
+			targetRoom.add(character.mob!);
+			showRoom(character.mob!, targetRoom);
 		}
 		character.showPrompt();
 

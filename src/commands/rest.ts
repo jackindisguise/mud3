@@ -119,6 +119,11 @@ export default {
 					`You rest and recover ${recoveryParts.join(", ")}.`,
 					MESSAGE_GROUP.INFO
 				);
+			} else {
+				actor.sendMessage(
+					"You don't feel any more rested.",
+					MESSAGE_GROUP.INFO
+				);
 			}
 		}, REST_COOLDOWN_MS);
 	},

@@ -34,13 +34,12 @@ export default {
 			return;
 		}
 
-		const mob = character.mob;
-		const oldLevel = mob.level;
-		const remainingExperience = EXPERIENCE_THRESHOLD - mob.experience;
-		const growth = mob.resolveGrowthModifier();
+		const oldLevel = actor.level;
+		const remainingExperience = EXPERIENCE_THRESHOLD - actor.experience;
+		const growth = actor.resolveGrowthModifier();
 		const ceiledExperience = Math.ceil(remainingExperience * growth);
-		const experienceGained = mob.gainExperience(ceiledExperience);
-		const newLevel = mob.level;
+		const experienceGained = actor.gainExperience(ceiledExperience);
+		const newLevel = actor.level;
 
 		if (newLevel > oldLevel) {
 			actor.sendMessage(

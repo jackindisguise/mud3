@@ -75,8 +75,6 @@ export default {
 			return;
 		}
 
-		const mob = character.mob;
-
 		const sections: string[][] = [];
 
 		const infoLines: string[] = string.box({
@@ -86,16 +84,16 @@ export default {
 					COLOR.CYAN
 				)} ${character.credentials.username.padEnd(10)}`,
 				`${color("Race:      ", COLOR.CYAN)} ${(
-					mob.race.name ?? "(unknown)"
+					actor.race.name ?? "(unknown)"
 				).padEnd(10)}`,
 				`${color("Job:       ", COLOR.CYAN)} ${(
-					mob.job.name ?? "(unknown)"
+					actor.job.name ?? "(unknown)"
 				).padEnd(10)}`,
-				`${color("Level:     ", COLOR.CYAN)} ${mob.level
+				`${color("Level:     ", COLOR.CYAN)} ${actor.level
 					.toString()
 					.padStart(3, "0")
 					.padEnd(10)}`,
-				`${color("Experience:", COLOR.CYAN)} ${mob.experience
+				`${color("Experience:", COLOR.CYAN)} ${actor.experience
 					.toString()
 					.padStart(3, "0")
 					.padEnd(10)}`,
@@ -110,24 +108,24 @@ export default {
 
 		const healthLine = string.pad({
 			string: `${color("Health:", COLOR.CRIMSON)} ${formatStat(
-				mob.health
-			)} / ${formatStat(mob.maxHealth)}`,
+				actor.health
+			)} / ${formatStat(actor.maxHealth)}`,
 			width: 25,
 			sizer: SIZER,
 			textAlign: string.ALIGN.CENTER,
 		});
 		const exhaustionLine = string.pad({
 			string: `${color("Exhaustion:", COLOR.LIME)} ${formatStat(
-				mob.exhaustion
-			)} / ${formatStat(mob.maxExhaustion)}`,
+				actor.exhaustion
+			)} / ${formatStat(actor.maxExhaustion)}`,
 			width: 25,
 			sizer: SIZER,
 			textAlign: string.ALIGN.CENTER,
 		});
 		const manaLine = string.pad({
 			string: `${color("Mana:", COLOR.CYAN)} ${formatStat(
-				mob.mana
-			)} / ${formatStat(mob.maxMana)}`,
+				actor.mana
+			)} / ${formatStat(actor.maxMana)}`,
 			width: 26,
 			sizer: SIZER,
 			textAlign: string.ALIGN.CENTER,
@@ -136,7 +134,7 @@ export default {
 		const statsLines: string[] = [healthLine, exhaustionLine, manaLine];
 		sections.push(buildSectionBox("Stats", [statsLines.join("")]));
 
-		const primary = mob.primaryAttributes;
+		const primary = actor.primaryAttributes;
 		const strengthLine = string.pad({
 			string: `${color("Strength:", COLOR.CRIMSON)} ${formatStat(
 				primary.strength
@@ -168,7 +166,7 @@ export default {
 			buildSectionBox("Primary Attributes", [primaryLines.join("")])
 		);
 
-		const secondary = mob.secondaryAttributes;
+		const secondary = actor.secondaryAttributes;
 		const strengthLines: string[] = string.box({
 			input: [
 				`${color("Attack Power:", COLOR.CRIMSON)} ${formatStat(

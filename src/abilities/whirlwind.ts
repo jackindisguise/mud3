@@ -33,7 +33,7 @@ export const command: CommandObject = {
 	cooldown(context: CommandContext, args: Map<string, any>) {
 		const { actor, room } = context;
 		const character = actor.character;
-		if (!actor.knowsAbility(ABILITY_ID)) {
+		if (!actor.knowsAbilityById(ABILITY_ID)) {
 			return 0;
 		}
 		if (!room) {
@@ -47,7 +47,7 @@ export const command: CommandObject = {
 		const character = actor.character;
 
 		// Check if actor knows this ability
-		if (!actor.knowsAbility(ABILITY_ID)) {
+		if (!actor.knowsAbilityById(ABILITY_ID)) {
 			actor.sendMessage(
 				"You don't know that ability.",
 				MESSAGE_GROUP.COMMAND_RESPONSE

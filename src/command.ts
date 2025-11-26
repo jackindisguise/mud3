@@ -1813,7 +1813,7 @@ export class CommandRegistry {
 		for (const command of this.commands) {
 			// Skip ability commands if the actor doesn't know the ability
 			if (command instanceof AbilityCommand) {
-				if (!context.actor.knowsAbility(command.abilityId)) {
+				if (!context.actor.knowsAbilityById(command.abilityId)) {
 					continue;
 				}
 			}

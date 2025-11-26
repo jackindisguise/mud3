@@ -12,24 +12,12 @@
  */
 
 import { Mob, Room, Weapon, EQUIPMENT_SLOT } from "./dungeon.js";
-import { Character, MESSAGE_GROUP } from "./character.js";
+import { MESSAGE_GROUP } from "./character.js";
 import { color, COLOR } from "./color.js";
 import { LINEBREAK } from "./telnet.js";
 import logger from "./logger.js";
 import { getLocation, LOCATION } from "./package/locations.js";
-import {
-	act,
-	damageMessage,
-	ActMessageTemplates,
-	ActContext,
-	ActOptions,
-} from "./act.js";
-import {
-	getDamageMultiplier,
-	DAMAGE_TYPE,
-	HitType,
-	getThirdPersonVerb,
-} from "./damage-types.js";
+import { act } from "./act.js";
 import { showRoom } from "./commands/look.js";
 
 /**

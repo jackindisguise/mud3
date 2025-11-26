@@ -44,7 +44,7 @@ export default {
 		}
 
 		// Check if already learned
-		if (actor.knowsAbility(abilityId)) {
+		if (actor.knowsAbilityById(abilityId)) {
 			const proficiency = actor.learnedAbilities.get(abilityId) || 0;
 			const uses = actor.getAbilityUses(abilityId);
 			actor.sendMessage(
@@ -55,7 +55,7 @@ export default {
 		}
 
 		// Learn the ability with 0 uses
-		actor.addAbility(abilityId, 0);
+		actor.addAbility(ability, 0);
 		actor.sendMessage(
 			`You have learned ${ability.name}! ${ability.description}`,
 			MESSAGE_GROUP.COMMAND_RESPONSE

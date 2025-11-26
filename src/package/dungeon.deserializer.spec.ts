@@ -34,8 +34,8 @@ import {
 	SerializedWeapon,
 } from "../dungeon.js";
 import archetypePkg from "./archetype.js";
-import abilitiesPkg from "./abilities.js";
-import { getAllAbilities } from "./abilities.js";
+import abilitiesPkg from "./ability.js";
+import { getAllAbilities } from "../registry/ability.js";
 import { createMob } from "./dungeon.js";
 
 describe("package/dungeon.ts deserializers", () => {

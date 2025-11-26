@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { deserializeCharacter } from "./character.js";
 import { Character, SerializedCharacter } from "../character.js";
 import archetypePkg from "./archetype.js";
-import abilitiesPkg from "./abilities.js";
+import abilitiesPkg from "./ability.js";
 import { CHANNEL } from "../channel.js";
 import { Mob } from "../dungeon.js";
 import { createMob } from "./dungeon.js";

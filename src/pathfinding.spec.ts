@@ -9,7 +9,7 @@ import {
 	RoomLink,
 	getDungeonById,
 	dir2text,
-} from "./dungeon.js";
+} from "./core/dungeon.js";
 import {
 	findDirectionsBetweenRooms,
 	findDirectionsViaRefs,

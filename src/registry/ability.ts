@@ -1,4 +1,4 @@
-import { Ability } from "../ability.js";
+import { Ability } from "../core/ability.js";
 
 /** Registry of all loaded abilities by ID */
 const ABILITY_REGISTRY = new Map<string, Ability>();

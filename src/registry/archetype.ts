@@ -4,7 +4,7 @@ import {
 	Job,
 	BaseArchetypeDefinition,
 	freezeArchetype,
-} from "../archetype.js";
+} from "../core/archetype.js";
 
 /**
  * Global registry of loaded races.

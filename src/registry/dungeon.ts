@@ -8,7 +8,7 @@
  * @module registry/dungeon
  */
 
-import { Dungeon, Room, RoomLink, Mob } from "../dungeon.js";
+import { Dungeon, Room, RoomLink, Mob } from "../core/dungeon.js";
 
 /**
  * Registry of dungeons by their optional persistent ID.

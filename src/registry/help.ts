@@ -1,5 +1,5 @@
 import logger from "../logger.js";
-import { Helpfile } from "../help.js";
+import { Helpfile } from "../core/help.js";
 
 /**
  * Global registry of loaded helpfiles.

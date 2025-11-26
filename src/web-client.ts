@@ -14,8 +14,8 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
 import logger from "./logger.js";
-import { MudClient } from "./io.js";
-import { LINEBREAK } from "./telnet.js";
+import { MudClient } from "./core/io.js";
+import { LINEBREAK } from "./core/telnet.js";
 import {
 	stripColors,
 	COLOR_ESCAPE,
@@ -23,7 +23,7 @@ import {
 	COLOR_TAG,
 	TEXT_STYLE,
 	TEXT_STYLE_TAG,
-} from "./color.js";
+} from "./core/color.js";
 import { getSafeRootDirectory } from "./utils/path.js";
 
 const __filename = fileURLToPath(import.meta.url);

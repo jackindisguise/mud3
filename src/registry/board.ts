@@ -1,5 +1,5 @@
 import logger from "../logger.js";
-import { Board } from "../board.js";
+import { Board } from "../core/board.js";
 
 /**
  * Global registry of loaded boards.

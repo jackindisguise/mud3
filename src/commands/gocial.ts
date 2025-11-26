@@ -15,11 +15,11 @@
  * @module commands/gocial
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { Character, MESSAGE_GROUP } from "../character.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
-import { CHANNEL, formatChannelMessage } from "../channel.js";
+import { CHANNEL, formatChannelMessage } from "../core/channel.js";
 import { getSocialCommand, getSocialCommandNames } from "../social.js";
 import { formatSocialMessage } from "./_social.js";
 

@@ -16,8 +16,8 @@
  * @module commands/exec
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 
 export default {

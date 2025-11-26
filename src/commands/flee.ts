@@ -15,9 +15,9 @@
  * @module commands/flee
  */
 
-import { CommandContext, PRIORITY } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { DIRECTIONS, DIRECTION, Room, dir2text } from "../dungeon.js";
+import { CommandContext, PRIORITY } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { DIRECTIONS, DIRECTION, Room, dir2text } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
 

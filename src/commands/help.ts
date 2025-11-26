@@ -22,15 +22,15 @@
  * @module commands/help
  */
 
-import { CommandContext, ParseResult } from "../command.js";
+import { CommandContext, ParseResult } from "../core/command.js";
 import { CommandObject } from "../package/commands.js";
 import { getHelpfile } from "../registry/help.js";
-import { Helpfile } from "../help.js";
+import { Helpfile } from "../core/help.js";
 import { autocompleteHelpfile } from "../registry/help.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../dungeon.js";
-import { LINEBREAK } from "../telnet.js";
-import { SIZER, color, COLOR } from "../color.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Mob } from "../core/dungeon.js";
+import { LINEBREAK } from "../core/telnet.js";
+import { SIZER, color, COLOR } from "../core/color.js";
 import { string } from "mud-ext";
 
 /**

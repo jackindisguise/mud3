@@ -16,8 +16,8 @@
  * @module commands/board
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import {
 	loadBoard,
@@ -25,9 +25,15 @@ import {
 	markMessageAsReadAndSave,
 } from "../package/board.js";
 import { getBoard, registerBoard } from "../registry/board.js";
-import { Board, BoardMessage } from "../board.js";
-import { color, COLOR, textStyleToTag, TEXT_STYLE, SIZER } from "../color.js";
-import { LINEBREAK } from "../telnet.js";
+import { Board, BoardMessage } from "../core/board.js";
+import {
+	color,
+	COLOR,
+	textStyleToTag,
+	TEXT_STYLE,
+	SIZER,
+} from "../core/color.js";
+import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
 import { showBoardsList } from "./boards.js";
 

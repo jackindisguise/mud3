@@ -12,8 +12,8 @@
  * @module commands/up
  */
 
-import { CommandContext, PRIORITY } from "../command.js";
-import { DIRECTION } from "../dungeon.js";
+import { CommandContext, PRIORITY } from "../core/command.js";
+import { DIRECTION } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import {
 	DEFAULT_COMMAND_VALUES,

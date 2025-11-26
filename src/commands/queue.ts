@@ -1,6 +1,6 @@
-import { MESSAGE_GROUP } from "../character.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import type { CommandObject } from "../package/commands.js";
-import { LINEBREAK } from "../telnet.js";
+import { LINEBREAK } from "../core/telnet.js";
 
 export default {
 	pattern: "queue",

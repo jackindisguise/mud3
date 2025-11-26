@@ -20,8 +20,8 @@
  * @module commands/config
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP, EchoMode } from "../character.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP, EchoMode } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import {
 	COLOR,
@@ -30,8 +30,8 @@ import {
 	color,
 	nameToColor,
 	SIZER,
-} from "../color.js";
-import { LINEBREAK } from "../telnet.js";
+} from "../core/color.js";
+import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
 
 /**

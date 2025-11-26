@@ -14,7 +14,7 @@
  * @module commands/trade
  */
 
-import { CommandContext } from "../command.js";
+import { CommandContext } from "../core/command.js";
 import { CommandObject } from "../package/commands.js";
 import boardCommand from "./board.js";
 

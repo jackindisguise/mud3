@@ -17,9 +17,9 @@
  * @module commands/attack
  */
 
-import { CommandContext, ParseResult, PRIORITY } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Mob, Room } from "../dungeon.js";
+import { CommandContext, ParseResult, PRIORITY } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Mob, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { initiateCombat, addToCombatQueue } from "../combat.js";
 

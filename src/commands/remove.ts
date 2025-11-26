@@ -15,9 +15,9 @@
  * @module commands/remove
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Equipment, EQUIPMENT_SLOT } from "../dungeon.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Equipment, EQUIPMENT_SLOT } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 const slotMessages: Record<EQUIPMENT_SLOT, string> = {

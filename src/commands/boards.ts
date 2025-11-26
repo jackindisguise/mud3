@@ -13,14 +13,14 @@
  * @module commands/boards
  */
 
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP, Character } from "../character.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP, Character } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { getBoards } from "../registry/board.js";
-import { color, COLOR, SIZER } from "../color.js";
-import { LINEBREAK } from "../telnet.js";
-import { formatDuration } from "../time.js";
-import { Board } from "../board.js";
+import { color, COLOR, SIZER } from "../core/color.js";
+import { LINEBREAK } from "../core/telnet.js";
+import { formatDuration } from "../core/time.js";
+import { Board } from "../core/board.js";
 import { string } from "mud-ext";
 
 /**

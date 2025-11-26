@@ -7,9 +7,9 @@
  * @module commands/_movement
  */
 
-import { CommandContext, PRIORITY } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Room, DIRECTION, dir2text } from "../dungeon.js";
+import { CommandContext, PRIORITY } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Room, DIRECTION, dir2text } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 const DEFAULT_COOLDOWN_MS = 100;

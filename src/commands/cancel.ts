@@ -1,6 +1,6 @@
-import { MESSAGE_GROUP } from "../character.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import type { CommandObject } from "../package/commands.js";
-import type { ActionQueueEntry, ActionState } from "../command.js";
+import type { ActionQueueEntry, ActionState } from "../core/command.js";
 
 function describeCommand(entry: ActionQueueEntry | undefined): string {
 	return entry?.command?.pattern ?? "action";

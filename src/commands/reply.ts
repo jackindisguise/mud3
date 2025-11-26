@@ -16,10 +16,10 @@
  * @module commands/reply
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP, Character } from "../character.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP, Character } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
-import { CHANNEL } from "../channel.js";
+import { CHANNEL } from "../core/channel.js";
 import { getCharacterById } from "../package/character.js";
 
 export default {

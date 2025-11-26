@@ -21,20 +21,20 @@
  * @module commands/look
  */
 
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import {
 	Room,
 	DIRECTION,
 	dir2text,
 	DIRECTIONS,
 	DungeonObject,
-} from "../dungeon.js";
-import { getEquipmentList } from "../equipment.js";
-import { Mob } from "../dungeon.js";
+} from "../core/dungeon.js";
+import { getEquipmentList } from "../core/equipment.js";
+import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { COLOR, color, SIZER } from "../color.js";
-import { LINEBREAK } from "../telnet.js";
+import { COLOR, color, SIZER } from "../core/color.js";
+import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
 import { generateMinimap, generateMinimapFromSteps } from "../minimap.js";
 

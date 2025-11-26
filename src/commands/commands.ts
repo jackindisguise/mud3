@@ -1,5 +1,5 @@
-import { CommandContext, CommandRegistry, Command } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext, CommandRegistry, Command } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 
 export default {
 	pattern: "commands~",

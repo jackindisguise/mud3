@@ -13,9 +13,9 @@
  * @module commands/bonuses
  */
 
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Equipment, Armor, Weapon } from "../dungeon.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Equipment, Armor, Weapon } from "../core/dungeon.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -28,10 +28,10 @@ import {
 	SECONDARY_ATTRIBUTE_FACTORS,
 	HEALTH_PER_VITALITY,
 	MANA_PER_WISDOM,
-} from "../attribute.js";
+} from "../core/attribute.js";
 import { CommandObject } from "../package/commands.js";
-import { LINEBREAK } from "../telnet.js";
-import { COLOR, color } from "../color.js";
+import { LINEBREAK } from "../core/telnet.js";
+import { COLOR, color } from "../core/color.js";
 
 /**
  * Format a number with a sign prefix for display.

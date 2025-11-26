@@ -1,5 +1,5 @@
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import type { CommandObject } from "../package/commands.js";
 
 const WORK_COOLDOWN_MS = 3_000;
@@ -14,4 +14,3 @@ export default {
 		);
 	},
 } satisfies CommandObject;
-

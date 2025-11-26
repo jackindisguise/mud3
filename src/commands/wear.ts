@@ -18,10 +18,16 @@
  * @module commands/wear
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { DungeonObject } from "../dungeon.js";
-import { Equipment, Armor, Weapon, EQUIPMENT_SLOT, Mob } from "../dungeon.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { DungeonObject } from "../core/dungeon.js";
+import {
+	Equipment,
+	Armor,
+	Weapon,
+	EQUIPMENT_SLOT,
+	Mob,
+} from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 
 const slotMessages: Record<EQUIPMENT_SLOT, string> = {

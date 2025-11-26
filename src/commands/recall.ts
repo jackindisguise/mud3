@@ -10,9 +10,9 @@
  * @module commands/recall
  */
 
-import { CommandContext, PRIORITY } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Room } from "../dungeon.js";
+import { CommandContext, PRIORITY } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { getLocation, LOCATION } from "../registry/locations.js";
 import { act } from "../act.js";

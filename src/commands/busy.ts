@@ -18,10 +18,10 @@
  * @module commands/busy
  */
 
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP, MESSAGE_GROUP_NAMES } from "../character.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP, MESSAGE_GROUP_NAMES } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
-import { color, COLOR } from "../color.js";
+import { color, COLOR } from "../core/color.js";
 
 /**
  * List of message groups that can be forwarded in busy mode.

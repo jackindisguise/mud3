@@ -16,11 +16,11 @@
  * @module commands/say
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../dungeon.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { CHANNEL } from "../channel.js";
+import { CHANNEL } from "../core/channel.js";
 
 export default {
 	pattern: "say~ <message:text>",

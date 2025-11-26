@@ -15,10 +15,10 @@
  * @module commands/unblock
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
-import { color, COLOR } from "../color.js";
+import { color, COLOR } from "../core/color.js";
 
 export default {
 	pattern: "unblock <username:word>",

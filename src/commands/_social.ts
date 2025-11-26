@@ -10,9 +10,9 @@
  * @module commands/_social
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../dungeon.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Mob } from "../core/dungeon.js";
 import { act, ActMessageTemplates } from "../act.js";
 
 /**

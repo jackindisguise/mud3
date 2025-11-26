@@ -26,12 +26,12 @@
  * @module commands/who
  */
 
-import { CommandContext } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
-import { LINEBREAK } from "../telnet.js";
-import { color, COLOR, SIZER } from "../color.js";
+import { LINEBREAK } from "../core/telnet.js";
+import { color, COLOR, SIZER } from "../core/color.js";
 import { string } from "mud-ext";
 
 export default {

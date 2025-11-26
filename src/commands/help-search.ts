@@ -17,11 +17,11 @@
  * @module commands/help-search
  */
 
-import { CommandContext, ParseResult } from "../command.js";
+import { CommandContext, ParseResult } from "../core/command.js";
 import { CommandObject } from "../package/commands.js";
 import { searchHelpfiles } from "../registry/help.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { LINEBREAK } from "../telnet.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { LINEBREAK } from "../core/telnet.js";
 
 /**
  * Display search results categorized by match type.

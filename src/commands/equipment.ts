@@ -15,11 +15,11 @@
  * @module commands/equipment
  */
 
-import { CommandContext, PRIORITY } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
+import { CommandContext, PRIORITY } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
-import { LINEBREAK } from "../telnet.js";
-import { getEquipmentList } from "../equipment.js";
+import { LINEBREAK } from "../core/telnet.js";
+import { getEquipmentList } from "../core/equipment.js";
 
 export default {
 	pattern: "equipment",

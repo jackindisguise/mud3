@@ -17,12 +17,12 @@
  * @module commands/ooc
  */
 
-import { CommandContext, ParseResult } from "../command.js";
-import { MESSAGE_GROUP } from "../character.js";
-import { Mob } from "../dungeon.js";
+import { CommandContext, ParseResult } from "../core/command.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Game } from "../game.js";
-import { CHANNEL, formatChannelMessage } from "../channel.js";
+import { CHANNEL, formatChannelMessage } from "../core/channel.js";
 
 export default {
 	pattern: "ooc~ <message:text>",

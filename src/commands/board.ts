@@ -19,7 +19,12 @@
 import { CommandContext, ParseResult } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { getBoard, loadBoard } from "../package/board.js";
+import {
+	loadBoard,
+	saveBoard,
+	markMessageAsReadAndSave,
+} from "../package/board.js";
+import { getBoard, registerBoard } from "../registry/board.js";
 import { Board, BoardMessage } from "../board.js";
 import { color, COLOR, textStyleToTag, TEXT_STYLE, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
@@ -69,7 +74,7 @@ export default {
 			// Remove expired messages before processing
 			const removed = board.removeExpiredMessages();
 			if (removed > 0) {
-				board.save().catch(() => {
+				saveBoard(board).catch(() => {
 					// Error is logged by board.save(), continue anyway
 				});
 			}
@@ -311,7 +316,7 @@ function displayBoard(
 
 /**
  * Displays a message and marks it as read by the character.
- * This is a convenience function that combines displayMessage and markMessageAsRead.
+ * This is a convenience function that combines displayMessage and markMessageAsReadAndSave.
  *
  * @param actor - The actor viewing the message
  * @param board - The board containing the message
@@ -324,9 +329,9 @@ async function displayAndMarkMessageAsRead(
 	msg: BoardMessage,
 	characterId: number
 ): Promise<void> {
-	// Mark message as read (automatically saves the board)
-	await board.markMessageAsRead(msg.id, characterId);
+	// Mark message as read and save the board
 	displayMessage(actor, board, msg);
+	await markMessageAsReadAndSave(board, msg.id, characterId);
 }
 
 function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
@@ -334,11 +339,20 @@ function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
 	const postedDate = new Date(msg.postedAt);
 	const formattedDate = postedDate.toLocaleString();
 
+	const headerLines = [
+		`${color("Author:", COLOR.CYAN)} ${color(msg.author, COLOR.LIME)}`,
+		`${color("Subject:", COLOR.CYAN)} ${color(msg.subject, COLOR.WHITE)}`,
+	];
+
+	// Add target field if message has targets
+	if (msg.targets && msg.targets.length > 0) {
+		headerLines.push(
+			`${color("Target:", COLOR.CYAN)} ${color(msg.targets.join(", "), COLOR.YELLOW)}`
+		);
+	}
+
 	const header = string.box({
-		input: [
-			`${color("Author:", COLOR.CYAN)} ${color(msg.author, COLOR.LIME)}`,
-			`${color("Subject:", COLOR.CYAN)} ${color(msg.subject, COLOR.WHITE)}`,
-		],
+		input: headerLines,
 		width: 76,
 		sizer: SIZER,
 	});
@@ -807,8 +821,9 @@ function startWriteSequence(
 					content,
 					targets.length > 0 ? targets : undefined
 				);
-				// Mark message as read by the author (automatically saves the board)
-				await board.markMessageAsRead(
+				// Mark message as read by the author and save the board
+				await markMessageAsReadAndSave(
+					board,
 					newMessage.id,
 					character.credentials.characterId
 				);

@@ -16,7 +16,7 @@
 import { CommandContext } from "../command.js";
 import { MESSAGE_GROUP, Character } from "../character.js";
 import { CommandObject } from "../package/commands.js";
-import { getBoards, loadBoards } from "../package/board.js";
+import { getBoards } from "../registry/board.js";
 import { color, COLOR, SIZER } from "../color.js";
 import { LINEBREAK } from "../telnet.js";
 import { formatDuration } from "../time.js";

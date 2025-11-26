@@ -48,7 +48,8 @@ import {
 	loadCharacterFromSerialized,
 	saveCharacter,
 } from "./package/character.js";
-import { getBoards, loadBoards } from "./package/board.js";
+import { loadBoards, saveBoard } from "./package/board.js";
+import { getBoards } from "./registry/board.js";
 import { Board } from "./board.js";
 import { saveGameState, getNextCharacterId } from "./package/gamestate.js";
 import { executeAllDungeonResets } from "./package/dungeon.js";
@@ -1194,7 +1195,7 @@ export class Game {
 			for (const board of boards) {
 				const removed = board.removeExpiredMessages();
 				if (removed > 0) {
-					await board.save();
+					await saveBoard(board);
 					totalRemoved += removed;
 					logger.debug(
 						`Removed ${removed} expired message(s) from board "${board.name}"`
@@ -1222,7 +1223,7 @@ export class Game {
 
 			logger.info(`Saving ${boards.length} board(s)...`);
 
-			const savePromises = boards.map((board) => board.save());
+			const savePromises = boards.map((board) => saveBoard(board));
 			await Promise.all(savePromises);
 
 			logger.info(`All boards saved successfully`);

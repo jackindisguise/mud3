@@ -10,29 +10,17 @@ import {
  * Global registry of loaded races.
  * Maps race IDs to their race definitions.
  */
-const raceRegistry: Map<string, Race> = new Map();
+const RACE_REGISTRY: Map<string, Race> = new Map();
+const READONLY_RACE_REGISTRY: ReadonlyMap<string, Race> = RACE_REGISTRY;
+export { READONLY_RACE_REGISTRY as RACE_REGISTRY };
 
 /**
  * Global registry of loaded jobs.
  * Maps job IDs to their job definitions.
  */
-const jobRegistry: Map<string, Job> = new Map();
-
-/**
- * Get the race registry.
- * @returns The race registry
- */
-export function getRaceRegistry(): ReadonlyMap<string, Race> {
-	return raceRegistry;
-}
-
-/**
- * Get the job registry.
- * @returns The job registry
- */
-export function getJobRegistry(): ReadonlyMap<string, Job> {
-	return jobRegistry;
-}
+const JOB_REGISTRY: Map<string, Job> = new Map();
+const READONLY_JOB_REGISTRY: ReadonlyMap<string, Job> = JOB_REGISTRY;
+export { READONLY_JOB_REGISTRY as JOB_REGISTRY };
 
 /**
  * Register a race in the global registry.
@@ -41,11 +29,11 @@ export function getJobRegistry(): ReadonlyMap<string, Job> {
  */
 export function registerRace(definition: BaseArchetypeDefinition): Race {
 	const frozen = freezeArchetype(definition);
-	const previous = raceRegistry.get(frozen.id);
+	const previous = RACE_REGISTRY.get(frozen.id);
 	if (previous) {
 		logger.warn(`Overriding existing race archetype with id "${frozen.id}"`);
 	}
-	raceRegistry.set(frozen.id, frozen);
+	RACE_REGISTRY.set(frozen.id, frozen);
 	logger.debug(`Registered race: ${frozen.id} (${frozen.name})`);
 	return frozen;
 }
@@ -57,11 +45,11 @@ export function registerRace(definition: BaseArchetypeDefinition): Race {
  */
 export function registerJob(definition: BaseArchetypeDefinition): Job {
 	const frozen = freezeArchetype(definition);
-	const previous = jobRegistry.get(frozen.id);
+	const previous = JOB_REGISTRY.get(frozen.id);
 	if (previous) {
 		logger.warn(`Overriding existing job archetype with id "${frozen.id}"`);
 	}
-	jobRegistry.set(frozen.id, frozen);
+	JOB_REGISTRY.set(frozen.id, frozen);
 	logger.debug(`Registered job: ${frozen.id} (${frozen.name})`);
 	return frozen;
 }
@@ -72,7 +60,7 @@ export function registerJob(definition: BaseArchetypeDefinition): Job {
  * @returns The race or undefined if not found
  */
 export function getRaceById(id: string): Race | undefined {
-	const race = raceRegistry.get(id);
+	const race = RACE_REGISTRY.get(id);
 	if (!race) {
 		logger.warn(`Requested race '${id}' not found.`);
 		return undefined;
@@ -86,7 +74,7 @@ export function getRaceById(id: string): Race | undefined {
  * @returns The job or undefined if not found
  */
 export function getJobById(id: string): Job | undefined {
-	const job = jobRegistry.get(id);
+	const job = JOB_REGISTRY.get(id);
 	if (!job) {
 		logger.warn(`Requested job '${id}' not found.`);
 		return undefined;
@@ -99,7 +87,7 @@ export function getJobById(id: string): Job | undefined {
  * @returns Array of all races
  */
 export function getAllRaces(): ReadonlyArray<Race> {
-	return Array.from(raceRegistry.values());
+	return Array.from(RACE_REGISTRY.values());
 }
 
 /**
@@ -107,7 +95,7 @@ export function getAllRaces(): ReadonlyArray<Race> {
  * @returns Array of all jobs
  */
 export function getAllJobs(): ReadonlyArray<Job> {
-	return Array.from(jobRegistry.values());
+	return Array.from(JOB_REGISTRY.values());
 }
 
 /**
@@ -167,8 +155,8 @@ export function getDefaultJob(): Job {
  * Primarily used for testing.
  */
 export function clearArchetypes(): void {
-	raceRegistry.clear();
-	jobRegistry.clear();
+	RACE_REGISTRY.clear();
+	JOB_REGISTRY.clear();
 	logger.debug("Cleared all archetypes");
 }
 
@@ -176,12 +164,12 @@ export function clearArchetypes(): void {
  * Get the total number of registered races.
  */
 export function getRaceCount(): number {
-	return raceRegistry.size;
+	return RACE_REGISTRY.size;
 }
 
 /**
  * Get the total number of registered jobs.
  */
 export function getJobCount(): number {
-	return jobRegistry.size;
+	return JOB_REGISTRY.size;
 }

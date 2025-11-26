@@ -6,7 +6,6 @@ import {
 	BaseArchetypeDefinition,
 	GrowthModifierCurve,
 } from "./archetype.js";
-import { PrimaryAttributeSet, ResourceCapacities } from "./attribute.js";
 import {
 	DamageTypeRelationships,
 	DAMAGE_RELATIONSHIP,

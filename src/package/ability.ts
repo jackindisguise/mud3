@@ -35,45 +35,20 @@
  *
  * @module package/abilities
  */
-import { CommandRegistry, AbilityCommand } from "../command.js";
-import type { CommandObject } from "./commands.js";
 import { Package } from "package-loader";
 import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import logger from "../logger.js";
-import { Ability, generateProficiencyTable } from "../ability.js";
+import { CommandRegistry, AbilityCommand } from "../command.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { access, constants } from "fs/promises";
-
-/** Registry of all loaded abilities by ID */
-const ABILITY_REGISTRY = new Map<string, Ability>();
-
-/**
- * Gets an ability by its ID.
- * @param id The ability ID to look up
- * @returns The ability or undefined if not found
- */
-export function getAbilityById(id: string): Ability | undefined {
-	return ABILITY_REGISTRY.get(id);
-}
-
-/**
- * Gets all registered abilities.
- * @returns Array of all abilities
- */
-export function getAllAbilities(): Ability[] {
-	return Array.from(ABILITY_REGISTRY.values());
-}
-
-/**
- * Checks if an ability ID is already registered.
- * @param id The ability ID to check
- * @returns true if the ability ID is already registered
- */
-export function hasAbility(id: string): boolean {
-	return ABILITY_REGISTRY.has(id);
-}
+import { Ability, generateProficiencyTable } from "../ability.js";
+import {
+	ABILITY_REGISTRY,
+	hasAbility,
+	registerAbility,
+} from "../registry/ability.js";
 
 /** Directory for compiled TypeScript abilities */
 const ROOT_DIRECTORY = getSafeRootDirectory();
@@ -146,7 +121,7 @@ async function loadAbilities() {
 					}
 
 					// Check for duplicate ability IDs
-					if (ABILITY_REGISTRY.has(abilityId)) {
+					if (hasAbility(abilityId)) {
 						logger.error(
 							`Duplicate ability ID "${abilityId}" found in ${relative(
 								ROOT_DIRECTORY,
@@ -206,7 +181,7 @@ async function loadAbilities() {
 					ability.proficiencyTable = generateProficiencyTable(ability);
 
 					// Register the ability
-					ABILITY_REGISTRY.set(abilityId, ability);
+					registerAbility(ability);
 					logger.debug(
 						`Loaded ability "${abilityId}" (${ability.name}) from ${relative(
 							ROOT_DIRECTORY,

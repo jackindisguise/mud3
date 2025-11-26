@@ -18,7 +18,7 @@ import {
 	getAllRaces,
 	getJobById,
 	getRaceById,
-} from "./package/archetype.js";
+} from "./registry/archetype.js";
 import { Mob, WEAPON_TYPES } from "./dungeon.js";
 import { createMob } from "./package/dungeon.js";
 import {

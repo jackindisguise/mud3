@@ -55,7 +55,7 @@ import { executeAllDungeonResets } from "./package/dungeon.js";
 import { color, COLOR } from "./color.js";
 import logger from "./logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
-import { getStarterRaces, getStarterJobs } from "./package/archetype.js";
+import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
 import { LINEBREAK } from "./telnet.js";
 import { searchHelpfiles } from "./registry/help.js";
 import { processCombatRound } from "./combat.js";

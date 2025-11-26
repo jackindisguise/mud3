@@ -27,25 +27,18 @@
  *
  * @module package/dungeon
  */
-import archetypePkg, {
+import archetypePkg from "./archetype.js";
+import {
 	getRaceById,
 	getJobById,
 	getDefaultRace,
 	getDefaultJob,
-} from "./archetype.js";
+} from "../registry/archetype.js";
 import type { Race, Job } from "../archetype.js";
 import { getAbilityById } from "../registry/ability.js";
 import { Ability, getProficiencyAtUses } from "../ability.js";
 import { join, relative } from "path";
-import {
-	mkdir,
-	readFile,
-	writeFile,
-	access,
-	readdir,
-	rename,
-	unlink,
-} from "fs/promises";
+import { mkdir, readFile, access, readdir } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import logger from "../logger.js";
 import {

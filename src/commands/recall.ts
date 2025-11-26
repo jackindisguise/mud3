@@ -14,7 +14,7 @@ import { CommandContext, PRIORITY } from "../command.js";
 import { MESSAGE_GROUP } from "../character.js";
 import { Room } from "../dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { getLocation, LOCATION } from "../package/locations.js";
+import { getLocation, LOCATION } from "../registry/locations.js";
 import { act } from "../act.js";
 import { showRoom } from "./look.js";
 

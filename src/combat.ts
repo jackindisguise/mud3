@@ -16,7 +16,7 @@ import { MESSAGE_GROUP } from "./character.js";
 import { color, COLOR } from "./color.js";
 import { LINEBREAK } from "./telnet.js";
 import logger from "./logger.js";
-import { getLocation, LOCATION } from "./package/locations.js";
+import { getLocation, LOCATION } from "./registry/locations.js";
 import { act } from "./act.js";
 import { showRoom } from "./commands/look.js";
 

@@ -2,130 +2,39 @@
  * Package: locations - Location configuration loader
  *
  * Loads `data/locations.yaml` (creating it with sensible defaults if missing),
- * and provides accessors to find locations by their key.
+ * and updates the locations registry.
  *
  * Behavior
  * - Reads YAML from `data/locations.yaml`
  * - If the file is absent/unreadable, writes default locations to disk
- * - Provides typed accessors for location keys
+ * - Validates that all location references point to existing rooms
  *
  * @example
- * import locationsPkg, { getLocation, LOCATION } from './package/locations.js';
+ * import locationsPkg from './package/locations.js';
+ * import { getLocation, LOCATION } from '../registry/locations.js';
  * await locationsPkg.loader();
  * const startingRoom = getLocation(LOCATION.START);
  *
  * @module package/locations
  */
 import { Package } from "package-loader";
-import { getRoomByRef, Room } from "../dungeon.js";
+import { getRoomByRef } from "../dungeon.js";
 import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
+import {
+	Locations,
+	LOCATIONS_DEFAULT,
+	setLocations,
+} from "../registry/locations.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const LOCATIONS_PATH = join(DATA_DIRECTORY, "locations.yaml");
 
-/**
- * Enum for location keys.
- * Provides type-safe access to location references.
- */
-export const enum LOCATION {
-	START = "start",
-	RECALL = "recall",
-	GRAVEYARD = "graveyard",
-}
-
 type LocationKey = "start" | "recall" | "graveyard";
-
-export type LocationsConfig = {
-	start: string;
-	recall: string;
-	graveyard: string;
-};
-
-export const LOCATIONS_DEFAULT: LocationsConfig = {
-	start: "@tower{0,0,0}",
-	recall: "@tower{0,0,0}",
-	graveyard: "@tower{0,0,0}",
-} as const;
-
-// make a copy of the default, don't reference it directly plz
-export const LOCATIONS: LocationsConfig = {
-	...LOCATIONS_DEFAULT,
-};
-
-/**
- * Get a location by its key.
- * @param key The location key to retrieve (can use LOCATION enum or string)
- * @returns The Room instance for the location, or undefined if not found
- *
- * @example
- * ```typescript
- * const startingRoom = getLocation(LOCATION.START);
- * // Returns: Room instance or undefined
- *
- * const recallRoom = getLocation('recall');
- * // Also works with string keys
- * ```
- */
-export function getLocation(key: LOCATION | LocationKey): Room {
-	const roomRef = LOCATIONS[key as LocationKey];
-	return getRoomByRef(roomRef)!;
-}
-
-/**
- * Get a location reference string by its key.
- * @param key The location key to retrieve (can use LOCATION enum or string)
- * @returns The room reference string for the location, or undefined if not found
- *
- * @example
- * ```typescript
- * const startingRoomRef = getLocationRef(LOCATION.START);
- * // Returns: "@tower{0,0,0}"
- *
- * const recallRoomRef = getLocationRef('recall');
- * // Also works with string keys
- * ```
- */
-export function getLocationRef(key: LOCATION | LocationKey): string {
-	return LOCATIONS[key as LocationKey]!;
-}
-
-/**
- * Get all locations as a dictionary of Room objects.
- * @returns A dictionary mapping location keys to Room instances
- *
- * @example
- * ```typescript
- * const locations = getAllLocations();
- * const startingRoom = locations[LOCATION.START];
- * ```
- */
-export function getAllLocations(): Record<LocationKey, Room> {
-	return {
-		start: getLocation(LOCATION.START),
-		recall: getLocation(LOCATION.RECALL),
-		graveyard: getLocation(LOCATION.GRAVEYARD),
-	};
-}
-
-/**
- * Get all location reference strings as a dictionary.
- * @returns A copy of the locations configuration with reference strings
- *
- * @example
- * ```typescript
- * const locationRefs = getAllLocationRefs();
- * const startingRoomRef = locationRefs[LOCATION.START];
- * // Returns: "@tower{9,19,0}"
- * ```
- */
-export function getAllLocationRefs(): LocationsConfig {
-	return { ...LOCATIONS };
-}
 
 export async function loadLocations() {
 	logger.debug(
@@ -133,24 +42,25 @@ export async function loadLocations() {
 	);
 	try {
 		const content = await readFile(LOCATIONS_PATH, "utf-8");
-		const parsed = YAML.load(content) as Partial<LocationsConfig> | undefined;
+		const parsed = YAML.load(content) as Partial<Locations> | undefined;
 		const locations = parsed ?? {};
+		const safe: Locations = { ...LOCATIONS_DEFAULT };
 
 		// merge location config
-		for (const key of Object.keys(locations) as Array<keyof LocationsConfig>) {
+		for (const key of Object.keys(locations) as Array<keyof Locations>) {
 			if (key in LOCATIONS_DEFAULT) {
-				if (LOCATIONS[key] === locations[key]) {
+				if (safe[key] === locations[key]) {
 					logger.debug(`DEFAULT ${key} = ${locations[key]}`);
 					continue;
 				}
-				LOCATIONS[key] = locations[key] as string;
+				safe[key] = locations[key] as string;
 				logger.debug(`Set ${key} = ${locations[key]}`);
 			}
 		}
 
 		// Validate that all locations reference actual rooms
 		const invalidLocations: string[] = [];
-		for (const [key, roomRef] of Object.entries(LOCATIONS) as Array<
+		for (const [key, roomRef] of Object.entries(safe) as Array<
 			[LocationKey, string]
 		>) {
 			const room = getRoomByRef(roomRef);
@@ -168,6 +78,7 @@ export async function loadLocations() {
 			);
 		}
 
+		setLocations(safe);
 		logger.info("Locations loaded successfully");
 	} catch (error) {
 		// Check if this is a validation error (should be re-thrown)

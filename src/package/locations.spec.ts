@@ -5,7 +5,8 @@ import { join } from "path";
 import { existsSync } from "fs";
 import YAML from "js-yaml";
 import { Dungeon, Room } from "../dungeon.js";
-import locationsPkg, {
+import locationsPkg from "./locations.js";
+import {
 	getLocation,
 	getLocationRef,
 	getAllLocations,
@@ -13,7 +14,9 @@ import locationsPkg, {
 	LOCATION,
 	LOCATIONS,
 	LOCATIONS_DEFAULT,
-} from "./locations.js";
+	Locations,
+	setLocations,
+} from "../registry/locations.js";
 
 import { getSafeRootDirectory } from "../utils/path.js";
 
@@ -172,9 +175,12 @@ suite("package/locations.ts", () => {
 
 	test("getLocation should return Room object", () => {
 		// Set up valid locations
-		LOCATIONS.start = "@tower{0,0,0}";
-		LOCATIONS.recall = "@tower{1,1,0}";
-		LOCATIONS.graveyard = "@tower{2,2,0}";
+		const tmpLocations: Locations = {
+			start: "@tower{0,0,0}",
+			recall: "@tower{1,1,0}",
+			graveyard: "@tower{2,2,0}",
+		};
+		setLocations(tmpLocations);
 
 		// Test with enum
 		const startRoom = getLocation(LOCATION.START);
@@ -184,7 +190,7 @@ suite("package/locations.ts", () => {
 		assert.strictEqual(startRoom.coordinates.z, 0);
 
 		// Test with string key
-		const recallRoom = getLocation("recall");
+		const recallRoom = getLocation(LOCATION.RECALL);
 		assert.ok(recallRoom);
 		assert.strictEqual(recallRoom.coordinates.x, 1);
 		assert.strictEqual(recallRoom.coordinates.y, 1);
@@ -193,24 +199,30 @@ suite("package/locations.ts", () => {
 
 	test("getLocationRef should return reference string", () => {
 		// Set up valid locations
-		LOCATIONS.start = "@tower{3,3,0}";
-		LOCATIONS.recall = "@tower{4,4,0}";
-		LOCATIONS.graveyard = "@tower{5,5,0}";
+		const tmpLocations: Locations = {
+			start: "@tower{3,3,0}",
+			recall: "@tower{4,4,0}",
+			graveyard: "@tower{5,5,0}",
+		};
+		setLocations(tmpLocations);
 
 		// Test with enum
 		const startRef = getLocationRef(LOCATION.START);
 		assert.strictEqual(startRef, "@tower{3,3,0}");
 
 		// Test with string key
-		const recallRef = getLocationRef("recall");
+		const recallRef = getLocationRef(LOCATION.RECALL);
 		assert.strictEqual(recallRef, "@tower{4,4,0}");
 	});
 
 	test("getAllLocations should return dictionary of Room objects", () => {
 		// Set up valid locations
-		LOCATIONS.start = "@tower{6,6,0}";
-		LOCATIONS.recall = "@tower{7,7,0}";
-		LOCATIONS.graveyard = "@tower{8,8,0}";
+		const tmpLocations: Locations = {
+			start: "@tower{6,6,0}",
+			recall: "@tower{7,7,0}",
+			graveyard: "@tower{8,8,0}",
+		};
+		setLocations(tmpLocations);
 
 		const locations = getAllLocations();
 
@@ -235,9 +247,12 @@ suite("package/locations.ts", () => {
 
 	test("getAllLocationRefs should return dictionary of reference strings", () => {
 		// Set up valid locations
-		LOCATIONS.start = "@tower{9,9,0}";
-		LOCATIONS.recall = "@tower{10,10,0}";
-		LOCATIONS.graveyard = "@tower{11,11,0}";
+		const tmpLocations: Locations = {
+			start: "@tower{9,9,0}",
+			recall: "@tower{10,10,0}",
+			graveyard: "@tower{11,11,0}",
+		};
+		setLocations(tmpLocations);
 
 		const locationRefs = getAllLocationRefs();
 
@@ -257,9 +272,18 @@ suite("package/locations.ts", () => {
 		assert.strictEqual(locationRefs.graveyard, "@tower{11,11,0}");
 
 		// Verify it's a copy (not a reference)
-		const originalStart = LOCATIONS.start;
-		LOCATIONS.start = "@tower{99,99,0}";
+		const tmpLocations2: Locations = {
+			start: "@tower{99,99,0}",
+			recall: "@tower{10,10,0}",
+			graveyard: "@tower{11,11,0}",
+		};
+		setLocations(tmpLocations2);
+		assert.strictEqual(LOCATIONS.start, "@tower{99,99,0}");
+		assert.strictEqual(LOCATIONS.recall, "@tower{10,10,0}");
+		assert.strictEqual(LOCATIONS.graveyard, "@tower{11,11,0}");
 		assert.strictEqual(locationRefs.start, "@tower{9,9,0}");
-		LOCATIONS.start = originalStart;
+		assert.strictEqual(locationRefs.recall, "@tower{10,10,0}");
+		assert.strictEqual(locationRefs.graveyard, "@tower{11,11,0}");
+		setLocations(tmpLocations);
 	});
 });

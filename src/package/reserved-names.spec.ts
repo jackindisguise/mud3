@@ -1,9 +1,9 @@
 import { suite, test, before } from "node:test";
 import assert from "node:assert";
 import { Dungeon, DungeonObjectTemplate } from "../dungeon.js";
-import reservedNamesPkg from "./reservedNames.js";
-import { isNameBlocked } from "../registry/reservedNames.js";
-import dungeonPkg from "./dungeon.js";
+import reservedNamesPkg from "./reserved-names.js";
+import { isNameBlocked } from "../registry/reserved-names.js";
+import dungeonPkg, { createDungeonInstance } from "./dungeon.js";
 
 suite("package/reservedNames.ts", () => {
 	let testDungeon: Dungeon;
@@ -13,7 +13,7 @@ suite("package/reservedNames.ts", () => {
 		await dungeonPkg.loader();
 
 		// Create a test dungeon with some mob templates
-		testDungeon = Dungeon.generateEmptyDungeon({
+		testDungeon = createDungeonInstance({
 			id: "test-dungeon",
 			dimensions: { width: 10, height: 10, layers: 1 },
 		});

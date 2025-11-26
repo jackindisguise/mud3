@@ -17,14 +17,15 @@
  * @module package/reservedNames
  */
 
-import { loadPackage, Package } from "package-loader";
+import { Package } from "package-loader";
 import logger from "../logger.js";
-import { DUNGEON_REGISTRY } from "../dungeon.js";
+import { DUNGEON_REGISTRY } from "../registry/dungeon.js";
+import dungeonPkg from "./dungeon.js";
 import { stripColors } from "../color.js";
 import {
 	addBlockedName,
 	clearBlockedNames,
-} from "../registry/reservedNames.js";
+} from "../registry/reserved-names.js";
 
 /**
  * Builds the cache of blocked names from all mob templates.
@@ -75,9 +76,8 @@ function buildBlockedNamesCache(): void {
 
 export default {
 	name: "reservedNames",
+	dependencies: [dungeonPkg],
 	loader: async () => {
-		await logger.block("reservedNames", async () => {
-			buildBlockedNamesCache();
-		});
+		buildBlockedNamesCache();
 	},
 } as Package;

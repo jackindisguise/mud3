@@ -17,6 +17,7 @@ import {
 	clearPathCache,
 	clearDungeonGraphCache,
 } from "./pathfinding.js";
+import { registerDungeonInstance } from "./package/dungeon.js";
 
 suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 	test("should find a path from dungeon A to E via linear links", () => {
@@ -24,8 +25,8 @@ suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 		clearDungeonGraphCache();
 		const ids = ["A", "B", "C", "D", "E"];
 		const size = 20;
-		const dungeons: Dungeon[] = ids.map((id) =>
-			Dungeon.generateEmptyDungeon(
+		const dungeons: Dungeon[] = ids.map((id) => {
+			const dungeon = Dungeon.generateEmptyDungeon(
 				{
 					id,
 					dimensions: { width: size, height: size, layers: size },
@@ -33,8 +34,11 @@ suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 				{
 					allowedExits: DIRECTIONS.reduce((acc, dir) => acc | dir),
 				}
-			)
-		);
+			);
+			// Register dungeon in registry (normally done by package layer)
+			registerDungeonInstance(dungeon);
+			return dungeon;
+		});
 
 		const rooms: Room[] = dungeons.map((d) => {
 			const r = d.contents[
@@ -87,6 +91,11 @@ suite("pathfinding - via refs returns flat direction list", () => {
 			id: "C-map",
 			dimensions: { width: 3, height: 3, layers: 1 },
 		});
+
+		// Register dungeons in registry (normally done by package layer)
+		registerDungeonInstance(A);
+		registerDungeonInstance(B);
+		registerDungeonInstance(C);
 
 		const A_220 = A.getRoom({ x: 2, y: 2, z: 0 }) as Room;
 		const B_020 = B.getRoom({ x: 0, y: 2, z: 0 }) as Room;

@@ -339,8 +339,6 @@ export async function loadBoards(): Promise<Board[]> {
 export default {
 	name: "board",
 	loader: async () => {
-		await logger.block("board", async () => {
-			await loadBoards();
-		});
+		await loadBoards();
 	},
 } as Package;

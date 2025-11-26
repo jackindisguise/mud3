@@ -133,60 +133,58 @@ function validateRelatedReferences(): void {
 export default {
 	name: "help",
 	loader: async () => {
-		await logger.block("help", async () => {
-			logger.debug(
-				`Loading helpfiles from ${relative(ROOT_DIRECTORY, HELP_DIRECTORY)}`
-			);
+		logger.debug(
+			`Loading helpfiles from ${relative(ROOT_DIRECTORY, HELP_DIRECTORY)}`
+		);
 
-			let loaded = 0;
-			let errors = 0;
+		let loaded = 0;
+		let errors = 0;
 
-			try {
-				const files = await readdir(HELP_DIRECTORY);
+		try {
+			const files = await readdir(HELP_DIRECTORY);
 
-				for (const file of files) {
-					// Skip files starting with underscore
-					if (file.startsWith("_")) {
-						continue;
-					}
-
-					// Only process .yaml files
-					if (extname(file).toLowerCase() !== ".yaml") {
-						continue;
-					}
-
-					const filePath = join(HELP_DIRECTORY, file);
-
-					try {
-						const helpfile = await loadHelpfile(filePath);
-						registerHelpfile(helpfile);
-						loaded++;
-					} catch (error) {
-						logger.error(
-							`Failed to load helpfile ${relative(ROOT_DIRECTORY, filePath)}: ${
-								error instanceof Error ? error.message : String(error)
-							}`
-						);
-						errors++;
-					}
+			for (const file of files) {
+				// Skip files starting with underscore
+				if (file.startsWith("_")) {
+					continue;
 				}
 
-				// Validate all related references after loading all helpfiles
-				validateRelatedReferences();
+				// Only process .yaml files
+				if (extname(file).toLowerCase() !== ".yaml") {
+					continue;
+				}
 
-				logger.info(
-					`Loaded ${loaded} helpfile(s)${
-						errors > 0 ? ` (${errors} error(s))` : ""
-					}`
-				);
-			} catch (error) {
-				logger.warn(
-					`Failed to read helpfile directory ${relative(
-						ROOT_DIRECTORY,
-						HELP_DIRECTORY
-					)}: ${error instanceof Error ? error.message : String(error)}`
-				);
+				const filePath = join(HELP_DIRECTORY, file);
+
+				try {
+					const helpfile = await loadHelpfile(filePath);
+					registerHelpfile(helpfile);
+					loaded++;
+				} catch (error) {
+					logger.error(
+						`Failed to load helpfile ${relative(ROOT_DIRECTORY, filePath)}: ${
+							error instanceof Error ? error.message : String(error)
+						}`
+					);
+					errors++;
+				}
 			}
-		});
+
+			// Validate all related references after loading all helpfiles
+			validateRelatedReferences();
+
+			logger.info(
+				`Loaded ${loaded} helpfile(s)${
+					errors > 0 ? ` (${errors} error(s))` : ""
+				}`
+			);
+		} catch (error) {
+			logger.warn(
+				`Failed to read helpfile directory ${relative(
+					ROOT_DIRECTORY,
+					HELP_DIRECTORY
+				)}: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
 	},
 } as Package;

@@ -253,8 +253,6 @@ async function loadAbilities() {
 export default {
 	name: "abilities",
 	loader: async () => {
-		await logger.block("abilities", async () => {
-			await loadAbilities();
-		});
+		await loadAbilities();
 	},
 } as Package;

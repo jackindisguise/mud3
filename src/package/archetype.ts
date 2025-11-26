@@ -295,35 +295,33 @@ function logSummary(): void {
 export default {
 	name: "archetype",
 	loader: async () => {
-		await logger.block("archetype", async () => {
-			logger.debug("Loading races...");
-			await logger.block("races", async () => {
-				const raceCount = await loadDirectory(RACES_DIRECTORY, "race");
-				if (raceCount === 0) {
-					logger.warn(
-						`No race archetypes found in ${relative(
-							ROOT_DIRECTORY,
-							RACES_DIRECTORY
-						)}`
-					);
-					throw new Error("No race archetypes found");
-				}
-			});
-			logger.debug("Loading jobs...");
-			await logger.block("jobs", async () => {
-				const jobCount = await loadDirectory(JOBS_DIRECTORY, "job");
-				if (jobCount === 0) {
-					logger.warn(
-						`No job archetypes found in ${relative(
-							ROOT_DIRECTORY,
-							JOBS_DIRECTORY
-						)}`
-					);
-					throw new Error("No job archetypes found");
-				}
-			});
-
-			logSummary();
+		logger.debug("Loading races...");
+		await logger.block("races", async () => {
+			const raceCount = await loadDirectory(RACES_DIRECTORY, "race");
+			if (raceCount === 0) {
+				logger.warn(
+					`No race archetypes found in ${relative(
+						ROOT_DIRECTORY,
+						RACES_DIRECTORY
+					)}`
+				);
+				throw new Error("No race archetypes found");
+			}
 		});
+		logger.debug("Loading jobs...");
+		await logger.block("jobs", async () => {
+			const jobCount = await loadDirectory(JOBS_DIRECTORY, "job");
+			if (jobCount === 0) {
+				logger.warn(
+					`No job archetypes found in ${relative(
+						ROOT_DIRECTORY,
+						JOBS_DIRECTORY
+					)}`
+				);
+				throw new Error("No job archetypes found");
+			}
+		});
+
+		logSummary();
 	},
 } as Package;

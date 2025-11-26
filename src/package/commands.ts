@@ -426,8 +426,6 @@ async function generateSocialCommands(): Promise<void> {
 export default {
 	name: "commands",
 	loader: async () => {
-		await logger.block("commands", async () => {
-			await loadCommands();
-		});
+		await loadCommands();
 	},
 } as Package;

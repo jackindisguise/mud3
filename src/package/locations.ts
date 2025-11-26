@@ -23,6 +23,7 @@ import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
+import dungeonPkg from "./dungeon.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import {
 	Locations,
@@ -118,10 +119,9 @@ export async function loadLocations() {
 
 export default {
 	name: "locations",
+	dependencies: [dungeonPkg],
 	loader: async () => {
 		// read locations.yaml
-		await logger.block("locations", async () => {
-			await loadLocations();
-		});
+		await loadLocations();
 	},
 } as Package;

@@ -32,7 +32,7 @@ import { MudServer, MudClient } from "./io.js";
 import { CommandContext, CommandRegistry } from "./command.js";
 import { Character, SerializedCharacter, MESSAGE_GROUP } from "./character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./dungeon.js";
-import { isNameBlocked } from "./registry/reservedNames.js";
+import { isNameBlocked } from "./registry/reserved-names.js";
 import { createMob } from "./package/dungeon.js";
 import { Race, Job } from "./archetype.js";
 import { showRoom } from "./commands/look.js";

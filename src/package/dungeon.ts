@@ -28,6 +28,7 @@
  * @module package/dungeon
  */
 import archetypePkg from "./archetype.js";
+import abilityPkg from "./ability.js";
 import {
 	getRaceById,
 	getJobById,
@@ -37,6 +38,11 @@ import {
 import type { Race, Job } from "../archetype.js";
 import { getAbilityById } from "../registry/ability.js";
 import { Ability, getProficiencyAtUses } from "../ability.js";
+import {
+	registerDungeon,
+	hasDungeon,
+	addWanderingMob,
+} from "../registry/dungeon.js";
 import { join, relative } from "path";
 import { mkdir, readFile, access, readdir } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
@@ -63,6 +69,7 @@ import {
 	DungeonObjectOptions,
 	Mob,
 	MobOptions,
+	BEHAVIOR,
 	Item,
 	Prop,
 	Equipment,
@@ -89,6 +96,7 @@ import {
 	type EquipmentTemplate,
 	type ArmorTemplate,
 	type WeaponTemplate,
+	DungeonOptions,
 } from "../dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
@@ -103,6 +111,12 @@ const DUNGEON_DIR = join(DATA_DIRECTORY, "dungeons");
  * Factory function to create a DungeonObject with an auto-generated OID.
  * This is the preferred way to create objects in package modules.
  */
+export function createDungeonInstance(options: DungeonOptions): Dungeon {
+	const dungeon = new Dungeon(options);
+	if (dungeon.id) registerDungeonInstance(dungeon);
+	return dungeon;
+}
+
 export function createDungeonObject(
 	options?: Omit<DungeonObjectOptions, "oid">
 ): DungeonObject {
@@ -110,6 +124,30 @@ export function createDungeonObject(
 		...options,
 		oid: getNextObjectId(),
 	});
+}
+
+/**
+ * Register a dungeon in the registry.
+ * This should be called after creating a dungeon with an id.
+ *
+ * @param dungeon The dungeon to register
+ * @throws Error if the dungeon id is already in use
+ */
+export function registerDungeonInstance(dungeon: Dungeon): void {
+	if (!dungeon.id) {
+		throw new Error("Cannot register dungeon without an id");
+	}
+	if (hasDungeon(dungeon.id)) {
+		throw new Error(`Dungeon id "${dungeon.id}" is already in use`);
+	}
+	registerDungeon(dungeon.id, dungeon);
+	const roomCount =
+		dungeon.dimensions.width *
+		dungeon.dimensions.height *
+		dungeon.dimensions.layers;
+	logger.debug(
+		`Registered dungeon "${dungeon.id}" with ${roomCount} cells (${dungeon.dimensions.width}x${dungeon.dimensions.height}x${dungeon.dimensions.layers})`
+	);
 }
 
 /**
@@ -123,12 +161,19 @@ export function createMob(
 ): Mob {
 	const race = options?.race ?? getDefaultRace();
 	const job = options?.job ?? getDefaultJob();
-	return new Mob({
+	const mob = new Mob({
 		...options,
 		race,
 		job,
 		oid: getNextObjectId(),
 	});
+
+	// Register in wandering mobs cache if wander behavior is enabled
+	if (mob.hasBehavior(BEHAVIOR.WANDER) && !mob.character) {
+		addWanderingMob(mob);
+	}
+
+	return mob;
 }
 
 /**
@@ -505,14 +550,18 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 
 		// Create dungeon
 		logger.debug(`[${id}] Stage 6: Creating dungeon instance`);
+		const dungeonId = data.dungeon.id || id;
 		const dungeon = new Dungeon({
-			id: data.dungeon.id || id,
-			name: name || data.dungeon.id || id,
+			id: dungeonId,
+			name: name || dungeonId,
 			description,
 			dimensions,
 			resetMessage,
 		});
 		logger.debug(`[${id}] Dungeon instance created: "${dungeon.name}"`);
+
+		// Register dungeon in registry
+		registerDungeonInstance(dungeon);
 
 		// Create rooms from grid
 		// Reverse the grid array so that YAML files can have top floor first
@@ -1347,12 +1396,18 @@ export function deserializeMob(data: SerializedMob): Mob {
 		mob.recalculateDerivedAttributes(mob.captureResourceRatios());
 		logger.debug(`Mob deserialization complete`);
 	}
+
+	// Register in wandering mobs cache if wander behavior is enabled
+	if (mob.hasBehavior(BEHAVIOR.WANDER) && !mob.character) {
+		addWanderingMob(mob);
+	}
+
 	return mob;
 }
 
 export default {
 	name: "dungeon",
-	dependencies: [archetypePkg],
+	dependencies: [archetypePkg, abilityPkg],
 	loader: async () => {
 		await logger.block("dungeon", async () => {
 			const dungeons = await loadDungeons();

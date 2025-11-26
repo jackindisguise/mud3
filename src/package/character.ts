@@ -388,13 +388,8 @@ export default {
 	name: "character",
 	dependencies: [archetypePkg],
 	loader: async () => {
-		await logger.block("character", async () => {
-			logger.debug(
-				`Character storage directory ready: ${relative(
-					ROOT_DIRECTORY,
-					CHAR_DIR
-				)}`
-			);
-		});
+		logger.debug(
+			`Character storage directory ready: ${relative(ROOT_DIRECTORY, CHAR_DIR)}`
+		);
 	},
 } as Package;

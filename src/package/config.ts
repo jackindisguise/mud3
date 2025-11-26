@@ -128,8 +128,6 @@ export default {
 	name: "config",
 	loader: async () => {
 		// read config.yaml
-		await logger.block("config", async () => {
-			await loadConfig();
-		});
+		await loadConfig();
 	},
 } as Package;

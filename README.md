@@ -65,7 +65,7 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 
 - **YAML-Based Storage**: All game data (characters, dungeons, boards) stored in YAML files
 - **Auto-Save**: Periodic automatic saves of game state
-- **Package System**: Modular loading system for commands, configs, archetypes, abilities, and more
+- **Package System**: Automated package discovery and dependency-ordered loading system
 
 ## Technology Stack
 
@@ -129,11 +129,23 @@ npm start
 # Run tests
 npm test
 
+# Run TypeScript tests (with source maps)
+npm run test:ts
+
+# Run individual test files for easier debugging
+npm run test:individual:ts
+
+# Type-check without building
+npm run build:ts
+
 # Generate documentation
 npm run doc
 
 # Run with auto-rebuild
 npm run rerun
+
+# Run TypeScript directly (development)
+npm run start:ts
 
 # Launch the Electron-based dungeon editor
 npm run electron:dev
@@ -143,13 +155,41 @@ npm run electron:mac
 npm run electron:win:portable
 ```
 
+## Architecture
+
+The codebase follows a clear separation of concerns:
+
+- **`src/core/`** - Core modules containing type definitions, classes, and core logic. These modules define the fundamental game entities and should never import from package modules.
+- **`src/registry/`** - Registry modules providing runtime data access and helper functions. These manage centralized data structures and provide readonly views for external access.
+- **`src/package/`** - Package modules handling loading, serialization, and persistence. These modules load data from files and populate the registries.
+- **`src/commands/`** - Command implementations loaded by the commands package.
+- **`src/abilities/`** - Ability implementations loaded by the abilities package.
+- **`src/`** - Utility modules (game.ts, combat.ts, act.ts, etc.) that facilitate game functionality.
+
+The package system automatically discovers all packages in `src/package/`, builds a dependency graph, and loads them in the correct order using topological sorting.
+
 ## Project Structure
 
 - `src/` - Source code (TypeScript)
-  - `commands/` - Game commands (movement, combat, social, etc.)
-  - `abilities/` - Ability definitions (Whirlwind, Pure Power, etc.)
+  - `core/` - Core modules (types, classes, core logic)
+    - `dungeon.ts` - Dungeon, Room, Mob, Item classes and types
+    - `character.ts` - Character class and message grouping
+    - `command.ts` - Command system framework
+    - `archetype.ts` - Race and Job types
+    - `ability.ts` - Ability types
+    - `board.ts`, `channel.ts`, `color.ts`, `equipment.ts`, etc.
+  - `registry/` - Registry modules (runtime data access)
+    - `dungeon.ts` - Dungeon registry and room link management
+    - `character.ts` - Active character tracking
+    - `config.ts`, `gamestate.ts`, `help.ts`, `locations.ts`, etc.
+  - `package/` - Package modules (loading and serialization)
+    - Automatically discovered and loaded in dependency order
+    - Handles loading from YAML files and populating registries
+  - `commands/` - Command implementations
+  - `abilities/` - Ability implementations
   - `electron/` - Electron main process and preload scripts
-  - `package/` - Package loaders (commands, abilities, configs, etc.)
+  - `utils/` - Utility functions
+- `package.ts` - Automated package loader with dependency resolution
 - `data/` - Game data files (characters, dungeons, configs, help files)
   - `dungeons/` - Dungeon definitions
   - `characters/` - Player character data

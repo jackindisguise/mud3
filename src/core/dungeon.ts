@@ -75,7 +75,7 @@ import {
 import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { act } from "../act.js";
-import { Game } from "../game.js";
+import { forEachCharacter } from "../game.js";
 import {
 	removeFromCombatQueue,
 	handleDeath,
@@ -1032,7 +1032,7 @@ export class Dungeon {
 		message: string,
 		group: MESSAGE_GROUP = MESSAGE_GROUP.SYSTEM
 	): void {
-		Game.game!.forEachCharacter((character) => {
+		forEachCharacter((character) => {
 			if (character.mob!.dungeon !== this) return;
 			character.sendMessage(message, group);
 		});

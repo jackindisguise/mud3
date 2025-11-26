@@ -47,7 +47,7 @@
 import { DungeonObject, Item, Room, DIRECTION, text2dir } from "./dungeon.js";
 import { Mob, Equipment } from "./dungeon.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
-import { Game } from "../game.js";
+import { forEachCharacter } from "../game.js";
 import logger from "../logger.js";
 
 /**
@@ -1277,7 +1277,7 @@ export abstract class Command {
 	 * like "2.alice" to select the 2nd matching character (1-based).
 	 *
 	 * Returns undefined if:
-	 * - No Game instance is available (Game.game is undefined)
+	 * - No characters are currently online
 	 * - No online character matches the provided username/keywords
 	 * - The specified index is out of range
 	 *
@@ -1300,13 +1300,11 @@ export abstract class Command {
 		keywords: string,
 		context: CommandContext
 	): Character | undefined {
-		if (!Game.game) return undefined;
-
 		const { index, keywords: searchKeywords } =
 			this.parseNumberPrefix(keywords);
 		const matches: Character[] = [];
 
-		Game.game.forEachCharacter((char: Character) => {
+		forEachCharacter((char: Character) => {
 			// Check username match (case-insensitive)
 			if (
 				char.credentials.username.toLowerCase() === searchKeywords.toLowerCase()

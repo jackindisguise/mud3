@@ -21,7 +21,7 @@ import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { Game } from "../game.js";
+import { forEachCharacter } from "../game.js";
 import { CHANNEL, formatChannelMessage } from "../core/channel.js";
 
 export default {
@@ -53,7 +53,7 @@ export default {
 		}
 
 		// Send to all characters in the OOC channel
-		Game.game!.forEachCharacter((recipient) => {
+		forEachCharacter((recipient) => {
 			recipient.sendChat(character, message, CHANNEL.OOC);
 		});
 	},

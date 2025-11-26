@@ -70,8 +70,8 @@ await logger.block("pathfinding", async () => {
 	});
 });
 
-// Start the game using startGame() to properly set Game.game singleton
-const game = await startGame();
+// Start the game
+const stopGame = await startGame();
 const timeout = 1000 * 6000;
 logger.info(
 	`Game server started. It will shut down automatically in ${
@@ -82,7 +82,7 @@ logger.info(
 setTimeout(async () => {
 	try {
 		logger.info("Auto-shutdown timer reached. Stopping game server...");
-		await game.stop();
+		await stopGame();
 		logger.info("Game server stopped. Exiting process.");
 	} catch (err) {
 		logger.error("Error during auto-shutdown:", err);

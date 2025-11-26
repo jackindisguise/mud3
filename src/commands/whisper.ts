@@ -21,7 +21,6 @@ import { CommandContext, ParseResult, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP, Character } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { CHANNEL } from "../core/channel.js";
-import { Game } from "../game.js";
 
 export default {
 	pattern: "whisper~ <target:character> <message:text>",

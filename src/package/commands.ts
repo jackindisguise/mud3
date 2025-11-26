@@ -39,7 +39,13 @@ import { runInNewContext } from "vm";
 import YAML from "js-yaml";
 import logger from "../logger.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Game } from "../game.js";
+import {
+	forEachCharacter,
+	broadcast,
+	announce,
+	forEachSession,
+	getGameStats,
+} from "../game.js";
 import { access } from "fs/promises";
 import { constants } from "fs";
 import {
@@ -172,8 +178,14 @@ export class YAMLCommandAdapter extends Command {
 			room: context.room,
 			// Provide MESSAGE_GROUP enum for message routing
 			MESSAGE_GROUP,
-			// Provide access to game instance for global operations
-			game: Game.game,
+			// Provide access to game functions for global operations
+			game: {
+				forEachCharacter,
+				broadcast,
+				announce,
+				forEachSession,
+				getGameStats,
+			},
 			// If this is an error handler, provide the parse result
 			result,
 			// Provide console for debugging (consider removing in production)

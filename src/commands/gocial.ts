@@ -18,7 +18,7 @@
 import { CommandContext, ParseResult } from "../core/command.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
-import { Game } from "../game.js";
+import { forEachCharacter } from "../game.js";
 import { CHANNEL, formatChannelMessage } from "../core/channel.js";
 import { getSocialCommand, getSocialCommandNames } from "../social.js";
 import { formatSocialMessage } from "./_social.js";
@@ -95,7 +95,7 @@ export default {
 				? formatSocialMessage(messages.target, userDisplay, targetDisplay)
 				: undefined;
 
-		Game.game!.forEachCharacter((recipient) => {
+		forEachCharacter((recipient) => {
 			if (!recipient.isInChannel(CHANNEL.GOCIAL)) return;
 
 			// Check if recipient is blocking the speaker

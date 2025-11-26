@@ -7,7 +7,7 @@
  * @module board
  */
 
-import { Game } from "../game.js";
+import { forEachCharacter } from "../game.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 
 export interface BoardMessage {
@@ -131,8 +131,8 @@ export class Board {
 		this.messages.push(message);
 
 		// Notify targeted characters that they have mail
-		if (message.targets && message.targets.length > 0 && Game.game) {
-			Game.game.forEachCharacter((character: Character) => {
+		if (message.targets && message.targets.length > 0) {
+			forEachCharacter((character: Character) => {
 				const targetUsername = character.credentials.username.toLowerCase();
 				const isTarget = message.targets!.some(
 					(t) => t.toLowerCase() === targetUsername

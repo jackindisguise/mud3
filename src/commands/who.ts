@@ -29,7 +29,7 @@
 import { CommandContext } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
-import { Game } from "../game.js";
+import { getGameStats, forEachCharacter } from "../game.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { color, COLOR, SIZER } from "../core/color.js";
 import { string } from "mud-ext";
@@ -38,9 +38,8 @@ export default {
 	pattern: "who~",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor } = context;
-		const game = Game.game!;
 
-		const stats = game.getGameStats();
+		const stats = getGameStats();
 		const players: Array<{
 			name: string;
 			race: string;
@@ -49,7 +48,7 @@ export default {
 		}> = [];
 
 		// Collect all active player names
-		game.forEachCharacter((character) => {
+		forEachCharacter((character) => {
 			const raceName = character.mob?.race?.name ?? "Unknown";
 			const jobName = character.mob?.job?.name ?? "Unknown";
 			players.push({

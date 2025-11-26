@@ -347,7 +347,10 @@ function displayMessage(actor: any, board: Board, msg: BoardMessage): void {
 	// Add target field if message has targets
 	if (msg.targets && msg.targets.length > 0) {
 		headerLines.push(
-			`${color("Target:", COLOR.CYAN)} ${color(msg.targets.join(", "), COLOR.YELLOW)}`
+			`${color("Target:", COLOR.CYAN)} ${color(
+				msg.targets.join(", "),
+				COLOR.YELLOW
+			)}`
 		);
 	}
 

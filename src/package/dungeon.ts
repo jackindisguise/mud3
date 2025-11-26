@@ -93,7 +93,7 @@ import {
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
-import { getNextObjectIdSync } from "./gamestate.js";
+import { getNextObjectId } from "../registry/gamestate.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -108,7 +108,7 @@ export function createDungeonObject(
 ): DungeonObject {
 	return new DungeonObject({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -127,7 +127,7 @@ export function createMob(
 		...options,
 		race,
 		job,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -137,7 +137,7 @@ export function createMob(
 export function createRoom(options: Omit<RoomOptions, "oid">): Room {
 	return new Room({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -147,7 +147,7 @@ export function createRoom(options: Omit<RoomOptions, "oid">): Room {
 export function createItem(options?: Omit<DungeonObjectOptions, "oid">): Item {
 	return new Item({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -157,7 +157,7 @@ export function createItem(options?: Omit<DungeonObjectOptions, "oid">): Item {
 export function createProp(options?: Omit<DungeonObjectOptions, "oid">): Prop {
 	return new Prop({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -169,7 +169,7 @@ export function createEquipment(
 ): Equipment {
 	return new Equipment({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -179,7 +179,7 @@ export function createEquipment(
 export function createArmor(options?: Omit<ArmorOptions, "oid">): Armor {
 	return new Armor({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -189,7 +189,7 @@ export function createArmor(options?: Omit<ArmorOptions, "oid">): Armor {
 export function createWeapon(options?: Omit<WeaponOptions, "oid">): Weapon {
 	return new Weapon({
 		...options,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 }
 
@@ -207,7 +207,7 @@ function createFromTemplate(
 	oid?: number
 ): DungeonObject {
 	let obj: DungeonObject;
-	const providedOid = oid ?? getNextObjectIdSync();
+	const providedOid = oid ?? getNextObjectId();
 
 	// Create the appropriate object type
 	switch (template.type) {
@@ -302,7 +302,7 @@ function createFromTemplate(
 export function createFromTemplateWithOid(
 	template: DungeonObjectTemplate
 ): DungeonObject {
-	return createFromTemplate(template, getNextObjectIdSync());
+	return createFromTemplate(template, getNextObjectId());
 }
 
 /**
@@ -315,7 +315,7 @@ export function createRoomFromTemplate(
 	const room = new Room({
 		coordinates,
 		templateId: template.id,
-		oid: getNextObjectIdSync(),
+		oid: getNextObjectId(),
 	});
 	room.applyTemplate(template);
 	return room;

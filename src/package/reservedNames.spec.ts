@@ -1,8 +1,8 @@
 import { suite, test, before } from "node:test";
 import assert from "node:assert";
 import { Dungeon, DungeonObjectTemplate } from "../dungeon.js";
-import { isNameBlocked } from "./reservedNames.js";
 import reservedNamesPkg from "./reservedNames.js";
+import { isNameBlocked } from "../registry/reservedNames.js";
 import dungeonPkg from "./dungeon.js";
 
 suite("package/reservedNames.ts", () => {

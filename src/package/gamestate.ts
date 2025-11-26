@@ -14,6 +14,7 @@
  *
  * @example
  * import gamestatePkg, { getElapsedTime, getNextCharacterId, saveGameState } from './package/gamestate.js';
+ * import { getElapsedTime, getNextCharacterId } from '../registry/gamestate.js';
  * await gamestatePkg.loader();
  * const elapsed = getElapsedTime(); // milliseconds since game started
  * const characterId = await getNextCharacterId(); // get next unique character ID
@@ -27,57 +28,25 @@ import { readFile, writeFile, rename, unlink } from "fs/promises";
 import logger from "../logger.js";
 import YAML from "js-yaml";
 import { getSafeRootDirectory } from "../utils/path.js";
+import {
+	GAME_STATE,
+	GAME_STATE_DEFAULT,
+	type SerializedGameState,
+	setGameState,
+	setSessionStartTime,
+	getNextCharacterId as getNextCharacterIdFromRegistry,
+	getNextObjectId as getNextObjectIdFromRegistry,
+	updateLastSaved,
+	GameState,
+} from "../registry/gamestate.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const GAMESTATE_PATH = join(DATA_DIRECTORY, "gamestate.yaml");
 
-/**
- * Serialized game state structure.
- */
-export interface SerializedGameState {
-	/** Total elapsed game time in milliseconds */
-	elapsedTime: number;
-	/** Timestamp when this state was last saved (ISO string) */
-	lastSaved: string;
-	/** Next character ID to assign */
-	nextCharacterId: number;
-	/** Next object ID (OID) to assign */
-	nextObjectId: number;
-}
-
-export const GAME_STATE_DEFAULT: SerializedGameState = {
-	elapsedTime: 0,
-	lastSaved: new Date().toISOString(),
-	nextCharacterId: 1,
-	nextObjectId: 1,
-} as const;
-
-// make a copy of the default, don't reference it directly plz
-export const GAME_STATE: SerializedGameState = {
-	...GAME_STATE_DEFAULT,
-};
-
-/**
- * Timestamp when the current session started (for calculating session elapsed time).
- */
-let sessionStartTime: number = Date.now();
-
-/**
- * Get the total elapsed game time in milliseconds.
- * This includes time from previous sessions plus time in the current session.
- */
-export function getElapsedTime(): number {
-	const sessionElapsed = Date.now() - sessionStartTime;
-	return GAME_STATE.elapsedTime + sessionElapsed;
-}
-
-/**
- * Get the elapsed time since the last save.
- */
-export function getSessionElapsedTime(): number {
-	return Date.now() - sessionStartTime;
-}
+// Re-export types and constants for backwards compatibility
+export type { SerializedGameState };
+export { GAME_STATE, GAME_STATE_DEFAULT };
 
 /**
  * Get the next available character ID and increment the counter.
@@ -87,8 +56,7 @@ export function getSessionElapsedTime(): number {
  * @returns The next character ID to assign
  */
 export async function getNextCharacterId(): Promise<number> {
-	const id = GAME_STATE.nextCharacterId;
-	GAME_STATE.nextCharacterId++;
+	const id = getNextCharacterIdFromRegistry();
 	await saveGameState();
 	return id;
 }
@@ -101,22 +69,8 @@ export async function getNextCharacterId(): Promise<number> {
  * @returns The next object ID to assign
  */
 export async function getNextObjectId(): Promise<number> {
-	const id = GAME_STATE.nextObjectId;
-	GAME_STATE.nextObjectId++;
+	const id = getNextObjectIdFromRegistry();
 	await saveGameState();
-	return id;
-}
-
-/**
- * Get the next available object ID (OID) synchronously and increment the counter.
- * This version does not save immediately, but the ID is guaranteed to be unique.
- * The gamestate will be saved periodically or on the next async save operation.
- *
- * @returns The next object ID to assign
- */
-export function getNextObjectIdSync(): number {
-	const id = GAME_STATE.nextObjectId;
-	GAME_STATE.nextObjectId++;
 	return id;
 }
 
@@ -135,6 +89,8 @@ export async function loadGameState(): Promise<void> {
 			| undefined;
 		const data = parsed ?? {};
 
+		const safe: GameState = { ...GAME_STATE_DEFAULT };
+
 		// Merge elapsedTime
 		if (data.elapsedTime !== undefined) {
 			// Calculate downtime and add it to elapsed time
@@ -145,46 +101,43 @@ export async function loadGameState(): Promise<void> {
 			const downtime = currentTime - savedTime;
 
 			// Add downtime to elapsed time
-			GAME_STATE.elapsedTime = data.elapsedTime + downtime;
+			safe.elapsedTime = data.elapsedTime + downtime;
 
 			logger.debug(
 				`Game state loaded. Server was down for ${Math.round(
 					downtime / 1000
 				)} seconds. Total elapsed time: ${Math.round(
-					GAME_STATE.elapsedTime / 1000
+					safe.elapsedTime / 1000
 				)} seconds.`
 			);
 		} else {
-			logger.debug(`DEFAULT elapsedTime = ${GAME_STATE.elapsedTime}`);
+			logger.debug(`DEFAULT elapsedTime = ${safe.elapsedTime}`);
 		}
 
 		// Merge lastSaved
 		if (data.lastSaved !== undefined) {
-			if (GAME_STATE.lastSaved === data.lastSaved) {
-				logger.debug(`DEFAULT lastSaved = ${data.lastSaved}`);
-			} else {
-				GAME_STATE.lastSaved = data.lastSaved;
-				logger.debug(`Set lastSaved = ${data.lastSaved}`);
-			}
+			const lastSaved = new Date(data.lastSaved);
+			safe.lastSaved = lastSaved;
+			logger.debug(`Set lastSaved = ${data.lastSaved}`);
 		}
 
 		// Merge nextCharacterId
 		if (data.nextCharacterId !== undefined) {
-			GAME_STATE.nextCharacterId = data.nextCharacterId;
-			logger.debug(`Loaded nextCharacterId = ${GAME_STATE.nextCharacterId}`);
+			safe.nextCharacterId = data.nextCharacterId;
+			logger.debug(`Loaded nextCharacterId = ${safe.nextCharacterId}`);
 		} else {
-			logger.debug(`DEFAULT nextCharacterId = ${GAME_STATE.nextCharacterId}`);
+			logger.debug(`DEFAULT nextCharacterId = ${safe.nextCharacterId}`);
 		}
 
 		// Merge nextObjectId
 		if (data.nextObjectId !== undefined) {
-			GAME_STATE.nextObjectId = data.nextObjectId;
-			logger.debug(`Loaded nextObjectId = ${GAME_STATE.nextObjectId}`);
+			safe.nextObjectId = data.nextObjectId;
+			logger.debug(`Loaded nextObjectId = ${safe.nextObjectId}`);
 		} else {
-			logger.debug(`DEFAULT nextObjectId = ${GAME_STATE.nextObjectId}`);
+			logger.debug(`DEFAULT nextObjectId = ${safe.nextObjectId}`);
 		}
 
-		sessionStartTime = Date.now();
+		setGameState(safe);
 		logger.info("Game state loaded successfully");
 	} catch (error: any) {
 		// File doesn't exist or other error - save default gamestate
@@ -211,14 +164,17 @@ export async function saveGameState() {
 	const tempPath = `${GAMESTATE_PATH}.tmp`;
 	try {
 		// Update elapsed time with current session time before saving
-		const sessionElapsed = Date.now() - sessionStartTime;
-		GAME_STATE.elapsedTime += sessionElapsed;
-		sessionStartTime = Date.now(); // Reset session start
+		const now = new Date();
+		updateLastSaved(now);
 
-		// Update lastSaved timestamp
-		GAME_STATE.lastSaved = new Date().toISOString();
+		const serialized: SerializedGameState = {
+			elapsedTime: GAME_STATE.elapsedTime,
+			lastSaved: GAME_STATE.lastSaved?.toISOString(),
+			nextCharacterId: GAME_STATE.nextCharacterId,
+			nextObjectId: GAME_STATE.nextObjectId,
+		};
 
-		const yaml = YAML.dump(GAME_STATE, {
+		const yaml = YAML.dump(serialized, {
 			noRefs: true,
 			lineWidth: 120,
 		});

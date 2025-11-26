@@ -55,7 +55,7 @@
 
 import { Mob, SerializedMob } from "./dungeon.js";
 import { createHash } from "crypto";
-import { CONFIG } from "./package/config.js";
+import { CONFIG } from "./registry/config.js";
 import type { MudClient } from "./io.js";
 import { CHANNEL, formatChannelMessage } from "./channel.js";
 import { LINEBREAK } from "./telnet.js";

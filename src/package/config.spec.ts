@@ -4,7 +4,8 @@ import { readFile, writeFile, unlink, copyFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import YAML from "js-yaml";
-import config, { CONFIG, CONFIG_DEFAULT } from "./config.js";
+import config from "./config.js";
+import { CONFIG, CONFIG_DEFAULT } from "../registry/config.js";
 
 const CONFIG_PATH = join(process.cwd(), "data", "config.yaml");
 const BACKUP_PATH = join(process.cwd(), "data", "config.yaml.backup");

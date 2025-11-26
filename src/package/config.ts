@@ -2,8 +2,7 @@
  * Package: config - YAML configuration loader
  *
  * Loads `data/config.yaml` (creating it with sensible defaults if missing),
- * merges it into the in-memory `CONFIG` object, and exposes typed config
- * shapes for game, server, and security settings.
+ * merges it into the in-memory `CONFIG` object from the config registry.
  *
  * Behavior
  * - Reads YAML from `data/config.yaml`
@@ -12,7 +11,8 @@
  * - Logs details at `info`/`debug` levels, including default vs overridden
  *
  * @example
- * import configPkg, { CONFIG } from './package/config.js';
+ * import configPkg from './package/config.js';
+ * import { CONFIG } from '../registry/config.js';
  * await configPkg.loader();
  * console.log(CONFIG.server.port);
  *
@@ -24,51 +24,19 @@ import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
+import {
+	CONFIG,
+	CONFIG_DEFAULT,
+	type Config,
+	type GameConfig,
+	type ServerConfig,
+	type SecurityConfig,
+	setConfig,
+} from "../registry/config.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const CONFIG_PATH = join(DATA_DIRECTORY, "config.yaml");
-
-export type GameConfig = {
-	name: string;
-	creator: string;
-};
-
-export type ServerConfig = {
-	port: number;
-	inactivity_timeout: number;
-};
-
-export type SecurityConfig = {
-	password_salt: string;
-};
-
-export type Config = {
-	game: GameConfig;
-	server: ServerConfig;
-	security: SecurityConfig;
-};
-
-export const CONFIG_DEFAULT: Config = {
-	game: {
-		name: "mud3",
-		creator: "jackindisguise",
-	},
-	server: {
-		port: 23,
-		inactivity_timeout: 1800,
-	},
-	security: {
-		password_salt: "changeme_default_salt_12345",
-	},
-} as const;
-
-// make a copy of the default, don't reference it directly plz
-export const CONFIG: Config = {
-	game: { ...CONFIG_DEFAULT.game },
-	server: { ...CONFIG_DEFAULT.server },
-	security: { ...CONFIG_DEFAULT.security },
-};
 
 export async function loadConfig() {
 	logger.debug(`Loading config from ${relative(ROOT_DIRECTORY, CONFIG_PATH)}`);
@@ -76,6 +44,7 @@ export async function loadConfig() {
 		const content = await readFile(CONFIG_PATH, "utf-8");
 		const parsed = YAML.load(content) as Partial<Config> | undefined;
 		const config = parsed ?? {};
+		const safe: Config = { ...CONFIG_DEFAULT };
 
 		// merge game config
 		if (config.game) {
@@ -85,7 +54,7 @@ export async function loadConfig() {
 						logger.debug(`DEFAULT game.${key} = ${config.game[key]}`);
 						continue;
 					}
-					CONFIG.game[key] = config.game[key] as any;
+					safe.game[key] = config.game[key] as any;
 					logger.debug(`Set game.${key} = ${config.game[key]}`, {
 						config: config,
 					});
@@ -103,7 +72,7 @@ export async function loadConfig() {
 						logger.debug(`DEFAULT server.${key} = ${config.server[key]}`);
 						continue;
 					}
-					CONFIG.server[key] = config.server[key] as any;
+					safe.server[key] = config.server[key] as any;
 					logger.debug(`Set server.${key} = ${config.server[key]}`);
 				}
 			}
@@ -119,12 +88,13 @@ export async function loadConfig() {
 						logger.debug(`DEFAULT security.${key} = ${config.security[key]}`);
 						continue;
 					}
-					CONFIG.security[key] = config.security[key] as any;
+					safe.security[key] = config.security[key] as any;
 					logger.debug(`Set security.${key} = ${config.security[key]}`);
 				}
 			}
 		}
 
+		setConfig(safe);
 		logger.info("Config loaded successfully");
 	} catch (error) {
 		// if file can't be read or doesn't exist, save default config

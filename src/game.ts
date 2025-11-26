@@ -36,7 +36,7 @@ import { isNameBlocked } from "./package/reservedNames.js";
 import { createMob } from "./package/dungeon.js";
 import { Race, Job } from "./archetype.js";
 import { showRoom } from "./commands/look.js";
-import { CONFIG } from "./package/config.js";
+import { CONFIG } from "./registry/config.js";
 import {
 	saveCharacter as saveCharacterFile,
 	loadCharacter as loadCharacterFile,

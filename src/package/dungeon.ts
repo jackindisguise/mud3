@@ -102,6 +102,7 @@ import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { getNextObjectId } from "../registry/gamestate.js";
+import { migrateDungeonData } from "../migrations/dungeon/runner.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -395,6 +396,7 @@ export interface SerializedReset {
  * Serialized dungeon format structure.
  */
 export interface SerializedDungeonFormat {
+	version?: string; // Project version when this file was saved
 	dungeon: {
 		id?: string;
 		name?: string;
@@ -495,11 +497,15 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		logger.debug(
 			`[${id}] Stage 2: Parsing YAML content (${content.length} bytes)`
 		);
-		const data = YAML.load(content) as SerializedDungeonFormat;
+		let data = YAML.load(content) as SerializedDungeonFormat;
 
 		if (!data.dungeon) {
 			throw new Error("Invalid dungeon format: missing 'dungeon' key");
 		}
+
+		// Stage 2.5: Migrate data if needed
+		logger.debug(`[${id}] Stage 2.5: Checking for migrations`);
+		data = await migrateDungeonData(data, id);
 
 		logger.debug(`[${id}] Stage 3: Extracting dungeon data`);
 		const {

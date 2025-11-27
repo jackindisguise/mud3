@@ -283,18 +283,17 @@ export async function checkCharacterPassword(
 	}
 
 	const content = await readFile(filePath, "utf-8");
-	let raw = YAML.load(content) as SerializedCharacter & { version?: string };
-
-	// Migrate character data if needed (but don't save - this is just for password checking)
-	raw = await migrateCharacterData(raw, username);
+	const raw = YAML.load(content) as SerializedCharacter & { version?: string };
 
 	// Hash the input password and compare with stored hash
+	// Note: We don't migrate here - migration happens in deserializeCharacter
 	const hashedPassword = hashPassword(password);
 	if (raw.credentials.passwordHash !== hashedPassword) {
 		logger.debug(`Password mismatch for user: ${username}`);
 		return undefined;
 	}
 
+	// Return raw data - migration will happen when deserializing
 	return raw;
 }
 
@@ -306,63 +305,71 @@ export async function checkCharacterPassword(
  * @returns New Character instance
  */
 export async function deserializeCharacter(
-	data: SerializedCharacter
+	data: SerializedCharacter & { version?: string }
 ): Promise<Character> {
-	const mobDataWithType: SerializedMob = { ...data.mob!, type: "Mob" };
-	// Deserialize the mob using the package deserializer
-	const mob = await deserializeMob(mobDataWithType);
+	const version = data.version;
+	// Migrate character data first
+	const migratedData = await migrateCharacterData(
+		data,
+		data.credentials?.username
+	);
+
+	const mobDataWithType: SerializedMob = { ...migratedData.mob!, type: "Mob" };
+	// Deserialize the mob using the package deserializer, passing character version for nested objects
+	const mob = await deserializeMob(mobDataWithType, true, version);
 
 	// Handle backward compatibility: if characterId is missing, assign a temporary one
-	const characterId = data.credentials.characterId ?? Number.MAX_SAFE_INTEGER;
+	const characterId =
+		migratedData.credentials.characterId ?? Number.MAX_SAFE_INTEGER;
 
 	const creds = {
 		characterId,
-		username: data.credentials.username,
-		passwordHash: data.credentials.passwordHash,
-		email: data.credentials.email,
-		createdAt: new Date(data.credentials.createdAt),
-		lastLogin: new Date(data.credentials.lastLogin),
-		isActive: data.credentials.isActive,
-		isBanned: data.credentials.isBanned,
-		isAdmin: data.credentials.isAdmin,
+		username: migratedData.credentials.username,
+		passwordHash: migratedData.credentials.passwordHash,
+		email: migratedData.credentials.email,
+		createdAt: new Date(migratedData.credentials.createdAt),
+		lastLogin: new Date(migratedData.credentials.lastLogin),
+		isActive: migratedData.credentials.isActive,
+		isBanned: migratedData.credentials.isBanned,
+		isAdmin: migratedData.credentials.isAdmin,
 	};
 
 	// Convert channels and blockedUsers arrays back to Sets
 	const settings: PlayerSettings = {
-		receiveOOC: data.settings.receiveOOC,
-		verboseMode: data.settings.verboseMode,
-		prompt: data.settings.prompt,
-		colorEnabled: data.settings.colorEnabled,
-		autoLook: data.settings.autoLook,
-		briefMode: data.settings.briefMode,
-		echoMode: data.settings.echoMode,
-		busyModeEnabled: data.settings.busyModeEnabled,
+		receiveOOC: migratedData.settings.receiveOOC,
+		verboseMode: migratedData.settings.verboseMode,
+		prompt: migratedData.settings.prompt,
+		colorEnabled: migratedData.settings.colorEnabled,
+		autoLook: migratedData.settings.autoLook,
+		briefMode: migratedData.settings.briefMode,
+		echoMode: migratedData.settings.echoMode,
+		busyModeEnabled: migratedData.settings.busyModeEnabled,
 		channels:
-			data.settings.channels !== undefined
-				? new Set(data.settings.channels)
+			migratedData.settings.channels !== undefined
+				? new Set(migratedData.settings.channels)
 				: new Set(),
 		blockedUsers:
-			data.settings.blockedUsers !== undefined
-				? new Set(data.settings.blockedUsers)
+			migratedData.settings.blockedUsers !== undefined
+				? new Set(migratedData.settings.blockedUsers)
 				: undefined,
 		busyForwardedGroups:
-			data.settings.busyForwardedGroups !== undefined
-				? new Set(data.settings.busyForwardedGroups)
+			migratedData.settings.busyForwardedGroups !== undefined
+				? new Set(migratedData.settings.busyForwardedGroups)
 				: new Set([MESSAGE_GROUP.CHANNELS]),
 		combatBusyForwardedGroups:
-			data.settings.combatBusyForwardedGroups !== undefined
-				? new Set(data.settings.combatBusyForwardedGroups)
+			migratedData.settings.combatBusyForwardedGroups !== undefined
+				? new Set(migratedData.settings.combatBusyForwardedGroups)
 				: new Set([MESSAGE_GROUP.CHANNELS]),
 		defaultColor:
-			data.settings.defaultColor !== undefined
-				? COLOR_NAME_TO_COLOR[data.settings.defaultColor]
+			migratedData.settings.defaultColor !== undefined
+				? COLOR_NAME_TO_COLOR[migratedData.settings.defaultColor]
 				: undefined,
 	};
 
 	const character = new Character({
 		credentials: creds,
 		settings: settings,
-		stats: data.stats,
+		stats: migratedData.stats,
 		mob,
 	});
 
@@ -406,11 +413,9 @@ export async function loadCharacter(
 	}
 
 	const content = await readFile(filePath, "utf-8");
-	let raw = YAML.load(content) as SerializedCharacter & { version?: string };
+	const raw = YAML.load(content) as SerializedCharacter & { version?: string };
 
-	// Migrate character data if needed
-	raw = await migrateCharacterData(raw, username);
-
+	// Migration happens inside deserializeCharacter
 	const character = await deserializeCharacter(raw);
 	// Auto-register as active upon successful load
 	registerActiveCharacter(character);

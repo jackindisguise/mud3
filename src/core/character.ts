@@ -1227,10 +1227,10 @@ export class Character {
 
 		if (this.mob) {
 			// Serialize mob and remove 'type' field
+			// Don't pass version to mob - character's version will be used for migration on load
 			const mobData: SerializedMob = {
 				...(this.mob.serialize({
 					compress: true,
-					version: options?.version,
 				}) as SerializedMob),
 			};
 

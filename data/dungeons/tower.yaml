@@ -1,3 +1,4 @@
+version: 1.21.0
 dungeon:
   id: tower
   name: Da Tower
@@ -472,6 +473,14 @@ dungeon:
       job: warrior
       level: 1
       behaviors: {aggressive: true}
+    - id: cake
+      type: Mob
+      display: qwe
+      description: qwe
+      keywords: qwe
+      race: goliath
+      job: warrior
+      level: 1
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{13,16,1}'
@@ -697,6 +706,10 @@ dungeon:
       roomRef: '@tower{9,18,0}'
       minCount: 20
       maxCount: 100
+    - templateId: tower-sword
+      roomRef: '@tower{9,19,0}'
+      minCount: 1
+      maxCount: 1
   exitOverrides:
     7,17,0: 271
     5,4,0: 271

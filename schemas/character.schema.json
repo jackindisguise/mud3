@@ -4,6 +4,11 @@
 	"type": "object",
 	"required": ["credentials", "settings", "stats", "mob"],
 	"properties": {
+		"version": {
+			"type": "string",
+			"description": "Project version when this character file was saved (semantic versioning format: major.minor.patch).",
+			"pattern": "^\\d+\\.\\d+\\.\\d+$"
+		},
 		"credentials": {
 			"type": "object",
 			"description": "Account authentication and status information.",
@@ -89,7 +94,7 @@
 				},
 				"defaultColor": {
 					"type": "string",
-					"description": "Default text color code used for this character's output."
+					"description": "Default text color name used for this character's output (e.g., 'crimson', 'cyan', 'light blue')."
 				},
 				"channels": {
 					"type": "array",

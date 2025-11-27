@@ -4,6 +4,11 @@
 	"type": "object",
 	"required": ["dungeon"],
 	"properties": {
+		"version": {
+			"type": "string",
+			"description": "Project version when this dungeon file was saved (semantic versioning format: major.minor.patch).",
+			"pattern": "^\\d+\\.\\d+\\.\\d+$"
+		},
 		"dungeon": {
 			"type": "object",
 			"description": "Complete dungeon definition including rooms, templates, and spawn rules.",

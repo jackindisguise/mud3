@@ -80,13 +80,13 @@ async function removeEmptyDirs(dir) {
 	try {
 		const entries = await readdir(dir);
 		if (entries.length === 0) {
-			console.log(`Removing empty directory: ${dir}`);
-			//await rmdir(dir);
+			//console.log(`Removing empty directory: ${dir}`);
+			await rmdir(dir);
 			// Try to remove parent directory too
 			const parent = dirname(dir);
 			if (parent !== dir && parent.startsWith(distDir)) {
-				console.log(`Removing empty directory: ${parent}`);
-				//await removeEmptyDirs(parent);
+				//console.log(`Removing empty directory: ${parent}`);
+				await removeEmptyDirs(parent);
 			}
 		}
 	} catch (error) {
@@ -100,7 +100,7 @@ async function main() {
 		return;
 	}
 
-	console.log("Scanning for orphaned files...");
+	//console.log("Scanning for orphaned files...");
 
 	// Get all files in dist
 	const distFiles = await getAllFiles(distDir);
@@ -147,7 +147,7 @@ async function main() {
 
 		if (!sourceExists) {
 			try {
-				//await unlink(distFilePath);
+				await unlink(distFilePath);
 				removedCount++;
 				console.log(`Removed: ${distFile}`);
 			} catch (error) {
@@ -170,7 +170,9 @@ async function main() {
 		// Ignore errors
 	}
 
-	console.log(`\nCleaned ${removedCount} orphaned file(s).`);
+	if (removedCount > 0) {
+		console.log(`\nCleaned ${removedCount} orphaned file(s).`);
+	}
 }
 
 main().catch((error) => {

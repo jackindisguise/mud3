@@ -240,7 +240,10 @@ export class MapEditorService {
 			const packageJsonPath = join(getSafeRootDirectory(), "package.json");
 			const packageJsonContent = await readFile(packageJsonPath, "utf-8");
 			const packageJson = JSON.parse(packageJsonContent);
-			return { version: packageJson.version || "unknown" };
+			// Return dungeonVersion for dungeon files, falling back to version if not set
+			return {
+				version: packageJson.dungeonVersion || packageJson.version || "unknown",
+			};
 		} catch (error) {
 			logger.warn(`Failed to read package.json version: ${error}`);
 			return { version: "unknown" };

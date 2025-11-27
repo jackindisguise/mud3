@@ -80,7 +80,7 @@ export type {
 } from "./weapon/types.js";
 
 // Export version utilities
-export { compareVersions, getCurrentVersion } from "./version.js";
+export { compareVersions, getCurrentDungeonVersion } from "./version.js";
 
 // Export generic migration system for other data types
 export { migrateData } from "./generic/runner.js";

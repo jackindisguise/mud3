@@ -5,7 +5,7 @@
  */
 
 import { findMigrationPath } from "./registry.js";
-import { getCurrentVersion, compareVersions } from "../version.js";
+import { getCurrentDungeonVersion, compareVersions } from "../version.js";
 import logger from "../../logger.js";
 
 /**
@@ -23,7 +23,7 @@ export async function migrateData<T extends { version?: string }>(
 	identifier?: string
 ): Promise<T> {
 	const fileVersion = data.version || "1.0.0"; // Default for old files without version
-	const currentVersion = await getCurrentVersion();
+	const currentVersion = await getCurrentDungeonVersion();
 
 	// If already at current version, no migration needed
 	if (fileVersion === currentVersion) {

@@ -1202,8 +1202,10 @@ export function executeAllDungeonResets(): void {
  */
 async function deserializeDungeonObjectWithMigration(
 	data: AnySerializedDungeonObject,
-	shouldMigrate: boolean = true
+	shouldMigrate: boolean = true,
+	parentVersion?: string
 ): Promise<DungeonObject> {
+	const version = data.version || parentVersion;
 	const typed = data as SerializedDungeonObject;
 	const type: SerializedDungeonObjectType =
 		(typed.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
@@ -1217,27 +1219,40 @@ async function deserializeDungeonObjectWithMigration(
 	// Normalize compressed data by overlaying onto the base serialization for the type.
 	let normalized = normalizeSerializedData(data);
 
-	// Delegate to type-specific deserializers (migrate: false since we already migrated)
+	// Delegate to type-specific deserializers
 	switch (type) {
 		case "Room":
-			return await deserializeRoom(normalized as SerializedRoom, true);
+			return await deserializeRoom(normalized as SerializedRoom, true, version);
 		case "Mob":
-			return await deserializeMob(normalized as SerializedMob, true);
+			return await deserializeMob(normalized as SerializedMob, true, version);
 		case "Equipment":
 			return await deserializeEquipment(
 				normalized as SerializedEquipment,
-				true
+				true,
+				version
 			);
 		case "Armor":
-			return await deserializeArmor(normalized as SerializedArmor, true);
+			return await deserializeArmor(
+				normalized as SerializedArmor,
+				true,
+				version
+			);
 		case "Weapon":
-			return await deserializeWeapon(normalized as SerializedWeapon, true);
+			return await deserializeWeapon(
+				normalized as SerializedWeapon,
+				true,
+				version
+			);
 		case "Movable":
-			return await deserializeMovable(normalized as SerializedMovable, true);
+			return await deserializeMovable(
+				normalized as SerializedMovable,
+				true,
+				version
+			);
 		case "Item":
-			return await deserializeItem(normalized as SerializedItem, true);
+			return await deserializeItem(normalized as SerializedItem, true, version);
 		case "Prop":
-			return await deserializeProp(normalized as SerializedProp);
+			return await deserializeProp(normalized as SerializedProp, version);
 		case "DungeonObject":
 			// handled in main body
 			break;
@@ -1254,7 +1269,11 @@ async function deserializeDungeonObjectWithMigration(
 			`Deserializing ${typed.contents.length} content object(s) for ${type}`
 		);
 		for (const contentData of typed.contents) {
-			const contentObj = await deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				shouldMigrate,
+				version
+			);
 			obj.add(contentObj);
 		}
 	}
@@ -1284,12 +1303,17 @@ export async function deserializeDungeonObject(
  */
 export async function deserializeRoom(
 	data: SerializedRoom,
-	migrate: boolean = true
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Room> {
 	// Apply migrations if requested
 	let migratedData = data;
 	if (migrate) {
 		const dataWithVersion = data as SerializedRoom & { version?: string };
+		// Use parentVersion if room doesn't have its own version
+		if (!dataWithVersion.version && parentVersion) {
+			dataWithVersion.version = parentVersion;
+		}
 		try {
 			// Rooms don't have their own migration system yet, but we can add it here later
 			migratedData = dataWithVersion;
@@ -1308,9 +1332,16 @@ export async function deserializeRoom(
 		...roomData,
 		allowedExits: norm.allowedExits ?? defaultExits,
 	});
+	// Determine version for nested objects
+	const versionForNested =
+		(migratedData as any & { version?: string }).version || parentVersion;
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = await deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate,
+				versionForNested
+			);
 			room.add(contentObj);
 		}
 	}
@@ -1325,13 +1356,28 @@ export async function deserializeRoom(
  */
 export async function deserializeMovable(
 	data: SerializedMovable,
-	migrate: boolean = true
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Movable> {
+	// Apply parentVersion if object doesn't have its own version
+	if (parentVersion && migrate) {
+		const dataWithVersion = data as any & { version?: string };
+		if (!dataWithVersion.version) {
+			dataWithVersion.version = parentVersion;
+		}
+	}
 	const norm = normalizeSerializedData(data) as SerializedMovable;
 	const movable = new Movable(norm);
+	// Determine version for nested objects
+	const versionForNested =
+		(norm as any & { version?: string }).version || parentVersion;
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = await deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate,
+				versionForNested
+			);
 			movable.add(contentObj);
 		}
 	}
@@ -1344,12 +1390,29 @@ export async function deserializeMovable(
  * @param data The serialized prop data
  * @param migrate Whether to apply migrations (default: true)
  */
-export async function deserializeProp(data: SerializedProp): Promise<Prop> {
+export async function deserializeProp(
+	data: SerializedProp,
+	parentVersion?: string
+): Promise<Prop> {
+	// Apply parentVersion if object doesn't have its own version
+	if (parentVersion) {
+		const dataWithVersion = data as any & { version?: string };
+		if (!dataWithVersion.version) {
+			dataWithVersion.version = parentVersion;
+		}
+	}
 	const norm = normalizeSerializedData(data);
 	const prop = new Prop(norm);
+	// Determine version for nested objects
+	const versionForNested =
+		(norm as any & { version?: string }).version || parentVersion;
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = await deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				true,
+				versionForNested
+			);
 			prop.add(contentObj);
 		}
 	}
@@ -1364,12 +1427,17 @@ export async function deserializeProp(data: SerializedProp): Promise<Prop> {
  */
 export async function deserializeItem(
 	data: SerializedItem,
-	migrate: boolean = true
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Item> {
 	// Apply migrations if requested
 	let migratedData = data;
 	if (migrate) {
 		const dataWithVersion: SerializedItem & { version?: string } = data;
+		// Use parentVersion if item doesn't have its own version
+		if (!dataWithVersion.version && parentVersion) {
+			dataWithVersion.version = parentVersion;
+		}
 		try {
 			migratedData = await migrateItemData(dataWithVersion, data.keywords);
 		} catch (error) {
@@ -1386,12 +1454,16 @@ export async function deserializeItem(
 	const norm = normalizeSerializedData(
 		migratedData
 	) as unknown as SerializedItem;
+	// Determine version for nested objects
+	const versionForNested =
+		(migratedData as any & { version?: string }).version || parentVersion;
 	const item = new Item(norm as SerializedItem);
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
-				migrate
+				migrate,
+				versionForNested
 			);
 			item.add(contentObj);
 		}
@@ -1407,12 +1479,17 @@ export async function deserializeItem(
  */
 export async function deserializeEquipment(
 	data: SerializedEquipment,
-	migrate: boolean = true
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Equipment> {
 	// Apply migrations if requested
 	let migratedData = data;
 	if (migrate) {
 		const dataWithVersion = data as any & { version?: string };
+		// Use parentVersion if equipment doesn't have its own version
+		if (!dataWithVersion.version && parentVersion) {
+			dataWithVersion.version = parentVersion;
+		}
 		try {
 			migratedData = (await migrateEquipmentData(
 				dataWithVersion as any,
@@ -1430,6 +1507,9 @@ export async function deserializeEquipment(
 	const { type, ...equipmentData } = normalizeSerializedData(
 		migratedData
 	) as SerializedEquipment;
+	// Determine version for nested objects
+	const versionForNested =
+		(migratedData as any & { version?: string }).version || parentVersion;
 	const equipment = new Equipment({
 		...equipmentData,
 		slot: equipmentData.slot,
@@ -1441,7 +1521,8 @@ export async function deserializeEquipment(
 		for (const contentData of equipmentData.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
-				migrate
+				migrate,
+				versionForNested
 			);
 			equipment.add(contentObj);
 		}
@@ -1457,12 +1538,17 @@ export async function deserializeEquipment(
  */
 export async function deserializeArmor(
 	data: SerializedArmor,
-	migrate: boolean = true
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Armor> {
 	// Apply migrations if requested
 	let migratedData = data;
 	if (migrate) {
 		const dataWithVersion = data as any & { version?: string };
+		// Use parentVersion if armor doesn't have its own version
+		if (!dataWithVersion.version && parentVersion) {
+			dataWithVersion.version = parentVersion;
+		}
 		try {
 			migratedData = (await migrateArmorData(
 				dataWithVersion as any,
@@ -1478,6 +1564,9 @@ export async function deserializeArmor(
 	}
 
 	const armorData = normalizeSerializedData(migratedData) as SerializedArmor;
+	// Determine version for nested objects
+	const versionForNested =
+		(migratedData as any & { version?: string }).version || parentVersion;
 	const armor = new Armor({
 		...armorData,
 		slot: armorData.slot,
@@ -1490,7 +1579,8 @@ export async function deserializeArmor(
 		for (const contentData of armorData.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
-				migrate
+				migrate,
+				versionForNested
 			);
 			armor.add(contentObj);
 		}
@@ -1506,12 +1596,17 @@ export async function deserializeArmor(
  */
 export async function deserializeWeapon(
 	data: SerializedWeapon,
-	migrate: boolean = true
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Weapon> {
 	// Apply migrations if requested
 	let migratedData = data;
 	if (migrate) {
 		const dataWithVersion = data as any & { version?: string };
+		// Use parentVersion if weapon doesn't have its own version
+		if (!dataWithVersion.version && parentVersion) {
+			dataWithVersion.version = parentVersion;
+		}
 		try {
 			migratedData = (await migrateWeaponData(
 				dataWithVersion as any,
@@ -1529,6 +1624,9 @@ export async function deserializeWeapon(
 	const weaponData = normalizeSerializedData(
 		migratedData
 	) as unknown as SerializedWeapon;
+	// Determine version for nested objects
+	const versionForNested =
+		(migratedData as any & { version?: string }).version || parentVersion;
 	const weapon = new Weapon({
 		...weaponData,
 		slot: weaponData.slot,
@@ -1543,7 +1641,8 @@ export async function deserializeWeapon(
 		for (const contentData of weaponData.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
-				migrate
+				migrate,
+				versionForNested
 			);
 			weapon.add(contentObj);
 		}
@@ -1559,9 +1658,11 @@ export async function deserializeWeapon(
  * @param migrate Whether to apply migrations (default: true)
  */
 export async function deserializeMob(
-	data: SerializedMob,
-	migrate: boolean = true
+	data: SerializedMob & { version?: string },
+	migrate: boolean = true,
+	parentVersion?: string
 ): Promise<Mob> {
+	const version = data.version || parentVersion;
 	logger.debug(
 		`Deserializing Mob${data.keywords ? `: "${data.keywords}"` : ""} (race: ${
 			data.race
@@ -1571,12 +1672,8 @@ export async function deserializeMob(
 	// Apply migrations if requested
 	let migratedData = data;
 	if (migrate) {
-		const dataWithVersion = data as any & { version?: string };
 		try {
-			migratedData = (await migrateMobData(
-				dataWithVersion as any,
-				data.keywords
-			)) as any;
+			migratedData = await migrateMobData({ ...data, version }, data.keywords);
 		} catch (error) {
 			logger.warn(
 				`Migration failed for Mob${
@@ -1645,13 +1742,14 @@ export async function deserializeMob(
 		}
 		mob._learnedAbilities = learnedAbilities;
 	}
+	// Determine version to use for nested objects (mob's version or parent version)
 	if (normalized.contents && Array.isArray(normalized.contents)) {
 		logger.debug(`Restoring ${normalized.contents.length} content object(s)`);
 		for (const contentData of normalized.contents) {
-			const contentObj = await deserializeDungeonObjectWithMigration(
-				contentData,
-				migrate
-			);
+			const contentObj = await deserializeDungeonObject({
+				...contentData,
+				version,
+			});
 			mob.add(contentObj);
 		}
 	}
@@ -1665,7 +1763,8 @@ export async function deserializeMob(
 				// Legacy format - take first item only
 				const equipment = (await deserializeDungeonObjectWithMigration(
 					equipmentData[0] as unknown as AnySerializedDungeonObject,
-					migrate
+					migrate,
+					version
 				)) as Equipment;
 				(mob as any)._equipped.set(slot, equipment);
 				if (!mob.contains(equipment)) {
@@ -1674,7 +1773,8 @@ export async function deserializeMob(
 			} else {
 				const equipment = (await deserializeDungeonObjectWithMigration(
 					equipmentData as unknown as AnySerializedDungeonObject,
-					migrate
+					migrate,
+					version
 				)) as Equipment;
 				(mob as any)._equipped.set(slot, equipment);
 				if (!mob.contains(equipment)) {

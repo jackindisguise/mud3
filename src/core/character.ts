@@ -58,7 +58,7 @@ import { Mob, SerializedMob } from "./dungeon.js";
 import type { MudClient } from "./io.js";
 import { CHANNEL, formatChannelMessage } from "./channel.js";
 import { formatPlaytime } from "./time.js";
-import { color, COLOR, stickyColor } from "./color.js";
+import { color, COLOR, COLOR_NAMES, stickyColor } from "./color.js";
 import type { ActionState } from "./command.js";
 
 /**
@@ -346,10 +346,12 @@ export interface SerializedPlayerSettings {
 	briefMode?: boolean;
 	/** Channels the player is subscribed to (serialized as array of enum values) */
 	channels?: CHANNEL[];
+	/** Input echo preference */
+	echoMode?: EchoMode;
 	/** Blocked usernames (serialized as array) */
 	blockedUsers?: string[];
-	/** Default terminal color for all messages sent to this character (serialized as number) */
-	defaultColor?: number;
+	/** Default terminal color for all messages sent to this character (serialized as color name string) */
+	defaultColor?: string;
 	/** Whether busy mode is enabled */
 	busyModeEnabled?: boolean;
 	/** Whether combat busy mode is enabled */
@@ -1210,6 +1212,11 @@ export class Character {
 			combatBusyForwardedGroups: this.settings.combatBusyForwardedGroups
 				? Array.from(this.settings.combatBusyForwardedGroups)
 				: [],
+			// Convert COLOR enum to color name string for readability
+			defaultColor:
+				this.settings.defaultColor !== undefined
+					? COLOR_NAMES[this.settings.defaultColor]
+					: undefined,
 		};
 
 		const result: SerializedCharacter = {
@@ -1230,17 +1237,4 @@ export class Character {
 
 		return result;
 	}
-
-	/**
-	 * Creates a Character instance from serialized data.
-	 *
-	 * @param data Serialized character data
-	 * @returns New Character instance
-	 *
-	 * @example
-	 * ```typescript
-	 * const saveData = JSON.parse(await fs.readFile(`characters/${username}.json`, 'utf8'));
-	 * const character = Character.deserialize(saveData);
-	 * ```
-	 */
 }

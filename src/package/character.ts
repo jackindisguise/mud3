@@ -51,9 +51,16 @@ import { constants as FS_CONSTANTS } from "fs";
 import { createHash } from "crypto";
 import logger from "../logger.js";
 import {
+	nameToColor,
+	COLOR,
+	COLOR_NAMES,
+	COLOR_NAME_TO_COLOR,
+} from "../core/color.js";
+import {
 	Character,
 	SerializedCharacter,
 	MESSAGE_GROUP,
+	PlayerSettings,
 } from "../core/character.js";
 import { SerializedMob } from "../core/dungeon.js";
 import archetypePkg from "../package/archetype.js";
@@ -62,6 +69,8 @@ import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { CONFIG } from "../registry/config.js";
+import { getCurrentVersion } from "../migrations/version.js";
+import { migrateCharacterData } from "../migrations/character/runner.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -213,7 +222,18 @@ export async function saveCharacter(character: Character) {
 	const filePath = getCharacterFilePath(character.credentials.username);
 	const tempPath = `${filePath}.tmp`;
 	if (!data.mob) throw new Error("Character mob is required to save");
-	const yaml = YAML.dump(data as any, { noRefs: true, lineWidth: 120 });
+
+	// Build ordered data with version first
+	const currentVersion = await getCurrentVersion();
+	const versionedData: any = {
+		version: currentVersion,
+		...data,
+	};
+
+	const yaml = YAML.dump(versionedData, {
+		noRefs: true,
+		lineWidth: 120,
+	});
 
 	try {
 		// Write to temporary file first
@@ -268,7 +288,10 @@ export async function checkCharacterPassword(
 	}
 
 	const content = await readFile(filePath, "utf-8");
-	const raw = YAML.load(content) as SerializedCharacter;
+	let raw = YAML.load(content) as SerializedCharacter & { version?: string };
+
+	// Migrate character data if needed (but don't save - this is just for password checking)
+	raw = await migrateCharacterData(raw, username);
 
 	// Hash the input password and compare with stored hash
 	const hashedPassword = hashPassword(password);
@@ -308,8 +331,15 @@ export function deserializeCharacter(data: SerializedCharacter): Character {
 	};
 
 	// Convert channels and blockedUsers arrays back to Sets
-	const settings = {
-		...data.settings,
+	const settings: PlayerSettings = {
+		receiveOOC: data.settings.receiveOOC,
+		verboseMode: data.settings.verboseMode,
+		prompt: data.settings.prompt,
+		colorEnabled: data.settings.colorEnabled,
+		autoLook: data.settings.autoLook,
+		briefMode: data.settings.briefMode,
+		echoMode: data.settings.echoMode,
+		busyModeEnabled: data.settings.busyModeEnabled,
 		channels:
 			data.settings.channels !== undefined
 				? new Set(data.settings.channels)
@@ -326,15 +356,15 @@ export function deserializeCharacter(data: SerializedCharacter): Character {
 			data.settings.combatBusyForwardedGroups !== undefined
 				? new Set(data.settings.combatBusyForwardedGroups)
 				: new Set([MESSAGE_GROUP.CHANNELS]),
+		defaultColor:
+			data.settings.defaultColor !== undefined
+				? COLOR_NAME_TO_COLOR[data.settings.defaultColor]
+				: undefined,
 	};
-
-	if (data.settings.defaultColor !== undefined) {
-		(settings as any).defaultColor = data.settings.defaultColor;
-	}
 
 	const character = new Character({
 		credentials: creds,
-		settings: settings as any,
+		settings: settings,
 		stats: data.stats,
 		mob,
 	});
@@ -379,7 +409,10 @@ export async function loadCharacter(
 	}
 
 	const content = await readFile(filePath, "utf-8");
-	const raw = YAML.load(content) as SerializedCharacter;
+	let raw = YAML.load(content) as SerializedCharacter & { version?: string };
+
+	// Migrate character data if needed
+	raw = await migrateCharacterData(raw, username);
 
 	const character = deserializeCharacter(raw);
 	// Auto-register as active upon successful load

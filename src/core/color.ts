@@ -79,6 +79,35 @@ export const COLORS: string[] = [
 ] as const;
 
 /**
+ * Type representing valid color name strings.
+ * Derived from the values in COLOR_NAMES for type safety.
+ */
+export type ColorName = (typeof COLOR_NAMES)[COLOR];
+
+/**
+ * Reverse mapping from color name strings to COLOR enum values.
+ * Provides type-safe conversion from color names to enum values.
+ */
+export const COLOR_NAME_TO_COLOR: Record<ColorName, COLOR> = {
+	[COLOR_NAMES[COLOR.BLACK]]: COLOR.BLACK,
+	[COLOR_NAMES[COLOR.MAROON]]: COLOR.MAROON,
+	[COLOR_NAMES[COLOR.DARK_GREEN]]: COLOR.DARK_GREEN,
+	[COLOR_NAMES[COLOR.OLIVE]]: COLOR.OLIVE,
+	[COLOR_NAMES[COLOR.DARK_BLUE]]: COLOR.DARK_BLUE,
+	[COLOR_NAMES[COLOR.PURPLE]]: COLOR.PURPLE,
+	[COLOR_NAMES[COLOR.TEAL]]: COLOR.TEAL,
+	[COLOR_NAMES[COLOR.SILVER]]: COLOR.SILVER,
+	[COLOR_NAMES[COLOR.GREY]]: COLOR.GREY,
+	[COLOR_NAMES[COLOR.CRIMSON]]: COLOR.CRIMSON,
+	[COLOR_NAMES[COLOR.LIME]]: COLOR.LIME,
+	[COLOR_NAMES[COLOR.YELLOW]]: COLOR.YELLOW,
+	[COLOR_NAMES[COLOR.LIGHT_BLUE]]: COLOR.LIGHT_BLUE,
+	[COLOR_NAMES[COLOR.PINK]]: COLOR.PINK,
+	[COLOR_NAMES[COLOR.CYAN]]: COLOR.CYAN,
+	[COLOR_NAMES[COLOR.WHITE]]: COLOR.WHITE,
+} as const;
+
+/**
  * Available background colors.
  */
 export enum BG_COLOR {

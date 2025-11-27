@@ -1,6 +1,9 @@
 # hide node modules
 node_modules
 
+# hide tsc build info
+.tsbuildinfo
+
 # hide compiled files
 dist
 

@@ -103,6 +103,11 @@ import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { getNextObjectId } from "../registry/gamestate.js";
 import { migrateDungeonData } from "../migrations/dungeon/runner.js";
+import { migrateMobData } from "../migrations/mob/runner.js";
+import { migrateItemData } from "../migrations/item/runner.js";
+import { migrateEquipmentData } from "../migrations/equipment/runner.js";
+import { migrateArmorData } from "../migrations/armor/runner.js";
+import { migrateWeaponData } from "../migrations/weapon/runner.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -1066,15 +1071,16 @@ export function executeAllDungeonResets(): void {
 }
 
 /**
- * Deserialize a serialized DungeonObject back into an instance.
- * This is the main entry point for deserializing any dungeon object type.
+ * Internal deserialization function with migration control.
  *
  * @param data The serialized object data
+ * @param shouldMigrate Whether to apply migrations (default: true)
  * @returns New DungeonObject instance with restored hierarchy
  */
-export function deserializeDungeonObject(
-	data: AnySerializedDungeonObject
-): DungeonObject {
+async function deserializeDungeonObjectWithMigration(
+	data: AnySerializedDungeonObject,
+	shouldMigrate: boolean = true
+): Promise<DungeonObject> {
 	const typed = data as SerializedDungeonObject;
 	const type: SerializedDungeonObjectType =
 		(typed.type as SerializedDungeonObjectType | undefined) ?? "DungeonObject";
@@ -1086,26 +1092,29 @@ export function deserializeDungeonObject(
 	);
 
 	// Normalize compressed data by overlaying onto the base serialization for the type.
-	const normalized = normalizeSerializedData(data);
+	let normalized = normalizeSerializedData(data);
 
-	// Delegate to type-specific deserializers
+	// Delegate to type-specific deserializers (migrate: false since we already migrated)
 	switch (type) {
 		case "Room":
-			return deserializeRoom(normalized as SerializedRoom);
+			return await deserializeRoom(normalized as SerializedRoom, true);
 		case "Mob":
-			return deserializeMob(normalized as SerializedMob);
+			return await deserializeMob(normalized as SerializedMob, true);
 		case "Equipment":
-			return deserializeEquipment(normalized as SerializedEquipment);
+			return await deserializeEquipment(
+				normalized as SerializedEquipment,
+				true
+			);
 		case "Armor":
-			return deserializeArmor(normalized as SerializedArmor);
+			return await deserializeArmor(normalized as SerializedArmor, true);
 		case "Weapon":
-			return deserializeWeapon(normalized as SerializedWeapon);
+			return await deserializeWeapon(normalized as SerializedWeapon, true);
 		case "Movable":
-			return deserializeMovable(normalized as SerializedMovable);
+			return await deserializeMovable(normalized as SerializedMovable, true);
 		case "Item":
-			return deserializeItem(normalized as SerializedItem);
+			return await deserializeItem(normalized as SerializedItem, true);
 		case "Prop":
-			return deserializeProp(normalized as SerializedProp);
+			return await deserializeProp(normalized as SerializedProp);
 		case "DungeonObject":
 			// handled in main body
 			break;
@@ -1114,9 +1123,7 @@ export function deserializeDungeonObject(
 	}
 
 	// DungeonObjects in particular
-	let obj: DungeonObject = new DungeonObject(
-		typed as unknown as DungeonObjectOptions
-	);
+	let obj: DungeonObject = new DungeonObject(typed);
 
 	// Handle contents for all object types
 	if (typed.contents) {
@@ -1124,7 +1131,7 @@ export function deserializeDungeonObject(
 			`Deserializing ${typed.contents.length} content object(s) for ${type}`
 		);
 		for (const contentData of typed.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObject(contentData);
 			obj.add(contentObj);
 		}
 	}
@@ -1133,10 +1140,42 @@ export function deserializeDungeonObject(
 }
 
 /**
- * Deserialize a SerializedRoom into a Room instance.
+ * Deserialize a serialized DungeonObject back into an instance.
+ * This is the main entry point for deserializing any dungeon object type.
+ * Migrations are applied automatically based on object type.
+ *
+ * @param data The serialized object data
+ * @returns New DungeonObject instance with restored hierarchy
  */
-export function deserializeRoom(data: SerializedRoom): Room {
-	const norm = normalizeSerializedData(data) as SerializedRoom;
+export async function deserializeDungeonObject(
+	data: AnySerializedDungeonObject
+): Promise<DungeonObject> {
+	return deserializeDungeonObjectWithMigration(data, true);
+}
+
+/**
+ * Deserialize a SerializedRoom into a Room instance.
+ *
+ * @param data The serialized room data
+ * @param migrate Whether to apply migrations (default: true)
+ */
+export async function deserializeRoom(
+	data: SerializedRoom,
+	migrate: boolean = true
+): Promise<Room> {
+	// Apply migrations if requested
+	let migratedData = data;
+	if (migrate) {
+		const dataWithVersion = data as SerializedRoom & { version?: string };
+		try {
+			// Rooms don't have their own migration system yet, but we can add it here later
+			migratedData = dataWithVersion;
+		} catch (error) {
+			logger.warn(`Migration failed for Room: ${error}`);
+		}
+	}
+
+	const norm = normalizeSerializedData(migratedData);
 	// allowedExits is mandatory, but handle legacy data that might not have it
 	const defaultExits =
 		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
@@ -1148,7 +1187,7 @@ export function deserializeRoom(data: SerializedRoom): Room {
 	});
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObject(contentData);
 			room.add(contentObj);
 		}
 	}
@@ -1157,13 +1196,19 @@ export function deserializeRoom(data: SerializedRoom): Room {
 
 /**
  * Deserialize a SerializedMovable into a Movable instance.
+ *
+ * @param data The serialized movable data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeMovable(data: AnySerializedDungeonObject): Movable {
-	const norm = normalizeSerializedData(data) as unknown as SerializedMovable;
-	const movable = new Movable(norm as SerializedMovable);
+export async function deserializeMovable(
+	data: SerializedMovable,
+	migrate: boolean = true
+): Promise<Movable> {
+	const norm = normalizeSerializedData(data) as SerializedMovable;
+	const movable = new Movable(norm);
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObject(contentData);
 			movable.add(contentObj);
 		}
 	}
@@ -1172,13 +1217,16 @@ export function deserializeMovable(data: AnySerializedDungeonObject): Movable {
 
 /**
  * Deserialize a SerializedProp into a Prop instance.
+ *
+ * @param data The serialized prop data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeProp(data: SerializedProp): Prop {
-	const norm = normalizeSerializedData(data) as SerializedProp;
+export async function deserializeProp(data: SerializedProp): Promise<Prop> {
+	const norm = normalizeSerializedData(data);
 	const prop = new Prop(norm);
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObject(contentData);
 			prop.add(contentObj);
 		}
 	}
@@ -1187,13 +1235,41 @@ export function deserializeProp(data: SerializedProp): Prop {
 
 /**
  * Deserialize a SerializedItem into an Item instance.
+ *
+ * @param data The serialized item data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeItem(data: AnySerializedDungeonObject): Item {
-	const norm = normalizeSerializedData(data) as unknown as SerializedItem;
+export async function deserializeItem(
+	data: SerializedItem,
+	migrate: boolean = true
+): Promise<Item> {
+	// Apply migrations if requested
+	let migratedData = data;
+	if (migrate) {
+		const dataWithVersion: SerializedItem & { version?: string } = data;
+		try {
+			migratedData = await migrateItemData(dataWithVersion, data.keywords);
+		} catch (error) {
+			logger.warn(
+				`Migration failed for Item${
+					(data as SerializedItem).keywords
+						? ` "${(data as SerializedItem).keywords}"`
+						: ""
+				}: ${error}`
+			);
+		}
+	}
+
+	const norm = normalizeSerializedData(
+		migratedData
+	) as unknown as SerializedItem;
 	const item = new Item(norm as SerializedItem);
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate
+			);
 			item.add(contentObj);
 		}
 	}
@@ -1202,10 +1278,34 @@ export function deserializeItem(data: AnySerializedDungeonObject): Item {
 
 /**
  * Deserialize a SerializedEquipment into an Equipment instance.
+ *
+ * @param data The serialized equipment data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeEquipment(data: SerializedEquipment): Equipment {
+export async function deserializeEquipment(
+	data: SerializedEquipment,
+	migrate: boolean = true
+): Promise<Equipment> {
+	// Apply migrations if requested
+	let migratedData = data;
+	if (migrate) {
+		const dataWithVersion = data as any & { version?: string };
+		try {
+			migratedData = (await migrateEquipmentData(
+				dataWithVersion as any,
+				data.keywords
+			)) as any;
+		} catch (error) {
+			logger.warn(
+				`Migration failed for Equipment${
+					data.keywords ? ` "${data.keywords}"` : ""
+				}: ${error}`
+			);
+		}
+	}
+
 	const { type, ...equipmentData } = normalizeSerializedData(
-		data
+		migratedData
 	) as SerializedEquipment;
 	const equipment = new Equipment({
 		...equipmentData,
@@ -1216,7 +1316,10 @@ export function deserializeEquipment(data: SerializedEquipment): Equipment {
 	});
 	if (equipmentData.contents && Array.isArray(equipmentData.contents)) {
 		for (const contentData of equipmentData.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate
+			);
 			equipment.add(contentObj);
 		}
 	}
@@ -1225,9 +1328,33 @@ export function deserializeEquipment(data: SerializedEquipment): Equipment {
 
 /**
  * Deserialize a SerializedArmor into an Armor instance.
+ *
+ * @param data The serialized armor data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeArmor(data: SerializedArmor): Armor {
-	const armorData = normalizeSerializedData(data) as SerializedArmor;
+export async function deserializeArmor(
+	data: SerializedArmor,
+	migrate: boolean = true
+): Promise<Armor> {
+	// Apply migrations if requested
+	let migratedData = data;
+	if (migrate) {
+		const dataWithVersion = data as any & { version?: string };
+		try {
+			migratedData = (await migrateArmorData(
+				dataWithVersion as any,
+				data.keywords
+			)) as any;
+		} catch (error) {
+			logger.warn(
+				`Migration failed for Armor${
+					data.keywords ? ` "${data.keywords}"` : ""
+				}: ${error}`
+			);
+		}
+	}
+
+	const armorData = normalizeSerializedData(migratedData) as SerializedArmor;
 	const armor = new Armor({
 		...armorData,
 		slot: armorData.slot,
@@ -1238,7 +1365,10 @@ export function deserializeArmor(data: SerializedArmor): Armor {
 	});
 	if (armorData.contents && Array.isArray(armorData.contents)) {
 		for (const contentData of armorData.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate
+			);
 			armor.add(contentObj);
 		}
 	}
@@ -1247,10 +1377,34 @@ export function deserializeArmor(data: SerializedArmor): Armor {
 
 /**
  * Deserialize a SerializedWeapon into a Weapon instance.
+ *
+ * @param data The serialized weapon data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeWeapon(data: SerializedWeapon): Weapon {
+export async function deserializeWeapon(
+	data: SerializedWeapon,
+	migrate: boolean = true
+): Promise<Weapon> {
+	// Apply migrations if requested
+	let migratedData = data;
+	if (migrate) {
+		const dataWithVersion = data as any & { version?: string };
+		try {
+			migratedData = (await migrateWeaponData(
+				dataWithVersion as any,
+				data.keywords
+			)) as any;
+		} catch (error) {
+			logger.warn(
+				`Migration failed for Weapon${
+					data.keywords ? ` "${data.keywords}"` : ""
+				}: ${error}`
+			);
+		}
+	}
+
 	const weaponData = normalizeSerializedData(
-		data
+		migratedData
 	) as unknown as SerializedWeapon;
 	const weapon = new Weapon({
 		...weaponData,
@@ -1264,7 +1418,10 @@ export function deserializeWeapon(data: SerializedWeapon): Weapon {
 	});
 	if (weaponData.contents && Array.isArray(weaponData.contents)) {
 		for (const contentData of weaponData.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate
+			);
 			weapon.add(contentObj);
 		}
 	}
@@ -1274,14 +1431,39 @@ export function deserializeWeapon(data: SerializedWeapon): Weapon {
 /**
  * Deserialize a SerializedMob into a Mob instance.
  * This handles the special case of looking up race, job, and abilities from package modules.
+ *
+ * @param data The serialized mob data
+ * @param migrate Whether to apply migrations (default: true)
  */
-export function deserializeMob(data: SerializedMob): Mob {
+export async function deserializeMob(
+	data: SerializedMob,
+	migrate: boolean = true
+): Promise<Mob> {
 	logger.debug(
 		`Deserializing Mob${data.keywords ? `: "${data.keywords}"` : ""} (race: ${
 			data.race
 		}, job: ${data.job})`
 	);
-	const normalized = normalizeSerializedData(data) as SerializedMob;
+
+	// Apply migrations if requested
+	let migratedData = data;
+	if (migrate) {
+		const dataWithVersion = data as any & { version?: string };
+		try {
+			migratedData = (await migrateMobData(
+				dataWithVersion as any,
+				data.keywords
+			)) as any;
+		} catch (error) {
+			logger.warn(
+				`Migration failed for Mob${
+					data.keywords ? ` "${data.keywords}"` : ""
+				}: ${error}`
+			);
+		}
+	}
+
+	const normalized = normalizeSerializedData(migratedData) as SerializedMob;
 	const {
 		race: raceId,
 		job: jobId,
@@ -1294,7 +1476,6 @@ export function deserializeMob(data: SerializedMob): Mob {
 	// Explicitly remove race and job from rest to prevent string IDs from overwriting resolved objects
 	const { race: _race, job: _job, ...mobOptions } = rest as any;
 
-	logger.debug(`Looking up race "${raceId}" and job "${jobId}"`);
 	const race = getRaceById(raceId);
 	const job = getJobById(jobId);
 
@@ -1311,31 +1492,7 @@ export function deserializeMob(data: SerializedMob): Mob {
 			`Failed to deserialize Mob: job "${jobId}" not found in archetype registry`
 		);
 	}
-	logger.debug(`Race and job resolved: race="${race.id}", job="${job.id}"`);
 
-	// Validate that race and job have startingAttributes
-	if (!race.startingAttributes) {
-		logger.error(
-			`Race "${raceId}" (id: ${race.id}) is missing startingAttributes`
-		);
-		throw new Error(
-			`Failed to deserialize Mob: race "${raceId}" (id: ${race.id}) is missing startingAttributes`
-		);
-	}
-	if (!job.startingAttributes) {
-		logger.error(
-			`Job "${jobId}" (id: ${job.id}) is missing startingAttributes`
-		);
-		throw new Error(
-			`Failed to deserialize Mob: job "${jobId}" (id: ${job.id}) is missing startingAttributes`
-		);
-	}
-
-	logger.debug(
-		`Creating Mob instance with race="${race.id}", job="${job.id}", level=${
-			mobOptions.level ?? 1
-		}`
-	);
 	const mob = new Mob({
 		race,
 		job,
@@ -1365,10 +1522,13 @@ export function deserializeMob(data: SerializedMob): Mob {
 		}
 		mob._learnedAbilities = learnedAbilities;
 	}
-	if (data.contents && Array.isArray(data.contents)) {
-		logger.debug(`Restoring ${data.contents.length} content object(s)`);
-		for (const contentData of data.contents) {
-			const contentObj = deserializeDungeonObject(contentData);
+	if (normalized.contents && Array.isArray(normalized.contents)) {
+		logger.debug(`Restoring ${normalized.contents.length} content object(s)`);
+		for (const contentData of normalized.contents) {
+			const contentObj = await deserializeDungeonObjectWithMigration(
+				contentData,
+				migrate
+			);
 			mob.add(contentObj);
 		}
 	}
@@ -1380,17 +1540,19 @@ export function deserializeMob(data: SerializedMob): Mob {
 			// Handle both single items and arrays (for backward compatibility)
 			if (Array.isArray(equipmentData)) {
 				// Legacy format - take first item only
-				const equipment = deserializeDungeonObject(
-					equipmentData[0] as unknown as AnySerializedDungeonObject
-				) as Equipment;
+				const equipment = (await deserializeDungeonObjectWithMigration(
+					equipmentData[0] as unknown as AnySerializedDungeonObject,
+					migrate
+				)) as Equipment;
 				(mob as any)._equipped.set(slot, equipment);
 				if (!mob.contains(equipment)) {
 					mob.add(equipment);
 				}
 			} else {
-				const equipment = deserializeDungeonObject(
-					equipmentData as unknown as AnySerializedDungeonObject
-				) as Equipment;
+				const equipment = (await deserializeDungeonObjectWithMigration(
+					equipmentData as unknown as AnySerializedDungeonObject,
+					migrate
+				)) as Equipment;
 				(mob as any)._equipped.set(slot, equipment);
 				if (!mob.contains(equipment)) {
 					mob.add(equipment);

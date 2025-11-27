@@ -310,10 +310,12 @@ export async function checkCharacterPassword(
  * @param data The serialized character data
  * @returns New Character instance
  */
-export function deserializeCharacter(data: SerializedCharacter): Character {
+export async function deserializeCharacter(
+	data: SerializedCharacter
+): Promise<Character> {
 	const mobDataWithType: SerializedMob = { ...data.mob!, type: "Mob" };
 	// Deserialize the mob using the package deserializer
-	const mob = deserializeMob(mobDataWithType);
+	const mob = await deserializeMob(mobDataWithType);
 
 	// Handle backward compatibility: if characterId is missing, assign a temporary one
 	const characterId = data.credentials.characterId ?? Number.MAX_SAFE_INTEGER;
@@ -378,10 +380,10 @@ export function deserializeCharacter(data: SerializedCharacter): Character {
  * @param data The serialized character data
  * @returns The deserialized Character instance
  */
-export function loadCharacterFromSerialized(
+export async function loadCharacterFromSerialized(
 	data: SerializedCharacter
-): Character {
-	const character = deserializeCharacter(data);
+): Promise<Character> {
+	const character = await deserializeCharacter(data);
 	// Auto-register as active upon successful load
 	registerActiveCharacter(character);
 	return character;
@@ -414,7 +416,7 @@ export async function loadCharacter(
 	// Migrate character data if needed
 	raw = await migrateCharacterData(raw, username);
 
-	const character = deserializeCharacter(raw);
+	const character = await deserializeCharacter(raw);
 	// Auto-register as active upon successful load
 	registerActiveCharacter(character);
 	return character;

@@ -946,7 +946,9 @@ function nanny(session: LoginSession): void {
 			}
 
 			// Load the character from serialized data
-			const loadedCharacter = loadCharacterFromSerialized(serializedCharacter);
+			const loadedCharacter = await loadCharacterFromSerialized(
+				serializedCharacter
+			);
 
 			// Get the saved location reference from the serialized data
 			const savedLocationRef = serializedCharacter.mob?.location as

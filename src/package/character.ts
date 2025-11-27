@@ -69,7 +69,7 @@ import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { CONFIG } from "../registry/config.js";
-import { getCurrentVersion } from "../migrations/version.js";
+import { getCurrentDungeonVersion } from "../migrations/version.js";
 import { migrateCharacterData } from "../migrations/character/runner.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
@@ -219,7 +219,7 @@ async function fileExists(path: string): Promise<boolean> {
 
 export async function saveCharacter(character: Character) {
 	const data: SerializedCharacter = character.serialize({
-		version: await getCurrentVersion(),
+		version: await getCurrentDungeonVersion(),
 	});
 	const filePath = getCharacterFilePath(character.credentials.username);
 	const tempPath = `${filePath}.tmp`;

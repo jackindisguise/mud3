@@ -1192,6 +1192,7 @@ select option:focus {
 
 .room-link-item {
 	display: flex;
+	flex-wrap: nowrap;
 	gap: 0.5rem;
 	align-items: center;
 	margin-bottom: 0.5rem;
@@ -1199,10 +1200,11 @@ select option:focus {
 	background: var(--base03);
 	border: 1px solid var(--base01);
 	border-radius: 4px;
+	min-width: 0;
+	width: 100%;
 }
 
 .room-link-item select {
-	flex: 0 0 100px;
 	padding: 0.5rem;
 	background: var(--base02);
 	border: 1px solid var(--base01);
@@ -1215,7 +1217,27 @@ select option:focus {
 	color: var(--base2);
 }
 
-.room-link-item input {
+.room-link-item .room-link-direction {
+	flex: 0 0 70px;
+}
+
+.room-link-item .room-link-dungeon {
+	flex: 0 0 100px;
+}
+
+.room-link-item input[type="number"] {
+	flex: 0 0 60px;
+	padding: 0.4rem;
+	background: var(--base03);
+	border: 1px solid var(--base01);
+	color: var(--base1);
+	border-radius: 4px;
+	font-family: monospace;
+	font-size: 0.85rem;
+	text-align: center;
+}
+
+.room-link-item input[type="text"] {
 	flex: 1;
 	padding: 0.5rem;
 	background: var(--base03);
@@ -1227,6 +1249,7 @@ select option:focus {
 }
 
 .room-link-item button {
+	flex: 0 0 auto;
 	padding: 0.5rem 1rem;
 	background: var(--base02);
 	border: 1px solid var(--base01);
@@ -1234,10 +1257,18 @@ select option:focus {
 	border-radius: 4px;
 	cursor: pointer;
 	font-size: 0.9rem;
+	white-space: nowrap;
 }
 
 .room-link-item button:hover {
 	background: var(--base01);
+}
+
+.room-link-item .make-2way-btn {
+	padding: 0.5rem;
+	min-width: auto;
+	font-size: 1.2rem;
+	line-height: 1;
 }
 
 .add-link-btn {
@@ -1269,6 +1300,17 @@ select option:focus {
 
 #room-links-container {
 	margin-bottom: 0.5rem;
+}
+
+.exit-buttons {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 0.5rem;
+	width: 100%;
+}
+
+#exit-override-room-links-container {
+	width: 100%;
 }
 
 .calculated-attributes {

@@ -81,8 +81,55 @@ class MapEditor {
 		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
 		this.currentMousePosition = null; // {x, y, z} of cell mouse is over
 		this.projectVersion = null; // Project version from package.json
+		this.dungeonList = []; // List of available dungeon IDs
 
 		this.init();
+	}
+
+	/**
+	 * Parse a room reference string (@dungeon{x,y,z}) into components
+	 * @param {string} ref - Room reference string
+	 * @returns {{dungeonId: string, x: number, y: number, z: number} | null}
+	 */
+	parseRoomRef(ref) {
+		if (!ref || typeof ref !== "string") return null;
+		const match = ref.match(/^@([^{]+)\{(\d+),(\d+),(\d+)\}$/);
+		if (!match) return null;
+		return {
+			dungeonId: match[1],
+			x: parseInt(match[2], 10),
+			y: parseInt(match[3], 10),
+			z: parseInt(match[4], 10),
+		};
+	}
+
+	/**
+	 * Format room reference components into string (@dungeon{x,y,z})
+	 * @param {string} dungeonId - Dungeon ID
+	 * @param {number} x - X coordinate
+	 * @param {number} y - Y coordinate
+	 * @param {number} z - Z coordinate
+	 * @returns {string}
+	 */
+	formatRoomRef(dungeonId, x, y, z) {
+		return `@${dungeonId}{${x},${y},${z}}`;
+	}
+
+	/**
+	 * Get the opposite direction
+	 * @param {string} direction - Direction (north, south, east, west, up, down)
+	 * @returns {string} Opposite direction
+	 */
+	getOppositeDirection(direction) {
+		const opposites = {
+			north: "south",
+			south: "north",
+			east: "west",
+			west: "east",
+			up: "down",
+			down: "up",
+		};
+		return opposites[direction] || direction;
 	}
 
 	async fetchHitTypesData() {
@@ -556,23 +603,36 @@ class MapEditor {
 	async loadDungeonList() {
 		try {
 			const data = await this.fetchDungeonListData();
+			this.dungeonList = data.dungeons || [];
+		} catch (error) {
+			console.error("Failed to load dungeon list:", error);
+			this.dungeonList = [];
+		}
+	}
+
+	async loadDungeonList() {
+		try {
+			const data = await this.fetchDungeonListData();
+			this.dungeonList = data.dungeons || [];
 			const select = document.getElementById("dungeon-select");
-			select.innerHTML = '<option value="">Select a dungeon...</option>';
+			if (select) {
+				select.innerHTML = '<option value="">Select a dungeon...</option>';
 
-			// Add "New..." option
-			const newOption = document.createElement("option");
-			newOption.value = "__NEW__";
-			newOption.textContent = "New...";
-			select.appendChild(newOption);
+				// Add "New..." option
+				const newOption = document.createElement("option");
+				newOption.value = "__NEW__";
+				newOption.textContent = "New...";
+				select.appendChild(newOption);
 
-			(data.dungeons || []).forEach((id) => {
-				const option = document.createElement("option");
-				option.value = id;
-				option.textContent = id;
-				select.appendChild(option);
-			});
+				this.dungeonList.forEach((id) => {
+					const option = document.createElement("option");
+					option.value = id;
+					option.textContent = id;
+					select.appendChild(option);
+				});
 
-			this.updateCurrentDungeonDisplay();
+				this.updateCurrentDungeonDisplay();
+			}
 			this.updateDungeonSettingsForm(this.yamlData?.dungeon || null);
 		} catch (error) {
 			console.error("Failed to load dungeon list:", error);
@@ -2648,7 +2708,7 @@ class MapEditor {
 				<p style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.75rem;">
 					Template default: ${this.formatAllowedExits(templateAllowedExits)}
 				</p>
-				<div class="exit-buttons" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
+				<div class="exit-buttons">
 					<button class="exit-btn" data-direction="north" style="padding: 0.5rem;">NORTH</button>
 					<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">SOUTH</button>
 					<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">EAST</button>
@@ -2670,22 +2730,12 @@ class MapEditor {
 					(d) => d === dir || !usedDirections.includes(d)
 				);
 
-				return `
-			<div class="room-link-item" data-index="${index}">
-				<select class="room-link-direction" data-original-dir="${dir}">
-					${availableDirs
-						.map(
-							(d) =>
-								`<option value="${d}" ${d === dir ? "selected" : ""}>${
-									d.charAt(0).toUpperCase() + d.slice(1)
-								}</option>`
-						)
-						.join("")}
-				</select>
-				<input type="text" class="room-link-ref" value="${ref}" placeholder="@dungeon{x,y,z}">
-				<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
-			</div>
-		`;
+				return `<div class="room-link-item" data-index="${index}">${this.generateRoomLinkHTML(
+					availableDirs,
+					dir,
+					ref,
+					index
+				)}</div>`;
 			})
 			.join("");
 
@@ -2753,6 +2803,11 @@ class MapEditor {
 				}
 			};
 		}
+
+		// Store current room coordinates in modal for make-2way functionality
+		modal.dataset.exitOverrideX = x;
+		modal.dataset.exitOverrideY = y;
+		modal.dataset.exitOverrideZ = z;
 
 		modal.classList.add("active");
 
@@ -2848,20 +2903,12 @@ class MapEditor {
 			const linkItem = document.createElement("div");
 			linkItem.className = "room-link-item";
 			linkItem.dataset.index = index;
-			linkItem.innerHTML = `
-				<select class="room-link-direction">
-					${availableDirs
-						.map(
-							(d) =>
-								`<option value="${d}">${
-									d.charAt(0).toUpperCase() + d.slice(1)
-								}</option>`
-						)
-						.join("")}
-				</select>
-				<input type="text" class="room-link-ref" placeholder="@dungeon{x,y,z}">
-				<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
-			`;
+			linkItem.innerHTML = this.generateRoomLinkHTML(
+				availableDirs,
+				"",
+				"",
+				index
+			);
 
 			container.appendChild(linkItem);
 
@@ -2871,6 +2918,14 @@ class MapEditor {
 				deleteBtn.onclick = (e) => {
 					const idx = parseInt(e.target.dataset.index);
 					deleteExitOverrideRoomLink(idx);
+				};
+			}
+
+			const make2WayBtn = linkItem.querySelector(".make-2way-btn");
+			if (make2WayBtn) {
+				make2WayBtn.onclick = async (e) => {
+					const idx = parseInt(e.target.dataset.index);
+					await this.makeExit2WayForOverride(idx, x, y, z);
 				};
 			}
 
@@ -2896,12 +2951,20 @@ class MapEditor {
 				// Re-index remaining items
 				container.querySelectorAll(".room-link-item").forEach((item, i) => {
 					item.dataset.index = i;
-					const btn = item.querySelector(".delete-link-btn");
-					if (btn) {
-						btn.dataset.index = i;
-						btn.onclick = (e) => {
+					const deleteBtn = item.querySelector(".delete-link-btn");
+					if (deleteBtn) {
+						deleteBtn.dataset.index = i;
+						deleteBtn.onclick = (e) => {
 							const idx = parseInt(e.target.dataset.index);
 							deleteExitOverrideRoomLink(idx);
+						};
+					}
+					const make2WayBtn = item.querySelector(".make-2way-btn");
+					if (make2WayBtn) {
+						make2WayBtn.dataset.index = i;
+						make2WayBtn.onclick = async (e) => {
+							const idx = parseInt(e.target.dataset.index);
+							await this.makeExit2WayForOverride(idx, x, y, z);
 						};
 					}
 				});
@@ -2926,6 +2989,16 @@ class MapEditor {
 				btn.onclick = (e) => {
 					const index = parseInt(e.target.dataset.index);
 					deleteExitOverrideRoomLink(index);
+				};
+			});
+
+		// Make 2-way buttons
+		document
+			.querySelectorAll("#exit-override-room-links-container .make-2way-btn")
+			.forEach((btn) => {
+				btn.onclick = async (e) => {
+					const index = parseInt(e.target.dataset.index);
+					await this.makeExit2WayForOverride(index, x, y, z);
 				};
 			});
 
@@ -2964,9 +3037,29 @@ class MapEditor {
 				);
 				linkItems.forEach((item) => {
 					const direction = item.querySelector(".room-link-direction").value;
-					const ref = item.querySelector(".room-link-ref").value.trim();
-					if (ref) {
-						roomLinks[direction] = ref;
+					const dungeonSelect = item.querySelector(".room-link-dungeon");
+					const xInput = item.querySelector(".room-link-x");
+					const yInput = item.querySelector(".room-link-y");
+					const zInput = item.querySelector(".room-link-z");
+
+					// Try new format first (dropdown + number inputs)
+					if (dungeonSelect && xInput && yInput && zInput) {
+						const dungeonId = dungeonSelect.value;
+						const x = parseInt(xInput.value, 10);
+						const y = parseInt(yInput.value, 10);
+						const z = parseInt(zInput.value, 10);
+						if (dungeonId && !isNaN(x) && !isNaN(y) && !isNaN(z)) {
+							roomLinks[direction] = this.formatRoomRef(dungeonId, x, y, z);
+						}
+					} else {
+						// Fallback to old text input format
+						const refInput = item.querySelector(".room-link-ref");
+						if (refInput) {
+							const ref = refInput.value.trim();
+							if (ref) {
+								roomLinks[direction] = ref;
+							}
+						}
 					}
 				});
 
@@ -3175,22 +3268,12 @@ class MapEditor {
 						(d) => d === dir || !usedDirections.includes(d)
 					);
 
-					return `
-				<div class="room-link-item" data-index="${index}">
-					<select class="room-link-direction" data-original-dir="${dir}">
-						${availableDirs
-							.map(
-								(d) =>
-									`<option value="${d}" ${d === dir ? "selected" : ""}>${
-										d.charAt(0).toUpperCase() + d.slice(1)
-									}</option>`
-							)
-							.join("")}
-					</select>
-					<input type="text" class="room-link-ref" value="${ref}" placeholder="@dungeon{x,y,z}">
-					<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
-				</div>
-			`;
+					return `<div class="room-link-item" data-index="${index}">${this.generateRoomLinkHTML(
+						availableDirs,
+						dir,
+						ref,
+						index
+					)}</div>`;
 				})
 				.join("");
 
@@ -3553,6 +3636,14 @@ class MapEditor {
 				};
 			});
 
+			// Make 2-way buttons
+			document.querySelectorAll(".make-2way-btn").forEach((btn) => {
+				btn.onclick = (e) => {
+					const index = parseInt(e.target.dataset.index);
+					this.makeExit2WayForTemplate(index);
+				};
+			});
+
 			// Dense button handler
 			const denseBtn = document.getElementById("template-dense-btn");
 			if (denseBtn) {
@@ -3770,9 +3861,29 @@ class MapEditor {
 			const linkItems = document.querySelectorAll(".room-link-item");
 			linkItems.forEach((item) => {
 				const direction = item.querySelector(".room-link-direction").value;
-				const ref = item.querySelector(".room-link-ref").value.trim();
-				if (ref) {
-					roomLinks[direction] = ref;
+				const dungeonSelect = item.querySelector(".room-link-dungeon");
+				const xInput = item.querySelector(".room-link-x");
+				const yInput = item.querySelector(".room-link-y");
+				const zInput = item.querySelector(".room-link-z");
+
+				// Try new format first (dropdown + number inputs)
+				if (dungeonSelect && xInput && yInput && zInput) {
+					const dungeonId = dungeonSelect.value;
+					const x = parseInt(xInput.value, 10);
+					const y = parseInt(yInput.value, 10);
+					const z = parseInt(zInput.value, 10);
+					if (dungeonId && !isNaN(x) && !isNaN(y) && !isNaN(z)) {
+						roomLinks[direction] = this.formatRoomRef(dungeonId, x, y, z);
+					}
+				} else {
+					// Fallback to old text input format
+					const refInput = item.querySelector(".room-link-ref");
+					if (refInput) {
+						const ref = refInput.value.trim();
+						if (ref) {
+							roomLinks[direction] = ref;
+						}
+					}
 				}
 			});
 
@@ -3781,12 +3892,15 @@ class MapEditor {
 				const oldRoom = dungeon.rooms[index];
 				const updated = {
 					...oldRoom,
-					...(this.projectVersion && { version: this.projectVersion }),
 					display,
 					description,
 					...(mapText && { mapText }),
 					...(mapColor !== undefined && { mapColor }),
 				};
+				// Remove version if it exists - templates don't have version, dungeon does
+				if (updated.version !== undefined) {
+					delete updated.version;
+				}
 				// Set allowedExits bitmap (mandatory field)
 				updated.allowedExits = allowedExits;
 				// Set dense property (only include if true)
@@ -3815,7 +3929,6 @@ class MapEditor {
 			} else {
 				// Add new
 				const newRoom = {
-					...(this.projectVersion && { version: this.projectVersion }),
 					display,
 					description,
 				};
@@ -3873,7 +3986,6 @@ class MapEditor {
 			const newTemplate = {
 				id: templateId,
 				type: templateType,
-				...(this.projectVersion && { version: this.projectVersion }),
 				display,
 				description,
 			};
@@ -4019,8 +4131,11 @@ class MapEditor {
 				const updated = {
 					...oldTemplate,
 					...newTemplate,
-					...(this.projectVersion && { version: this.projectVersion }),
 				};
+				// Remove version if it exists - templates don't have version, dungeon does
+				if (updated.version !== undefined) {
+					delete updated.version;
+				}
 				// Remove mob fields if type changed away from Mob
 				if (templateType !== "Mob" && oldTemplate.type === "Mob") {
 					delete updated.race;
@@ -5047,6 +5162,52 @@ class MapEditor {
 		}
 	}
 
+	/**
+	 * Generate HTML for a room link item with dropdown and number inputs
+	 * @param {string[]} availableDirs - Available directions
+	 * @param {string} selectedDir - Selected direction (optional)
+	 * @param {string} ref - Room reference string to parse (optional)
+	 * @param {number} index - Item index
+	 * @returns {string} HTML string
+	 */
+	generateRoomLinkHTML(availableDirs, selectedDir = "", ref = "", index = 0) {
+		const parsed = ref ? this.parseRoomRef(ref) : null;
+		const dungeonId = parsed?.dungeonId || this.currentDungeonId || "";
+		const x = parsed?.x ?? 0;
+		const y = parsed?.y ?? 0;
+		const z = parsed?.z ?? 0;
+
+		const dungeonOptions = this.dungeonList
+			.map(
+				(id) =>
+					`<option value="${id}" ${
+						id === dungeonId ? "selected" : ""
+					}>${id}</option>`
+			)
+			.join("");
+
+		return `
+			<select class="room-link-direction">
+				${availableDirs
+					.map(
+						(d) =>
+							`<option value="${d}" ${d === selectedDir ? "selected" : ""}>${
+								d.charAt(0).toUpperCase() + d.slice(1)
+							}</option>`
+					)
+					.join("")}
+			</select>
+			<select class="room-link-dungeon">
+				${dungeonOptions}
+			</select>
+			<input type="number" class="room-link-x" value="${x}" min="0" step="1" placeholder="X">
+			<input type="number" class="room-link-y" value="${y}" min="0" step="1" placeholder="Y">
+			<input type="number" class="room-link-z" value="${z}" min="0" step="1" placeholder="Z">
+			<button type="button" class="make-2way-btn" data-index="${index}" title="Make 2-way link">⇄</button>
+			<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
+		`;
+	}
+
 	addRoomLink() {
 		const container = document.getElementById("room-links-container");
 		if (!container) return;
@@ -5058,20 +5219,12 @@ class MapEditor {
 		const linkItem = document.createElement("div");
 		linkItem.className = "room-link-item";
 		linkItem.dataset.index = index;
-		linkItem.innerHTML = `
-			<select class="room-link-direction">
-				${availableDirs
-					.map(
-						(d) =>
-							`<option value="${d}">${
-								d.charAt(0).toUpperCase() + d.slice(1)
-							}</option>`
-					)
-					.join("")}
-			</select>
-			<input type="text" class="room-link-ref" placeholder="@dungeon{x,y,z}">
-			<button type="button" class="delete-link-btn" data-index="${index}">Delete</button>
-		`;
+		linkItem.innerHTML = this.generateRoomLinkHTML(
+			availableDirs,
+			"",
+			"",
+			index
+		);
 		container.appendChild(linkItem);
 
 		// Attach delete handler to the new button
@@ -5080,6 +5233,15 @@ class MapEditor {
 			deleteBtn.onclick = (e) => {
 				const idx = parseInt(e.target.dataset.index);
 				this.deleteRoomLink(idx);
+			};
+		}
+
+		// Attach make-2way handler to the new button
+		const make2WayBtn = linkItem.querySelector(".make-2way-btn");
+		if (make2WayBtn) {
+			make2WayBtn.onclick = (e) => {
+				const idx = parseInt(e.target.dataset.index);
+				this.makeExit2WayForTemplate(idx);
 			};
 		}
 
@@ -5105,12 +5267,20 @@ class MapEditor {
 			// Re-index remaining items
 			container.querySelectorAll(".room-link-item").forEach((item, i) => {
 				item.dataset.index = i;
-				const btn = item.querySelector(".delete-link-btn");
-				if (btn) {
-					btn.dataset.index = i;
-					btn.onclick = (e) => {
+				const deleteBtn = item.querySelector(".delete-link-btn");
+				if (deleteBtn) {
+					deleteBtn.dataset.index = i;
+					deleteBtn.onclick = (e) => {
 						const idx = parseInt(e.target.dataset.index);
 						this.deleteRoomLink(idx);
+					};
+				}
+				const make2WayBtn = item.querySelector(".make-2way-btn");
+				if (make2WayBtn) {
+					make2WayBtn.dataset.index = i;
+					make2WayBtn.onclick = (e) => {
+						const idx = parseInt(e.target.dataset.index);
+						this.makeExit2WayForTemplate(idx);
 					};
 				}
 			});
@@ -5118,6 +5288,229 @@ class MapEditor {
 			// Update direction dropdowns after deletion
 			this.updateRoomLinkDirections();
 		}
+	}
+
+	async makeExit2WayForOverride(linkIndex, currentX, currentY, currentZ) {
+		if (!this.yamlData) return;
+
+		const container = document.getElementById(
+			"exit-override-room-links-container"
+		);
+		if (!container) return;
+
+		const items = Array.from(container.querySelectorAll(".room-link-item"));
+		if (linkIndex < 0 || linkIndex >= items.length) return;
+
+		const linkItem = items[linkIndex];
+		const directionSelect = linkItem.querySelector(".room-link-direction");
+		const dungeonSelect = linkItem.querySelector(".room-link-dungeon");
+		const xInput = linkItem.querySelector(".room-link-x");
+		const yInput = linkItem.querySelector(".room-link-y");
+		const zInput = linkItem.querySelector(".room-link-z");
+
+		if (!directionSelect || !dungeonSelect || !xInput || !yInput || !zInput)
+			return;
+
+		const direction = directionSelect.value;
+		const targetDungeonId = dungeonSelect.value;
+		const targetX = parseInt(xInput.value, 10);
+		const targetY = parseInt(yInput.value, 10);
+		const targetZ = parseInt(zInput.value, 10);
+
+		if (
+			!targetDungeonId ||
+			isNaN(targetX) ||
+			isNaN(targetY) ||
+			isNaN(targetZ)
+		) {
+			this.showToast("Invalid target", "Please fill in all room link fields");
+			return;
+		}
+
+		// Get opposite direction
+		const oppositeDir = this.getOppositeDirection(direction);
+
+		// Format the reciprocal link
+		const reciprocalLink = this.formatRoomRef(
+			this.currentDungeonId,
+			currentX,
+			currentY,
+			currentZ
+		);
+
+		// Check if target is in the same dungeon
+		if (targetDungeonId === this.currentDungeonId) {
+			// Same dungeon - modify directly
+			const dungeon = this.yamlData.dungeon;
+			const targetCoordKey = `${targetX},${targetY},${targetZ}`;
+
+			if (!dungeon.exitOverrides) {
+				dungeon.exitOverrides = {};
+			}
+
+			let targetOverride = dungeon.exitOverrides[targetCoordKey];
+			if (!targetOverride || typeof targetOverride === "number") {
+				// Create new object override or convert number to object
+				const targetRoom = this.getRoomAt(dungeon, targetX, targetY, targetZ);
+				const baseAllowedExits = targetRoom?.allowedExits || 0;
+				targetOverride = {
+					allowedExits:
+						typeof targetOverride === "number"
+							? targetOverride
+							: baseAllowedExits,
+					roomLinks: {},
+				};
+			} else if (!targetOverride.roomLinks) {
+				targetOverride.roomLinks = {};
+			}
+
+			// Add reciprocal link
+			targetOverride.roomLinks[oppositeDir] = reciprocalLink;
+			dungeon.exitOverrides[targetCoordKey] = targetOverride;
+
+			this.showToast(
+				"2-way link created",
+				`Added ${oppositeDir} link from target room back to (${currentX}, ${currentY}, ${currentZ})`
+			);
+
+			// Re-render map
+			this.renderMap(dungeon);
+		} else {
+			// Different dungeon - need to load, modify, and save it
+			try {
+				// Save current state
+				const currentDungeonId = this.currentDungeonId;
+				const currentYamlData = JSON.parse(JSON.stringify(this.yamlData));
+
+				// Load target dungeon
+				const targetData = await this.fetchDungeonData(targetDungeonId);
+				const targetYamlData = jsyaml.load(targetData.yaml);
+				const targetDungeon = targetYamlData.dungeon;
+
+				// Get or create exit override for target room
+				const targetCoordKey = `${targetX},${targetY},${targetZ}`;
+
+				if (!targetDungeon.exitOverrides) {
+					targetDungeon.exitOverrides = {};
+				}
+
+				let targetOverride = targetDungeon.exitOverrides[targetCoordKey];
+				if (!targetOverride || typeof targetOverride === "number") {
+					// Temporarily set yamlData to access getRoomAt
+					const tempYamlData = this.yamlData;
+					this.yamlData = { dungeon: targetDungeon };
+					const targetRoom = this.getRoomAt(
+						targetDungeon,
+						targetX,
+						targetY,
+						targetZ
+					);
+					this.yamlData = tempYamlData;
+
+					const baseAllowedExits = targetRoom?.allowedExits || 0;
+					targetOverride = {
+						allowedExits:
+							typeof targetOverride === "number"
+								? targetOverride
+								: baseAllowedExits,
+						roomLinks: {},
+					};
+				} else if (!targetOverride.roomLinks) {
+					targetOverride.roomLinks = {};
+				}
+
+				// Add reciprocal link
+				targetOverride.roomLinks[oppositeDir] = reciprocalLink;
+				targetDungeon.exitOverrides[targetCoordKey] = targetOverride;
+
+				// Save target dungeon
+				const orderedRoot = {};
+				if (targetYamlData.version) {
+					orderedRoot.version = targetYamlData.version;
+				}
+				orderedRoot.dungeon = targetDungeon;
+
+				const targetYaml = jsyaml.dump(orderedRoot, {
+					lineWidth: 120,
+					noRefs: true,
+					flowLevel: 4,
+				});
+
+				await this.saveDungeonData(targetDungeonId, targetYaml);
+
+				// Restore current dungeon
+				this.currentDungeonId = currentDungeonId;
+				this.yamlData = currentYamlData;
+
+				this.showToast(
+					"2-way link created",
+					`Added ${oppositeDir} link in ${targetDungeonId} from target room back to (${currentX}, ${currentY}, ${currentZ})`
+				);
+			} catch (error) {
+				console.error("Failed to create 2-way link in target dungeon:", error);
+				this.showToast(
+					"Failed to create 2-way link",
+					`Error: ${error.message}`
+				);
+			}
+		}
+	}
+
+	makeExit2WayForTemplate(linkIndex) {
+		if (!this.yamlData) return;
+
+		const container = document.getElementById("room-links-container");
+		if (!container) return;
+
+		const items = Array.from(container.querySelectorAll(".room-link-item"));
+		if (linkIndex < 0 || linkIndex >= items.length) return;
+
+		const linkItem = items[linkIndex];
+		const directionSelect = linkItem.querySelector(".room-link-direction");
+		const dungeonSelect = linkItem.querySelector(".room-link-dungeon");
+		const xInput = linkItem.querySelector(".room-link-x");
+		const yInput = linkItem.querySelector(".room-link-y");
+		const zInput = linkItem.querySelector(".room-link-z");
+
+		if (!directionSelect || !dungeonSelect || !xInput || !yInput || !zInput)
+			return;
+
+		const direction = directionSelect.value;
+		const targetDungeonId = dungeonSelect.value;
+		const targetX = parseInt(xInput.value, 10);
+		const targetY = parseInt(yInput.value, 10);
+		const targetZ = parseInt(zInput.value, 10);
+
+		if (
+			!targetDungeonId ||
+			isNaN(targetX) ||
+			isNaN(targetY) ||
+			isNaN(targetZ)
+		) {
+			this.showToast("Invalid target", "Please fill in all room link fields");
+			return;
+		}
+
+		// Get the current template index from modal
+		const modal = document.getElementById("template-modal");
+		const templateId = document.getElementById("template-id")?.value;
+		const templateType = document.getElementById("template-type")?.value;
+
+		if (templateType !== "room") {
+			this.showToast(
+				"Not available",
+				"2-way links only work for room templates"
+			);
+			return;
+		}
+
+		// For templates, we need to find all rooms using this template and create exit overrides
+		// This is complex, so for now we'll just show a message
+		// TODO: Implement finding all rooms using this template and creating exit overrides
+		this.showToast(
+			"Not yet implemented",
+			"2-way links for room templates require finding all rooms using the template. Please use exit overrides for specific rooms."
+		);
 	}
 
 	async calculateMobAttributes() {

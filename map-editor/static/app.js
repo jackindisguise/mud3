@@ -3781,6 +3781,7 @@ class MapEditor {
 				const oldRoom = dungeon.rooms[index];
 				const updated = {
 					...oldRoom,
+					...(this.projectVersion && { version: this.projectVersion }),
 					display,
 					description,
 					...(mapText && { mapText }),
@@ -3813,7 +3814,11 @@ class MapEditor {
 				}
 			} else {
 				// Add new
-				const newRoom = { display, description };
+				const newRoom = {
+					...(this.projectVersion && { version: this.projectVersion }),
+					display,
+					description,
+				};
 				if (mapText) newRoom.mapText = mapText;
 				if (mapColor !== undefined) newRoom.mapColor = mapColor;
 				// Set allowedExits bitmap (mandatory field, defaults to NSEW)
@@ -3868,6 +3873,7 @@ class MapEditor {
 			const newTemplate = {
 				id: templateId,
 				type: templateType,
+				...(this.projectVersion && { version: this.projectVersion }),
 				display,
 				description,
 			};
@@ -4013,6 +4019,7 @@ class MapEditor {
 				const updated = {
 					...oldTemplate,
 					...newTemplate,
+					...(this.projectVersion && { version: this.projectVersion }),
 				};
 				// Remove mob fields if type changed away from Mob
 				if (templateType !== "Mob" && oldTemplate.type === "Mob") {

@@ -218,19 +218,14 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 export async function saveCharacter(character: Character) {
-	const data: SerializedCharacter = character.serialize();
+	const data: SerializedCharacter = character.serialize({
+		version: await getCurrentVersion(),
+	});
 	const filePath = getCharacterFilePath(character.credentials.username);
 	const tempPath = `${filePath}.tmp`;
 	if (!data.mob) throw new Error("Character mob is required to save");
 
-	// Build ordered data with version first
-	const currentVersion = await getCurrentVersion();
-	const versionedData: any = {
-		version: currentVersion,
-		...data,
-	};
-
-	const yaml = YAML.dump(versionedData, {
+	const yaml = YAML.dump(data, {
 		noRefs: true,
 		lineWidth: 120,
 	});

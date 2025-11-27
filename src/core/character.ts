@@ -1183,7 +1183,7 @@ export class Character {
 	 *   JSON.stringify(saveData, null, 2));
 	 * ```
 	 */
-	public serialize(): SerializedCharacter {
+	public serialize(options?: { version?: string }): SerializedCharacter {
 		const c = this.credentials;
 		const serializedCreds: SerializedPlayerCredentials = {
 			characterId: c.characterId,
@@ -1228,13 +1228,19 @@ export class Character {
 		if (this.mob) {
 			// Serialize mob and remove 'type' field
 			const mobData: SerializedMob = {
-				...(this.mob.serialize({ compress: true }) as SerializedMob),
+				...(this.mob.serialize({
+					compress: true,
+					version: options?.version,
+				}) as SerializedMob),
 			};
 
 			const { type, ...mobDataWithoutType } = mobData;
 			result.mob = mobDataWithoutType;
 		}
 
-		return result;
+		return {
+			...(options?.version && { version: options.version }),
+			...result,
+		};
 	}
 }

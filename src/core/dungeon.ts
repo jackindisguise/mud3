@@ -1655,6 +1655,7 @@ export interface RoomOptions extends DungeonObjectOptions {
 export interface SerializedDungeonObject {
 	type: SerializedDungeonObjectType;
 	oid?: number; // Optional: present for instances, absent for templates
+	version?: string; // Project version when this object was serialized
 	keywords: string;
 	display: string;
 	templateId?: string;
@@ -2810,7 +2811,10 @@ export class DungeonObject {
 	 * // saveData contains type, keywords, display, description, contents, and dungeonId (if any)
 	 * ```
 	 */
-	serialize(options?: { compress?: boolean }): SerializedDungeonObject {
+	serialize(options?: {
+		compress?: boolean;
+		version?: string;
+	}): SerializedDungeonObject {
 		const locationRef =
 			this.location instanceof Room ? this.location.getRoomRef() : undefined;
 		const serializedContents = this._contents.map((obj) =>
@@ -2819,6 +2823,7 @@ export class DungeonObject {
 
 		// Uncompressed/base form includes selected keys even when undefined
 		const uncompressed: SerializedDungeonObject = {
+			...(options?.version && { version: options.version }),
 			type: this.constructor.name as SerializedDungeonObjectType,
 			oid: this.oid, // Always include oid for instances
 			keywords: this.keywords,
@@ -3490,10 +3495,16 @@ export class Room extends DungeonObject {
 	 * // saveData includes coordinates along with other room properties
 	 * ```
 	 */
-	serialize(options?: { compress?: boolean }): SerializedRoom {
-		const baseData = super.serialize(options);
+	serialize(options?: {
+		compress?: boolean;
+		version?: string;
+	}): SerializedRoom {
+		const base = {
+			...(options?.version && { version: options.version }),
+			...super.serialize(options),
+		};
 		// Remove oid from serialization - Rooms are identified by coordinates, not OIDs
-		const { oid, ...baseDataWithoutOid } = baseData;
+		const { oid, ...baseDataWithoutOid } = base;
 		const result: SerializedRoom = {
 			...baseDataWithoutOid,
 			type: "Room" as const,
@@ -4232,9 +4243,15 @@ export class Equipment extends Item {
 	 * // Can be saved to file or sent over network
 	 * ```
 	 */
-	public serialize(options?: { compress?: boolean }): SerializedEquipment {
+	public serialize(options?: {
+		compress?: boolean;
+		version?: string;
+	}): SerializedEquipment {
 		// Build uncompressed including subclass fields, then apply common compression if requested
-		const base = super.serialize(); // always uncompressed shape
+		const base = {
+			...(options?.version && { version: options.version }),
+			...super.serialize(options),
+		};
 		const uncompressed: SerializedEquipment = {
 			...(base as SerializedDungeonObject),
 			type: "Equipment",
@@ -4378,9 +4395,15 @@ export class Armor extends Equipment {
 	 *
 	 * @returns Serialized armor object
 	 */
-	public serialize(options?: { compress?: boolean }): SerializedArmor {
+	public serialize(options?: {
+		compress?: boolean;
+		version?: string;
+	}): SerializedArmor {
 		// Build full uncompressed then compress against template baseline if requested
-		const base = super.serialize();
+		const base = {
+			...(options?.version && { version: options.version }),
+			...super.serialize(options),
+		};
 		const uncompressed: SerializedArmor = {
 			...(base as SerializedDungeonObject),
 			type: "Armor",
@@ -4559,9 +4582,13 @@ export class Weapon extends Equipment {
 	 */
 	public override serialize(options?: {
 		compress?: boolean;
+		version?: string;
 	}): SerializedWeapon {
 		// Build full uncompressed then compress against template baseline if requested
-		const base = super.serialize();
+		const base = {
+			...(options?.version && { version: options.version }),
+			...super.serialize(options),
+		};
 		const uncompressed: SerializedWeapon = {
 			...(base as SerializedDungeonObject),
 			type: "Weapon",
@@ -5575,19 +5602,6 @@ export class Mob extends Movable {
 
 		// Handle Mob-specific properties
 		const mobTemplate = template as MobTemplate;
-		// Note: race and job from templates are applied as-is (they should be Race/Job objects, not IDs)
-		// If a template provides race/job as IDs, they need to be resolved before calling applyTemplate
-		// This is handled in the package layer when creating objects from templates
-		if (mobTemplate.race !== undefined) {
-			// Template should provide Race object, not ID string
-			this._race = mobTemplate.race as any;
-			this.recalculateDerivedAttributes(this.captureResourceRatios());
-		}
-		if (mobTemplate.job !== undefined) {
-			// Template should provide Job object, not ID string
-			this._job = mobTemplate.job as any;
-			this.recalculateDerivedAttributes(this.captureResourceRatios());
-		}
 		if (mobTemplate.level !== undefined) {
 			this.level = mobTemplate.level;
 		}
@@ -6968,9 +6982,12 @@ export class Mob extends Movable {
 	 * // Can be saved to file or sent over network
 	 * ```
 	 */
-	public serialize(options?: { compress?: boolean }): SerializedMob {
+	public serialize(options?: {
+		compress?: boolean;
+		version?: string;
+	}): SerializedMob {
 		// Always build from an uncompressed base so compression can compare against template baselines
-		const base = super.serialize(); // uncompressed base shape
+		const base = super.serialize(options); // uncompressed base shape
 		const uncompressed = {
 			...(base as SerializedDungeonObject),
 		} as SerializedMob;
@@ -7407,6 +7424,9 @@ function compressSerializedObject<T extends SerializedDungeonObject>(
 		type,
 		...(uncompressed.oid !== undefined && { oid: uncompressed.oid }), // Include oid if present (instances only)
 		...(templateId ? { templateId } : {}),
+		...(uncompressed.version !== undefined && {
+			version: uncompressed.version,
+		}), // Always preserve version
 	};
 	for (const [key, value] of Object.entries(uncompressed) as Array<
 		[keyof SerializedDungeonObject, unknown]
@@ -7414,6 +7434,7 @@ function compressSerializedObject<T extends SerializedDungeonObject>(
 		if (key === "type") continue;
 		if (key === "templateId") continue;
 		if (key === "oid") continue; // Already handled above
+		if (key === "version") continue; // Always preserve version, skip compression
 		const baseValue = (base as any)?.[key];
 		if (value !== baseValue) {
 			(compressed as any)[key] = value;

@@ -15,7 +15,7 @@ describe("package/character.ts deserializer", () => {
 		await abilitiesPkg.loader();
 	});
 
-	it("deserializes a basic Character", () => {
+	it("deserializes a basic Character", async () => {
 		const data: SerializedCharacter = {
 			credentials: {
 				characterId: 1,
@@ -54,7 +54,7 @@ describe("package/character.ts deserializer", () => {
 			},
 		};
 
-		const character = deserializeCharacter(data);
+		const character = await deserializeCharacter(data);
 
 		assert.ok(character instanceof Character);
 		assert.strictEqual(character.credentials.username, "testuser");
@@ -71,7 +71,7 @@ describe("package/character.ts deserializer", () => {
 		assert.strictEqual(character.mob.level, 5);
 	});
 
-	it("converts channels array to Set", () => {
+	it("converts channels array to Set", async () => {
 		const data: SerializedCharacter = {
 			credentials: {
 				characterId: 1,
@@ -104,7 +104,7 @@ describe("package/character.ts deserializer", () => {
 			},
 		};
 
-		const character = deserializeCharacter(data);
+		const character = await deserializeCharacter(data);
 
 		assert.ok(character.settings.channels instanceof Set);
 		assert.strictEqual(character.settings.channels.size, 3);
@@ -113,7 +113,7 @@ describe("package/character.ts deserializer", () => {
 		assert.ok(character.settings.channels.has(CHANNEL.SAY));
 	});
 
-	it("converts blockedUsers array to Set", () => {
+	it("converts blockedUsers array to Set", async () => {
 		const data: SerializedCharacter = {
 			credentials: {
 				characterId: 1,
@@ -146,7 +146,7 @@ describe("package/character.ts deserializer", () => {
 			},
 		};
 
-		const character = deserializeCharacter(data);
+		const character = await deserializeCharacter(data);
 
 		assert.ok(character.settings.blockedUsers instanceof Set);
 		assert.strictEqual(character.settings.blockedUsers!.size, 2);
@@ -154,7 +154,7 @@ describe("package/character.ts deserializer", () => {
 		assert.ok(character.settings.blockedUsers!.has("user2"));
 	});
 
-	it("handles missing characterId with default value", () => {
+	it("handles missing characterId with default value", async () => {
 		const data: SerializedCharacter = {
 			credentials: {
 				username: "testuser",
@@ -184,7 +184,7 @@ describe("package/character.ts deserializer", () => {
 			},
 		};
 
-		const character = deserializeCharacter(data);
+		const character = await deserializeCharacter(data);
 
 		// Should assign Number.MAX_SAFE_INTEGER as fallback
 		assert.strictEqual(
@@ -193,7 +193,7 @@ describe("package/character.ts deserializer", () => {
 		);
 	});
 
-	it("round-trips a Character", () => {
+	it("round-trips a Character", async () => {
 		const mob = createMob();
 		const original = new Character({
 			credentials: {
@@ -220,7 +220,7 @@ describe("package/character.ts deserializer", () => {
 		});
 
 		const serialized = original.serialize();
-		const deserialized = deserializeCharacter(serialized);
+		const deserialized = await deserializeCharacter(serialized);
 
 		assert.strictEqual(
 			deserialized.credentials.username,

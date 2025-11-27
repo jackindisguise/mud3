@@ -46,7 +46,7 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeDungeonObject", () => {
-		it("deserializes a basic DungeonObject", () => {
+		it("deserializes a basic DungeonObject", async () => {
 			const data: SerializedDungeonObject = {
 				type: "DungeonObject",
 				keywords: "test object",
@@ -54,7 +54,7 @@ describe("package/dungeon.ts deserializers", () => {
 				description: "A test object",
 			};
 
-			const obj = deserializeDungeonObject(data);
+			const obj = await deserializeDungeonObject(data);
 
 			assert.ok(obj instanceof DungeonObject);
 			assert.strictEqual(obj.keywords, "test object");
@@ -62,7 +62,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(obj.description, "A test object");
 		});
 
-		it("deserializes DungeonObject with contents", () => {
+		it("deserializes DungeonObject with contents", async () => {
 			const data: SerializedDungeonObject = {
 				type: "DungeonObject",
 				keywords: "chest",
@@ -76,7 +76,7 @@ describe("package/dungeon.ts deserializers", () => {
 				],
 			};
 
-			const obj = deserializeDungeonObject(data);
+			const obj = await deserializeDungeonObject(data);
 
 			assert.ok(obj instanceof DungeonObject);
 			assert.strictEqual(obj.contents.length, 1);
@@ -84,21 +84,21 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(obj.contents[0].keywords, "gold coin");
 		});
 
-		it("throws error for invalid type", () => {
+		it("throws error for invalid type", async () => {
 			const data = {
 				type: "InvalidType",
 				keywords: "test",
 				display: "Test",
-			} as any;
+			};
 
-			assert.throws(() => {
-				deserializeDungeonObject(data);
+			await assert.rejects(async () => {
+				await deserializeDungeonObject(data as any);
 			}, /no valid type to deserialize/);
 		});
 	});
 
 	describe("deserializeRoom", () => {
-		it("deserializes a basic Room", () => {
+		it("deserializes a basic Room", async () => {
 			const data: SerializedRoom = {
 				type: "Room",
 				keywords: "test room",
@@ -107,7 +107,7 @@ describe("package/dungeon.ts deserializers", () => {
 				allowedExits: DIRECTION.NORTH | DIRECTION.SOUTH,
 			};
 
-			const room = deserializeRoom(data);
+			const room = await deserializeRoom(data);
 
 			assert.ok(room instanceof Room);
 			assert.strictEqual(room.keywords, "test room");
@@ -117,7 +117,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(room.allowedExits, DIRECTION.NORTH | DIRECTION.SOUTH);
 		});
 
-		it("uses default exits when not provided", () => {
+		it("uses default exits when not provided", async () => {
 			const data: SerializedRoom = {
 				type: "Room",
 				keywords: "room",
@@ -125,14 +125,14 @@ describe("package/dungeon.ts deserializers", () => {
 				coordinates: { x: 0, y: 0, z: 0 },
 			} as SerializedRoom;
 
-			const room = deserializeRoom(data);
+			const room = await deserializeRoom(data);
 
 			const defaultExits =
 				DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
 			assert.strictEqual(room.allowedExits, defaultExits);
 		});
 
-		it("deserializes Room with contents", () => {
+		it("deserializes Room with contents", async () => {
 			const data: SerializedRoom = {
 				type: "Room",
 				keywords: "room",
@@ -148,7 +148,7 @@ describe("package/dungeon.ts deserializers", () => {
 				],
 			};
 
-			const room = deserializeRoom(data);
+			const room = await deserializeRoom(data);
 
 			assert.strictEqual(room.contents.length, 1);
 			assert.ok(room.contents[0] instanceof Prop);
@@ -156,20 +156,20 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeMovable", () => {
-		it("deserializes a basic Movable", () => {
+		it("deserializes a basic Movable", async () => {
 			const data: SerializedMovable = {
 				type: "Movable",
 				keywords: "movable",
 				display: "Movable",
 			};
 
-			const movable = deserializeMovable(data);
+			const movable = await deserializeMovable(data);
 
 			assert.ok(movable instanceof Movable);
 			assert.strictEqual(movable.keywords, "movable");
 		});
 
-		it("deserializes Movable with contents", () => {
+		it("deserializes Movable with contents", async () => {
 			const data: SerializedMovable = {
 				type: "Movable",
 				keywords: "bag",
@@ -183,7 +183,7 @@ describe("package/dungeon.ts deserializers", () => {
 				],
 			};
 
-			const movable = deserializeMovable(data);
+			const movable = await deserializeMovable(data);
 
 			assert.strictEqual(movable.contents.length, 1);
 			assert.ok(movable.contents[0] instanceof Item);
@@ -191,14 +191,14 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeItem", () => {
-		it("deserializes a basic Item", () => {
+		it("deserializes a basic Item", async () => {
 			const data: SerializedItem = {
 				type: "Item",
 				keywords: "item",
 				display: "Item",
 			};
 
-			const item = deserializeItem(data);
+			const item = await deserializeItem(data);
 
 			assert.ok(item instanceof Item);
 			assert.strictEqual(item.keywords, "item");
@@ -206,14 +206,14 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeProp", () => {
-		it("deserializes a basic Prop", () => {
+		it("deserializes a basic Prop", async () => {
 			const data: SerializedProp = {
 				type: "Prop",
 				keywords: "prop",
 				display: "Prop",
 			};
 
-			const prop = deserializeProp(data);
+			const prop = await deserializeProp(data);
 
 			assert.ok(prop instanceof Prop);
 			assert.strictEqual(prop.keywords, "prop");
@@ -221,7 +221,7 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeEquipment", () => {
-		it("deserializes a basic Equipment", () => {
+		it("deserializes a basic Equipment", async () => {
 			const data: SerializedEquipment = {
 				type: "Equipment",
 				keywords: "ring",
@@ -229,14 +229,14 @@ describe("package/dungeon.ts deserializers", () => {
 				slot: EQUIPMENT_SLOT.FINGER,
 			};
 
-			const equipment = deserializeEquipment(data);
+			const equipment = await deserializeEquipment(data);
 
 			assert.ok(equipment instanceof Equipment);
 			assert.strictEqual(equipment.keywords, "ring");
 			assert.strictEqual(equipment.slot, EQUIPMENT_SLOT.FINGER);
 		});
 
-		it("deserializes Equipment with bonuses", () => {
+		it("deserializes Equipment with bonuses", async () => {
 			const data: SerializedEquipment = {
 				type: "Equipment",
 				keywords: "ring",
@@ -246,7 +246,7 @@ describe("package/dungeon.ts deserializers", () => {
 				resourceBonuses: { maxHealth: 10 },
 			};
 
-			const equipment = deserializeEquipment(data);
+			const equipment = await deserializeEquipment(data);
 
 			assert.strictEqual(equipment.attributeBonuses.strength, 5);
 			assert.strictEqual(equipment.resourceBonuses.maxHealth, 10);
@@ -254,7 +254,7 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeArmor", () => {
-		it("deserializes a basic Armor", () => {
+		it("deserializes a basic Armor", async () => {
 			const data: SerializedArmor = {
 				type: "Armor",
 				keywords: "armor",
@@ -263,14 +263,14 @@ describe("package/dungeon.ts deserializers", () => {
 				defense: 5,
 			};
 
-			const armor = deserializeArmor(data);
+			const armor = await deserializeArmor(data);
 
 			assert.ok(armor instanceof Armor);
 			assert.strictEqual(armor.slot, EQUIPMENT_SLOT.CHEST);
 			assert.strictEqual(armor.defense, 5);
 		});
 
-		it("defaults defense to 0 when not provided", () => {
+		it("defaults defense to 0 when not provided", async () => {
 			const data: SerializedArmor = {
 				type: "Armor",
 				keywords: "armor",
@@ -279,14 +279,14 @@ describe("package/dungeon.ts deserializers", () => {
 				defense: 0,
 			};
 
-			const armor = deserializeArmor(data);
+			const armor = await deserializeArmor(data);
 
 			assert.strictEqual(armor.defense, 0);
 		});
 	});
 
 	describe("deserializeWeapon", () => {
-		it("deserializes a basic Weapon", () => {
+		it("deserializes a basic Weapon", async () => {
 			const data: SerializedWeapon = {
 				type: "Weapon",
 				keywords: "sword",
@@ -297,7 +297,7 @@ describe("package/dungeon.ts deserializers", () => {
 				weaponType: "longsword",
 			};
 
-			const weapon = deserializeWeapon(data);
+			const weapon = await deserializeWeapon(data);
 
 			assert.ok(weapon instanceof Weapon);
 			assert.strictEqual(weapon.slot, EQUIPMENT_SLOT.MAIN_HAND);
@@ -306,7 +306,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(weapon.type, "longsword");
 		});
 
-		it("defaults attackPower to 0 and type to shortsword when not provided", () => {
+		it("defaults attackPower to 0 and type to shortsword when not provided", async () => {
 			const data: SerializedWeapon = {
 				type: "Weapon",
 				keywords: "weapon",
@@ -316,7 +316,7 @@ describe("package/dungeon.ts deserializers", () => {
 				hitType: "slash",
 			};
 
-			const weapon = deserializeWeapon(data);
+			const weapon = await deserializeWeapon(data);
 
 			assert.strictEqual(weapon.attackPower, 0);
 			assert.strictEqual(weapon.type, "shortsword");
@@ -324,7 +324,7 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("deserializeMob", () => {
-		it("deserializes a basic Mob", () => {
+		it("deserializes a basic Mob", async () => {
 			const data: SerializedMob = {
 				type: "Mob",
 				keywords: "mob",
@@ -338,7 +338,7 @@ describe("package/dungeon.ts deserializers", () => {
 				exhaustion: 0,
 			};
 
-			const mob = deserializeMob(data);
+			const mob = await deserializeMob(data);
 
 			assert.ok(mob instanceof Mob);
 			assert.strictEqual(mob.level, 5);
@@ -349,7 +349,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(mob.mana, 25);
 		});
 
-		it("deserializes Mob with learned abilities", () => {
+		it("deserializes Mob with learned abilities", async () => {
 			// First, we need to ensure abilities are loaded
 			const data: SerializedMob = {
 				type: "Mob",
@@ -367,7 +367,7 @@ describe("package/dungeon.ts deserializers", () => {
 				},
 			};
 
-			const mob = deserializeMob(data);
+			const mob = await deserializeMob(data);
 
 			assert.ok(mob instanceof Mob);
 			// If abilities were provided and found, they should be in the map
@@ -375,7 +375,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.ok(mob._learnedAbilities instanceof Map);
 		});
 
-		it("deserializes Mob with equipped items", () => {
+		it("deserializes Mob with equipped items", async () => {
 			const data: SerializedMob = {
 				type: "Mob",
 				keywords: "mob",
@@ -400,7 +400,7 @@ describe("package/dungeon.ts deserializers", () => {
 				} as Record<EQUIPMENT_SLOT, SerializedWeapon>,
 			};
 
-			const mob = deserializeMob(data);
+			const mob = await deserializeMob(data);
 
 			assert.ok(mob instanceof Mob);
 			const equipped = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
@@ -409,7 +409,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(equipped.attackPower, 10);
 		});
 
-		it("deserializes Mob with contents", () => {
+		it("deserializes Mob with contents", async () => {
 			const data: SerializedMob = {
 				type: "Mob",
 				keywords: "mob",
@@ -430,13 +430,13 @@ describe("package/dungeon.ts deserializers", () => {
 				],
 			};
 
-			const mob = deserializeMob(data);
+			const mob = await deserializeMob(data);
 
 			assert.strictEqual(mob.contents.length, 1);
 			assert.ok(mob.contents[0] instanceof Item);
 		});
 
-		it("handles legacy array format for equipped items", () => {
+		it("handles legacy array format for equipped items", async () => {
 			const data: SerializedMob = {
 				type: "Mob",
 				keywords: "mob",
@@ -463,7 +463,7 @@ describe("package/dungeon.ts deserializers", () => {
 				} as any,
 			};
 
-			const mob = deserializeMob(data);
+			const mob = await deserializeMob(data);
 
 			const equipped = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
 			assert.ok(equipped);
@@ -472,7 +472,7 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("round-trip serialization/deserialization", () => {
-		it("round-trips a DungeonObject", () => {
+		it("round-trips a DungeonObject", async () => {
 			const original = new DungeonObject({
 				keywords: "test",
 				display: "Test",
@@ -480,14 +480,14 @@ describe("package/dungeon.ts deserializers", () => {
 			});
 
 			const serialized = original.serialize();
-			const deserialized = deserializeDungeonObject(serialized);
+			const deserialized = await deserializeDungeonObject(serialized);
 
 			assert.strictEqual(deserialized.keywords, original.keywords);
 			assert.strictEqual(deserialized.display, original.display);
 			assert.strictEqual(deserialized.description, original.description);
 		});
 
-		it("round-trips a Room", () => {
+		it("round-trips a Room", async () => {
 			const original = new Room({
 				keywords: "room",
 				display: "Room",
@@ -496,7 +496,7 @@ describe("package/dungeon.ts deserializers", () => {
 			});
 
 			const serialized = original.serialize();
-			const deserialized = deserializeRoom(serialized as SerializedRoom);
+			const deserialized = await deserializeRoom(serialized as SerializedRoom);
 
 			assert.strictEqual(deserialized.keywords, original.keywords);
 			assert.strictEqual(deserialized.x, original.x);
@@ -505,7 +505,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(deserialized.allowedExits, original.allowedExits);
 		});
 
-		it("round-trips a Mob", () => {
+		it("round-trips a Mob", async () => {
 			const original = createMob({
 				keywords: "test mob",
 				display: "Test Mob",
@@ -514,7 +514,7 @@ describe("package/dungeon.ts deserializers", () => {
 			});
 
 			const serialized = original.serialize();
-			const deserialized = deserializeMob(serialized as SerializedMob);
+			const deserialized = await deserializeMob(serialized as SerializedMob);
 
 			assert.strictEqual(deserialized.keywords, original.keywords);
 			assert.strictEqual(deserialized.level, original.level);
@@ -523,7 +523,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.ok(deserialized.job);
 		});
 
-		it("round-trips an Equipment with bonuses", () => {
+		it("round-trips an Equipment with bonuses", async () => {
 			const original = new Equipment({
 				keywords: "ring",
 				display: "Ring",
@@ -533,7 +533,7 @@ describe("package/dungeon.ts deserializers", () => {
 			});
 
 			const serialized = original.serialize();
-			const deserialized = deserializeEquipment(
+			const deserialized = await deserializeEquipment(
 				serialized as SerializedEquipment
 			);
 
@@ -548,7 +548,7 @@ describe("package/dungeon.ts deserializers", () => {
 			);
 		});
 
-		it("round-trips an Armor", () => {
+		it("round-trips an Armor", async () => {
 			const original = new Armor({
 				keywords: "armor",
 				display: "Armor",
@@ -557,13 +557,15 @@ describe("package/dungeon.ts deserializers", () => {
 			});
 
 			const serialized = original.serialize();
-			const deserialized = deserializeArmor(serialized as SerializedArmor);
+			const deserialized = await deserializeArmor(
+				serialized as SerializedArmor
+			);
 
 			assert.strictEqual(deserialized.slot, original.slot);
 			assert.strictEqual(deserialized.defense, original.defense);
 		});
 
-		it("round-trips a Weapon", () => {
+		it("round-trips a Weapon", async () => {
 			const original = new Weapon({
 				keywords: "sword",
 				display: "Sword",
@@ -574,7 +576,9 @@ describe("package/dungeon.ts deserializers", () => {
 			});
 
 			const serialized = original.serialize();
-			const deserialized = deserializeWeapon(serialized as SerializedWeapon);
+			const deserialized = await deserializeWeapon(
+				serialized as SerializedWeapon
+			);
 
 			assert.strictEqual(deserialized.slot, original.slot);
 			assert.strictEqual(deserialized.attackPower, original.attackPower);
@@ -584,7 +588,7 @@ describe("package/dungeon.ts deserializers", () => {
 	});
 
 	describe("Mob ability serialization/deserialization", () => {
-		it("saves and loads a Mob with an ability", () => {
+		it("saves and loads a Mob with an ability", async () => {
 			// Get an ability from the registry
 			const allAbilities = getAllAbilities();
 			const testAbility = allAbilities[0];
@@ -617,7 +621,7 @@ describe("package/dungeon.ts deserializers", () => {
 			);
 
 			// Deserialize the Mob
-			const deserialized = deserializeMob(serialized as SerializedMob);
+			const deserialized = await deserializeMob(serialized as SerializedMob);
 
 			// Verify ability is present after deserialization
 			assert.ok(deserialized.knowsAbilityById(testAbility.id));
@@ -629,7 +633,7 @@ describe("package/dungeon.ts deserializers", () => {
 			assert.strictEqual(deserialized.experience, original.experience);
 		});
 
-		it("saves and loads a Mob with multiple abilities", () => {
+		it("saves and loads a Mob with multiple abilities", async () => {
 			// Get multiple abilities from the registry
 			const allAbilities = getAllAbilities();
 			if (allAbilities.length < 2) {
@@ -656,7 +660,7 @@ describe("package/dungeon.ts deserializers", () => {
 			const serialized = original.serialize();
 
 			// Deserialize the Mob
-			const deserialized = deserializeMob(serialized as SerializedMob);
+			const deserialized = await deserializeMob(serialized as SerializedMob);
 
 			// Verify both abilities are present after deserialization
 			assert.ok(deserialized.knowsAbilityById(ability1.id));

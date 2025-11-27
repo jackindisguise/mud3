@@ -80,6 +80,7 @@ class MapEditor {
 		this.initialChangeSnapshot = null; // Baseline state for history timeline
 		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
 		this.currentMousePosition = null; // {x, y, z} of cell mouse is over
+		this.projectVersion = null; // Project version from package.json
 
 		this.init();
 	}
@@ -135,6 +136,17 @@ class MapEditor {
 		const response = await fetch("/api/dungeons");
 		if (!response.ok) {
 			throw new Error(`Failed to load dungeon list: ${response.statusText}`);
+		}
+		return response.json();
+	}
+
+	async fetchVersionData() {
+		if (this.api?.getVersion) {
+			return this.api.getVersion();
+		}
+		const response = await fetch("/api/version");
+		if (!response.ok) {
+			throw new Error(`Failed to load version: ${response.statusText}`);
 		}
 		return response.json();
 	}
@@ -211,10 +223,21 @@ class MapEditor {
 		await this.loadDungeonList();
 		await this.loadRacesAndJobs();
 		await this.loadHitTypes();
+		await this.loadVersion();
 
 		// Check for unsaved work in localStorage
 		this.checkForUnsavedWork();
 		this.setupEventListeners();
+	}
+
+	async loadVersion() {
+		try {
+			const data = await this.fetchVersionData();
+			this.projectVersion = data.version || null;
+		} catch (error) {
+			console.error("Failed to load version:", error);
+			this.projectVersion = null;
+		}
 	}
 
 	async loadHitTypes() {
@@ -4912,8 +4935,15 @@ class MapEditor {
 
 		this.yamlData.dungeon = orderedDungeon;
 
+		// Rebuild root object with version first
+		const orderedRoot = {};
+		if (this.projectVersion) {
+			orderedRoot.version = this.projectVersion;
+		}
+		orderedRoot.dungeon = orderedDungeon;
+
 		// Convert back to YAML
-		const yaml = jsyaml.dump(this.yamlData, {
+		const yaml = jsyaml.dump(orderedRoot, {
 			lineWidth: 120,
 			noRefs: true,
 			flowLevel: 4,

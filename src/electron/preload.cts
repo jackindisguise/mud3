@@ -5,6 +5,7 @@ const api = {
 	getWeaponTypes: () => ipcRenderer.invoke("map-editor:get-weapon-types"),
 	getRaces: () => ipcRenderer.invoke("map-editor:get-races"),
 	getJobs: () => ipcRenderer.invoke("map-editor:get-jobs"),
+	getVersion: () => ipcRenderer.invoke("map-editor:get-version"),
 	listDungeons: () => ipcRenderer.invoke("map-editor:list-dungeons"),
 	getDungeon: (id: string) => ipcRenderer.invoke("map-editor:get-dungeon", id),
 	updateDungeon: (payload: { id: string; yaml: string }) =>

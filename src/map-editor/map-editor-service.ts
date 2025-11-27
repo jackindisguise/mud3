@@ -28,6 +28,7 @@ import {
 } from "../core/damage-types.js";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
+import { migrateDungeonData } from "../migrations/dungeon/runner.js";
 
 export interface DungeonListResponse {
 	dungeons: string[];
@@ -106,11 +107,21 @@ export class MapEditorService {
 	public async getDungeon(id: string): Promise<DungeonResponse> {
 		const filePath = this.getDungeonFilePath(id);
 		const yamlContent = await readFile(filePath, "utf-8");
-		const data = YAML.load(yamlContent) as SerializedDungeonFormat;
+		let data = YAML.load(yamlContent) as SerializedDungeonFormat;
 
 		if (!data?.dungeon) {
 			throw new Error("Invalid dungeon format");
 		}
+
+		// Migrate data if needed
+		data = await migrateDungeonData(data, id);
+
+		// Convert migrated data back to YAML for the response
+		const migratedYaml = YAML.dump(data, {
+			lineWidth: 120,
+			noRefs: true,
+			flowLevel: 4,
+		});
 
 		return {
 			id: data.dungeon.id || id,
@@ -118,7 +129,7 @@ export class MapEditorService {
 			resetMessage: data.dungeon.resetMessage,
 			name: data.dungeon.name,
 			description: data.dungeon.description,
-			yaml: yamlContent,
+			yaml: migratedYaml,
 		};
 	}
 
@@ -222,6 +233,18 @@ export class MapEditorService {
 		return {
 			weaponTypes: [...WEAPON_TYPES],
 		};
+	}
+
+	public async getVersion(): Promise<{ version: string }> {
+		try {
+			const packageJsonPath = join(getSafeRootDirectory(), "package.json");
+			const packageJsonContent = await readFile(packageJsonPath, "utf-8");
+			const packageJson = JSON.parse(packageJsonContent);
+			return { version: packageJson.version || "unknown" };
+		} catch (error) {
+			logger.warn(`Failed to read package.json version: ${error}`);
+			return { version: "unknown" };
+		}
 	}
 
 	private getDungeonFilePath(id: string): string {

@@ -117,6 +117,11 @@ class MapEditorServerImpl implements MapEditorServer {
 				return;
 			}
 
+			if (path === "/api/version" && req.method === "GET") {
+				await this.getVersion(res);
+				return;
+			}
+
 			if (path === "/api/races" && req.method === "GET") {
 				await this.getRaces(res);
 				return;
@@ -267,6 +272,18 @@ class MapEditorServerImpl implements MapEditorServer {
 				return;
 			}
 			logger.error(`Failed to update dungeon ${id}: ${error}`);
+			res.writeHead(500, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: String(error) }));
+		}
+	}
+
+	private async getVersion(res: ServerResponse): Promise<void> {
+		try {
+			const result = await this.service.getVersion();
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(result));
+		} catch (error) {
+			logger.error(`Failed to get version: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}

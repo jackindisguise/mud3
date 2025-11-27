@@ -122,6 +122,7 @@ function registerHandlers() {
 	ipcMain.handle("map-editor:get-weapon-types", () => service.getWeaponTypes());
 	ipcMain.handle("map-editor:get-races", () => service.getRaces());
 	ipcMain.handle("map-editor:get-jobs", () => service.getJobs());
+	ipcMain.handle("map-editor:get-version", () => service.getVersion());
 	ipcMain.handle("map-editor:list-dungeons", () => service.listDungeons());
 	ipcMain.handle("map-editor:get-dungeon", (_event, id: string) =>
 		service.getDungeon(id)

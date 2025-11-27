@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.22.0](https://github.com/jackindisguise/mud3/compare/v1.21.0...v1.22.0) (2025-11-27)
+
+
+### Features
+
+* **build:** enable incremental TypeScript compilation ([4c7b507](https://github.com/jackindisguise/mud3/commit/4c7b5073bc5c26b99365069a381d9f90ac82acb1))
+* **color:** added ColorName type and COLOR_NAME_TO_COLOR mapping ([9803021](https://github.com/jackindisguise/mud3/commit/9803021ec1fc5efe0d004f4fb3e2eff87ba8ee45))
+* **core:** added version support to serialization system ([aeb1c9a](https://github.com/jackindisguise/mud3/commit/aeb1c9a3086336d1e8c8b1b01f24999ecbce24c3))
+* **data:** added version fields to dungeon files ([cd3ed4d](https://github.com/jackindisguise/mud3/commit/cd3ed4d63efc7deb6f74a543ea0d76fa9ddff82d))
+* **deserialization:** integrated migrations into object deserialization ([2783811](https://github.com/jackindisguise/mud3/commit/278381121b6cb3c0738d6005367ce96066c50059))
+* **dungeon:** added parentVersion support to all deserializers ([d04aeba](https://github.com/jackindisguise/mud3/commit/d04aeba68c95fa10590b9291a4fdd65f26927add))
+* **map-editor:** added version support and dungeon migration integration ([c03aa68](https://github.com/jackindisguise/mud3/commit/c03aa68f299c97cb1c6240b5300830872f068e98))
+* **map-editor:** added version support to room and template creation ([ab595b6](https://github.com/jackindisguise/mud3/commit/ab595b69dcb7c5050a2357011ed16190c22666e3))
+* **migrations:** added data migration system for dungeons and characters ([9847079](https://github.com/jackindisguise/mud3/commit/9847079f37dd2612c9e4ede88ff6a10abf01ec70))
+* **migrations:** added migration frameworks for mobs, items, equipment, armor, and weapons ([26dfa2d](https://github.com/jackindisguise/mud3/commit/26dfa2dd95e4ad0ea792334cc4e5472cdb850a50))
+* **migrations:** added template migration system for all entity types ([e5db66e](https://github.com/jackindisguise/mud3/commit/e5db66e4b84c65c65c41f81b979cf866ff0f948a))
+* **package:** integrated migration system into dungeon and character loading ([e67be41](https://github.com/jackindisguise/mud3/commit/e67be410a76c610041394ea93d85219da5251346))
+* **schemas:** added version field to dungeon and character schemas ([a14b513](https://github.com/jackindisguise/mud3/commit/a14b513d3d7b7034dc5306cfe815bfc621560383))
+* **test-parallel:** track and display cancelled, skipped, and todo tests ([dba915d](https://github.com/jackindisguise/mud3/commit/dba915dac13281c776448a454c6d4903750ea838))
+
+
+### Bug Fixes
+
+* **build:** improved clean-orphaned script to handle .cts and .mts file extensions ([285e076](https://github.com/jackindisguise/mud3/commit/285e0768b2536f796a18e2bbb4f9685cffae9248))
+* **build:** improved TypeScript error formatting in tsc-and-list script ([ab2f917](https://github.com/jackindisguise/mud3/commit/ab2f91706e6e619dd5cf6a06266929068cc48134))
+* **tests:** updated tests to handle async deserialization functions ([fecfded](https://github.com/jackindisguise/mud3/commit/fecfdede91c958f0fbb54566201d3bfc809bd936))
+
 ## [1.21.0](https://github.com/jackindisguise/mud3/compare/v1.20.0...v1.21.0) (2025-11-26)
 
 

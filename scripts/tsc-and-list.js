@@ -65,12 +65,84 @@ function emittedToSourcePath(emittedPath) {
 	return sourcePath;
 }
 
+/**
+ * Format and display TypeScript errors with pretty formatting
+ */
+function formatAndDisplayErrors(errorOutput) {
+	// Filter out TSFILE lines (build info)
+	const errorLines = errorOutput
+		.split("\n")
+		.filter((line) => !line.includes("TSFILE:") && line.trim());
+
+	console.error(chalk.red.bold("\nTypeScript errors:\n"));
+
+	// Parse error lines - format: file:line:column - error TS####: message
+	for (let i = 0; i < errorLines.length; i++) {
+		const line = errorLines[i];
+
+		// Check if this is an error line with file:line:column
+		// Format 1: file:line:column - error TS####: message
+		// Format 2: file(line,column): error TS####: message (with optional leading whitespace)
+		let errorMatch = line.match(
+			/^\s*(.+?):(\d+):(\d+)\s*-\s*error\s+(TS\d+):\s*(.+)$/
+		);
+		if (!errorMatch) {
+			// Try format with parentheses
+			errorMatch = line.match(
+				/^\s*(.+?)\((\d+),(\d+)\):\s*error\s+(TS\d+):\s*(.+)$/
+			);
+		}
+		if (errorMatch) {
+			const [, file, lineNum, col, errorCode, message] = errorMatch;
+			// Display file:line:column in red bold with X
+			console.error(chalk.red.bold(`✗ ${file}:${lineNum}:${col}`));
+			// Display error code and message indented
+			console.error(chalk.red(`  error ${chalk.bold(errorCode)}: ${message}`));
+			continue;
+		}
+
+		// Check if this is a code snippet line (starts with line number)
+		if (/^\s*\d+\s+\|/.test(line) || /^\s*\d+\s+/.test(line)) {
+			console.error(chalk.gray(`  ${line}`));
+			continue;
+		}
+
+		// Check if this is an underline line (tildes or carets)
+		if (/^[\s~^]+$/.test(line)) {
+			console.error(chalk.gray(`  ${line}`));
+			continue;
+		}
+
+		// Check if this is the "Found X error" summary
+		if (line.match(/^Found \d+ error/)) {
+			console.error(chalk.red.bold(`\n${line}`));
+			continue;
+		}
+
+		// Other lines (blank lines, etc.) - skip or show as-is
+		if (line.trim() === "") {
+			console.error();
+		} else {
+			console.error(chalk.gray(`  ${line}`));
+		}
+	}
+}
+
 async function main() {
 	try {
 		// Run tsc --listEmittedFiles to get only files that were emitted
 		const { stdout, stderr } = await execAsync("tsc --listEmittedFiles", {
 			cwd: projectRoot,
 		});
+
+		// Check for TypeScript errors in stderr
+		if (stderr && stderr.trim()) {
+			// Check if it contains error messages (TS#### format)
+			if (stderr.includes("error TS")) {
+				formatAndDisplayErrors(stderr);
+				process.exit(1);
+			}
+		}
 
 		// Parse output - each line is an emitted file path
 		const lines = stdout
@@ -107,10 +179,6 @@ async function main() {
 			console.log(
 				chalk.yellow("No files were compiled (incremental build - no changes).")
 			);
-			if (stderr) {
-				console.error(chalk.yellow("\nTypeScript warnings:"));
-				console.error(stderr);
-			}
 			return;
 		}
 
@@ -133,17 +201,26 @@ async function main() {
 		}
 
 		console.log(); // Blank line at end
-
-		// Show errors if any
-		if (stderr && !stderr.includes("TS")) {
-			console.error(chalk.yellow("\nTypeScript warnings:"));
-			console.error(stderr);
-		}
 	} catch (error) {
+		// execAsync rejects when exit code is non-zero
+		// The error object contains stdout and stderr
+		const stderr = error.stderr || "";
+		const stdout = error.stdout || "";
+
+		// Combine stdout and stderr - TypeScript errors can be in either
+		const allOutput = (stdout + "\n" + stderr).trim();
+
+		// Check if it contains TypeScript errors
+		if (allOutput.includes("error TS")) {
+			formatAndDisplayErrors(allOutput);
+			process.exit(1);
+		}
+
+		// If no recognizable errors, show the generic error message and all output
 		console.error(chalk.red("Error running TypeScript:"), error.message);
-		if (error.stderr) {
-			console.error(chalk.red("\nTypeScript errors:"));
-			console.error(error.stderr);
+		if (allOutput) {
+			console.error(chalk.red("\nTypeScript output:"));
+			console.error(allOutput);
 		}
 		process.exit(1);
 	}

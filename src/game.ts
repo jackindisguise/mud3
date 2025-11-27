@@ -123,13 +123,28 @@ const namesInCreation = new Set<string>();
 /** Track last command time per character to detect rapid successive commands */
 const lastCommandTime = new Map<Character, number>();
 
+/** Character save interval timer */
 let saveTimer: number | undefined;
+
+/** Board cleanup interval timer */
 let boardCleanupTimer: number | undefined;
+
+/** Game state save interval timer */
 let gameStateSaveTimer: number | undefined;
+
+/** Dungeon reset interval timer */
 let dungeonResetTimer: number | undefined;
+
+/** Combat round interval timer */
 let combatTimer: number | undefined;
+
+/** Wander behavior interval timer */
 let wanderTimer: number | undefined;
+
+/** Regeneration interval timer */
 let regenerationTimer: number | undefined;
+
+/** Next connection ID */
 let nextConnectionId = 1;
 
 /** Web client server (optional) */
@@ -1214,7 +1229,10 @@ async function stop(): Promise<void> {
  *
  * @returns An object containing counts of active connections, players online, and login sessions
  */
-export function getGameStats() {
+export function getGameStats(): {
+	activeConnections: number;
+	playersOnline: number;
+} {
 	return {
 		activeConnections: loginSessions.size,
 		playersOnline: activeCharacters.size,

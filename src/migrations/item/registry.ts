@@ -51,3 +51,4 @@ export function findMigrationPath(
 export function getAllMigrations(): MigrationInfo<SerializedItem>[] {
 	return getAllGenericMigrations<SerializedItem>("item");
 }
+

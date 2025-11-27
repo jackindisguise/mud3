@@ -52,3 +52,4 @@ export function getAllMigrations(): MigrationInfo<SerializedEquipment>[] {
 	return getAllGenericMigrations<SerializedEquipment>("equipment");
 }
 
+

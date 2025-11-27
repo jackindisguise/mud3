@@ -52,3 +52,4 @@ export function getAllMigrations(): MigrationInfo<SerializedArmor>[] {
 	return getAllGenericMigrations<SerializedArmor>("armor");
 }
 
+

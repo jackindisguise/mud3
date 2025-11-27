@@ -52,3 +52,4 @@ export function getAllMigrations(): MigrationInfo<SerializedWeapon>[] {
 	return getAllGenericMigrations<SerializedWeapon>("weapon");
 }
 
+

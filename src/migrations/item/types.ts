@@ -20,3 +20,4 @@ export type Migration = GenericMigration<SerializedItem>;
  */
 export interface MigrationInfo extends GenericMigrationInfo<SerializedItem> {}
 
+

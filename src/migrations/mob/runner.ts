@@ -21,10 +21,5 @@ export async function migrateMobData(
 	data: SerializedMob & { version?: string },
 	mobId?: string
 ): Promise<SerializedMob & { version?: string }> {
-	return migrateData<SerializedMob & { version?: string }>(
-		"mob",
-		data,
-		mobId
-	);
+	return migrateData<SerializedMob & { version?: string }>("mob", data, mobId);
 }
-

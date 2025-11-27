@@ -21,3 +21,4 @@ export type Migration = GenericMigration<SerializedEquipment>;
 export interface MigrationInfo
 	extends GenericMigrationInfo<SerializedEquipment> {}
 
+

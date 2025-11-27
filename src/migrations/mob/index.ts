@@ -12,3 +12,4 @@ import "./v1.0.0-to-v1.21.0.js";
 export { migrateMobData } from "./runner.js";
 export { registerMigration, findMigrationPath } from "./registry.js";
 export type { Migration, MigrationInfo } from "./types.js";
+

@@ -19,3 +19,4 @@ export type Migration = GenericMigration<SerializedMob>;
  * Migration metadata for mob data
  */
 export interface MigrationInfo extends GenericMigrationInfo<SerializedMob> {}
+

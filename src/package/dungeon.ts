@@ -268,15 +268,13 @@ function createFromTemplate(
 			);
 		case "Mob": {
 			const mobTemplate = template as MobTemplate;
-			// Mob templates should have race/job resolved to objects by this point
-			const race =
-				typeof mobTemplate.race === "string"
-					? getDefaultRace()
-					: mobTemplate.race ?? getDefaultRace();
-			const job =
-				typeof mobTemplate.job === "string"
-					? getDefaultJob()
-					: mobTemplate.job ?? getDefaultJob();
+			// Resolve race/job string IDs to Race/Job objects
+			const race = mobTemplate.race
+				? getRaceById(mobTemplate.race) ?? getDefaultRace()
+				: getDefaultRace();
+			const job = mobTemplate.job
+				? getJobById(mobTemplate.job) ?? getDefaultJob()
+				: getDefaultJob();
 			obj = new Mob({
 				templateId: template.id,
 				oid: providedOid,
@@ -503,6 +501,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			`[${id}] Stage 2: Parsing YAML content (${content.length} bytes)`
 		);
 		let data = YAML.load(content) as SerializedDungeonFormat;
+		const originalVersion = data.version;
 
 		if (!data.dungeon) {
 			throw new Error("Invalid dungeon format: missing 'dungeon' key");
@@ -735,52 +734,35 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 		logger.debug(`[${id}] Stage 8: Loading templates`);
 		if (templates && Array.isArray(templates)) {
 			logger.debug(`[${id}] Found ${templates.length} template(s) to load`);
-			for (const template of templates) {
-				if (!template.id) {
+			for (const rawTemplate of templates) {
+				if (!rawTemplate.id) {
 					logger.warn(`[${id}] Skipping invalid template: missing id`);
 					continue;
 				}
 				logger.debug(
-					`[${id}] Loading template "${template.id}" (type: ${template.type})`
+					`[${id}] Loading template "${rawTemplate.id}" (type: ${rawTemplate.type})`
 				);
-				const hydrated: DungeonObjectTemplate = {
-					...template,
-					id: globalizeTemplateId(template.id, dungeon.id!),
-				};
 
-				// For Mob templates, resolve race/job IDs to Race/Job objects before adding
-				if (hydrated.type === "Mob") {
-					const mobTemplate = hydrated as MobTemplate;
-					if (mobTemplate.race && typeof mobTemplate.race === "string") {
-						logger.debug(
-							`[${id}] Resolving race "${mobTemplate.race}" for template "${template.id}"`
-						);
-						const race = getRaceById(mobTemplate.race);
-						if (!race) {
-							throw new Error(
-								`Template "${template.id}": race "${mobTemplate.race}" not found in archetype registry`
-							);
-						}
-						(mobTemplate as any).race = race;
-					}
-					if (mobTemplate.job && typeof mobTemplate.job === "string") {
-						logger.debug(
-							`[${id}] Resolving job "${mobTemplate.job}" for template "${template.id}"`
-						);
-						const job = getJobById(mobTemplate.job);
-						if (!job) {
-							throw new Error(
-								`Template "${template.id}": job "${mobTemplate.job}" not found in archetype registry`
-							);
-						}
-						(mobTemplate as any).job = job;
-					}
-				}
+				// Stage 1: Migrate template data before hydration
+				// Use dungeon's version if template doesn't have one
+				const migratedTemplateData = await migrateTemplateData(
+					rawTemplate,
+					rawTemplate.id,
+					id,
+					originalVersion
+				);
+
+				// Stage 2: Hydrate migrated template data into DungeonObjectTemplate
+				// Templates keep string IDs for race/job - they will be resolved when creating instances
+				const hydrated: DungeonObjectTemplate = {
+					...(migratedTemplateData as DungeonObjectTemplate),
+					id: globalizeTemplateId(rawTemplate.id, dungeon.id!),
+				};
 
 				// Generate baseSerialized for the template (package layer responsibility)
 				if (!hydrated.baseSerialized) {
 					logger.debug(
-						`[${id}] Generating baseSerialized for template "${template.id}"`
+						`[${id}] Generating baseSerialized for template "${rawTemplate.id}"`
 					);
 					if (hydrated.type === "Room") {
 						const room = new Room({
@@ -798,10 +780,12 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 
 				try {
 					dungeon.addTemplate(hydrated);
-					logger.debug(`[${id}] Template "${template.id}" loaded successfully`);
+					logger.debug(
+						`[${id}] Template "${rawTemplate.id}" loaded successfully`
+					);
 				} catch (error) {
 					logger.error(
-						`[${id}] Failed to load template "${template.id}": ${error}`
+						`[${id}] Failed to load template "${rawTemplate.id}": ${error}`
 					);
 					throw error;
 				}
@@ -900,6 +884,145 @@ export async function getAllDungeonIds(): Promise<string[]> {
 	} catch (error) {
 		logger.error(`Failed to read dungeons directory: ${error}`);
 		return [];
+	}
+}
+
+/**
+ * Migrate a template from YAML data before hydration.
+ * This function handles type-safe migration of template data based on the template type.
+ *
+ * @param rawTemplateData - Raw template data from YAML (unknown type)
+ * @param templateId - Template ID for logging
+ * @param dungeonId - Dungeon ID for logging
+ * @param dungeonVersion - Dungeon version (used if template doesn't have a version)
+ * @returns Migrated template data (still as serialized format, not hydrated)
+ */
+async function migrateTemplateData(
+	rawTemplateData: unknown,
+	templateId: string,
+	dungeonId: string,
+	dungeonVersion?: string
+): Promise<unknown> {
+	// Stage 1: Validate raw data has required fields
+	if (!rawTemplateData || typeof rawTemplateData !== "object") {
+		logger.warn(
+			`[${dungeonId}] Template "${templateId}": Invalid template data, skipping migration`
+		);
+		return rawTemplateData;
+	}
+
+	const templateObj = rawTemplateData as Record<string, unknown>;
+	const templateType = templateObj.type as
+		| SerializedDungeonObjectType
+		| undefined;
+	let templateVersion = templateObj.version as string | undefined;
+
+	// Stage 2: If template has no version, use dungeon's version or default to "1.0.0"
+	if (!templateVersion) {
+		if (dungeonVersion) {
+			templateVersion = dungeonVersion;
+			// Set the version on the template data so migration can use it
+			templateObj.version = dungeonVersion;
+			logger.debug(
+				`[${dungeonId}] Template "${templateId}": No version field, using dungeon version ${dungeonVersion}`
+			);
+		} else {
+			// Default to "1.0.0" for old files without version
+			templateVersion = "1.0.0";
+			templateObj.version = "1.0.0";
+			logger.debug(
+				`[${dungeonId}] Template "${templateId}": No version field and dungeon has no version, defaulting to 1.0.0`
+			);
+		}
+	}
+
+	// Stage 3: If no type, cannot migrate
+	if (!templateType) {
+		logger.warn(
+			`[${dungeonId}] Template "${templateId}": No type field, skipping migration`
+		);
+		return rawTemplateData;
+	}
+
+	// Stage 4: Type-safe migration based on template type
+	try {
+		switch (templateType) {
+			case "Mob": {
+				// Stage 4a: Cast to SerializedMob type
+				const serializedMob = rawTemplateData as SerializedMob & {
+					version?: string;
+				};
+				// Stage 4b: Migrate using Mob migration function
+				const migratedMob = await migrateMobData(serializedMob, templateId);
+				// Stage 4c: Return migrated data
+				return migratedMob;
+			}
+			case "Item": {
+				// Stage 4a: Cast to SerializedItem type
+				const serializedItem = rawTemplateData as SerializedItem & {
+					version?: string;
+				};
+				// Stage 4b: Migrate using Item migration function
+				const migratedItem = await migrateItemData(serializedItem, templateId);
+				// Stage 4c: Return migrated data
+				return migratedItem;
+			}
+			case "Equipment": {
+				// Stage 4a: Cast to SerializedEquipment type
+				const serializedEquipment = rawTemplateData as SerializedEquipment & {
+					version?: string;
+				};
+				// Stage 4b: Migrate using Equipment migration function
+				const migratedEquipment = await migrateEquipmentData(
+					serializedEquipment,
+					templateId
+				);
+				// Stage 4c: Return migrated data
+				return migratedEquipment;
+			}
+			case "Armor": {
+				// Stage 4a: Cast to SerializedArmor type
+				const serializedArmor = rawTemplateData as SerializedArmor & {
+					version?: string;
+				};
+				// Stage 4b: Migrate using Armor migration function
+				const migratedArmor = await migrateArmorData(
+					serializedArmor,
+					templateId
+				);
+				// Stage 4c: Return migrated data
+				return migratedArmor;
+			}
+			case "Weapon": {
+				// Stage 4a: Cast to SerializedWeapon type
+				const serializedWeapon = rawTemplateData as SerializedWeapon & {
+					version?: string;
+				};
+				// Stage 4b: Migrate using Weapon migration function
+				const migratedWeapon = await migrateWeaponData(
+					serializedWeapon,
+					templateId
+				);
+				// Stage 4c: Return migrated data
+				return migratedWeapon;
+			}
+			case "Room":
+			case "Movable":
+			case "Prop":
+			case "DungeonObject":
+			default:
+				// Stage 4: No migration system for these types yet
+				logger.debug(
+					`[${dungeonId}] Template "${templateId}": Type "${templateType}" has no migration system, skipping migration`
+				);
+				return rawTemplateData;
+		}
+	} catch (error) {
+		logger.warn(
+			`[${dungeonId}] Template "${templateId}": Migration failed: ${error}`
+		);
+		// Return original data if migration fails
+		return rawTemplateData;
 	}
 }
 

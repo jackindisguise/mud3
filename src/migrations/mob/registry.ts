@@ -47,3 +47,4 @@ export function findMigrationPath(
 export function getAllMigrations(): MigrationInfo<SerializedMob>[] {
 	return getAllGenericMigrations<SerializedMob>("mob");
 }
+

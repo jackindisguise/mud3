@@ -20,3 +20,4 @@ export type Migration = GenericMigration<SerializedWeapon>;
  */
 export interface MigrationInfo extends GenericMigrationInfo<SerializedWeapon> {}
 
+

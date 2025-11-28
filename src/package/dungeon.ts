@@ -55,6 +55,7 @@ import {
 	DungeonObjectTemplate,
 	RoomTemplate,
 	MobTemplate,
+	ItemTemplate,
 	DIRECTION,
 	Reset,
 	DUNGEON_REGISTRY,
@@ -96,6 +97,8 @@ import {
 	type EquipmentTemplate,
 	type ArmorTemplate,
 	type WeaponTemplate,
+	type ItemType,
+	type equipmentType,
 	DungeonOptions,
 } from "../core/dungeon.js";
 import YAML from "js-yaml";
@@ -103,11 +106,14 @@ import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { getNextObjectId } from "../registry/gamestate.js";
 import { migrateDungeonData } from "../migrations/dungeon/runner.js";
+import { migrateRoomData } from "../migrations/room/runner.js";
 import { migrateMobData } from "../migrations/mob/runner.js";
 import { migrateItemData } from "../migrations/item/runner.js";
 import { migrateEquipmentData } from "../migrations/equipment/runner.js";
 import { migrateArmorData } from "../migrations/armor/runner.js";
 import { migrateWeaponData } from "../migrations/weapon/runner.js";
+import { COLOR_NAME_TO_COLOR } from "../core/color.js";
+import assert from "assert";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -558,6 +564,35 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			`[${id}] Grid validated: ${grid.length} layers, ${rooms.length} room template(s)`
 		);
 
+		// Stage 5.5: Deserialize room templates from rooms array
+		// Room templates don't have type/id fields in YAML, so we need to add type for deserialization
+		logger.debug(`[${id}] Stage 5.5: Deserializing room templates`);
+		const deserializedRoomTemplates = await Promise.all(
+			rooms.map(async (roomTemplate, index) => {
+				// Add type and id for deserialization (rooms array omits these fields)
+				const roomTemplateWithType = {
+					...roomTemplate,
+					type: "Room" as const,
+					id: `room-template-${index}`, // Dummy ID for deserialization (not used in template registry)
+				};
+				try {
+					// Use the formal template deserialization system
+					const deserialized = await deserializeTemplate(
+						roomTemplateWithType,
+						`room-template-${index}`,
+						id,
+						originalVersion
+					);
+					return deserialized as RoomTemplate;
+				} catch (error) {
+					logger.error(
+						`[${id}] Failed to deserialize room template ${index}: ${error}`
+					);
+					throw error;
+				}
+			})
+		);
+
 		// Create dungeon
 		logger.debug(`[${id}] Stage 6: Creating dungeon instance`);
 		const dungeonId = data.dungeon.id || id;
@@ -628,37 +663,22 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 						);
 					}
 
-					const roomTemplate = rooms[templateArrayIndex];
+					const roomTemplate = deserializedRoomTemplates[templateArrayIndex];
 					if (!roomTemplate) {
 						throw new Error(
 							`Invalid dungeon format: template at index ${templateArrayIndex} is undefined`
 						);
 					}
 
-					const fullTemplate: RoomTemplate = {
-						id: "", // Not used, but required by interface
-						type: "Room",
-						...roomTemplate,
-						allowedExits:
-							roomTemplate.allowedExits !== undefined
-								? roomTemplate.allowedExits
-								: DIRECTION.NORTH |
-								  DIRECTION.SOUTH |
-								  DIRECTION.EAST |
-								  DIRECTION.WEST,
-					};
-
 					// Map YAML row index (top-first) to internal y coordinate (bottom-first)
 					const targetY = dimensions.height - 1 - y;
-					// Create room from template
+					const coordinates = { x, y, z };
+
+					// Create room from template using the formal template system
 					logger.debug(
 						`[${id}] Creating room at (${x},${y},${z}) from template index ${templateIndex}`
 					);
-					const room = createRoomFromTemplate(fullTemplate, {
-						x,
-						y,
-						z,
-					});
+					const room = createRoomFromTemplate(roomTemplate, coordinates);
 					totalRoomsCreated++;
 
 					// Apply exit override if present (before adding to dungeon)
@@ -743,42 +763,16 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					`[${id}] Loading template "${rawTemplate.id}" (type: ${rawTemplate.type})`
 				);
 
-				// Stage 1: Migrate template data before hydration
-				// Use dungeon's version if template doesn't have one
-				const migratedTemplateData = await migrateTemplateData(
-					rawTemplate,
-					rawTemplate.id,
-					id,
-					originalVersion
-				);
-
-				// Stage 2: Hydrate migrated template data into DungeonObjectTemplate
-				// Templates keep string IDs for race/job - they will be resolved when creating instances
-				const hydrated: DungeonObjectTemplate = {
-					...(migratedTemplateData as DungeonObjectTemplate),
-					id: globalizeTemplateId(rawTemplate.id, dungeon.id!),
-				};
-
-				// Generate baseSerialized for the template (package layer responsibility)
-				if (!hydrated.baseSerialized) {
-					logger.debug(
-						`[${id}] Generating baseSerialized for template "${rawTemplate.id}"`
-					);
-					if (hydrated.type === "Room") {
-						const room = new Room({
-							coordinates: { x: 0, y: 0, z: 0 },
-							templateId: hydrated.id,
-							oid: -1, // Baseline serialization uses -1
-						});
-						room.applyTemplate(hydrated as RoomTemplate);
-						hydrated.baseSerialized = room.serialize();
-					} else {
-						const obj = createFromTemplate(hydrated);
-						hydrated.baseSerialized = obj.serialize();
-					}
-				}
-
 				try {
+					// Use the formal template deserialization system
+					const globalizedId = globalizeTemplateId(rawTemplate.id, dungeon.id!);
+					const hydrated = await deserializeTemplate(
+						rawTemplate,
+						globalizedId,
+						id,
+						originalVersion
+					);
+
 					dungeon.addTemplate(hydrated);
 					logger.debug(
 						`[${id}] Template "${rawTemplate.id}" loaded successfully`
@@ -897,7 +891,7 @@ export async function getAllDungeonIds(): Promise<string[]> {
  * @param dungeonVersion - Dungeon version (used if template doesn't have a version)
  * @returns Migrated template data (still as serialized format, not hydrated)
  */
-async function migrateTemplateData(
+export async function migrateTemplateData(
 	rawTemplateData: unknown,
 	templateId: string,
 	dungeonId: string,
@@ -947,6 +941,16 @@ async function migrateTemplateData(
 	// Stage 4: Type-safe migration based on template type
 	try {
 		switch (templateType) {
+			case "Room": {
+				// Stage 4a: Cast to SerializedRoom type
+				const serializedRoom = rawTemplateData as SerializedRoom & {
+					version?: string;
+				};
+				// Stage 4b: Migrate using Room migration function
+				const migratedRoom = await migrateRoomData(serializedRoom, templateId);
+				// Stage 4c: Return migrated data
+				return migratedRoom;
+			}
 			case "Mob": {
 				// Stage 4a: Cast to SerializedMob type
 				const serializedMob = rawTemplateData as SerializedMob & {
@@ -1006,7 +1010,6 @@ async function migrateTemplateData(
 				// Stage 4c: Return migrated data
 				return migratedWeapon;
 			}
-			case "Room":
 			case "Movable":
 			case "Prop":
 			case "DungeonObject":
@@ -1261,7 +1264,17 @@ async function deserializeDungeonObjectWithMigration(
 	}
 
 	// DungeonObjects in particular
-	let obj: DungeonObject = new DungeonObject(typed);
+	const options: DungeonObjectOptions = {
+		...typed,
+		mapColor:
+			typed.mapColor !== undefined
+				? COLOR_NAME_TO_COLOR[
+						typed.mapColor as keyof typeof COLOR_NAME_TO_COLOR
+				  ]
+				: undefined,
+	};
+
+	let obj: DungeonObject = new DungeonObject(options);
 
 	// Handle contents for all object types
 	if (typed.contents) {
@@ -1315,23 +1328,15 @@ export async function deserializeRoom(
 			dataWithVersion.version = parentVersion;
 		}
 		try {
-			// Rooms don't have their own migration system yet, but we can add it here later
-			migratedData = dataWithVersion;
+			migratedData = await migrateRoomData(dataWithVersion, data.keywords);
 		} catch (error) {
 			logger.warn(`Migration failed for Room: ${error}`);
 		}
 	}
 
-	const norm = normalizeSerializedData(migratedData);
-	// allowedExits is mandatory, but handle legacy data that might not have it
-	const defaultExits =
-		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
-	// Remove oid if present - Rooms don't use OIDs (identified by coordinates)
-	const { oid, ...roomData } = norm;
-	const room = new Room({
-		...roomData,
-		allowedExits: norm.allowedExits ?? defaultExits,
-	});
+	const norm = normalizeSerializedData(migratedData) as SerializedRoom;
+	const options = hydrateSerializedRoomData(norm);
+	const room = new Room(options);
 	// Determine version for nested objects
 	const versionForNested =
 		(migratedData as any & { version?: string }).version || parentVersion;
@@ -1367,7 +1372,8 @@ export async function deserializeMovable(
 		}
 	}
 	const norm = normalizeSerializedData(data) as SerializedMovable;
-	const movable = new Movable(norm);
+	const options = hydrateSerializedMovableData(norm);
+	const movable = new Movable(options);
 	// Determine version for nested objects
 	const versionForNested =
 		(norm as any & { version?: string }).version || parentVersion;
@@ -1402,7 +1408,8 @@ export async function deserializeProp(
 		}
 	}
 	const norm = normalizeSerializedData(data);
-	const prop = new Prop(norm);
+	const options = hydrateSerializedDungeonObjectData(norm);
+	const prop = new Prop(options);
 	// Determine version for nested objects
 	const versionForNested =
 		(norm as any & { version?: string }).version || parentVersion;
@@ -1451,13 +1458,12 @@ export async function deserializeItem(
 		}
 	}
 
-	const norm = normalizeSerializedData(
-		migratedData
-	) as unknown as SerializedItem;
+	const norm = normalizeSerializedData(migratedData) as SerializedItem;
 	// Determine version for nested objects
 	const versionForNested =
 		(migratedData as any & { version?: string }).version || parentVersion;
-	const item = new Item(norm as SerializedItem);
+	const options = hydrateSerializedItemData(norm);
+	const item = new Item(options);
 	if (norm.contents && Array.isArray(norm.contents)) {
 		for (const contentData of norm.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
@@ -1504,21 +1510,14 @@ export async function deserializeEquipment(
 		}
 	}
 
-	const { type, ...equipmentData } = normalizeSerializedData(
-		migratedData
-	) as SerializedEquipment;
+	const norm = normalizeSerializedData(migratedData) as SerializedEquipment;
 	// Determine version for nested objects
 	const versionForNested =
 		(migratedData as any & { version?: string }).version || parentVersion;
-	const equipment = new Equipment({
-		...equipmentData,
-		slot: equipmentData.slot,
-		attributeBonuses: equipmentData.attributeBonuses,
-		resourceBonuses: equipmentData.resourceBonuses,
-		secondaryAttributeBonuses: equipmentData.secondaryAttributeBonuses,
-	});
-	if (equipmentData.contents && Array.isArray(equipmentData.contents)) {
-		for (const contentData of equipmentData.contents) {
+	const options = hydrateSerializedEquipmentData(norm);
+	const equipment = new Equipment(options);
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
 				migrate,
@@ -1563,20 +1562,14 @@ export async function deserializeArmor(
 		}
 	}
 
-	const armorData = normalizeSerializedData(migratedData) as SerializedArmor;
+	const norm = normalizeSerializedData(migratedData) as SerializedArmor;
 	// Determine version for nested objects
 	const versionForNested =
 		(migratedData as any & { version?: string }).version || parentVersion;
-	const armor = new Armor({
-		...armorData,
-		slot: armorData.slot,
-		defense: armorData.defense ?? 0,
-		attributeBonuses: armorData.attributeBonuses,
-		resourceBonuses: armorData.resourceBonuses,
-		secondaryAttributeBonuses: armorData.secondaryAttributeBonuses,
-	});
-	if (armorData.contents && Array.isArray(armorData.contents)) {
-		for (const contentData of armorData.contents) {
+	const options = hydrateSerializedArmorData(norm);
+	const armor = new Armor(options);
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
 				migrate,
@@ -1621,24 +1614,19 @@ export async function deserializeWeapon(
 		}
 	}
 
-	const weaponData = normalizeSerializedData(
-		migratedData
-	) as unknown as SerializedWeapon;
+	const norm = normalizeSerializedData(migratedData) as SerializedWeapon;
 	// Determine version for nested objects
 	const versionForNested =
 		(migratedData as any & { version?: string }).version || parentVersion;
+	const options = hydrateSerializedWeaponData(norm);
+	// Apply defaults for required fields
 	const weapon = new Weapon({
-		...weaponData,
-		slot: weaponData.slot,
-		attackPower: weaponData.attackPower ?? 0,
-		hitType: weaponData.hitType,
-		type: weaponData.weaponType ?? "shortsword",
-		attributeBonuses: weaponData.attributeBonuses,
-		resourceBonuses: weaponData.resourceBonuses,
-		secondaryAttributeBonuses: weaponData.secondaryAttributeBonuses,
+		...options,
+		attackPower: options.attackPower ?? 0,
+		type: options.type ?? "shortsword",
 	});
-	if (weaponData.contents && Array.isArray(weaponData.contents)) {
-		for (const contentData of weaponData.contents) {
+	if (norm.contents && Array.isArray(norm.contents)) {
+		for (const contentData of norm.contents) {
 			const contentObj = await deserializeDungeonObjectWithMigration(
 				contentData,
 				migrate,
@@ -1648,6 +1636,516 @@ export async function deserializeWeapon(
 		}
 	}
 	return weapon;
+}
+
+/**
+ * Helper function to remove undefined values from an object.
+ */
+function pruneUndefined<T>(obj: T): Partial<T> {
+	const out: Record<string, unknown> = {};
+	for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+		if (v !== undefined) out[k] = v;
+	}
+	return out as Partial<T>;
+}
+
+/**
+ * Type guard to assert that a Partial<MobOptions> has the required fields (race and job).
+ * This allows TypeScript to narrow the type to MobOptions without a cast.
+ */
+function assertMobOptions(
+	options: Partial<MobOptions>
+): asserts options is MobOptions {
+	assert.ok(options.race, "Race is a required field in MobOptions.");
+	assert.ok(options.job, "Job is a required field in MobOptions.");
+}
+
+/**
+ * Hydrates a SerializedDungeonObject into DungeonObjectOptions.
+ * Handles conversion of serialized field formats (e.g., mapColor string -> COLOR enum).
+ * This is the base hydration function that all other hydration functions call.
+ */
+function hydrateSerializedDungeonObjectData(
+	data: SerializedDungeonObject
+): DungeonObjectOptions {
+	return pruneUndefined({
+		keywords: data.keywords,
+		display: data.display,
+		description: data.description,
+		roomDescription: data.roomDescription,
+		mapText: data.mapText,
+		mapColor:
+			data.mapColor !== undefined
+				? COLOR_NAME_TO_COLOR[data.mapColor as keyof typeof COLOR_NAME_TO_COLOR]
+				: undefined,
+		baseWeight: data.baseWeight,
+		templateId: data.templateId,
+	});
+}
+
+/**
+ * Type alias for Movable options (currently same as DungeonObjectOptions).
+ * Defined for type safety and future extensibility.
+ */
+type MovableOptions = DungeonObjectOptions;
+
+/**
+ * Type alias for Item options (currently same as DungeonObjectOptions).
+ * Defined for type safety and future extensibility.
+ */
+type ItemOptions = MovableOptions;
+
+/**
+ * Hydrates a SerializedRoom into RoomOptions.
+ * Calls DungeonObject hydration and adds Room-specific fields (coordinates, allowedExits, dense).
+ * Follows the class hierarchy: Room -> DungeonObject.
+ */
+function hydrateSerializedRoomData(data: SerializedRoom): RoomOptions {
+	const base = hydrateSerializedDungeonObjectData(data);
+	// allowedExits is mandatory in serialized form, but handle legacy data
+	const defaultExits =
+		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+	// coordinates is required, so we can safely cast back to RoomOptions
+	return pruneUndefined({
+		...base,
+		coordinates: data.coordinates,
+		allowedExits: data.allowedExits ?? defaultExits,
+		dense: data.dense,
+	}) as RoomOptions;
+}
+
+/**
+ * Hydrates a SerializedMovable into MovableOptions.
+ * Currently just calls the base DungeonObject hydration, but exists for future extensibility.
+ * Accepts SerializedDungeonObject since Movable doesn't add serialized fields beyond DungeonObject.
+ */
+function hydrateSerializedMovableData(
+	data: SerializedDungeonObject
+): MovableOptions {
+	return hydrateSerializedDungeonObjectData(data);
+}
+
+/**
+ * Hydrates a SerializedItem into ItemOptions.
+ * Calls Movable hydration following the class hierarchy: Item -> Movable -> DungeonObject.
+ * Accepts SerializedDungeonObject since SerializedItem doesn't add fields beyond base.
+ */
+function hydrateSerializedItemData(data: SerializedDungeonObject): ItemOptions {
+	return hydrateSerializedMovableData(data);
+}
+
+/**
+ * Hydrates a SerializedEquipment into EquipmentOptions.
+ * Calls Item hydration and adds Equipment-specific fields (slot, bonuses).
+ * Follows the class hierarchy: Equipment -> Item -> Movable -> DungeonObject.
+ */
+function hydrateSerializedEquipmentData(
+	data: SerializedEquipment
+): EquipmentOptions {
+	const base = hydrateSerializedItemData(data);
+	return pruneUndefined({
+		...base,
+		slot: data.slot,
+		attributeBonuses: data.attributeBonuses,
+		resourceBonuses: data.resourceBonuses,
+		secondaryAttributeBonuses: data.secondaryAttributeBonuses,
+	});
+}
+
+/**
+ * Hydrates a SerializedArmor into ArmorOptions.
+ * Calls Equipment hydration and adds Armor-specific field (defense).
+ * Follows the class hierarchy: Armor -> Equipment -> Item -> Movable -> DungeonObject.
+ */
+function hydrateSerializedArmorData(data: SerializedArmor): ArmorOptions {
+	const base = hydrateSerializedEquipmentData(data);
+	return pruneUndefined({
+		...base,
+		defense: data.defense,
+	});
+}
+
+/**
+ * Hydrates a SerializedWeapon into WeaponOptions.
+ * Calls Equipment hydration and adds Weapon-specific fields (attackPower, hitType, weaponType).
+ * Follows the class hierarchy: Weapon -> Equipment -> Item -> Movable -> DungeonObject.
+ */
+function hydrateSerializedWeaponData(data: SerializedWeapon): WeaponOptions {
+	const base = hydrateSerializedEquipmentData(data);
+	return pruneUndefined({
+		...base,
+		attackPower: data.attackPower,
+		hitType: data.hitType,
+		type: data.weaponType,
+	});
+}
+
+/**
+ * Hydrates a SerializedMob into MobOptions.
+ * Handles conversion of Mob-specific fields (behaviors, etc.) and resolves race/job from IDs.
+ * This function requires runtime data (race/job registries) so it lives in the package layer.
+ * Follows the class hierarchy: Mob -> Movable -> DungeonObject
+ */
+function hydrateSerializedMobData(data: SerializedMob): MobOptions {
+	const base = hydrateSerializedMovableData(data);
+
+	// Convert serialized behaviors (strings) back to enum keys
+	const behaviors: Partial<Record<BEHAVIOR, boolean>> | undefined =
+		data.behaviors
+			? Object.fromEntries(
+					Object.entries(data.behaviors)
+						.filter(([key]) =>
+							Object.values(BEHAVIOR).includes(key as BEHAVIOR)
+						)
+						.map(([key, value]) => [key as BEHAVIOR, !!value])
+			  )
+			: undefined;
+
+	// Resolve race and job from string IDs to actual objects
+	const race = getRaceById(data.race);
+	const job = getJobById(data.job);
+
+	if (!race) {
+		throw new Error(
+			`Failed to hydrate Mob: race "${data.race}" not found in archetype registry`
+		);
+	}
+	if (!job) {
+		throw new Error(
+			`Failed to hydrate Mob: job "${data.job}" not found in archetype registry`
+		);
+	}
+
+	const result: MobOptions = {
+		...base,
+		race,
+		job,
+		level: data.level,
+		experience: data.experience,
+		attributeBonuses: data.attributeBonuses,
+		resourceBonuses: data.resourceBonuses,
+		health: data.health,
+		mana: data.mana,
+		exhaustion: data.exhaustion,
+		behaviors,
+		// learnedAbilities will be handled separately during deserialization
+		// (not passed through options since it needs Ability objects, not IDs)
+	};
+
+	/**
+	 * Mob is the only DungeonObject with required fields in its constructor.
+	 * Because of that, for type-safety, we need to assert that the options has the required fields.
+	 * This is done by the assertMobOptions type guard.
+	 */
+	const pruned = pruneUndefined(result);
+	assertMobOptions(pruned);
+	return pruned;
+}
+
+/**
+ * Template hydration functions convert migrated serialized data into proper template types.
+ * Templates are essentially partial serialized objects with an id field, storing only differential fields.
+ */
+
+/**
+ * Hydrates migrated serialized data into a DungeonObjectTemplate.
+ * Removes runtime-only fields (oid, contents, location) and preserves template-specific fields.
+ */
+function hydrateTemplateData(
+	data: SerializedDungeonObject,
+	templateId: string
+): DungeonObjectTemplate {
+	// Extract only template-relevant fields (exclude runtime state)
+	// id and type are required, so we don't prune them
+	const pruned = pruneUndefined({
+		keywords: data.keywords,
+		display: data.display,
+		description: data.description,
+		roomDescription: data.roomDescription,
+		mapText: data.mapText,
+		mapColor: data.mapColor, // Keep as string (color name)
+		baseWeight: data.baseWeight,
+	});
+	return {
+		id: templateId,
+		type: data.type,
+		...pruned,
+	};
+}
+
+/**
+ * Hydrates migrated SerializedRoom data into a RoomTemplate.
+ * Follows the class hierarchy: RoomTemplate -> DungeonObjectTemplate.
+ */
+function hydrateRoomTemplateData(
+	data: SerializedRoom,
+	templateId: string
+): RoomTemplate {
+	const base = hydrateTemplateData(data, templateId);
+	const defaultExits =
+		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+	return pruneUndefined({
+		...base,
+		type: "Room",
+		allowedExits: data.allowedExits ?? defaultExits,
+		dense: data.dense,
+		// roomLinks is preserved from the original template data if present
+		roomLinks: (
+			data as SerializedRoom & { roomLinks?: Record<DirectionText, string> }
+		).roomLinks,
+	}) as RoomTemplate;
+}
+
+/**
+ * Hydrates migrated SerializedMob data into a MobTemplate.
+ * Keeps race/job as string IDs (not resolved to objects) since templates store IDs.
+ * Follows the class hierarchy: MobTemplate -> DungeonObjectTemplate.
+ */
+function hydrateMobTemplateData(
+	data: SerializedMob,
+	templateId: string
+): MobTemplate {
+	const base = hydrateTemplateData(data, templateId);
+
+	// Convert behaviors from serialized format (Record<string, boolean>) to template format
+	const behaviors: Partial<Record<BEHAVIOR, boolean>> | undefined =
+		data.behaviors
+			? Object.fromEntries(
+					Object.entries(data.behaviors)
+						.filter(([key]) =>
+							Object.values(BEHAVIOR).includes(key as BEHAVIOR)
+						)
+						.map(([key, value]) => [key as BEHAVIOR, !!value])
+			  )
+			: undefined;
+
+	return pruneUndefined({
+		...base,
+		type: "Mob",
+		race: data.race, // Keep as string ID
+		job: data.job, // Keep as string ID
+		level: data.level,
+		experience: data.experience,
+		attributeBonuses: data.attributeBonuses,
+		resourceBonuses: data.resourceBonuses,
+		health: data.health,
+		mana: data.mana,
+		exhaustion: data.exhaustion,
+		behaviors,
+	}) as MobTemplate;
+}
+
+/**
+ * Hydrates migrated SerializedItem data into an ItemTemplate.
+ * Follows the class hierarchy: ItemTemplate -> DungeonObjectTemplate.
+ * Accepts SerializedItem or SerializedEquipment (which extends SerializedItem).
+ */
+function hydrateItemTemplateData(
+	data: SerializedItem | SerializedEquipment,
+	templateId: string
+): ItemTemplate {
+	const base = hydrateTemplateData(data, templateId);
+	return {
+		...base,
+		type: data.type as ItemType,
+	};
+}
+
+/**
+ * Hydrates migrated SerializedEquipment data into an EquipmentTemplate.
+ * Follows the class hierarchy: EquipmentTemplate -> ItemTemplate -> DungeonObjectTemplate.
+ */
+function hydrateEquipmentTemplateData(
+	data: SerializedEquipment,
+	templateId: string
+): EquipmentTemplate {
+	const base = hydrateItemTemplateData(data, templateId);
+	return pruneUndefined({
+		...base,
+		type: data.type as equipmentType,
+		slot: data.slot,
+		attributeBonuses: data.attributeBonuses,
+		resourceBonuses: data.resourceBonuses,
+		secondaryAttributeBonuses: data.secondaryAttributeBonuses,
+	}) as EquipmentTemplate;
+}
+
+/**
+ * Hydrates migrated SerializedArmor data into an ArmorTemplate.
+ * Follows the class hierarchy: ArmorTemplate -> EquipmentTemplate -> ItemTemplate -> DungeonObjectTemplate.
+ */
+function hydrateArmorTemplateData(
+	data: SerializedArmor,
+	templateId: string
+): ArmorTemplate {
+	const base = hydrateEquipmentTemplateData(data, templateId);
+	return pruneUndefined({
+		...base,
+		type: "Armor",
+		defense: data.defense,
+	}) as ArmorTemplate;
+}
+
+/**
+ * Hydrates migrated SerializedWeapon data into a WeaponTemplate.
+ * Follows the class hierarchy: WeaponTemplate -> EquipmentTemplate -> ItemTemplate -> DungeonObjectTemplate.
+ */
+function hydrateWeaponTemplateData(
+	data: SerializedWeapon,
+	templateId: string
+): WeaponTemplate {
+	const base = hydrateEquipmentTemplateData(data, templateId);
+	return pruneUndefined({
+		...base,
+		type: "Weapon",
+		attackPower: data.attackPower,
+		hitType: data.hitType,
+		weaponType: data.weaponType,
+	}) as WeaponTemplate;
+}
+
+/**
+ * Generates the baseSerialized for a template by creating an instance and serializing it.
+ * This is used to cache the baseline serialization for template compression.
+ */
+function generateTemplateBaseSerialized(
+	template: DungeonObjectTemplate
+): SerializedDungeonObject {
+	if (template.type === "Room") {
+		const roomTemplate = template as RoomTemplate;
+		const room = new Room({
+			coordinates: { x: 0, y: 0, z: 0 },
+			templateId: template.id,
+			oid: -1, // Baseline serialization uses -1
+		});
+		room.applyTemplate(roomTemplate);
+		return room.serialize();
+	} else {
+		const obj = createFromTemplate(template, -1);
+		return obj.serialize();
+	}
+}
+
+/**
+ * Deserializes a raw template (from YAML) into a proper DungeonObjectTemplate.
+ * Handles the full pipeline: migration -> hydration -> baseSerialized generation.
+ *
+ * @param rawTemplate Raw template data from YAML (partial serialized object)
+ * @param templateId The template ID (may need to be globalized)
+ * @param dungeonId The dungeon ID for logging/error context
+ * @param dungeonVersion The dungeon version (used if template has no version)
+ * @returns A fully hydrated template with baseSerialized generated
+ */
+export async function deserializeTemplate(
+	rawTemplate: unknown,
+	templateId: string,
+	dungeonId: string,
+	dungeonVersion?: string
+): Promise<DungeonObjectTemplate> {
+	// Stage 1: Migrate template data
+	const migratedData = await migrateTemplateData(
+		rawTemplate,
+		templateId,
+		dungeonId,
+		dungeonVersion
+	);
+
+	// Stage 2: Validate migrated data has a type
+	if (!migratedData || typeof migratedData !== "object") {
+		throw new Error(
+			`[${dungeonId}] Template "${templateId}": Invalid template data after migration`
+		);
+	}
+
+	const migratedObj = migratedData as Record<string, unknown>;
+	const templateType = migratedObj.type as
+		| SerializedDungeonObjectType
+		| undefined;
+
+	if (!templateType) {
+		throw new Error(
+			`[${dungeonId}] Template "${templateId}": Missing type field after migration`
+		);
+	}
+
+	// Stage 3: Hydrate migrated data into proper template type
+	let hydrated: DungeonObjectTemplate;
+	switch (templateType) {
+		case "Room": {
+			hydrated = hydrateRoomTemplateData(
+				migratedData as SerializedRoom,
+				templateId
+			);
+			break;
+		}
+		case "Mob": {
+			hydrated = hydrateMobTemplateData(
+				migratedData as SerializedMob,
+				templateId
+			);
+			break;
+		}
+		case "Item": {
+			hydrated = hydrateItemTemplateData(
+				migratedData as SerializedItem,
+				templateId
+			);
+			break;
+		}
+		case "Equipment": {
+			hydrated = hydrateEquipmentTemplateData(
+				migratedData as SerializedEquipment,
+				templateId
+			);
+			break;
+		}
+		case "Armor": {
+			hydrated = hydrateArmorTemplateData(
+				migratedData as SerializedArmor,
+				templateId
+			);
+			break;
+		}
+		case "Weapon": {
+			hydrated = hydrateWeaponTemplateData(
+				migratedData as SerializedWeapon,
+				templateId
+			);
+			break;
+		}
+		case "Prop": {
+			hydrated = hydrateTemplateData(
+				migratedData as SerializedProp,
+				templateId
+			);
+			break;
+		}
+		case "Movable": {
+			hydrated = hydrateTemplateData(
+				migratedData as SerializedMovable,
+				templateId
+			);
+			break;
+		}
+		case "DungeonObject": {
+			hydrated = hydrateTemplateData(
+				migratedData as SerializedDungeonObject,
+				templateId
+			);
+			break;
+		}
+		default:
+			throw new Error(
+				`[${dungeonId}] Template "${templateId}": Unknown template type "${templateType}"`
+			);
+	}
+
+	// Stage 4: Generate baseSerialized if not present
+	if (!hydrated.baseSerialized) {
+		hydrated.baseSerialized = generateTemplateBaseSerialized(hydrated);
+	}
+
+	return hydrated;
 }
 
 /**
@@ -1684,40 +2182,12 @@ export async function deserializeMob(
 	}
 
 	const normalized = normalizeSerializedData(migratedData) as SerializedMob;
-	const {
-		race: raceId,
-		job: jobId,
-		equipped,
-		learnedAbilities: learnedAbilitiesData,
-		type,
-		...rest
-	} = normalized;
+	const { equipped, learnedAbilities: learnedAbilitiesData, type } = normalized;
 
-	// Explicitly remove race and job from rest to prevent string IDs from overwriting resolved objects
-	const { race: _race, job: _job, ...mobOptions } = rest as any;
+	// Use hydration function to convert serialized data to MobOptions
+	const mobOptions = hydrateSerializedMobData(normalized);
 
-	const race = getRaceById(raceId);
-	const job = getJobById(jobId);
-
-	// Validate that race and job were found
-	if (!race) {
-		logger.error(`Race "${raceId}" not found in archetype registry`);
-		throw new Error(
-			`Failed to deserialize Mob: race "${raceId}" not found in archetype registry`
-		);
-	}
-	if (!job) {
-		logger.error(`Job "${jobId}" not found in archetype registry`);
-		throw new Error(
-			`Failed to deserialize Mob: job "${jobId}" not found in archetype registry`
-		);
-	}
-
-	const mob = new Mob({
-		race,
-		job,
-		...mobOptions,
-	});
+	const mob = new Mob(mobOptions);
 	logger.debug(`Mob instance created successfully`);
 
 	// Restore learned abilities if provided

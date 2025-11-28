@@ -62,7 +62,7 @@
  */
 
 import { string } from "mud-ext";
-import { color, COLOR } from "./color.js";
+import { color, COLOR, COLOR_NAMES, COLOR_NAME_TO_COLOR } from "./color.js";
 import logger from "../logger.js";
 import {
 	addRoomLink,
@@ -1662,7 +1662,7 @@ export interface SerializedDungeonObject {
 	description?: string;
 	roomDescription?: string;
 	mapText?: string;
-	mapColor?: COLOR;
+	mapColor?: string; // Color name string (e.g., "red", "blue")
 	contents?: SerializedDungeonObject[];
 	location?: string; // RoomRef value
 	baseWeight?: number;
@@ -1831,7 +1831,7 @@ export interface DungeonObjectTemplate {
 	description?: string;
 	roomDescription?: string;
 	mapText?: string;
-	mapColor?: COLOR;
+	mapColor?: string; // Color name string (e.g., "red", "blue")
 	baseWeight?: number;
 	/**
 	 * Optional cached baseline serialization produced by this template.
@@ -2833,7 +2833,8 @@ export class DungeonObject {
 			description: this.description,
 			roomDescription: this.roomDescription,
 			mapText: this.mapText,
-			mapColor: this.mapColor,
+			mapColor:
+				this.mapColor !== undefined ? COLOR_NAMES[this.mapColor] : undefined,
 			...(serializedContents.length > 0 && { contents: serializedContents }),
 			...(locationRef && { location: locationRef }),
 			...(this.baseWeight !== 0 && { baseWeight: this.baseWeight }),
@@ -2992,7 +2993,10 @@ export class DungeonObject {
 			this.mapText = template.mapText;
 		}
 		if (template.mapColor !== undefined) {
-			this.mapColor = template.mapColor;
+			this.mapColor =
+				COLOR_NAME_TO_COLOR[
+					template.mapColor as keyof typeof COLOR_NAME_TO_COLOR
+				];
 		}
 		if (template.baseWeight !== undefined) {
 			this.baseWeight = template.baseWeight;
@@ -7527,122 +7531,10 @@ export function normalizeSerializedData<T extends AnySerializedDungeonObject>(
 	return merged as T;
 }
 
-function pruneUndefined<T extends Record<string, unknown>>(obj: T): T {
+export function pruneUndefined<T extends Record<string, unknown>>(obj: T): T {
 	const out: Record<string, unknown> = {};
 	for (const [k, v] of Object.entries(obj)) {
 		if (v !== undefined) out[k] = v;
 	}
 	return out as T;
-}
-
-/**
- * Converts a serialized object into constructor options for its class.
- * Contents and location are intentionally excluded; callers should attach
- * contents and place the object into rooms after construction.
- */
-export function serializedToOptions(
-	data: AnySerializedDungeonObject
-):
-	| DungeonObjectOptions
-	| RoomOptions
-	| EquipmentOptions
-	| ArmorOptions
-	| WeaponOptions
-	| MobOptions {
-	const norm = normalizeSerializedData(data);
-	const base: DungeonObjectOptions = pruneUndefined({
-		keywords: norm.keywords,
-		display: norm.display,
-		description: norm.description,
-		roomDescription: norm.roomDescription,
-		mapText: norm.mapText,
-		mapColor: norm.mapColor,
-		baseWeight: norm.baseWeight,
-	});
-
-	switch (norm.type) {
-		case "Room": {
-			const r = norm as SerializedRoom;
-			const opts: RoomOptions = pruneUndefined({
-				...base,
-				coordinates: r.coordinates,
-				allowedExits: r.allowedExits,
-				dense: r.dense,
-			});
-			return opts;
-		}
-		case "Equipment": {
-			const e = norm as SerializedEquipment;
-			const opts: EquipmentOptions = pruneUndefined({
-				...base,
-				slot: e.slot,
-				attributeBonuses: e.attributeBonuses,
-				resourceBonuses: e.resourceBonuses,
-				secondaryAttributeBonuses: e.secondaryAttributeBonuses,
-			});
-			return opts;
-		}
-		case "Armor": {
-			const a = norm as SerializedArmor;
-			const opts: ArmorOptions = pruneUndefined({
-				...(serializedToOptions({
-					...a,
-					type: "Equipment",
-				}) as EquipmentOptions),
-				defense: a.defense,
-			});
-			return opts;
-		}
-		case "Weapon": {
-			const w = norm as SerializedWeapon;
-			const opts: WeaponOptions = pruneUndefined({
-				...(serializedToOptions({
-					...w,
-					type: "Equipment",
-				}) as EquipmentOptions),
-				attackPower: w.attackPower,
-				hitType: w.hitType,
-				type: w.weaponType,
-			});
-			return opts;
-		}
-		case "Mob": {
-			const m = norm as SerializedMob;
-			// Convert serialized behaviors (strings) back to enum keys
-			const behaviors: Partial<Record<BEHAVIOR, boolean>> | undefined =
-				m.behaviors
-					? Object.fromEntries(
-							Object.entries(m.behaviors)
-								.filter(([key]) =>
-									Object.values(BEHAVIOR).includes(key as BEHAVIOR)
-								)
-								.map(([key, value]) => [key as BEHAVIOR, !!value])
-					  )
-					: undefined;
-			// Note: race and job are kept as string IDs here - they will be resolved in package layer
-			// This function is used by normalizeSerializedData which is in core, so it can't use package functions
-			const opts = pruneUndefined({
-				...base,
-				level: m.level,
-				experience: m.experience,
-				race: m.race, // Keep as string ID - resolved in package layer
-				job: m.job, // Keep as string ID - resolved in package layer
-				attributeBonuses: m.attributeBonuses,
-				resourceBonuses: m.resourceBonuses,
-				health: m.health,
-				mana: m.mana,
-				exhaustion: m.exhaustion,
-				behaviors,
-				// learnedAbilities will be handled separately during deserialization
-				// (not passed through options since it needs Ability objects, not IDs)
-			}) as any;
-			return opts;
-		}
-		case "Item":
-		case "Prop":
-		case "Movable":
-		case "DungeonObject":
-		default:
-			return base;
-	}
 }

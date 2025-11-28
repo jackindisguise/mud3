@@ -10,10 +10,14 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Movement System**: Cardinal directions (N/S/E/W), diagonals (NE/NW/SE/SW), and vertical movement (UP/DOWN)
 - **Room System**: Rooms with configurable exits (bitmask-based), density (passable/impassable), and custom descriptions
 - **Room Links**: Create tunnels and connections between rooms, even across different dungeons
+- **Exit Overrides**: Override exit configurations for specific room cells, allowing custom room links and exit permissions
+- **Cross-Dungeon Links**: Room links can connect rooms across different dungeons with automatic reciprocal link creation
 - **Template System**: Define reusable room and object templates for efficient dungeon creation
 - **Serialization**: Full save/load support with template-aware compression for efficient storage
+- **Data Migration System**: Automatic version-based migration system for dungeons, characters, rooms, mobs, items, equipment, armor, and weapons
 - **Reset System**: Automatically respawn mobs and items based on templates and room references
 - **Minimap**: Visual minimap display showing surrounding rooms with vision blocking and directional indicators
+- **Pathfinding**: A* pathfinding algorithm for finding optimal paths between rooms, with cross-dungeon pathfinding support
 
 ### Character & Combat System
 
@@ -46,6 +50,8 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 
 - **Channels**: Configurable communication channels (OOC, Gossip, Say, Newbie, Trade) with customizable message patterns
 - **Message Boards**: Persistent message boards with targeting (@mentions), read tracking, and interactive editing
+- **Busy Mode**: Message queuing system that allows players to queue certain message groups (channels, combat, info) to be read later, similar to an answering machine
+- **Combat Busy Mode**: Automatically activates during combat to queue non-critical messages, reducing combat screen clutter
 - **Color Support**: ANSI color codes throughout the interface with web client HTML conversion
 
 ### Objects & Items
@@ -66,15 +72,18 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **YAML-Based Storage**: All game data (characters, dungeons, boards) stored in YAML files
 - **Auto-Save**: Periodic automatic saves of game state
 - **Package System**: Automated package discovery and dependency-ordered loading system
+- **Data Migration System**: Automatic version-based migrations ensure old data files are upgraded to current format
+- **Separate Versioning**: Independent `dungeonVersion` field for dungeon data migrations, separate from application version
 
 ## Technology Stack
 
-- **TypeScript**: Full type safety throughout the codebase
+- **TypeScript**: Full type safety throughout the codebase with incremental compilation support
 - **Node.js**: Runtime environment with ES modules
 - **Telnet Server**: Custom telnet implementation for client connections
 - **WebSocket**: WebSocket support for web-based clients
 - **YAML**: Human-readable data storage format
 - **Electron**: Cross-platform desktop application framework for the dungeon editor
+- **Semantic Versioning**: Version management using semver for data migrations
 
 ## Dungeon Editor
 
@@ -89,6 +98,9 @@ npm run electron:dev
 The Electron shell loads the bundled `map-editor` frontend, talks directly to the MUD data files, and provides:
 - Visual room layout editing across layers
 - Exit/link editing with validation
+- Cross-dungeon room link creation with automatic reciprocal link support
+- Make 2-way button (⇄) for creating bidirectional room links
+- Exit override editing for custom room configurations
 - Template-aware dungeon creation and duplication
 - Attribute calculators for race/job combinations
 - Weapon template editing with weapon type selection
@@ -136,7 +148,10 @@ npm run test:ts
 npm run test:individual:ts
 
 # Type-check without building
-npm run build:ts
+npm run build:typecheck
+
+# Increment dungeon version (patch/minor/major)
+npm run update-dungeon-version [patch|minor|major]
 
 # Generate documentation
 npm run doc

@@ -98,6 +98,8 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	private buffer: string = "";
 	// Optional single-shot callback used by Game.nanny() style prompts
 	private pendingAskCallback?: (line: string) => void;
+	// Track if SGA (Suppress Go Ahead) is negotiated
+	private suppressGoAhead: boolean = false;
 
 	toString(): string {
 		return `{client@${this.getAddress()}}`;
@@ -152,6 +154,53 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 			logger.error(`Client error (${this.getAddress()}): ${error.message}`);
 			this.emit("error", error);
 		});
+
+		// Send IAC WILL SGA by default to offer Suppress Go Ahead
+		if (!this.socket.destroyed && this.socket.writable) {
+			this.socket.write(Buffer.from([0xff, 0xfb, 0x03])); // IAC WILL SGA
+			logger.debug(
+				`SGA negotiation (${this.getAddress()}): sent IAC WILL SGA (default offer)`
+			);
+		}
+	}
+
+	/**
+	 * Handle telnet option negotiations before processing data
+	 * @param data Raw binary data from the socket
+	 * @returns Buffer with negotiations removed
+	 */
+	private handleTelnetNegotiations(data: Buffer): Buffer {
+		const binary = data.toString("binary");
+		let result = binary;
+
+		// Handle IAC DO SGA (0xFF 0xFD 0x03) - client agrees to suppress GA (response to our IAC WILL SGA)
+		if (binary.includes("\xff\xfd\x03")) {
+			logger.debug(
+				`SGA negotiation (${this.getAddress()}): received IAC DO SGA, enabling full-duplex mode`
+			);
+			this.suppressGoAhead = true;
+			// Remove the negotiation from the stream
+			result = result.replace(/\xff\xfd\x03/g, "");
+		}
+
+		// Handle IAC DON'T SGA (0xFF 0xFE 0x03) - client rejects SGA
+		if (binary.includes("\xff\xfe\x03")) {
+			logger.debug(
+				`SGA negotiation (${this.getAddress()}): received IAC DON'T SGA, SGA not enabled`
+			);
+			this.suppressGoAhead = false;
+			// Respond with IAC WON'T SGA (0xFF 0xFC 0x03)
+			if (!this.socket.destroyed && this.socket.writable) {
+				this.socket.write(Buffer.from([0xff, 0xfc, 0x03]));
+				logger.debug(
+					`SGA negotiation (${this.getAddress()}): sent IAC WON'T SGA`
+				);
+			}
+			// Remove the negotiation from the stream
+			result = result.replace(/\xff\xfe\x03/g, "");
+		}
+
+		return Buffer.from(result, "binary");
 	}
 
 	private sanitizeTelnetCommands(input: Buffer): string {
@@ -162,16 +211,24 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		const noSubNegotiation = binary.replace(/\xff\xfa[\s\S]*?\xff\xf0/g, "");
 
 		// Remove IAC WILL/WONT/DO/DONT <option> negotiations.
+		// Note: DO/DON'T SGA are handled separately in handleTelnetNegotiations
 		const noNegotiations = noSubNegotiation.replace(/\xff[\xfb-\xfe]./g, "");
 
+		// Remove IAC GA (Go Ahead) - 0xFF 0xF9 (should be suppressed if SGA is enabled)
+		const noGoAhead = noNegotiations.replace(/\xff\xf9/g, "");
+
 		// Collapse escaped IAC bytes (IAC IAC -> literal 0xFF).
-		const unescaped = noNegotiations.replace(/\xff\xff/g, "\xff");
+		const unescaped = noGoAhead.replace(/\xff\xff/g, "\xff");
 
 		return Buffer.from(unescaped, "binary").toString("utf8");
 	}
 
 	private handleData(data: Buffer): void {
-		this.buffer += this.sanitizeTelnetCommands(data);
+		// Handle telnet negotiations first (before sanitizing)
+		const negotiated = this.handleTelnetNegotiations(data);
+
+		// Then sanitize and process the remaining data
+		this.buffer += this.sanitizeTelnetCommands(negotiated);
 
 		// Process complete lines
 		let newlineIndex: number;
@@ -205,8 +262,10 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	 */
 	public send(text: string, colorize: boolean = false): void {
 		const escaped = colorize ? _colorize(text) : stripColors(text);
-		if (!this.socket.destroyed && this.socket.writable)
+		if (!this.socket.destroyed && this.socket.writable) {
 			this.socket.write(escaped);
+			// With SGA enabled, we don't need to send GA messages
+		}
 	}
 
 	/**

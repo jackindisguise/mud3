@@ -4,6 +4,45 @@ import { MudServer, MudClient } from "./io.js";
 import { Socket } from "net";
 import { LINEBREAK } from "./telnet.js";
 
+/**
+ * Consume the IAC WILL SGA message that's sent by default on connection
+ * @param socket The socket to read from
+ * @returns Promise that resolves when the SGA message has been consumed
+ */
+async function consumeInitialSGA(socket: Socket): Promise<void> {
+	return new Promise<void>((resolve) => {
+		const IAC_WILL_SGA = Buffer.from([0xff, 0xfb, 0x03]);
+		let buffer = Buffer.alloc(0);
+		let consumed = false;
+
+		const dataHandler = (data: Buffer) => {
+			if (consumed) return;
+			buffer = Buffer.concat([buffer, data]);
+			// Check if we've received the IAC WILL SGA message at the start
+			if (buffer.length >= 3 && buffer.subarray(0, 3).equals(IAC_WILL_SGA)) {
+				consumed = true;
+				socket.removeListener("data", dataHandler);
+				resolve();
+			} else if (buffer.length >= 3) {
+				// If we got something else, that's unexpected but we'll resolve anyway
+				consumed = true;
+				socket.removeListener("data", dataHandler);
+				resolve();
+			}
+		};
+
+		socket.on("data", dataHandler);
+		// Timeout after 100ms in case the message doesn't arrive
+		setTimeout(() => {
+			if (!consumed) {
+				consumed = true;
+				socket.removeListener("data", dataHandler);
+				resolve();
+			}
+		}, 100);
+	});
+}
+
 describe("io.ts", () => {
 	describe("MudServer", () => {
 		let server: MudServer;
@@ -160,6 +199,11 @@ describe("io.ts", () => {
 			]);
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
+			// Consume the IAC WILL SGA messages sent on connection
+			await Promise.all([
+				consumeInitialSGA(client1),
+				consumeInitialSGA(client2),
+			]);
 
 			const messages1: string[] = [];
 			const messages2: string[] = [];
@@ -186,6 +230,8 @@ describe("io.ts", () => {
 			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
+			// Consume the IAC WILL SGA message sent on connection
+			await consumeInitialSGA(client1);
 
 			const messages: string[] = [];
 			client1.on("data", (data) => messages.push(data.toString()));
@@ -220,6 +266,8 @@ describe("io.ts", () => {
 			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
+			// Consume the IAC WILL SGA message sent on connection
+			await consumeInitialSGA(testSocket);
 		});
 
 		afterEach(async () => {
@@ -290,7 +338,9 @@ describe("io.ts", () => {
 			mudClient!.send("Hello, client!");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			assert.strictEqual(messages.join(""), "Hello, client!");
+			// Filter out telnet negotiation messages
+			const filtered = messages.join("").replace(/\xff\xfb\x03/g, ""); // Filter IAC WILL SGA if still present
+			assert.strictEqual(filtered, "Hello, client!");
 		});
 
 		it("should send lines to the client", async () => {
@@ -304,7 +354,9 @@ describe("io.ts", () => {
 			mudClient!.sendLine("Welcome!");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			assert.strictEqual(messages.join(""), `Welcome!${LINEBREAK}`);
+			// Filter out telnet negotiation messages
+			const filtered = messages.join("").replace(/\xff\xfb\x03/g, ""); // Filter IAC WILL SGA if still present
+			assert.strictEqual(filtered, `Welcome!${LINEBREAK}`);
 		});
 
 		it("should emit close event when connection is closed", async () => {

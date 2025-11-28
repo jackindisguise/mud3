@@ -11,6 +11,7 @@ import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Room, DIRECTION, dir2text } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
+import { showRoom } from "./look.js";
 
 const DEFAULT_COOLDOWN_MS = 100;
 
@@ -85,6 +86,8 @@ export function executeMovement(
 		`You leave to the ${directionText}.`,
 		MESSAGE_GROUP.COMMAND_RESPONSE
 	);
-	actor.step(direction);
-	return;
+
+	const success = actor.step(direction);
+	if (success && actor.character?.settings?.autoLook)
+		showRoom(actor, actor.location as Room);
 }

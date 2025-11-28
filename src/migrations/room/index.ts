@@ -6,7 +6,7 @@
  */
 
 // Import migrations (they self-register via side effects)
-import "./v1.0.0-to-v1.0.1.js";
+//import "./v1.0.0-to-v1.0.1.js";
 
 // Export public API
 export { migrateRoomData } from "./runner.js";

@@ -9,15 +9,9 @@ import {
 	isInCombatQueue,
 	getCombatQueue,
 	processCombatRound,
+	oneHit,
 } from "./combat.js";
-import {
-	PHYSICAL_DAMAGE_TYPE,
-	MAGICAL_DAMAGE_TYPE,
-	DAMAGE_RELATIONSHIP,
-	HitType,
-	DEFAULT_HIT_TYPE,
-	COMMON_HIT_TYPES,
-} from "./core/damage-types.js";
+import { DAMAGE_RELATIONSHIP, COMMON_HIT_TYPES } from "./core/damage-types.js";
 import { freezeArchetype } from "./core/archetype.js";
 
 const testJob = freezeArchetype({
@@ -241,7 +235,8 @@ suite("combat.ts", () => {
 
 			const initialHealth = defender.health;
 			// Use oneHit with guaranteedHit to ensure we test damage modifiers
-			attacker.oneHit({
+			oneHit({
+				attacker: attacker,
 				target: defender,
 				weapon: fireSword,
 				guaranteedHit: true,
@@ -289,7 +284,8 @@ suite("combat.ts", () => {
 
 			const initialHealth = defender.health;
 			// Use oneHit with guaranteedHit to ensure we test damage modifiers
-			attacker.oneHit({
+			oneHit({
+				attacker: attacker,
 				target: defender,
 				weapon: fireSword,
 				guaranteedHit: true,
@@ -336,7 +332,8 @@ suite("combat.ts", () => {
 
 			const initialHealth = defender.health;
 			// Use oneHit with guaranteedHit to ensure we test damage modifiers
-			attacker.oneHit({
+			oneHit({
+				attacker: attacker,
 				target: defender,
 				weapon: fireSword,
 				guaranteedHit: true,

@@ -16,6 +16,7 @@ import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
 import { act, damageMessage } from "../act.js";
+import { oneHit } from "../combat.js";
 
 export const ABILITY_ID = "whirlwind";
 
@@ -97,7 +98,8 @@ export const command: CommandObject = {
 			if (!(enemy instanceof Mob)) continue;
 
 			// Perform the attack
-			const damage = actor.oneHit({
+			const damage = oneHit({
+				attacker: actor,
 				target: enemy,
 				guaranteedHit: false,
 				abilityName: ability.name.toLowerCase(),

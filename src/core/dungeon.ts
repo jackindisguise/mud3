@@ -84,18 +84,14 @@ import {
 	processThreatSwitching,
 } from "../combat.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
-import { damageMessage } from "../act.js";
-import { showRoom } from "../commands/look.js";
 import {
 	HitType,
 	DEFAULT_HIT_TYPE,
 	COMMON_HIT_TYPES,
 	DAMAGE_TYPE,
 	PHYSICAL_DAMAGE_TYPE,
-	getDamageMultiplier,
 	mergeDamageRelationships,
 	DamageTypeRelationships,
-	getThirdPersonVerb,
 } from "./damage-types.js";
 import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
@@ -126,7 +122,6 @@ import {
 	createSecondaryAttributesView,
 	createResourceCapsView,
 } from "./attribute.js";
-import { ability as PURE_POWER } from "../abilities/pure-power.js";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
@@ -4834,24 +4829,6 @@ export interface SerializedMob extends SerializedDungeonObject {
  * ```
  */
 
-/**
- * Options for the oneHit method.
- */
-export interface OneHitOptions {
-	/** The mob being hit */
-	target: Mob;
-	/** Optional weapon to use for the attack. If not provided, uses unarmed/default hit type */
-	weapon?: Weapon;
-	/** If true, the attack will never miss (guaranteed hit) */
-	guaranteedHit?: boolean;
-	/** Optional ability name to use in damage messages instead of the hit verb */
-	abilityName?: string;
-	/** Optional flat bonus to add to attack power before damage calculation */
-	attackPowerBonus?: number;
-	/** Optional multiplier to apply to attack power before damage calculation */
-	attackPowerMultiplier?: number;
-}
-
 export class Mob extends Movable {
 	/** Private storage for the Character reference */
 	private _character?: Character;
@@ -6526,7 +6503,6 @@ export class Mob extends Movable {
 			{ excludeUser: true }
 		);
 
-		if (this.character?.settings?.autoLook) showRoom(this, this.location);
 		return true;
 	}
 
@@ -6778,198 +6754,6 @@ export class Mob extends Movable {
 			handleDeath(this, attacker);
 			return; // Don't initiate combat if target died
 		}
-	}
-
-	/**
-	 * Performs a hit attempt against a target, checking accuracy and dealing damage if successful.
-	 * This is the main method for combat hits. It checks accuracy vs avoidance, and if the hit
-	 * succeeds, calculates damage based on attack power, defense, critical hits, and damage type
-	 * relationships. It also handles threat generation and death if the target's health reaches 0.
-	 *
-	 * @param options Options for the hit, including target, weapon, and guaranteedHit flag
-	 * @returns The damage amount that was dealt (0 if missed, otherwise >= 0)
-	 *
-	 * @example
-	 * ```typescript
-	 * const attacker = new Mob();
-	 * const defender = new Mob();
-	 * const sword = new Weapon({ slot: EQUIPMENT_SLOT.MAIN_HAND, attackPower: 15 });
-	 *
-	 * // oneHit handles accuracy checks internally
-	 * const damage = attacker.oneHit({ target: defender, weapon: sword });
-	 * // Damage has already been dealt and messages sent (or miss message if missed)
-	 *
-	 * // Guaranteed hit (never misses)
-	 * const guaranteedDamage = attacker.oneHit({ target: defender, weapon: sword, guaranteedHit: true });
-	 * ```
-	 */
-	public oneHit(options: OneHitOptions): number {
-		const {
-			target,
-			weapon,
-			guaranteedHit = false,
-			abilityName,
-			attackPowerBonus = 0,
-			attackPowerMultiplier = 1,
-		} = options;
-
-		// Get the room where combat is occurring
-		const room = this.location;
-		if (!room || !(room instanceof Room)) {
-			return 0; // Can't hit if not in a room
-		}
-
-		// Verify target is in the same room
-		if (target.location !== room) {
-			return 0; // Target not in same room
-		}
-
-		// Check for Pure Power passive ability
-		// Pure Power increases attack power from +0% at 0% proficiency to +200% at 100% proficiency
-		let purePowerMultiplier = 1;
-		if (this.knowsAbilityById(PURE_POWER.id)) {
-			const proficiency = this.learnedAbilities.get(PURE_POWER.id) || 0;
-			// Formula: 1 + (proficiency / 100) * 2
-			// At 0%: 1 + 0 = 1.0 (no change)
-			// At 50%: 1 + 1 = 2.0 (+100%)
-			// At 100%: 1 + 2 = 3.0 (+200%)
-			purePowerMultiplier = 1 + (proficiency / 100) * 2;
-			this.useAbility(PURE_POWER, 1);
-		}
-
-		// Combine Pure Power multiplier with provided multiplier
-		const finalAttackPowerMultiplier =
-			attackPowerMultiplier * purePowerMultiplier;
-
-		// Check if attack hits (accuracy vs avoidance)
-		// Skip miss check if guaranteedHit is true
-		if (!guaranteedHit) {
-			// Base hit chance is 50%, modified by the difference between accuracy and avoidance
-			// accuracy 10 vs avoidance 10 = 50% hit chance
-			const hitChance = 50 + (this.accuracy - target.avoidance);
-			// Clamp hit chance to reasonable bounds (5% to 95%)
-			const clampedHitChance = Math.max(5, Math.min(95, hitChance));
-			const roll = Math.random() * 100;
-
-			if (roll > clampedHitChance) {
-				// Miss - send miss message
-				act(
-					{
-						user: "You miss {target}!",
-						target: "{User} misses you!",
-						room: "{User} misses {target}!",
-					},
-					{
-						user: this,
-						target: target,
-						room: room,
-					},
-					{ messageGroup: MESSAGE_GROUP.COMBAT }
-				);
-				return 0;
-			}
-		}
-
-		// Attack hits - proceed with damage calculation
-		// Get hit type from weapon or use default
-		const hitType = weapon ? weapon.hitType : DEFAULT_HIT_TYPE;
-
-		// Calculate base damage
-		// Base attack power comes from strength (without weapon bonuses)
-		// When using a weapon, add the weapon's attack power to the base
-		// When unarmed, use only the base attack power
-		const baseAttackPower = this.attackPower; // Base attack power (strength-derived, no weapon bonuses)
-		let damage = weapon
-			? baseAttackPower + weapon.attackPower
-			: baseAttackPower;
-
-		// Apply attack power bonus and multiplier (from abilities, etc.)
-		damage = (damage + attackPowerBonus) * finalAttackPowerMultiplier;
-
-		// Apply defense reduction
-		const defenseReduction = target.defense * 0.1; // 10% damage reduction per defense point
-		damage = Math.max(1, damage - defenseReduction);
-
-		// Check for critical hit
-		if (Math.random() * 100 < this.critRate) {
-			damage *= 2;
-		}
-
-		// Apply damage type relationships (resist, immune, vulnerable)
-		const targetRelationships = target.getDamageRelationships();
-		const damageMultiplier = getDamageMultiplier(
-			hitType.damageType,
-			targetRelationships
-		);
-		damage *= damageMultiplier;
-
-		const finalDamage = Math.floor(damage);
-
-		// Don't deal damage if it's 0 or less
-		if (finalDamage <= 0) {
-			return 0;
-		}
-
-		// Send combat messages
-		const damageStr = color(String(finalDamage), COLOR.CRIMSON);
-		const damageStrPlain = String(finalDamage);
-
-		// Get verb forms for different perspectives
-		const verbBase = hitType.verb; // First person: "You punch"
-		const verbThirdPersonBase = getThirdPersonVerb(hitType); // Third person: "punches"
-
-		// Color the verbs based on hit type color (default to WHITE)
-		const verbColor = hitType.color ?? COLOR.WHITE;
-		const verb = color(verbBase, verbColor);
-		const verbThirdPerson = color(verbThirdPersonBase, verbColor);
-
-		// Get weapon name if provided
-		const weaponName = weapon ? weapon.display : undefined;
-
-		// Build message templates based on whether ability, weapon, or default verb is used
-		let userMsg: string;
-		let targetMsg: string;
-		let roomMsg: string;
-
-		if (abilityName) {
-			// With ability: ability is the subject, always use "hits"
-			userMsg = `{RYour{x ${abilityName} hits {target} for ${damageStr} damage!`;
-			targetMsg = `{User}'s ${abilityName} hits {Ryou{x for ${damageStr} damage!`;
-			roomMsg = `{User}'s ${abilityName} hits {target} for ${damageStrPlain} damage!`;
-		} else if (weaponName) {
-			// With weapon: weapon is the subject, so always use third person
-			userMsg = `{RYour{x ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
-			targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-			roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
-		} else {
-			// Without weapon: user is the subject
-			// First person (user sees): "You punch"
-			userMsg = `{RYou{x ${verb} {target} for ${damageStr} damage!`;
-			// Third person (target/room see): "{User} punches"
-			targetMsg = `{User} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-			roomMsg = `{User} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
-		}
-
-		damageMessage(
-			{
-				user: userMsg,
-				target: targetMsg,
-				room: roomMsg,
-			},
-			{
-				user: this,
-				target: target,
-				room: room,
-			},
-			target,
-			finalDamage,
-			{ messageGroup: MESSAGE_GROUP.COMBAT }
-		);
-
-		// Deal the damage (this handles threat generation, death, and combat initiation)
-		target.damage(this, finalDamage);
-
-		return finalDamage;
 	}
 
 	/**

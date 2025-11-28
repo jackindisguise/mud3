@@ -100,6 +100,8 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	private pendingAskCallback?: (line: string) => void;
 	// Track if SGA (Suppress Go Ahead) is negotiated
 	private suppressGoAhead: boolean = false;
+	// Track SGA negotiation state to prevent infinite loops
+	private sgaNegotiationState: "none" | "pending" | "negotiated" | "rejected" = "none";
 
 	toString(): string {
 		return `{client@${this.getAddress()}}`;
@@ -155,9 +157,14 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 			this.emit("error", error);
 		});
 
-		// Send IAC WILL SGA by default to offer Suppress Go Ahead
-		if (!this.socket.destroyed && this.socket.writable) {
+		// Send IAC WILL SGA by default to offer Suppress Go Ahead (only once)
+		if (
+			this.sgaNegotiationState === "none" &&
+			!this.socket.destroyed &&
+			this.socket.writable
+		) {
 			this.socket.write(Buffer.from([0xff, 0xfb, 0x03])); // IAC WILL SGA
+			this.sgaNegotiationState = "pending";
 			logger.debug(
 				`SGA negotiation (${this.getAddress()}): sent IAC WILL SGA (default offer)`
 			);
@@ -173,27 +180,62 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		const binary = data.toString("binary");
 		let result = binary;
 
-		// Handle IAC DO SGA (0xFF 0xFD 0x03) - client agrees to suppress GA (response to our IAC WILL SGA)
+		// Handle IAC DO SGA (0xFF 0xFD 0x03)
+		// This can be either:
+		// 1. Client responding to our WILL SGA (negotiation complete, no response needed)
+		// 2. Client initiating negotiation (we should respond with WILL SGA, but only once)
 		if (binary.includes("\xff\xfd\x03")) {
-			logger.debug(
-				`SGA negotiation (${this.getAddress()}): received IAC DO SGA, enabling full-duplex mode`
-			);
-			this.suppressGoAhead = true;
+			if (this.sgaNegotiationState === "negotiated") {
+				// Already negotiated, ignore duplicate
+				logger.debug(
+					`SGA negotiation (${this.getAddress()}): received duplicate IAC DO SGA, ignoring`
+				);
+			} else if (this.sgaNegotiationState === "none") {
+				// Client initiated before we sent WILL SGA - respond with WILL SGA once
+				this.suppressGoAhead = true;
+				this.sgaNegotiationState = "negotiated";
+				if (!this.socket.destroyed && this.socket.writable) {
+					this.socket.write(Buffer.from([0xff, 0xfb, 0x03])); // IAC WILL SGA
+					logger.debug(
+						`SGA negotiation (${this.getAddress()}): received IAC DO SGA (client-initiated), responding with IAC WILL SGA (negotiation complete)`
+					);
+				}
+			} else if (this.sgaNegotiationState === "pending") {
+				// Client responding to our WILL SGA - negotiation complete, no response needed
+				this.suppressGoAhead = true;
+				this.sgaNegotiationState = "negotiated";
+				logger.debug(
+					`SGA negotiation (${this.getAddress()}): received IAC DO SGA (response to our WILL SGA), enabling full-duplex mode (negotiation complete)`
+				);
+			} else {
+				// State is "rejected" - client is trying to renegotiate, ignore or could respond with WON'T
+				logger.debug(
+					`SGA negotiation (${this.getAddress()}): received IAC DO SGA but negotiation was rejected, ignoring`
+				);
+			}
 			// Remove the negotiation from the stream
 			result = result.replace(/\xff\xfd\x03/g, "");
 		}
 
 		// Handle IAC DON'T SGA (0xFF 0xFE 0x03) - client rejects SGA
 		if (binary.includes("\xff\xfe\x03")) {
-			logger.debug(
-				`SGA negotiation (${this.getAddress()}): received IAC DON'T SGA, SGA not enabled`
-			);
-			this.suppressGoAhead = false;
-			// Respond with IAC WON'T SGA (0xFF 0xFC 0x03)
-			if (!this.socket.destroyed && this.socket.writable) {
-				this.socket.write(Buffer.from([0xff, 0xfc, 0x03]));
+			// Only respond if negotiation was pending or negotiated
+			if (
+				this.sgaNegotiationState === "pending" ||
+				this.sgaNegotiationState === "negotiated"
+			) {
+				this.suppressGoAhead = false;
+				this.sgaNegotiationState = "rejected";
+				// Respond with IAC WON'T SGA (0xFF 0xFC 0x03)
+				if (!this.socket.destroyed && this.socket.writable) {
+					this.socket.write(Buffer.from([0xff, 0xfc, 0x03]));
+					logger.debug(
+						`SGA negotiation (${this.getAddress()}): received IAC DON'T SGA, sent IAC WON'T SGA (negotiation rejected)`
+					);
+				}
+			} else {
 				logger.debug(
-					`SGA negotiation (${this.getAddress()}): sent IAC WON'T SGA`
+					`SGA negotiation (${this.getAddress()}): received IAC DON'T SGA, but negotiation state is ${this.sgaNegotiationState}, ignoring`
 				);
 			}
 			// Remove the negotiation from the stream
@@ -262,9 +304,30 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	 */
 	public send(text: string, colorize: boolean = false): void {
 		const escaped = colorize ? _colorize(text) : stripColors(text);
-		if (!this.socket.destroyed && this.socket.writable) {
-			this.socket.write(escaped);
-			// With SGA enabled, we don't need to send GA messages
+		
+		// Split by linebreaks to handle each line separately
+		const lines = escaped.split(LINEBREAK);
+		// Pop off the final bit after the last linebreak (the part without a linebreak)
+		const remaining = lines.pop();
+
+		// mudlet literally requires this exact set of instructions
+		// we can't call multiple write() calls for each line
+		// we need to strip the prompt off the bottom and send the rest first
+		this.socket.write(lines.join(LINEBREAK));
+			
+		// Send the remaining message (without linebreak) with GA - this is for prompts
+		if (remaining) {
+			if (!this.socket.destroyed && this.socket.writable) {
+				this.socket.write(remaining);
+			}
+			// If SGA is not enabled, send GA (Go Ahead) after the remaining text (prompts)
+			if (
+				!this.suppressGoAhead &&
+				!this.socket.destroyed &&
+				this.socket.writable
+			) {
+				this.socket.write(Buffer.from([0xff, 0xf9])); // IAC GA (Go Ahead)
+			}
 		}
 	}
 

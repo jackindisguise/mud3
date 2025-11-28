@@ -43,6 +43,21 @@ async function consumeInitialSGA(socket: Socket): Promise<void> {
 	});
 }
 
+/**
+ * Complete SGA negotiation by consuming the initial WILL SGA and responding with DO SGA
+ * This ensures SGA is enabled so tests don't receive GA messages after sends
+ * @param socket The socket to complete negotiation on
+ * @returns Promise that resolves when negotiation is complete
+ */
+async function completeSGANegotiation(socket: Socket): Promise<void> {
+	// First consume the initial WILL SGA message
+	await consumeInitialSGA(socket);
+	// Then respond with DO SGA to complete the negotiation
+	socket.write(Buffer.from([0xff, 0xfd, 0x03])); // IAC DO SGA
+	// Give a brief moment for the server to process
+	await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
 describe("io.ts", () => {
 	describe("MudServer", () => {
 		let server: MudServer;
@@ -199,10 +214,10 @@ describe("io.ts", () => {
 			]);
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			// Consume the IAC WILL SGA messages sent on connection
+			// Complete SGA negotiation to avoid GA messages in tests
 			await Promise.all([
-				consumeInitialSGA(client1),
-				consumeInitialSGA(client2),
+				completeSGANegotiation(client1),
+				completeSGANegotiation(client2),
 			]);
 
 			const messages1: string[] = [];
@@ -230,8 +245,8 @@ describe("io.ts", () => {
 			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			// Consume the IAC WILL SGA message sent on connection
-			await consumeInitialSGA(client1);
+			// Complete SGA negotiation to avoid GA messages in tests
+			await completeSGANegotiation(client1);
 
 			const messages: string[] = [];
 			client1.on("data", (data) => messages.push(data.toString()));
@@ -266,8 +281,8 @@ describe("io.ts", () => {
 			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			// Consume the IAC WILL SGA message sent on connection
-			await consumeInitialSGA(testSocket);
+			// Complete SGA negotiation to avoid GA messages in tests
+			await completeSGANegotiation(testSocket);
 		});
 
 		afterEach(async () => {
@@ -338,8 +353,11 @@ describe("io.ts", () => {
 			mudClient!.send("Hello, client!");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			// Filter out telnet negotiation messages
-			const filtered = messages.join("").replace(/\xff\xfb\x03/g, ""); // Filter IAC WILL SGA if still present
+			// Filter out telnet negotiation messages and GA if present
+			const filtered = messages
+				.join("")
+				.replace(/\xff\xfb\x03/g, "") // Filter IAC WILL SGA
+				.replace(/\xff\xf9/g, ""); // Filter IAC GA (Go Ahead)
 			assert.strictEqual(filtered, "Hello, client!");
 		});
 
@@ -354,8 +372,11 @@ describe("io.ts", () => {
 			mudClient!.sendLine("Welcome!");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			// Filter out telnet negotiation messages
-			const filtered = messages.join("").replace(/\xff\xfb\x03/g, ""); // Filter IAC WILL SGA if still present
+			// Filter out telnet negotiation messages and GA if present
+			const filtered = messages
+				.join("")
+				.replace(/\xff\xfb\x03/g, "") // Filter IAC WILL SGA
+				.replace(/\xff\xf9/g, ""); // Filter IAC GA (Go Ahead)
 			assert.strictEqual(filtered, `Welcome!${LINEBREAK}`);
 		});
 

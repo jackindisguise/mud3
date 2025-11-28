@@ -207,9 +207,16 @@ async function saveAllCharacters(): Promise<void> {
 	if (activeCharacters.size == 0) return;
 	logger.info(`Saving ${activeCharacters.size} active characters...`);
 
-	const savePromises = Array.from(activeCharacters.values()).map((character) =>
-		saveCharacterFile(character)
-	);
+	const savePromises = Array.from(activeCharacters.values())
+		.filter((character) => character.mob) // Only save characters with mobs
+		.map((character) =>
+			saveCharacterFile(character).catch((error) => {
+				// Log but don't throw - don't let one character's save failure break others
+				logger.error(
+					`Failed to save character ${character.credentials.username}: ${error}`
+				);
+			})
+		);
 
 	await Promise.all(savePromises);
 }
@@ -408,8 +415,24 @@ async function endPlayerSession(session: LoginSession): Promise<void> {
 		session.inactivityTimer = undefined;
 	}
 
+	// Remove from loginSessions BEFORE closing client to prevent handleDisconnection
+	// from trying to process this session again when the close event fires
+	// (This is idempotent - safe to call even if already removed)
+	if (loginSessions.has(session)) {
+		loginSessions.delete(session);
+	}
+
+	// Clean up name in creation if they were creating a character
+	if (session.creatingName) unblockName(session.creatingName);
+
 	// End character session
-	if (!session.character) return;
+	if (!session.character) {
+		// If no character, just close the client and return
+		if (session.client && session.client.isConnected()) {
+			session.client.close();
+		}
+		return;
+	}
 	session.character.endSession();
 
 	// Save character
@@ -418,13 +441,8 @@ async function endPlayerSession(session: LoginSession): Promise<void> {
 	logger.info(`${session.character} has left the game`);
 	const name = session.character.toString();
 
-	// Destroy the mob (clears all references and prepares for garbage collection)
-	if (session.character.mob) {
-		session.character.mob.destroy();
-		logger.info(`${name} has been destroyed`);
-	}
-
-	// Clean up tracking
+	// Remove from activeCharacters BEFORE destroying the mob to prevent race conditions
+	// with saveAllCharacters() which might try to serialize the character
 	activeCharacters.delete(session.character);
 
 	// Clean up command tracking
@@ -434,6 +452,19 @@ async function endPlayerSession(session: LoginSession): Promise<void> {
 	unregisterActiveCharacter(session.character);
 
 	logger.info(`${name} has been removed from active characters`);
+
+	// Destroy the mob (clears all references and prepares for garbage collection)
+	// Do this AFTER removing from activeCharacters to prevent saveAllCharacters from
+	// trying to serialize a destroyed mob
+	if (session.character.mob) {
+		session.character.mob.destroy();
+		logger.info(`${name} has been destroyed`);
+	}
+
+	// Close the client connection
+	if (session.client && session.client.isConnected()) {
+		session.client.close();
+	}
 }
 
 /**
@@ -474,12 +505,6 @@ async function handleDisconnection(client: MudClient): Promise<void> {
 		clearTimeout(session.inactivityTimer);
 		session.inactivityTimer = undefined;
 	}
-
-	// Clean up name in creation if they were creating a character
-	if (session.creatingName) unblockName(session.creatingName);
-
-	// remove from session tracking
-	loginSessions.delete(session);
 
 	// end player session if they were playing
 	await endPlayerSession(session);

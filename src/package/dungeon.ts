@@ -1669,6 +1669,7 @@ function hydrateSerializedDungeonObjectData(
 	data: SerializedDungeonObject
 ): DungeonObjectOptions {
 	return pruneUndefined({
+		oid: data.oid,
 		keywords: data.keywords,
 		display: data.display,
 		description: data.description,

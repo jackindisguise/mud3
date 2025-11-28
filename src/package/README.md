@@ -43,10 +43,18 @@ export default {
 
 Packages are automatically discovered and loaded in dependency order using topological sorting. The `lockfile` package is always loaded first if present.
 
+## Data Migration
+
+All package modules that load data automatically apply migrations before deserialization:
+- Dungeons are migrated using the dungeon migration system
+- Characters are migrated using the character migration system
+- Templates (mobs, items, equipment, armor, weapons, rooms) are migrated using their respective migration systems
+- Migrations use `dungeonVersion` from `package.json` for version comparison
+
 ## Key Modules
 
-- `dungeon.ts` - Dungeon loading, saving, and template management
-- `character.ts` - Character loading, saving, and password hashing
+- `dungeon.ts` - Dungeon loading, saving, template management, and deserialization with migration support
+- `character.ts` - Character loading, saving, password hashing, and deserialization with migration support
 - `gamestate.ts` - Game state persistence
 - `config.ts` - Configuration loading and merging
 - `archetype.ts` - Race and Job loading

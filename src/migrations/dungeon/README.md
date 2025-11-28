@@ -6,7 +6,9 @@ This directory contains migrations that transform dungeon YAML files from older 
 
 1. **Version Detection**: When loading a dungeon, the system checks the `version` field in the YAML file.
 
-2. **Path Finding**: If the file version is older than the current version, the system finds the shortest migration path using BFS.
+2. **Current Version**: The system uses `dungeonVersion` from `package.json` (separate from application `version`) as the target version.
+
+3. **Path Finding**: If the file version is older than the current `dungeonVersion`, the system finds the shortest migration path using BFS.
 
 3. **Sequential Execution**: Migrations are executed in order, each transforming the data one version step forward.
 
@@ -53,9 +55,15 @@ import "./v1.20.0-to-v1.21.0.js";
 
 ## Version Format
 
-Uses semantic versioning: `major.minor.patch` (e.g., `1.21.0`)
+Uses semantic versioning: `major.minor.patch` (e.g., `1.0.1`)
 
 - **Major**: Breaking changes (rare, may require manual intervention)
 - **Minor**: New features, backward compatible changes
 - **Patch**: Bug fixes, small adjustments
+
+## Dungeon Version
+
+Dungeon migrations use `dungeonVersion` from `package.json`, which is separate from the application `version`. This allows dungeon data migrations to be versioned independently from application releases.
+
+Use `npm run update-dungeon-version [patch|minor|major]` to increment the dungeon version.
 

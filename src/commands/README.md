@@ -45,6 +45,7 @@ The `CommandObject` includes:
 - **Inventory** - `get.ts`, `drop.ts`, `inventory.ts`, `equipment.ts`
 - **Character** - `score.ts`, `look.ts`, `abilities.ts`, `learn.ts`, `levelup.ts`
 - **Boards** - `board.ts`, `boards.ts`, `changes.ts`
+- **Communication** - `busy.ts` - Busy mode and message queuing management
 - **System** - `save.ts`, `quit.ts`, `help.ts`, `commands.ts`, `config.ts`
 
 ## Examples

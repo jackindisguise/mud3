@@ -52,7 +52,7 @@ import { readFile } from "fs/promises";
 ## Key Modules
 
 - `dungeon.ts` - Dungeon, Room, Mob, Item classes and world model
-- `character.ts` - Character class and message grouping
+- `character.ts` - Character class and message grouping (includes busy mode support)
 - `command.ts` - Command system framework
 - `archetype.ts` - Race and Job type definitions
 - `ability.ts` - Ability type definitions

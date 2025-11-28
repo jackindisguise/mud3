@@ -39,6 +39,15 @@ The map editor service provides endpoints for:
 - Creating/updating dungeons
 - Getting races, jobs, hit types, weapon types
 - Calculating mob attributes
+- Getting current `dungeonVersion` from package.json
+
+## Features
+
+- **Cross-Dungeon Editing**: Create room links between different dungeons with automatic reciprocal link creation
+- **Make 2-Way Button**: One-click button (⇄) to create bidirectional room links
+- **Exit Overrides**: Edit custom exit configurations for specific room cells
+- **Template Management**: Create and edit room and object templates
+- **Data Migration**: Automatically migrates dungeon data to current `dungeonVersion` when loading
 
 ## Usage
 

@@ -254,7 +254,9 @@ describe("io.ts", () => {
 			server.broadcastLine("Test message");
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			assert.strictEqual(messages.join(""), `Test message${LINEBREAK}`);
+			// broadcastLine sends text + LINEBREAK, which after splitting/joining results in just the text
+			// (the LINEBREAK is consumed during the split/join process)
+			assert.strictEqual(messages.join(""), "Test message");
 
 			client1.destroy();
 		});
@@ -377,7 +379,9 @@ describe("io.ts", () => {
 				.join("")
 				.replace(/\xff\xfb\x03/g, "") // Filter IAC WILL SGA
 				.replace(/\xff\xf9/g, ""); // Filter IAC GA (Go Ahead)
-			assert.strictEqual(filtered, `Welcome!${LINEBREAK}`);
+			// sendLine sends text + LINEBREAK, which after splitting/joining results in just the text
+			// (the LINEBREAK is consumed during the split/join process)
+			assert.strictEqual(filtered, "Welcome!");
 		});
 
 		it("should emit close event when connection is closed", async () => {

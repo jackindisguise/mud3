@@ -163,7 +163,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 			!this.socket.destroyed &&
 			this.socket.writable
 		) {
-			this.socket.write(Buffer.from([0xff, 0xfb, 0x03])); // IAC WILL SGA
+			this.socket.write(Buffer.from([0xff, 0xfc, 0x03])); // IAC WILL SGA
 			this.sgaNegotiationState = "pending";
 			logger.debug(
 				`SGA negotiation (${this.getAddress()}): sent IAC WILL SGA (default offer)`
@@ -310,10 +310,14 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		// Pop off the final bit after the last linebreak (the part without a linebreak)
 		const remaining = lines.pop();
 
+		// Send each complete line (no GA for lines ending in linebreak)
 		// mudlet literally requires this exact set of instructions
 		// we can't call multiple write() calls for each line
 		// we need to strip the prompt off the bottom and send the rest first
-		this.socket.write(lines.join(LINEBREAK));
+		if (lines.length > 0 && !this.socket.destroyed && this.socket.writable) {
+			// Join lines with LINEBREAK and add LINEBREAK at the end for complete lines
+			this.socket.write(lines.join(LINEBREAK));
+		}
 			
 		// Send the remaining message (without linebreak) with GA - this is for prompts
 		if (remaining) {

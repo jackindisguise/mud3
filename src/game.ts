@@ -74,6 +74,7 @@ import {
 	processRegeneration,
 	REGENERATION_INTERVAL_MS,
 } from "./regeneration.js";
+import { getLocation, LOCATION } from "./registry/locations.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -593,10 +594,10 @@ function startPlayerSession(
 	let targetRoom: Room | undefined;
 	if (isNewCharacter) {
 		// New characters start at @tower{0,0,0}
-		targetRoom = getRoomByRef("@tower{0,0,0}");
+		targetRoom = getLocation(LOCATION.START);
 		if (!targetRoom) {
 			logger.warn(
-				`Failed to find starting room @tower{0,0,0} for new character ${character.credentials.username}`
+				`Failed to find starting room ${LOCATION.START} for new character ${character.credentials.username}`
 			);
 			character.sendMessage(
 				"Warning: Could not find starting location. Please contact an administrator.",

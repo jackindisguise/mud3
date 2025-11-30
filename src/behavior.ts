@@ -26,59 +26,6 @@ import { findPathAStar } from "./pathfinding.js";
 import logger from "./logger.js";
 
 /**
- * Process aggressive behavior: generate threat when mobs enter rooms.
- * Called when a mob enters a room.
- *
- * - If an aggressive mob enters a room, it generates 1 threat for every character mob in the room.
- * - If a character mob enters a room with an aggressive mob, it generates 1 threat for that character mob.
- *
- * @param aggressiveMob The aggressive mob that should check for targets
- * @param room The room where the mob entered
- * @param enteringMob The mob that just entered (may be the aggressive mob itself)
- */
-function processAggressiveBehavior(
-	aggressiveMob: Mob,
-	room: Room,
-	enteringMob: Mob
-): void {
-	// Only NPCs can be aggressive
-	if (aggressiveMob.character) {
-		return;
-	}
-
-	// Check if mob has aggressive behavior
-	if (!aggressiveMob.hasBehavior(BEHAVIOR.AGGRESSIVE)) {
-		return;
-	}
-
-	// Case 1: Aggressive mob enters a room - generate 1 threat for every character mob in the room
-	if (aggressiveMob === enteringMob) {
-		for (const obj of room.contents) {
-			if (!(obj instanceof Mob)) continue;
-			const characterMob = obj as Mob;
-			if (characterMob === aggressiveMob) continue;
-			if (!characterMob.character) continue; // Only generate threat for character mobs
-
-			// generate 0 threat for this character mob
-			// puts it on the threat table
-			aggressiveMob.addThreat(characterMob, 0);
-		}
-		// Process threat switching to potentially engage
-		processThreatSwitching(aggressiveMob);
-		return;
-	}
-
-	// Case 2: Character mob enters a room with an aggressive mob - generate 1 threat for that character
-	// (The aggressive mob is already in the room, and a character mob just entered)
-	if (enteringMob.character && enteringMob.health > 0) {
-		// Generate 0 threat for the entering character mob
-		aggressiveMob.addThreat(enteringMob, 0);
-		// Process threat switching to potentially engage
-		processThreatSwitching(aggressiveMob);
-	}
-}
-
-/**
  * Check for aggressive behavior in a room after wandering.
  * If the mob is aggressive, it will attack any character mobs in the room.
  *

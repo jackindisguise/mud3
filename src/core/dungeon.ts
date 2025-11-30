@@ -3411,7 +3411,7 @@ export class Room extends DungeonObject {
 
 				// Process aggressive behavior: player entering room with aggressive mob in it
 				if (inhabitant.hasBehavior(BEHAVIOR.AGGRESSIVE) && enterer.character) {
-					if (!inhabitant.isInCombat()) {
+					if (!inhabitant.combatTarget) {
 						initiateCombat(inhabitant, enterer);
 					}
 					inhabitant.addToThreatTable(enterer);
@@ -3419,7 +3419,7 @@ export class Room extends DungeonObject {
 
 				// Also check if the entering mob is aggressive - it should generate threat for character mobs in the room
 				if (enterer.hasBehavior(BEHAVIOR.AGGRESSIVE) && inhabitant.character) {
-					if (!enterer.isInCombat()) {
+					if (!enterer.combatTarget) {
 						initiateCombat(enterer, inhabitant);
 					}
 					enterer.addToThreatTable(inhabitant);
@@ -3613,6 +3613,53 @@ export class Room extends DungeonObject {
  * - Automatic position updates
  * - Movement event hooks (through Room)
  */
+
+/**
+ * Options for the move() method.
+ * Allows script injection at various points during movement.
+ */
+export interface MoveOptions {
+	/** The destination location to move to */
+	location: DungeonObject | undefined;
+	/** Whether to trigger room entry/exit events (defaults to true) */
+	triggerEvents?: boolean;
+	/** Scripts to inject at various points during movement */
+	scripts?: {
+		/** Script to run before onExit is called */
+		beforeOnExit?: (movable: Movable, room: Room) => void;
+		/** Script to run after onExit is called */
+		afterOnExit?: (movable: Movable, room: Room) => void;
+		/** Script to run before onEnter is called */
+		beforeOnEnter?: (movable: Movable, room: Room) => void;
+		/** Script to run after onEnter is called */
+		afterOnEnter?: (movable: Movable, room: Room) => void;
+	};
+}
+
+/**
+ * Options for the step() method.
+ * Allows script injection at various points during movement.
+ */
+export interface StepOptions {
+	/** The direction to step */
+	direction: DIRECTION;
+	/** Scripts to inject at various points during movement */
+	scripts?: {
+		/** Script to run before onExit is called */
+		beforeOnExit?: (movable: Movable, room: Room, direction: DIRECTION) => void;
+		/** Script to run after onExit is called */
+		afterOnExit?: (movable: Movable, room: Room, direction: DIRECTION) => void;
+		/** Script to run before onEnter is called */
+		beforeOnEnter?: (
+			movable: Movable,
+			room: Room,
+			direction: DIRECTION
+		) => void;
+		/** Script to run after onEnter is called */
+		afterOnEnter?: (movable: Movable, room: Room, direction: DIRECTION) => void;
+	};
+}
+
 export class Movable extends DungeonObject {
 	/**
 	 * Cache of the current room coordinates where this object resides.
@@ -3829,14 +3876,83 @@ export class Movable extends DungeonObject {
 	 */
 	onStep(direction: DIRECTION, destinationRoom: Room): void {}
 
-	move(dobj: DungeonObject | undefined, triggerEvents: boolean = true) {
-		const oldLocation = this.location;
-		if (triggerEvents && oldLocation instanceof Room) {
-			oldLocation.onExit(this);
+	/**
+	 * Moves this object to a new container, triggering appropriate movement events.
+	 * Supports both legacy and new options-based signatures.
+	 *
+	 * @overload
+	 * @param options - MoveOptions object with location, triggerEvents, and optional scripts
+	 * @returns void
+	 *
+	 * @overload
+	 * @param location - The destination location (legacy signature)
+	 * @param triggerEvents - Whether to trigger room entry/exit events (defaults to true, legacy signature)
+	 * @returns void
+	 */
+	move(options: MoveOptions): void;
+	move(location: DungeonObject | undefined, triggerEvents?: boolean): void;
+	move(
+		optionsOrLocation: MoveOptions | DungeonObject | undefined,
+		triggerEvents?: boolean
+	) {
+		// Handle legacy signature: move(location, triggerEvents?)
+		let options: MoveOptions;
+		if (
+			optionsOrLocation === undefined ||
+			optionsOrLocation instanceof DungeonObject
+		) {
+			// Legacy signature
+			options = {
+				location: optionsOrLocation as DungeonObject | undefined,
+				triggerEvents: triggerEvents !== undefined ? triggerEvents : true,
+			};
+		} else {
+			// New options object signature
+			options = optionsOrLocation as MoveOptions;
 		}
-		super.move(dobj);
-		if (triggerEvents && this.location === dobj && dobj instanceof Room) {
-			dobj.onEnter(this);
+
+		const oldLocation = this.location;
+		const destination = options.location;
+		const shouldTriggerEvents = options.triggerEvents !== false;
+
+		// Call onExit if events should be triggered
+		if (shouldTriggerEvents && oldLocation instanceof Room) {
+			options.scripts?.beforeOnExit?.(this, oldLocation);
+			oldLocation.onExit(this);
+			options.scripts?.afterOnExit?.(this, oldLocation);
+		}
+
+		// Execute afterOnExit script if provided
+		if (
+			shouldTriggerEvents &&
+			oldLocation instanceof Room &&
+			options.scripts?.afterOnExit
+		) {
+			options.scripts.afterOnExit(this, oldLocation);
+		}
+
+		// Perform the actual move
+		super.move(destination);
+
+		// Execute beforeOnEnter script if provided
+		if (
+			shouldTriggerEvents &&
+			this.location === destination &&
+			destination instanceof Room &&
+			options.scripts?.beforeOnEnter
+		) {
+			options.scripts.beforeOnEnter(this, destination);
+		}
+
+		// Call onEnter if events should be triggered
+		if (
+			shouldTriggerEvents &&
+			this.location === destination &&
+			destination instanceof Room
+		) {
+			options.scripts?.beforeOnEnter?.(this, destination);
+			destination.onEnter(this);
+			options.scripts?.afterOnEnter?.(this, destination);
 		}
 	}
 
@@ -3845,7 +3961,7 @@ export class Movable extends DungeonObject {
 	 * The move only occurs if canStep() returns true for that direction.
 	 * Triggers appropriate exit/enter events on both rooms.
 	 *
-	 * @param dir The direction to move
+	 * @param optionsOrDirection Either a StepOptions object or a DIRECTION (legacy signature)
 	 * @returns true if the move was successful, false otherwise
 	 *
 	 * @example
@@ -3870,17 +3986,64 @@ export class Movable extends DungeonObject {
 	 *   }
 	 * }
 	 * ```
+	 *
+	 * @overload
+	 * @param options - StepOptions object with direction and optional scripts
+	 * @returns true if the move was successful, false otherwise
+	 *
+	 * @overload
+	 * @param direction - The direction to move (legacy signature)
+	 * @returns true if the move was successful, false otherwise
 	 */
-	step(dir: DIRECTION): boolean {
-		if (!this.canStep(dir)) return false;
-		const exit = this.getStep(dir);
-		if (this.location instanceof Room) this.location.onExit(this, dir);
-		this.move(exit, false);
-		if (this.location instanceof Room) {
-			this.location.onEnter(this, dir2reverse(dir));
-			// Call onStep hook after successful movement
-			this.onStep(dir, this.location);
+	step(options: StepOptions): boolean;
+	step(direction: DIRECTION): boolean;
+	step(optionsOrDirection: StepOptions | DIRECTION): boolean {
+		// Handle legacy signature: step(direction)
+		let options: StepOptions;
+		if (typeof optionsOrDirection === "number") {
+			// Legacy signature
+			options = { direction: optionsOrDirection };
+		} else {
+			// New options object signature
+			options = optionsOrDirection;
 		}
+
+		const dir = options.direction;
+		if (!this.canStep(dir)) return false;
+
+		const exit = this.getStep(dir);
+		const sourceRoom =
+			this.location instanceof Room ? this.location : undefined;
+
+		// Execute beforeOnExit script if provided
+		if (sourceRoom && options.scripts?.beforeOnExit) {
+			options.scripts.beforeOnExit(this, sourceRoom, dir);
+		}
+
+		// Call onExit
+		if (sourceRoom) {
+			options.scripts?.beforeOnExit?.(this, sourceRoom, dir);
+			sourceRoom.onExit(this, dir);
+			options.scripts?.afterOnExit?.(this, sourceRoom, dir);
+		}
+
+		// Move to destination (without triggering events, we handle them manually)
+		this.move(exit, false);
+
+		const destinationRoom =
+			this.location instanceof Room ? this.location : undefined;
+		if (destinationRoom) {
+			const reverseDir = dir2reverse(dir);
+
+			// Call onEnter
+			options.scripts?.beforeOnEnter?.(this, destinationRoom, reverseDir);
+			destinationRoom.onEnter(this, reverseDir);
+			options.scripts?.afterOnEnter?.(this, destinationRoom, reverseDir);
+
+			// Call onStep hook after successful movement
+			this.onStep(dir, destinationRoom);
+		}
+
 		return true;
 	}
 }
@@ -6479,47 +6642,85 @@ export class Mob extends Movable {
 		this.character?.sendMessage(text, group);
 	}
 
-	public override step(direction: DIRECTION): boolean {
+	/**
+	 * @overload
+	 * @param options - StepOptions object with direction and optional scripts
+	 * @returns true if the move was successful, false otherwise
+	 *
+	 * @overload
+	 * @param direction - The direction to move (legacy signature)
+	 * @returns true if the move was successful, false otherwise
+	 */
+	public override step(options: StepOptions): boolean;
+	public override step(direction: DIRECTION): boolean;
+	public override step(optionsOrDirection: StepOptions | DIRECTION): boolean {
+		// Handle legacy signature: step(direction)
+		let options: StepOptions;
+		if (typeof optionsOrDirection === "number") {
+			// Legacy signature
+			options = { direction: optionsOrDirection };
+		} else {
+			// New options object signature
+			options = optionsOrDirection;
+		}
+
+		const direction = options.direction;
 		const sourceRoom =
 			this.location instanceof Room ? this.location : undefined;
 		const directionText = dir2text(direction);
 		const reverseDirection = dir2reverse(direction);
 		const reverseDirectionText = dir2text(reverseDirection);
 
-		const moved = super.step(direction);
-		if (!moved) {
-			return false;
-		}
-
-		if (!(this.location instanceof Room)) return true;
-
-		const destinationRoom = this.location;
-
-		// Send messages to rooms using act()
-		if (sourceRoom) {
+		const tellSourceRoomWeLeft = (
+			movable: Movable,
+			room: Room,
+			direction: DIRECTION
+		) => {
 			act(
 				{
 					room: `{User} leaves to the ${directionText}.`,
 				},
 				{
 					user: this,
-					room: sourceRoom,
+					room: sourceRoom!,
 				},
 				{ excludeUser: true }
 			);
-		}
 
-		act(
-			{
-				room: `{User} arrives from the ${reverseDirectionText}.`,
-			},
-			{
-				user: this,
-				room: destinationRoom,
-			},
-			{ excludeUser: true }
-		);
+			options.scripts?.beforeOnExit?.(this, sourceRoom!, direction);
+		};
 
+		const tellDestinationRoomWeEntered = (
+			movable: Movable,
+			room: Room,
+			direction: DIRECTION
+		) => {
+			act(
+				{
+					room: `{User} arrives from the ${reverseDirectionText}.`,
+				},
+				{
+					user: this,
+					room: this.location as Room,
+				},
+				{ excludeUser: true }
+			);
+
+			options.scripts?.beforeOnEnter?.(
+				this,
+				this.location as Room,
+				reverseDirection
+			);
+		};
+
+		const moved = super.step({
+			...options,
+			scripts: {
+				...options.scripts,
+				...(sourceRoom ? { beforeOnExit: tellSourceRoomWeLeft } : {}),
+				...{ beforeOnEnter: tellDestinationRoomWeEntered },
+			},
+		});
 		return true;
 	}
 

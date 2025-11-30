@@ -2306,3 +2306,25 @@ header h1 {
 	color: var(--green);
 }
 
+.action-btn {
+	padding: 0.5rem 1rem;
+	border-radius: 4px;
+	background: var(--base02);
+	border: 2px solid var(--base01);
+	color: var(--base1);
+	font-size: 0.85rem;
+	cursor: pointer;
+	transition: all 0.2s;
+	font-weight: 500;
+}
+
+.action-btn:hover:not(:disabled) {
+	background: var(--base01);
+	border-color: var(--accent-primary);
+}
+
+.action-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+

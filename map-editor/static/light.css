@@ -1268,6 +1268,60 @@ header h1 {
 	margin-bottom: 0.5rem;
 }
 
+.copy-room-container {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	opacity: 0.4;
+	transition: opacity 0.2s ease;
+}
+
+.copy-room-container:hover {
+	opacity: 1;
+}
+
+.copy-room-select {
+	flex: 1;
+	padding: 0.5rem;
+	background: var(--bg-input);
+	backdrop-filter: blur(5px);
+	border: 1px solid var(--border-accent-3);
+	border-radius: 4px;
+	color: var(--base0);
+	font-size: 0.9rem;
+	cursor: pointer;
+}
+
+.copy-room-select:hover,
+.copy-room-select:focus {
+	border-color: var(--accent-primary);
+	outline: none;
+}
+
+.copy-room-btn {
+	padding: 0.5rem 1rem;
+	background: var(--base02);
+	border: 1px solid var(--base01);
+	color: var(--base1);
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 0.9rem;
+	transition: all 0.2s ease;
+}
+
+.copy-room-btn:hover:not(:disabled) {
+	background: var(--base01);
+	border-color: var(--accent-primary);
+}
+
+.copy-room-btn:disabled {
+	background: var(--base02);
+	border-color: var(--base01);
+	color: var(--base00);
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
 .exit-buttons {
 	display: grid;
 	grid-template-columns: repeat(6, minmax(0, 1fr));

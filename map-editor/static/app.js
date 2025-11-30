@@ -117,7 +117,7 @@ class MapEditor {
 
 	/**
 	 * Get the opposite direction
-	 * @param {string} direction - Direction (north, south, east, west, up, down)
+	 * @param {string} direction - Direction (north, south, east, west, northeast, northwest, southeast, southwest, up, down)
 	 * @returns {string} Opposite direction
 	 */
 	getOppositeDirection(direction) {
@@ -126,6 +126,10 @@ class MapEditor {
 			south: "north",
 			east: "west",
 			west: "east",
+			northeast: "southwest",
+			northwest: "southeast",
+			southeast: "northwest",
+			southwest: "northeast",
 			up: "down",
 			down: "up",
 		};
@@ -2681,6 +2685,10 @@ class MapEditor {
 			SOUTH: 1 << 1,
 			EAST: 1 << 2,
 			WEST: 1 << 3,
+			NORTHEAST: 1 << 4,
+			NORTHWEST: 1 << 5,
+			SOUTHEAST: 1 << 6,
+			SOUTHWEST: 1 << 7,
 			UP: 1 << 8,
 			DOWN: 1 << 9,
 		};
@@ -2690,6 +2698,10 @@ class MapEditor {
 			south: DIRECTION.SOUTH,
 			east: DIRECTION.EAST,
 			west: DIRECTION.WEST,
+			northeast: DIRECTION.NORTHEAST,
+			northwest: DIRECTION.NORTHWEST,
+			southeast: DIRECTION.SOUTHEAST,
+			southwest: DIRECTION.SOUTHWEST,
 			up: DIRECTION.UP,
 			down: DIRECTION.DOWN,
 		};
@@ -2713,6 +2725,10 @@ class MapEditor {
 					<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">SOUTH</button>
 					<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">EAST</button>
 					<button class="exit-btn" data-direction="west" style="padding: 0.5rem;">WEST</button>
+					<button class="exit-btn" data-direction="northeast" style="padding: 0.5rem;">NORTHEAST</button>
+					<button class="exit-btn" data-direction="northwest" style="padding: 0.5rem;">NORTHWEST</button>
+					<button class="exit-btn" data-direction="southeast" style="padding: 0.5rem;">SOUTHEAST</button>
+					<button class="exit-btn" data-direction="southwest" style="padding: 0.5rem;">SOUTHWEST</button>
 					<button class="exit-btn" data-direction="up" style="padding: 0.5rem;">UP</button>
 					<button class="exit-btn" data-direction="down" style="padding: 0.5rem;">DOWN</button>
 				</div>
@@ -2720,7 +2736,18 @@ class MapEditor {
 		`;
 
 		// Build roomLinks HTML
-		const allDirections = ["north", "south", "east", "west", "up", "down"];
+		const allDirections = [
+			"north",
+			"south",
+			"east",
+			"west",
+			"northeast",
+			"northwest",
+			"southeast",
+			"southwest",
+			"up",
+			"down",
+		];
 		const usedDirections = Object.keys(currentRoomLinks);
 
 		const roomLinksHtml = Object.entries(currentRoomLinks)
@@ -3191,9 +3218,224 @@ class MapEditor {
 		if (allowedExits & (1 << 1)) directions.push("S");
 		if (allowedExits & (1 << 2)) directions.push("E");
 		if (allowedExits & (1 << 3)) directions.push("W");
+		if (allowedExits & (1 << 4)) directions.push("NE");
+		if (allowedExits & (1 << 5)) directions.push("NW");
+		if (allowedExits & (1 << 6)) directions.push("SE");
+		if (allowedExits & (1 << 7)) directions.push("SW");
 		if (allowedExits & (1 << 8)) directions.push("UP");
 		if (allowedExits & (1 << 9)) directions.push("DOWN");
 		return directions.length > 0 ? directions.join(", ") : "None";
+	}
+
+	generateRoomCopyOptions(currentRoomId) {
+		const dungeon = this.yamlData?.dungeon;
+		if (!dungeon || !dungeon.rooms) {
+			return "";
+		}
+
+		const currentIndex =
+			currentRoomId !== null && currentRoomId !== undefined
+				? parseInt(currentRoomId)
+				: -1;
+		const options = dungeon.rooms
+			.map((room, index) => {
+				if (index === currentIndex) {
+					return null; // Exclude current room
+				}
+				const displayName = room.display || `Room ${index + 1}`;
+				return `<option value="${index}">${displayName} #${index}</option>`;
+			})
+			.filter((opt) => opt !== null)
+			.join("");
+
+		return options;
+	}
+
+	copyRoomSettings(sourceRoomIndex, targetRoomId) {
+		const dungeon = this.yamlData?.dungeon;
+		if (
+			!dungeon ||
+			!dungeon.rooms ||
+			sourceRoomIndex < 0 ||
+			sourceRoomIndex >= dungeon.rooms.length
+		) {
+			return;
+		}
+
+		const sourceRoom = dungeon.rooms[sourceRoomIndex];
+		if (!sourceRoom) {
+			return;
+		}
+
+		// Copy display name
+		const displayInput = document.getElementById("template-display");
+		if (displayInput) {
+			displayInput.value = sourceRoom.display || "";
+		}
+
+		// Copy description
+		const descriptionInput = document.getElementById("template-description");
+		if (descriptionInput) {
+			descriptionInput.value = sourceRoom.description || "";
+		}
+
+		// Copy map text
+		const mapTextInput = document.getElementById("template-map-text");
+		if (mapTextInput) {
+			mapTextInput.value = sourceRoom.mapText || "";
+		}
+
+		// Copy map color
+		const mapColorSelect = document.getElementById("template-map-color");
+		if (mapColorSelect && sourceRoom.mapColor !== undefined) {
+			mapColorSelect.value = sourceRoom.mapColor.toString();
+		}
+
+		// Copy dense
+		const denseBtn = document.getElementById("template-dense-btn");
+		if (denseBtn) {
+			if (sourceRoom.dense) {
+				denseBtn.classList.remove("disabled");
+				denseBtn.classList.add("enabled");
+				denseBtn.dataset.dense = "true";
+			} else {
+				denseBtn.classList.remove("enabled");
+				denseBtn.classList.add("disabled");
+				denseBtn.dataset.dense = "false";
+			}
+		}
+
+		// Copy allowedExits
+		const DIRECTION = {
+			NORTH: 1 << 0,
+			SOUTH: 1 << 1,
+			EAST: 1 << 2,
+			WEST: 1 << 3,
+			NORTHEAST: 1 << 4,
+			NORTHWEST: 1 << 5,
+			SOUTHEAST: 1 << 6,
+			SOUTHWEST: 1 << 7,
+			UP: 1 << 8,
+			DOWN: 1 << 9,
+		};
+		const DEFAULT_ALLOWED_EXITS =
+			DIRECTION.NORTH |
+			DIRECTION.SOUTH |
+			DIRECTION.EAST |
+			DIRECTION.WEST |
+			DIRECTION.NORTHEAST |
+			DIRECTION.NORTHWEST |
+			DIRECTION.SOUTHEAST |
+			DIRECTION.SOUTHWEST;
+		const allowedExits =
+			sourceRoom.allowedExits !== undefined && sourceRoom.allowedExits !== null
+				? sourceRoom.allowedExits
+				: DEFAULT_ALLOWED_EXITS;
+
+		const modal = document.getElementById("template-modal");
+		if (modal) {
+			modal.dataset.allowedExits = allowedExits;
+		}
+
+		// Update exit buttons
+		const TEXT2DIR = {
+			north: DIRECTION.NORTH,
+			south: DIRECTION.SOUTH,
+			east: DIRECTION.EAST,
+			west: DIRECTION.WEST,
+			northeast: DIRECTION.NORTHEAST,
+			northwest: DIRECTION.NORTHWEST,
+			southeast: DIRECTION.SOUTHEAST,
+			southwest: DIRECTION.SOUTHWEST,
+			up: DIRECTION.UP,
+			down: DIRECTION.DOWN,
+		};
+
+		document.querySelectorAll(".exit-btn").forEach((btn) => {
+			const direction = btn.dataset.direction;
+			const dirFlag = TEXT2DIR[direction];
+			if (!dirFlag) return;
+
+			const isEnabled = (allowedExits & dirFlag) !== 0;
+			if (isEnabled) {
+				btn.classList.remove("disabled");
+				btn.classList.add("enabled");
+			} else {
+				btn.classList.remove("enabled");
+				btn.classList.add("disabled");
+			}
+		});
+
+		// Copy room links
+		const roomLinksContainer = document.getElementById("room-links-container");
+		if (roomLinksContainer) {
+			roomLinksContainer.innerHTML = "";
+			const roomLinks = sourceRoom.roomLinks || {};
+			const allDirections = [
+				"north",
+				"south",
+				"east",
+				"west",
+				"northeast",
+				"northwest",
+				"southeast",
+				"southwest",
+				"up",
+				"down",
+			];
+			const usedDirections = Object.keys(roomLinks);
+
+			const roomLinksHtml = Object.entries(roomLinks)
+				.map(([dir, ref], index) => {
+					const availableDirs = allDirections.filter(
+						(d) => d === dir || !usedDirections.includes(d)
+					);
+					return `<div class="room-link-item" data-index="${index}">${this.generateRoomLinkHTML(
+						availableDirs,
+						dir,
+						ref,
+						index
+					)}</div>`;
+				})
+				.join("");
+
+			roomLinksContainer.innerHTML = roomLinksHtml;
+
+			// Re-attach event handlers for room links
+			document.querySelectorAll(".delete-link-btn").forEach((btn) => {
+				btn.onclick = (e) => {
+					const index = parseInt(e.target.dataset.index);
+					this.deleteRoomLink(index);
+				};
+			});
+
+			document.querySelectorAll(".make-2way-btn").forEach((btn) => {
+				btn.onclick = (e) => {
+					const index = parseInt(e.target.dataset.index);
+					this.makeExit2WayForTemplate(index);
+				};
+			});
+
+			document.querySelectorAll(".room-link-direction").forEach((select) => {
+				select.onchange = () => {
+					this.updateRoomLinkDirections();
+				};
+			});
+
+			// Update add button state
+			const addBtn = document.getElementById("add-room-link-btn");
+			if (addBtn) {
+				const canAddMore = usedDirections.length < allDirections.length;
+				addBtn.disabled = !canAddMore;
+			}
+		}
+
+		this.showToast(
+			"Room settings copied",
+			`Copied settings from "${
+				sourceRoom.display || `Room ${sourceRoomIndex + 1}`
+			}"`
+		);
 	}
 
 	showTemplateModal(type, id, template) {
@@ -3218,17 +3460,24 @@ class MapEditor {
 				SOUTH: 1 << 1, // 2
 				EAST: 1 << 2, // 4
 				WEST: 1 << 3, // 8
-				NORTHEAST: (1 << 0) | (1 << 2), // 5
-				NORTHWEST: (1 << 0) | (1 << 3), // 9
-				SOUTHEAST: (1 << 1) | (1 << 2), // 6
-				SOUTHWEST: (1 << 1) | (1 << 3), // 10
+				NORTHEAST: 1 << 4, // 16
+				NORTHWEST: 1 << 5, // 32
+				SOUTHEAST: 1 << 6, // 64
+				SOUTHWEST: 1 << 7, // 128
 				UP: 1 << 8, // 256
 				DOWN: 1 << 9, // 512
 			};
 
-			// Default allowedExits: NSEW only (not UP/DOWN, no diagonals)
+			// Default allowedExits: NSEW + diagonals (not UP/DOWN)
 			const DEFAULT_ALLOWED_EXITS =
-				DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+				DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
 
 			// Text to DIRECTION mapping
 			const TEXT2DIR = {
@@ -3258,7 +3507,18 @@ class MapEditor {
 
 			// Build room links HTML
 			const roomLinks = template.roomLinks || {};
-			const allDirections = ["north", "south", "east", "west", "up", "down"];
+			const allDirections = [
+				"north",
+				"south",
+				"east",
+				"west",
+				"northeast",
+				"northwest",
+				"southeast",
+				"southwest",
+				"up",
+				"down",
+			];
 			const usedDirections = Object.keys(roomLinks);
 
 			const roomLinksHtml = Object.entries(roomLinks)
@@ -3280,7 +3540,18 @@ class MapEditor {
 			const canAddMore = usedDirections.length < allDirections.length;
 
 			// Build exits HTML
-			const exitDirections = ["north", "south", "east", "west", "up", "down"];
+			const exitDirections = [
+				"north",
+				"south",
+				"east",
+				"west",
+				"northeast",
+				"northwest",
+				"southeast",
+				"southwest",
+				"up",
+				"down",
+			];
 
 			const exitsHtml = exitDirections
 				.map((dir) => {
@@ -3344,6 +3615,16 @@ class MapEditor {
 							? '<p style="color: #aaa; font-size: 0.85rem; margin-top: 0.5rem;">All directions are in use</p>'
 							: ""
 					}
+				</div>
+				<div class="form-group">
+					<label>Copy Room</label>
+					<div class="copy-room-container">
+						<select id="copy-room-select" class="copy-room-select">
+							<option value="">Select a room to copy...</option>
+							${this.generateRoomCopyOptions(id)}
+						</select>
+						<button type="button" class="copy-room-btn" id="copy-room-btn" disabled>Copy</button>
+					</div>
 				</div>
 			`;
 		} else {
@@ -3525,16 +3806,23 @@ class MapEditor {
 				SOUTH: 1 << 1,
 				EAST: 1 << 2,
 				WEST: 1 << 3,
-				NORTHEAST: (1 << 0) | (1 << 2),
-				NORTHWEST: (1 << 0) | (1 << 3),
-				SOUTHEAST: (1 << 1) | (1 << 2),
-				SOUTHWEST: (1 << 1) | (1 << 3),
+				NORTHEAST: 1 << 4,
+				NORTHWEST: 1 << 5,
+				SOUTHEAST: 1 << 6,
+				SOUTHWEST: 1 << 7,
 				UP: 1 << 8,
 				DOWN: 1 << 9,
 			};
 			const DEFAULT_ALLOWED_EXITS =
-				DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
-			// allowedExits is mandatory - default to NSEW if not set
+				DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
+			// allowedExits is mandatory - default to NSEW + diagonals if not set
 			const allowedExits =
 				template.allowedExits !== undefined && template.allowedExits !== null
 					? template.allowedExits
@@ -3550,10 +3838,10 @@ class MapEditor {
 				SOUTH: 1 << 1,
 				EAST: 1 << 2,
 				WEST: 1 << 3,
-				NORTHEAST: (1 << 0) | (1 << 2),
-				NORTHWEST: (1 << 0) | (1 << 3),
-				SOUTHEAST: (1 << 1) | (1 << 2),
-				SOUTHWEST: (1 << 1) | (1 << 3),
+				NORTHEAST: 1 << 4,
+				NORTHWEST: 1 << 5,
+				SOUTHEAST: 1 << 6,
+				SOUTHWEST: 1 << 7,
 				UP: 1 << 8,
 				DOWN: 1 << 9,
 			};
@@ -3575,7 +3863,14 @@ class MapEditor {
 			let currentAllowedExits =
 				template.allowedExits !== undefined && template.allowedExits !== null
 					? template.allowedExits
-					: DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+					: DIRECTION.NORTH |
+					  DIRECTION.SOUTH |
+					  DIRECTION.EAST |
+					  DIRECTION.WEST |
+					  DIRECTION.NORTHEAST |
+					  DIRECTION.NORTHWEST |
+					  DIRECTION.SOUTHEAST |
+					  DIRECTION.SOUTHWEST;
 
 			// Refresh all button states based on the current bitmap
 			const refreshExitButtons = () => {
@@ -3667,6 +3962,21 @@ class MapEditor {
 					this.updateRoomLinkDirections();
 				};
 			});
+
+			// Copy room functionality
+			const copyRoomSelect = document.getElementById("copy-room-select");
+			const copyRoomBtn = document.getElementById("copy-room-btn");
+			if (copyRoomSelect && copyRoomBtn) {
+				copyRoomSelect.onchange = () => {
+					copyRoomBtn.disabled = !copyRoomSelect.value;
+				};
+				copyRoomBtn.onclick = () => {
+					const sourceRoomIndex = parseInt(copyRoomSelect.value, 10);
+					if (!isNaN(sourceRoomIndex)) {
+						this.copyRoomSettings(sourceRoomIndex, id);
+					}
+				};
+			}
 		}
 
 		// Set up type selector handler to show/hide mob, weapon, armor, and equipment fields
@@ -3820,10 +4130,10 @@ class MapEditor {
 					SOUTH: 1 << 1,
 					EAST: 1 << 2,
 					WEST: 1 << 3,
-					NORTHEAST: (1 << 0) | (1 << 2),
-					NORTHWEST: (1 << 0) | (1 << 3),
-					SOUTHEAST: (1 << 1) | (1 << 2),
-					SOUTHWEST: (1 << 1) | (1 << 3),
+					NORTHEAST: 1 << 4,
+					NORTHWEST: 1 << 5,
+					SOUTHEAST: 1 << 6,
+					SOUTHWEST: 1 << 7,
 					UP: 1 << 8,
 					DOWN: 1 << 9,
 				};
@@ -3840,7 +4150,14 @@ class MapEditor {
 					down: DIRECTION.DOWN,
 				};
 				const DEFAULT_ALLOWED_EXITS =
-					DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+					DIRECTION.NORTH |
+					DIRECTION.SOUTH |
+					DIRECTION.EAST |
+					DIRECTION.WEST |
+					DIRECTION.NORTHEAST |
+					DIRECTION.NORTHWEST |
+					DIRECTION.SOUTHEAST |
+					DIRECTION.SOUTHWEST;
 
 				allowedExits = DEFAULT_ALLOWED_EXITS;
 				document.querySelectorAll(".exit-btn").forEach((btn) => {
@@ -5088,9 +5405,32 @@ class MapEditor {
 
 	getAvailableDirections() {
 		const container = document.getElementById("room-links-container");
-		if (!container) return ["north", "south", "east", "west", "up", "down"];
+		if (!container)
+			return [
+				"north",
+				"south",
+				"east",
+				"west",
+				"northeast",
+				"northwest",
+				"southeast",
+				"southwest",
+				"up",
+				"down",
+			];
 
-		const allDirections = ["north", "south", "east", "west", "up", "down"];
+		const allDirections = [
+			"north",
+			"south",
+			"east",
+			"west",
+			"northeast",
+			"northwest",
+			"southeast",
+			"southwest",
+			"up",
+			"down",
+		];
 		const usedDirections = Array.from(
 			container.querySelectorAll(".room-link-direction")
 		).map((select) => select.value);
@@ -5102,7 +5442,18 @@ class MapEditor {
 		const container = document.getElementById("room-links-container");
 		if (!container) return;
 
-		const allDirections = ["north", "south", "east", "west", "up", "down"];
+		const allDirections = [
+			"north",
+			"south",
+			"east",
+			"west",
+			"northeast",
+			"northwest",
+			"southeast",
+			"southwest",
+			"up",
+			"down",
+		];
 
 		// Update each dropdown to only show available directions
 		container.querySelectorAll(".room-link-direction").forEach((select) => {

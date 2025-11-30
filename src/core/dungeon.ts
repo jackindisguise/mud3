@@ -155,10 +155,10 @@ export const enum DIRECTION {
 	SOUTH = 1 << 1,
 	EAST = 1 << 2,
 	WEST = 1 << 3,
-	NORTHEAST = NORTH | EAST,
-	NORTHWEST = NORTH | WEST,
-	SOUTHEAST = SOUTH | EAST,
-	SOUTHWEST = SOUTH | WEST,
+	NORTHEAST = 1 << 4,
+	NORTHWEST = 1 << 5,
+	SOUTHEAST = 1 << 6,
+	SOUTHWEST = 1 << 7,
 	UP = 1 << 8,
 	DOWN = 1 << 9,
 }
@@ -1631,7 +1631,7 @@ export interface DungeonObjectOptions {
  */
 export interface RoomOptions extends DungeonObjectOptions {
 	coordinates: Coordinates;
-	allowedExits?: DIRECTION; // Bitmask of allowed exit directions (defaults to NSEW if not provided)
+	allowedExits?: DIRECTION; // Bitmask of allowed exit directions (defaults to NSEW + diagonals if not provided)
 	dense?: boolean; // Whether this room is dense (solid/impassable)
 }
 
@@ -3207,10 +3207,17 @@ export class Room extends DungeonObject {
 	constructor(options: RoomOptions) {
 		super(options);
 		this._coordinates = options.coordinates;
-		// Default allowedExits: NSEW only (not UP/DOWN, no diagonals)
+		// Default allowedExits: NSEW + diagonals (not UP/DOWN)
 		this.allowedExits =
 			options.allowedExits ??
-			DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+			DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
 		// Default dense to false
 		this.dense = options.dense ?? false;
 	}

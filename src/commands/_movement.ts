@@ -9,7 +9,7 @@
 
 import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Room, DIRECTION, dir2text } from "../core/dungeon.js";
+import { Room, DIRECTION, dir2text, Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { showRoom } from "./look.js";
 
@@ -87,7 +87,16 @@ export function executeMovement(
 		MESSAGE_GROUP.COMMAND_RESPONSE
 	);
 
-	const success = actor.step(direction);
-	if (success && actor.character?.settings?.autoLook)
-		showRoom(actor, actor.location as Room);
+	const success = actor.step({
+		direction,
+		scripts: {
+			beforeOnEnter: (movable, room) => {
+				// Show room to player mobs before onEnter is called
+				// This allows them to see the room before aggressive mobs attack
+				if (actor.character?.settings?.autoLook) {
+					showRoom(actor, room);
+				}
+			},
+		},
+	});
 }

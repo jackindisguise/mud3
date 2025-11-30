@@ -51,38 +51,42 @@ export default {
 			return;
 		}
 
+		actor.combatTarget = undefined;
 		const sourceRoom = room;
 
 		// Move to recall room
-		actor.move(recallRoom);
+		actor.move({
+			location: recallRoom,
+			scripts: {
+				beforeOnExit: () => {
+					act(
+						{
+							user: "You recall to safety.",
+							room: "{User} recalls away.",
+						},
+						{
+							user: actor,
+							room: sourceRoom,
+						},
+						{ excludeUser: true }
+					);
+				},
+				beforeOnEnter: () => {
+					act(
+						{
+							user: "You arrive at the recall location.",
+							room: "{User} arrives.",
+						},
+						{
+							user: actor,
+							room: recallRoom,
+						},
+						{ excludeUser: true }
+					);
 
-		// Send messages
-		act(
-			{
-				user: "You recall to safety.",
-				room: "{User} recalls away.",
+					if (actor.character?.settings?.autoLook) showRoom(actor, recallRoom);
+				},
 			},
-			{
-				user: actor,
-				room: sourceRoom,
-			}
-		);
-
-		act(
-			{
-				user: "You arrive at the recall location.",
-				room: "{User} arrives.",
-			},
-			{
-				user: actor,
-				room: recallRoom,
-			},
-			{ excludeUser: true }
-		);
-
-		// Show room description if auto-look is enabled
-		if (actor.character?.settings?.autoLook) {
-			showRoom(actor, recallRoom);
-		}
+		});
 	},
 } satisfies CommandObject;

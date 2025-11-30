@@ -634,16 +634,10 @@ export function processCombatRound(): void {
 
 	// Process each mob's combat round
 	const characters = sortedMobs.filter((mob) => mob.character);
-	characters.forEach(
-		(mob) =>
-			!mob.isInCombat() ||
-			mob.character!.sendLine(
-				`${LINEBREAK}` + color("[COMBAT ROUND]", COLOR.YELLOW)
-			)
-	);
 	for (const mob of sortedMobs) {
 		processMobCombatRound(mob);
 	}
+	characters.forEach((mob) => !mob.isInCombat() || mob.character!.showPrompt());
 }
 
 /**

@@ -203,6 +203,25 @@
 									</div>
 								</div>
 							</div>
+							<div class="toolbox-label" style="margin-left: 1rem">Actions</div>
+							<div class="toolbox-tools">
+								<button
+									id="clear-resets-btn"
+									class="action-btn"
+									title="Clear resets in selection"
+									disabled
+								>
+									Clear Resets
+								</button>
+								<button
+									id="clear-exit-overrides-btn"
+									class="action-btn"
+									title="Clear exit overrides in selection"
+									disabled
+								>
+									Clear Exit Overrides
+								</button>
+							</div>
 						</div>
 						<div class="map-grid" id="map-grid"></div>
 						<!-- Toast Container -->
@@ -410,8 +429,31 @@
 					<h2>Help & Tips</h2>
 					<div class="help-content">
 						<section class="help-section">
-							<h3>Layer Navigation</h3>
+							<h3>Keyboard Shortcuts</h3>
 							<ul>
+								<li>
+									<strong>Ctrl+C</strong> - Copy selected cells to clipboard
+								</li>
+								<li>
+									<strong>Ctrl+X</strong> - Cut selected cells (copy and delete)
+								</li>
+								<li>
+									<strong>Ctrl+V</strong> - Paste clipboard at current mouse
+									position
+								</li>
+								<li>
+									<strong>Ctrl+A</strong> - Select all cells on current layer
+								</li>
+								<li><strong>Ctrl+Z</strong> - Undo last action</li>
+								<li>
+									<strong>Ctrl+Y</strong> or <strong>Ctrl+Shift+Z</strong> -
+									Redo last undone action
+								</li>
+								<li><strong>Delete</strong> - Delete selected rooms</li>
+								<li>
+									<strong>Escape</strong> - Close modals, cancel selection, or
+									clear selection tool
+								</li>
 								<li><strong>Page Up</strong> - Go to next layer (higher)</li>
 								<li>
 									<strong>Page Down</strong> - Go to previous layer (lower)
@@ -487,6 +529,30 @@
 						</section>
 
 						<section class="help-section">
+							<h3>Copy, Cut & Paste</h3>
+							<ul>
+								<li>
+									Select cells using any selection tool, then use
+									<strong>Ctrl+C</strong> to copy or <strong>Ctrl+X</strong> to
+									cut them
+								</li>
+								<li>
+									Copied or cut cells include both rooms and their resets
+									(mobs/objects)
+								</li>
+								<li>
+									Use <strong>Ctrl+V</strong> to paste at the currently selected
+									cell position, or at (0, 0) on the current layer if no cell is
+									selected
+								</li>
+								<li>
+									Cut operations copy the cells and then delete them from the
+									grid, making it easy to move rooms to new locations
+								</li>
+							</ul>
+						</section>
+
+						<section class="help-section">
 							<h3>Auto-Fill Selection</h3>
 							<ul>
 								<li>First, use a selection tool to select cells on the map</li>
@@ -524,8 +590,16 @@
 								</li>
 								<li>
 									Use the <strong>Add/Edit Exit Override</strong> button in room
-									templates to customize which directions (NORTH, SOUTH, EAST,
-									WEST, UP, DOWN) are allowed for specific rooms
+									info to customize which directions are allowed for specific
+									rooms. Exit buttons are organized in rows: cardinals (north,
+									south, east, west) on the first row, diagonals (northeast,
+									northwest, southeast, southwest) on the second row, and
+									vertical (up, down) on the third row
+								</li>
+								<li>
+									In the exit override editor, click the small
+									<strong>⦿</strong> button at the start of each row to toggle
+									all exits in that row on or off at once
 								</li>
 							</ul>
 						</section>
@@ -706,6 +780,7 @@
 					</div>
 					<div class="modal-actions dungeon-settings-actions">
 						<button id="apply-dungeon-settings-btn">Apply Dimensions</button>
+						<button id="mobius-perimeter-btn">Apply Mobius Perimeter</button>
 						<button id="dungeon-settings-done">Done</button>
 					</div>
 				</div>

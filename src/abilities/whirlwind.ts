@@ -12,7 +12,7 @@
 
 import { CommandContext } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Mob } from "../core/dungeon.js";
+import { EQUIPMENT_SLOT, Mob, Weapon } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
 import { act, damageMessage } from "../act.js";
@@ -98,12 +98,15 @@ export const command: CommandObject = {
 			if (!(enemy instanceof Mob)) continue;
 
 			// Perform the attack
+			const mainHand = actor.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
+			const weapon = mainHand instanceof Weapon ? mainHand : undefined;
 			const damage = oneHit({
 				attacker: actor,
 				target: enemy,
 				guaranteedHit: false,
 				abilityName: ability.name.toLowerCase(),
 				attackPowerMultiplier: 0.5,
+				weapon,
 			});
 
 			if (damage > 0) {
@@ -112,6 +115,6 @@ export const command: CommandObject = {
 			}
 		}
 
-		actor.useAbilityById(ABILITY_ID, hitCount);
+		actor.useAbility(ability, hitCount);
 	},
 };

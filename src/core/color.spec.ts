@@ -1,6 +1,14 @@
 import { test, suite } from "node:test";
 import assert from "node:assert";
-import { colorize, stripColors, visibleLength } from "./color.js";
+import {
+	colorize,
+	stripColors,
+	visibleLength,
+	gradientStringTransformer,
+	repeatingColorStringTransformer,
+	color,
+	COLOR,
+} from "./color.js";
 import { FG, BG, STYLE } from "./telnet.js";
 
 suite("color.ts", () => {
@@ -222,6 +230,243 @@ suite("color.ts", () => {
 
 			assert.strictEqual(plain, 'player OOC: "{test}} message"');
 			assert.strictEqual(visibleLength(message), plain.length);
+		});
+	});
+
+	suite("gradientStringTransformer()", () => {
+		test("should return empty string for empty input", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.LIGHT_BLUE,
+			]);
+			assert.strictEqual(transformer(""), "");
+		});
+
+		test("should use first color for single character", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+			]);
+			const result = transformer("A");
+			assert.ok(result.includes("{R"));
+			assert.ok(result.includes("A"));
+			assert.ok(result.includes("{x"));
+		});
+
+		test("should split string evenly between colors", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+			]);
+			const result = transformer("ABCD");
+			// Should be split: "AB" (red) + "CD" (cyan)
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCD");
+			// First part should be red
+			assert.ok(result.startsWith("{R"));
+			// Should contain reset and cyan tag
+			assert.ok(result.includes("{x{C"));
+			assert.equal(result, "{RAB{x{CCD{x");
+		});
+
+		test("should handle remainder in middle chunk", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+				COLOR.YELLOW,
+			]);
+			const result = transformer("ABCDE");
+
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCDE");
+			assert.equal(result, "{RAB{x{CC{x{YDE{x");
+		});
+
+		test("should handle single color", () => {
+			const transformer = gradientStringTransformer([COLOR.CRIMSON]);
+			const result = transformer("Hello");
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "Hello");
+			assert.ok(result.includes("{R"));
+		});
+
+		test("should handle many colors", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+				COLOR.YELLOW,
+				COLOR.LIME,
+				COLOR.PINK,
+			]);
+			const result = transformer("Hello World");
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "Hello World");
+			// Should contain all color tags
+			assert.ok(result.includes("{R"));
+			assert.ok(result.includes("{C"));
+			assert.ok(result.includes("{Y"));
+			assert.ok(result.includes("{G"));
+			assert.ok(result.includes("{M"));
+		});
+
+		test("should handle string shorter than color count", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+				COLOR.YELLOW,
+				COLOR.LIME,
+			]);
+			const result = transformer("AB");
+			// 2 chars / 4 colors = 0 remainder, each gets 0 or 1 char
+			// Middle index (Math.ceil(4/2) = 2) gets remainder
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "AB");
+		});
+
+		test("should produce same visible length as input", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+				COLOR.YELLOW,
+			]);
+			const input = "Testing gradient";
+			const result = transformer(input);
+			assert.strictEqual(visibleLength(result), input.length);
+		});
+
+		test("should handle long strings", () => {
+			const transformer = gradientStringTransformer([
+				COLOR.CRIMSON,
+				COLOR.CYAN,
+			]);
+			const input = "A".repeat(100);
+			const result = transformer(input);
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, input);
+			assert.strictEqual(visibleLength(result), input.length);
+		});
+	});
+
+	suite("repeatingColorStringTransformer()", () => {
+		test("should return empty string for empty input", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN],
+				2
+			);
+			assert.strictEqual(transformer(""), "");
+		});
+
+		test("should color blocks of specified size", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN],
+				2
+			);
+			const result = transformer("ABCD");
+			// Should be: "AB" (red) + "CD" (cyan)
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCD");
+			assert.ok(result.includes("{R"));
+			assert.ok(result.includes("{x{C"));
+		});
+
+		test("should repeat colors cyclically", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN, COLOR.YELLOW],
+				2
+			);
+			const result = transformer("ABCDEF");
+			// Should be: "AB" (red), "CD" (cyan), "EF" (yellow)
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCDEF");
+			// Should cycle back to red for next block
+			const result2 = transformer("ABCDEFGH");
+			const stripped2 = stripColors(result2);
+			assert.strictEqual(stripped2, "ABCDEFGH");
+		});
+
+		test("should handle incomplete final block", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN],
+				3
+			);
+			const result = transformer("ABCDE");
+			// Should be: "ABC" (red), "DE" (cyan - incomplete block)
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCDE");
+		});
+
+		test("should handle block size larger than string", () => {
+			const transformer = repeatingColorStringTransformer([COLOR.CRIMSON], 10);
+			const result = transformer("ABC");
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABC");
+			assert.ok(result.includes("{R"));
+		});
+
+		test("should handle single color", () => {
+			const transformer = repeatingColorStringTransformer([COLOR.CRIMSON], 2);
+			const result = transformer("ABCD");
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCD");
+			// All blocks should be red
+			assert.ok(result.includes("{R"));
+		});
+
+		test("should handle block size of 1", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN],
+				1
+			);
+			const result = transformer("ABCD");
+			// Each character gets its own color
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCD");
+		});
+
+		test("should produce same visible length as input", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN, COLOR.YELLOW],
+				3
+			);
+			const input = "Testing repeating";
+			const result = transformer(input);
+			assert.strictEqual(visibleLength(result), input.length);
+		});
+
+		test("should handle many colors with small block size", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN, COLOR.YELLOW, COLOR.LIME, COLOR.PINK],
+				1
+			);
+			const result = transformer("ABCDE");
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCDE");
+		});
+
+		test("should handle long strings", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN],
+				5
+			);
+			const input = "A".repeat(50);
+			const result = transformer(input);
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, input);
+			assert.strictEqual(visibleLength(result), input.length);
+		});
+
+		test("should cycle through colors correctly", () => {
+			const transformer = repeatingColorStringTransformer(
+				[COLOR.CRIMSON, COLOR.CYAN],
+				2
+			);
+			const result = transformer("ABCDEFGH");
+			// Should be: "AB" (red), "CD" (cyan), "EF" (red), "GH" (cyan)
+			const stripped = stripColors(result);
+			assert.strictEqual(stripped, "ABCDEFGH");
+			// Should have multiple color transitions
+			const resetCount = (result.match(/{x/g) || []).length;
+			assert.ok(resetCount >= 2);
 		});
 	});
 });

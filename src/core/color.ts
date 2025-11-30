@@ -446,3 +446,64 @@ export const SIZER: string.Sizer = {
 export function visibleLength(text: string): number {
 	return stripColors(text).length;
 }
+
+/**
+ * Creates a string transformer that colors a string in a gradient pattern of colors.
+ * @param colors - The colors to use in the gradient pattern
+ * @returns A string transformer that colors a string in a gradient pattern of colors
+ */
+export function gradientStringTransformer(
+	colors: COLOR[]
+): (str: string) => string {
+	let colorIndex = 0;
+	return (str: string) => {
+		if (str.length === 0) return "";
+		if (str.length <= colors.length)
+			return str
+				.split("")
+				.map((char) => color(char, colors[colorIndex++ % colors.length]))
+				.join("");
+
+		const chunkLength = colors.length;
+		const chunkSize = Math.round(str.length / chunkLength);
+		const sizeMinusMiddle = chunkSize * (chunkLength - 1);
+		const middleChunkSize = str.length - sizeMinusMiddle;
+		const middleIndex = Math.ceil(chunkLength / 2) - 1;
+		const chunks: string[] = [];
+		let offset = 0;
+
+		for (let i = 0; i < chunkLength; i++) {
+			const currentChunkSize = i === middleIndex ? middleChunkSize : chunkSize;
+			const chunk = str.substring(offset, offset + currentChunkSize);
+			chunks.push(color(chunk, colors[colorIndex % colors.length]));
+			offset += currentChunkSize;
+			colorIndex++;
+		}
+
+		colorIndex += Math.floor(Math.random() * 10);
+		return chunks.join("");
+	};
+}
+
+/**
+ * Creates a string transformer that colors a string in a repeating pattern of colors.
+ * @param colors - The colors to use in the repeating pattern
+ * @param blockSize - The size of the block to color
+ * @returns A string transformer that colors a string in a repeating pattern of colors
+ */
+export function repeatingColorStringTransformer(
+	colors: COLOR[],
+	blockSize: number
+): (str: string) => string {
+	let colorIndex = 0;
+	return (str: string) => {
+		const colored = [];
+		for (let i = 0; i < str.length; i += blockSize) {
+			const _color = colors[colorIndex % colors.length];
+			const block = str.substring(i, i + blockSize);
+			colored.push(color(block, _color));
+			colorIndex++;
+		}
+		return colored.join("");
+	};
+}

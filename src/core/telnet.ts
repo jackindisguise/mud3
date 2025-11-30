@@ -3,6 +3,8 @@
  * Provides ANSI escape sequences for foreground and background colors.
  */
 
+import { isAscii } from "buffer";
+
 /** ANSI escape sequence prefix */
 const ESC = "\x1B[";
 
@@ -113,4 +115,29 @@ export function bgRGB(r: number, g: number, b: number): string {
 export function stripColors(text: string): string {
 	// eslint-disable-next-line no-control-regex
 	return text.replace(/\x1B\[[0-9;]*m/g, "");
+}
+
+export enum IAC {
+	IAC = 255,
+	WILL = 251,
+	WONT = 252,
+	DO = 253,
+	DONT = 254,
+	GA = 249,
+	SB = 250, // Subnegotiation Begin
+	SE = 240, // Subnegotiation End
+	SEND = 1, // SEND command (used in subnegotiations like TTYPE)
+}
+
+export enum TELNET_OPTION {
+	NAWS = 31,
+	TTYPE = 24,
+	MCCP1 = 85, // Mud Client Compression Protocol v1 (deprecated)
+	MCCP2 = 86, // Mud Client Compression Protocol v2
+	MCCP3 = 87, // Mud Client Compression Protocol v3
+	SGA = 3,
+}
+
+export function buildIACCommand(iac: IAC, option: number): Buffer {
+	return Buffer.from([IAC.IAC, iac, option]);
 }

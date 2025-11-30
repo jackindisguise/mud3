@@ -41,7 +41,16 @@ import { createServer, Server, Socket } from "net";
 import logger from "../logger.js";
 import { string } from "mud-ext";
 import { colorize as _colorize, stripColors } from "./color.js";
-import { LINEBREAK } from "./telnet.js";
+import { buildIACCommand, IAC, LINEBREAK, TELNET_OPTION } from "./telnet.js";
+import { TelnetNegotiationManager } from "./telnet-negotiation.js";
+import {
+	SGAHandler,
+	TTYPEHandler,
+	MCCP1Handler,
+	MCCP2Handler,
+	NAWSHandler,
+} from "./telnet-protocol-handlers.js";
+import { constants } from "zlib";
 
 export interface MudClient {
 	send(text: string, colorize?: boolean): void;
@@ -98,10 +107,12 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	private buffer: string = "";
 	// Optional single-shot callback used by Game.nanny() style prompts
 	private pendingAskCallback?: (line: string) => void;
-	// Track if SGA (Suppress Go Ahead) is negotiated
-	private suppressGoAhead: boolean = false;
-	// Track SGA negotiation state to prevent infinite loops
-	private sgaNegotiationState: "none" | "pending" | "negotiated" | "rejected" = "none";
+	// Telnet protocol negotiation manager
+	private negotiationManager: TelnetNegotiationManager;
+	// Message queue for batching writes
+	private messageQueue: string[] = [];
+	// Timer for flushing the message queue
+	private flushTimer: NodeJS.Timeout | null = null;
 
 	toString(): string {
 		return `{client@${this.getAddress()}}`;
@@ -110,6 +121,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	constructor(socket: Socket) {
 		super();
 		this.socket = socket;
+		this.negotiationManager = this.createNegotiationManager();
 		this.setupSocketHandlers();
 	}
 
@@ -141,6 +153,51 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		return super.off(event, listener);
 	}
 
+	/**
+	 * Create and configure the telnet negotiation manager with default protocols
+	 */
+	private createNegotiationManager(): TelnetNegotiationManager {
+		const address =
+			this.socket.remoteAddress && this.socket.remotePort
+				? `${this.socket.remoteAddress}:${this.socket.remotePort}`
+				: "unknown";
+		const manager = new TelnetNegotiationManager(this.socket, address);
+
+		// Register protocol handlers
+		manager.registerHandler(new SGAHandler());
+		manager.registerHandler(new TTYPEHandler());
+		manager.registerHandler(new MCCP1Handler());
+		manager.registerHandler(new MCCP2Handler());
+		manager.registerHandler(new NAWSHandler());
+
+		// Configure default protocols
+		// SGA is enabled by default (we want it)
+		manager.configureProtocol(TELNET_OPTION.SGA, {
+			enabled: false,
+		});
+
+		// TTYPE is enabled (we want to know client terminal type)
+		manager.configureProtocol(TELNET_OPTION.TTYPE, {
+			enabled: false,
+		});
+
+		// MCCP2 is enabled (compression)
+		manager.configureProtocol(TELNET_OPTION.MCCP2, {
+			enabled: true,
+			initiateOnConnect: true,
+		});
+
+		// NAWS is enabled (window size)
+		manager.configureProtocol(TELNET_OPTION.NAWS, {
+			enabled: false,
+		});
+
+		// Initiate negotiations on connection
+		manager.initiateNegotiations();
+
+		return manager;
+	}
+
 	private setupSocketHandlers(): void {
 		this.socket.setEncoding("binary");
 		this.socket.on("data", (data: Buffer) => {
@@ -149,6 +206,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 
 		this.socket.on("close", () => {
 			logger.debug(`Client disconnected: ${this.getAddress()}`);
+			// Flush any pending messages before closing
 			this.emit("close");
 		});
 
@@ -156,121 +214,14 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 			logger.error(`Client error (${this.getAddress()}): ${error.message}`);
 			this.emit("error", error);
 		});
-
-		// Send IAC WILL SGA by default to offer Suppress Go Ahead (only once)
-		if (
-			this.sgaNegotiationState === "none" &&
-			!this.socket.destroyed &&
-			this.socket.writable
-		) {
-			this.socket.write(Buffer.from([0xff, 0xfc, 0x03])); // IAC WILL SGA
-			this.sgaNegotiationState = "pending";
-			logger.debug(
-				`SGA negotiation (${this.getAddress()}): sent IAC WILL SGA (default offer)`
-			);
-		}
-	}
-
-	/**
-	 * Handle telnet option negotiations before processing data
-	 * @param data Raw binary data from the socket
-	 * @returns Buffer with negotiations removed
-	 */
-	private handleTelnetNegotiations(data: Buffer): Buffer {
-		const binary = data.toString("binary");
-		let result = binary;
-
-		// Handle IAC DO SGA (0xFF 0xFD 0x03)
-		// This can be either:
-		// 1. Client responding to our WILL SGA (negotiation complete, no response needed)
-		// 2. Client initiating negotiation (we should respond with WILL SGA, but only once)
-		if (binary.includes("\xff\xfd\x03")) {
-			if (this.sgaNegotiationState === "negotiated") {
-				// Already negotiated, ignore duplicate
-				logger.debug(
-					`SGA negotiation (${this.getAddress()}): received duplicate IAC DO SGA, ignoring`
-				);
-			} else if (this.sgaNegotiationState === "none") {
-				// Client initiated before we sent WILL SGA - respond with WILL SGA once
-				this.suppressGoAhead = true;
-				this.sgaNegotiationState = "negotiated";
-				if (!this.socket.destroyed && this.socket.writable) {
-					this.socket.write(Buffer.from([0xff, 0xfb, 0x03])); // IAC WILL SGA
-					logger.debug(
-						`SGA negotiation (${this.getAddress()}): received IAC DO SGA (client-initiated), responding with IAC WILL SGA (negotiation complete)`
-					);
-				}
-			} else if (this.sgaNegotiationState === "pending") {
-				// Client responding to our WILL SGA - negotiation complete, no response needed
-				this.suppressGoAhead = true;
-				this.sgaNegotiationState = "negotiated";
-				logger.debug(
-					`SGA negotiation (${this.getAddress()}): received IAC DO SGA (response to our WILL SGA), enabling full-duplex mode (negotiation complete)`
-				);
-			} else {
-				// State is "rejected" - client is trying to renegotiate, ignore or could respond with WON'T
-				logger.debug(
-					`SGA negotiation (${this.getAddress()}): received IAC DO SGA but negotiation was rejected, ignoring`
-				);
-			}
-			// Remove the negotiation from the stream
-			result = result.replace(/\xff\xfd\x03/g, "");
-		}
-
-		// Handle IAC DON'T SGA (0xFF 0xFE 0x03) - client rejects SGA
-		if (binary.includes("\xff\xfe\x03")) {
-			// Only respond if negotiation was pending or negotiated
-			if (
-				this.sgaNegotiationState === "pending" ||
-				this.sgaNegotiationState === "negotiated"
-			) {
-				this.suppressGoAhead = false;
-				this.sgaNegotiationState = "rejected";
-				// Respond with IAC WON'T SGA (0xFF 0xFC 0x03)
-				if (!this.socket.destroyed && this.socket.writable) {
-					this.socket.write(Buffer.from([0xff, 0xfc, 0x03]));
-					logger.debug(
-						`SGA negotiation (${this.getAddress()}): received IAC DON'T SGA, sent IAC WON'T SGA (negotiation rejected)`
-					);
-				}
-			} else {
-				logger.debug(
-					`SGA negotiation (${this.getAddress()}): received IAC DON'T SGA, but negotiation state is ${this.sgaNegotiationState}, ignoring`
-				);
-			}
-			// Remove the negotiation from the stream
-			result = result.replace(/\xff\xfe\x03/g, "");
-		}
-
-		return Buffer.from(result, "binary");
-	}
-
-	private sanitizeTelnetCommands(input: Buffer): string {
-		// Work in binary (latin1) space so every byte is preserved verbatim.
-		const binary = input.toString("binary");
-
-		// Remove IAC SB ... IAC SE subnegotiations.
-		const noSubNegotiation = binary.replace(/\xff\xfa[\s\S]*?\xff\xf0/g, "");
-
-		// Remove IAC WILL/WONT/DO/DONT <option> negotiations.
-		// Note: DO/DON'T SGA are handled separately in handleTelnetNegotiations
-		const noNegotiations = noSubNegotiation.replace(/\xff[\xfb-\xfe]./g, "");
-
-		// Remove IAC GA (Go Ahead) - 0xFF 0xF9 (should be suppressed if SGA is enabled)
-		const noGoAhead = noNegotiations.replace(/\xff\xf9/g, "");
-
-		// Collapse escaped IAC bytes (IAC IAC -> literal 0xFF).
-		const unescaped = noGoAhead.replace(/\xff\xff/g, "\xff");
-
-		return Buffer.from(unescaped, "binary").toString("utf8");
 	}
 
 	private handleData(data: Buffer): void {
-		// Handle telnet negotiations first (before sanitizing)
-		const negotiated = this.handleTelnetNegotiations(data);
+		// Process telnet negotiations and remove them from the stream
+		const cleaned = this.negotiationManager.processData(data);
 
-		// Then sanitize and process the remaining data
-		this.buffer += this.sanitizeTelnetCommands(negotiated);
+		// Convert to UTF-8 string and add to buffer
+		this.buffer += cleaned.toString("utf8");
 
 		// Process complete lines
 		let newlineIndex: number;
@@ -303,35 +254,24 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	 * @param text The text to send
 	 */
 	public send(text: string, colorize: boolean = false): void {
-		const escaped = colorize ? _colorize(text) : stripColors(text);
-		
-		// Split by linebreaks to handle each line separately
-		const lines = escaped.split(LINEBREAK);
-		// Pop off the final bit after the last linebreak (the part without a linebreak)
-		const remaining = lines.pop();
-
-		// Send each complete line (no GA for lines ending in linebreak)
-		// mudlet literally requires this exact set of instructions
-		// we can't call multiple write() calls for each line
-		// we need to strip the prompt off the bottom and send the rest first
-		if (lines.length > 0 && !this.socket.destroyed && this.socket.writable) {
-			// Join lines with LINEBREAK and add LINEBREAK at the end for complete lines
-			this.socket.write(lines.join(LINEBREAK));
+		if (this.socket.destroyed || !this.socket.writable) {
+			return;
 		}
-			
-		// Send the remaining message (without linebreak) with GA - this is for prompts
-		if (remaining) {
-			if (!this.socket.destroyed && this.socket.writable) {
-				this.socket.write(remaining);
-			}
-			// If SGA is not enabled, send GA (Go Ahead) after the remaining text (prompts)
-			if (
-				!this.suppressGoAhead &&
-				!this.socket.destroyed &&
-				this.socket.writable
-			) {
-				this.socket.write(Buffer.from([0xff, 0xf9])); // IAC GA (Go Ahead)
-			}
+		const escaped = colorize ? _colorize(text) : stripColors(text);
+		const compressor = this.negotiationManager.getData().mccp2?.compressor;
+		if (compressor) {
+			// Write as Buffer and flush immediately
+			const data = Buffer.from(escaped, "utf8");
+			logger.debug(
+				`MCCP2 (${this.getAddress()}): writing ${data.length} bytes to compressor`
+			);
+			compressor.write(data);
+			compressor.flush(constants.Z_SYNC_FLUSH);
+			logger.debug(
+				`MCCP2 (${this.getAddress()}): flushed compressor after writing ${data.length} bytes`
+			);
+		} else {
+			this.socket.write(escaped);
 		}
 	}
 
@@ -347,9 +287,22 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	 * Close the client connection
 	 */
 	public close(): void {
-		if (!this.socket.destroyed) {
-			this.socket.destroy();
+		if (this.socket.destroyed) {
+			return;
 		}
+
+		// Clean up MCCP2 compressor if active
+		const protocolData = this.negotiationManager.getData();
+		const compressor = protocolData.mccp2?.compressor;
+		if (compressor) {
+			// Remove all listeners (we set up a 'data' listener)
+			compressor.removeAllListeners();
+			// End the compressor stream to flush any remaining data
+			compressor.end();
+		}
+
+		// Destroy the socket (this will emit a close event)
+		this.socket.destroy();
 	}
 
 	/**

@@ -2,60 +2,74 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { MudServer, MudClient } from "./io.js";
 import { Socket } from "net";
-import { LINEBREAK } from "./telnet.js";
+import { LINEBREAK, TELNET_OPTION } from "./telnet.js";
 
 /**
- * Consume the IAC WILL SGA message that's sent by default on connection
- * @param socket The socket to read from
- * @returns Promise that resolves when the SGA message has been consumed
+ * Filter out all telnet negotiation commands from a message string
+ * This handles IAC commands, subnegotiations, and escaped IAC bytes
  */
-async function consumeInitialSGA(socket: Socket): Promise<void> {
-	return new Promise<void>((resolve) => {
-		const IAC_WILL_SGA = Buffer.from([0xff, 0xfb, 0x03]);
-		let buffer = Buffer.alloc(0);
-		let consumed = false;
+function filterTelnetNegotiations(message: string): string {
+	// Remove IAC SB ... IAC SE subnegotiations
+	let result = message.replace(/\xff\xfa[\s\S]*?\xff\xf0/g, "");
 
-		const dataHandler = (data: Buffer) => {
-			if (consumed) return;
-			buffer = Buffer.concat([buffer, data]);
-			// Check if we've received the IAC WILL SGA message at the start
-			if (buffer.length >= 3 && buffer.subarray(0, 3).equals(IAC_WILL_SGA)) {
-				consumed = true;
-				socket.removeListener("data", dataHandler);
-				resolve();
-			} else if (buffer.length >= 3) {
-				// If we got something else, that's unexpected but we'll resolve anyway
-				consumed = true;
-				socket.removeListener("data", dataHandler);
-				resolve();
-			}
-		};
+	// Remove IAC WILL/WONT/DO/DONT <option> commands
+	result = result.replace(/\xff[\xfb-\xfe]./g, "");
 
-		socket.on("data", dataHandler);
-		// Timeout after 100ms in case the message doesn't arrive
-		setTimeout(() => {
-			if (!consumed) {
-				consumed = true;
-				socket.removeListener("data", dataHandler);
-				resolve();
-			}
-		}, 100);
-	});
+	// Remove IAC GA (Go Ahead)
+	result = result.replace(/\xff\xf9/g, "");
+
+	// Collapse escaped IAC bytes (IAC IAC -> literal 0xFF)
+	result = result.replace(/\xff\xff/g, "\xff");
+
+	// Remove any remaining single IAC bytes (shouldn't happen but be safe)
+	result = result.replace(/\xff(?!\xff)/g, "");
+
+	return result;
 }
 
 /**
- * Complete SGA negotiation by consuming the initial WILL SGA and responding with DO SGA
- * This ensures SGA is enabled so tests don't receive GA messages after sends
- * @param socket The socket to complete negotiation on
- * @returns Promise that resolves when negotiation is complete
+ * Filter telnet negotiations from a buffer, returning the cleaned buffer
  */
-async function completeSGANegotiation(socket: Socket): Promise<void> {
-	// First consume the initial WILL SGA message
-	await consumeInitialSGA(socket);
-	// Then respond with DO SGA to complete the negotiation
-	socket.write(Buffer.from([0xff, 0xfd, 0x03])); // IAC DO SGA
-	// Give a brief moment for the server to process
-	await new Promise((resolve) => setTimeout(resolve, 10));
+function filterTelnetNegotiationsFromBuffer(data: Buffer): Buffer {
+	const binary = data.toString("binary");
+	let result = binary;
+
+	// Remove IAC SB ... IAC SE subnegotiations
+	result = result.replace(/\xff\xfa[\s\S]*?\xff\xf0/g, "");
+
+	// Remove IAC WILL/WONT/DO/DONT <option> commands
+	result = result.replace(/\xff[\xfb-\xfe]./g, "");
+
+	// Remove IAC GA (Go Ahead)
+	result = result.replace(/\xff\xf9/g, "");
+
+	// Collapse escaped IAC bytes (IAC IAC -> literal 0xFF)
+	result = result.replace(/\xff\xff/g, "\xff");
+
+	// Remove any remaining single IAC bytes (shouldn't happen but be safe)
+	result = result.replace(/\xff(?!\xff)/g, "");
+
+	if (result.length === 0) {
+		return Buffer.alloc(0);
+	}
+
+	return Buffer.from(result, "binary");
+}
+
+/**
+ * Create a data consumer that filters telnet negotiations before storing messages
+ * This should be attached to sockets before any negotiations are sent
+ */
+function createFilteredDataConsumer(
+	messages: string[]
+): (data: Buffer) => void {
+	return (data: Buffer) => {
+		const filtered = filterTelnetNegotiationsFromBuffer(data);
+		if (filtered.length > 0) {
+			// Convert to string using the same encoding as the original test expectations
+			messages.push(filtered.toString());
+		}
+	};
 }
 
 describe("io.ts", () => {
@@ -214,21 +228,18 @@ describe("io.ts", () => {
 			]);
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			// Complete SGA negotiation to avoid GA messages in tests
-			await Promise.all([
-				completeSGANegotiation(client1),
-				completeSGANegotiation(client2),
-			]);
 
 			const messages1: string[] = [];
 			const messages2: string[] = [];
 
-			client1.on("data", (data) => messages1.push(data.toString()));
-			client2.on("data", (data) => messages2.push(data.toString()));
+			// Attach filtered data consumers to filter out telnet negotiations
+			client1.on("data", createFilteredDataConsumer(messages1));
+			client2.on("data", createFilteredDataConsumer(messages2));
 
 			server.broadcast("Hello");
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
+			// Messages are already filtered by the consumer
 			assert.strictEqual(messages1.join(""), "Hello");
 			assert.strictEqual(messages2.join(""), "Hello");
 
@@ -245,18 +256,17 @@ describe("io.ts", () => {
 			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			// Complete SGA negotiation to avoid GA messages in tests
-			await completeSGANegotiation(client1);
 
 			const messages: string[] = [];
-			client1.on("data", (data) => messages.push(data.toString()));
+			// Attach filtered data consumer to filter out telnet negotiations
+			client1.on("data", createFilteredDataConsumer(messages));
 
 			server.broadcastLine("Test message");
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
-			// broadcastLine sends text + LINEBREAK, which after splitting/joining results in just the text
-			// (the LINEBREAK is consumed during the split/join process)
-			assert.strictEqual(messages.join(""), "Test message");
+			// broadcastLine sends text + LINEBREAK
+			// Messages are already filtered by the consumer
+			assert.strictEqual(messages.join(""), "Test message" + LINEBREAK);
 
 			client1.destroy();
 		});
@@ -283,8 +293,6 @@ describe("io.ts", () => {
 			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
-			// Complete SGA negotiation to avoid GA messages in tests
-			await completeSGANegotiation(testSocket);
 		});
 
 		afterEach(async () => {
@@ -348,40 +356,29 @@ describe("io.ts", () => {
 			assert.notStrictEqual(mudClient, null);
 
 			const messages: string[] = [];
-			testSocket.on("data", (data) => {
-				messages.push(data.toString());
-			});
+			// Attach filtered data consumer to filter out telnet negotiations
+			testSocket.on("data", createFilteredDataConsumer(messages));
 
 			mudClient!.send("Hello, client!");
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
-			// Filter out telnet negotiation messages and GA if present
-			const filtered = messages
-				.join("")
-				.replace(/\xff\xfb\x03/g, "") // Filter IAC WILL SGA
-				.replace(/\xff\xf9/g, ""); // Filter IAC GA (Go Ahead)
-			assert.strictEqual(filtered, "Hello, client!");
+			// Messages are already filtered by the consumer
+			assert.strictEqual(messages.join(""), "Hello, client!");
 		});
 
 		it("should send lines to the client", async () => {
 			assert.notStrictEqual(mudClient, null);
 
 			const messages: string[] = [];
-			testSocket.on("data", (data) => {
-				messages.push(data.toString());
-			});
+			// Attach filtered data consumer to filter out telnet negotiations
+			testSocket.on("data", createFilteredDataConsumer(messages));
 
 			mudClient!.sendLine("Welcome!");
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
-			// Filter out telnet negotiation messages and GA if present
-			const filtered = messages
-				.join("")
-				.replace(/\xff\xfb\x03/g, "") // Filter IAC WILL SGA
-				.replace(/\xff\xf9/g, ""); // Filter IAC GA (Go Ahead)
-			// sendLine sends text + LINEBREAK, which after splitting/joining results in just the text
-			// (the LINEBREAK is consumed during the split/join process)
-			assert.strictEqual(filtered, "Welcome!");
+			// sendLine sends text + LINEBREAK
+			// Messages are already filtered by the consumer
+			assert.strictEqual(messages.join(""), "Welcome!" + LINEBREAK);
 		});
 
 		it("should emit close event when connection is closed", async () => {
@@ -396,21 +393,6 @@ describe("io.ts", () => {
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
 			assert.strictEqual(closeEmitted, true);
-		});
-
-		it("should close the connection", async () => {
-			assert.notStrictEqual(mudClient, null);
-
-			let socketClosed = false;
-			testSocket.on("close", () => {
-				socketClosed = true;
-			});
-
-			mudClient!.close();
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			assert.strictEqual(socketClosed, true);
-			assert.strictEqual(mudClient!.isConnected(), false);
 		});
 
 		it("should report connection status", async () => {

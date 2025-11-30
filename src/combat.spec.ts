@@ -53,7 +53,7 @@ suite("combat.ts", () => {
 			display: "Attacker",
 			race: testRace,
 			job: testJob,
-			level: 1,
+			level: 10,
 		});
 		attacker.location = room;
 
@@ -62,7 +62,7 @@ suite("combat.ts", () => {
 			display: "Defender",
 			race: testRace,
 			job: testJob,
-			level: 1,
+			level: 10,
 		});
 		defender.location = room;
 	});
@@ -106,27 +106,27 @@ suite("combat.ts", () => {
 
 	suite("initiateCombat", () => {
 		test("should set attacker's target", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			assert.ok(attacker.combatTarget === defender);
 		});
 
 		test("should add attacker to combat queue", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			assert(isInCombatQueue(attacker));
 		});
 
 		test("should set defender's target if not already set", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			assert.ok(defender.combatTarget === attacker);
 		});
 
 		test("should add defender to combat queue if not already in combat", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			assert(isInCombatQueue(defender));
 		});
 
 		test("should ensure defender initiates combat with attacker", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 
 			// Defender should have attacker as target
 			assert.ok(
@@ -157,7 +157,7 @@ suite("combat.ts", () => {
 			});
 			playerDefender.location = room;
 
-			initiateCombat(attacker, playerDefender, room);
+			initiateCombat(attacker, playerDefender);
 
 			// Player defender should have player attacker as target
 			assert.ok(
@@ -190,8 +190,8 @@ suite("combat.ts", () => {
 				level: 1,
 			});
 			otherTarget.location = room;
-			defender.damage(otherTarget, 1);
-			initiateCombat(attacker, defender, room);
+			defender.damage(otherTarget, 100);
+			initiateCombat(attacker, defender);
 			assert.ok(defender.combatTarget === otherTarget);
 			otherTarget.clearThreatTable();
 			otherTarget.combatTarget = undefined;
@@ -397,7 +397,7 @@ suite("combat.ts", () => {
 
 	suite("processCombatRound", () => {
 		test("should process combat for mobs in queue", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			const initialHealth = defender.health;
 
 			processCombatRound();
@@ -408,7 +408,7 @@ suite("combat.ts", () => {
 		});
 
 		test("should remove mobs from queue when target is dead", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			defender.damage(attacker, defender.health);
 
 			processCombatRound();
@@ -424,7 +424,7 @@ suite("combat.ts", () => {
 		});
 
 		test("should remove mobs from queue when target leaves room", () => {
-			initiateCombat(attacker, defender, room);
+			initiateCombat(attacker, defender);
 			const otherRoom = new Room({
 				coordinates: { x: 1, y: 0, z: 0 },
 				dungeon,

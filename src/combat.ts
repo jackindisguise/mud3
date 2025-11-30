@@ -13,7 +13,14 @@
 
 import { Mob, Room, Weapon, EQUIPMENT_SLOT } from "./core/dungeon.js";
 import { MESSAGE_GROUP } from "./core/character.js";
-import { color, COLOR } from "./core/color.js";
+import {
+	color,
+	COLOR,
+	gradientStringTransformer,
+	repeatingColorStringTransformer,
+	SIZER,
+	stickyColor,
+} from "./core/color.js";
 import { LINEBREAK } from "./core/telnet.js";
 import logger from "./logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
@@ -25,6 +32,7 @@ import {
 	getThirdPersonVerb,
 } from "./core/damage-types.js";
 import { ability as PURE_POWER } from "./abilities/pure-power.js";
+import { string } from "mud-ext";
 
 /**
  * Options for the oneHit function.
@@ -104,23 +112,6 @@ export function oneHit(options: OneHitOptions): number {
 		return 0; // Target not in same room
 	}
 
-	// Check for Pure Power passive ability
-	// Pure Power increases attack power from +0% at 0% proficiency to +200% at 100% proficiency
-	let purePowerMultiplier = 1;
-	if (attacker.knowsAbilityById(PURE_POWER.id)) {
-		const proficiency = attacker.learnedAbilities.get(PURE_POWER.id) || 0;
-		// Formula: 1 + (proficiency / 100) * 2
-		// At 0%: 1 + 0 = 1.0 (no change)
-		// At 50%: 1 + 1 = 2.0 (+100%)
-		// At 100%: 1 + 2 = 3.0 (+200%)
-		purePowerMultiplier = 1 + (proficiency / 100) * 2;
-		attacker.useAbility(PURE_POWER, 1);
-	}
-
-	// Combine Pure Power multiplier with provided multiplier
-	const finalAttackPowerMultiplier =
-		attackPowerMultiplier * purePowerMultiplier;
-
 	// Check if attack hits (accuracy vs avoidance)
 	// Skip miss check if guaranteedHit is true
 	if (!guaranteedHit) {
@@ -150,6 +141,24 @@ export function oneHit(options: OneHitOptions): number {
 		}
 	}
 
+	// Check for Pure Power passive ability
+	// Pure Power increases attack power from +0% at 0% proficiency to +200% at 100% proficiency
+	let purePowerMultiplier = 1;
+	let usedPurePower = false;
+	if (attacker.knowsAbilityById(PURE_POWER.id)) {
+		const proficiency = attacker.learnedAbilities.get(PURE_POWER.id) || 0;
+		// Formula: 1 + (proficiency / 100) * 2
+		// At 0%: 1 + 0 = 1.0 (no change)
+		// At 50%: 1 + 1 = 2.0 (+100%)
+		// At 100%: 1 + 2 = 3.0 (+200%)
+		purePowerMultiplier = 1 + (proficiency / 100) * 2;
+		usedPurePower = true;
+	}
+
+	// Combine Pure Power multiplier with provided multiplier
+	const finalAttackPowerMultiplier =
+		attackPowerMultiplier * purePowerMultiplier;
+
 	// Attack hits - proceed with damage calculation
 	// Get hit type from weapon or use default
 	const hitType = weapon ? weapon.hitType : DEFAULT_HIT_TYPE;
@@ -165,8 +174,8 @@ export function oneHit(options: OneHitOptions): number {
 	damage = (damage + attackPowerBonus) * finalAttackPowerMultiplier;
 
 	// Apply defense reduction
-	const defenseReduction = target.defense * 0.1; // 10% damage reduction per defense point
-	damage = Math.max(1, damage - defenseReduction);
+	const defenseReduction = target.defense * 0.05; // 5% damage reduction per defense point
+	damage = Math.max(0, Math.floor(damage - defenseReduction));
 
 	// Check for critical hit
 	if (Math.random() * 100 < attacker.critRate) {
@@ -183,49 +192,63 @@ export function oneHit(options: OneHitOptions): number {
 
 	const finalDamage = Math.floor(damage);
 
-	// Don't deal damage if it's 0 or less
-	if (finalDamage <= 0) {
-		return 0;
-	}
-
 	// Send combat messages
 	const damageStr = color(String(finalDamage), COLOR.CRIMSON);
-	const damageStrPlain = String(finalDamage);
 
 	// Get verb forms for different perspectives
 	const verbBase = hitType.verb; // First person: "You punch"
 	const verbThirdPersonBase = getThirdPersonVerb(hitType); // Third person: "punches"
 
 	// Color the verbs based on hit type color (default to WHITE)
-	const verbColor = hitType.color ?? COLOR.WHITE;
-	const verb = color(verbBase, verbColor);
-	const verbThirdPerson = color(verbThirdPersonBase, verbColor);
+	let verbColor = hitType.color ?? COLOR.WHITE;
+	let verb = color(verbBase, verbColor);
+	let verbThirdPerson = color(verbThirdPersonBase, verbColor);
 
 	// Get weapon name if provided
-	const weaponName = weapon ? weapon.display : undefined;
+	let weaponName = undefined;
+	if (weapon) {
+		weaponName = weapon.display;
+		verbColor = weapon.hitType.color ?? COLOR.WHITE;
+		verb = color(weapon.hitType.verb, verbColor);
+		verbThirdPerson = color(getThirdPersonVerb(weapon.hitType), verbColor);
+	}
 
 	// Build message templates based on whether ability, weapon, or default verb is used
 	let userMsg: string;
 	let targetMsg: string;
 	let roomMsg: string;
 
-	if (abilityName) {
+	if (finalDamage <= 0) {
+		if (abilityName) {
+			userMsg = `{RYour{x ${abilityName}'s ${verb} {target}, having no effect!`;
+			targetMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {Ryou{x, having no effect!`;
+			roomMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {target}, having no effect!`;
+		} else if (weaponName) {
+			userMsg = `{RYou{x ${weaponName}'s ${verb} does absolutely nothing to {target}!`;
+			targetMsg = `{User}'s ${weaponName}'s ${verbThirdPerson} does absolutely nothing to {Ryou{x!`;
+			roomMsg = `{User}'s ${weaponName}'s ${verbThirdPerson} does absolutely nothing to {target}!`;
+		} else {
+			userMsg = `{RYou{x ${verb} {target}, doing absolutely nothing!`;
+			targetMsg = `{User} ${verbThirdPerson} {Ryou{x, doing absolutely nothing!`;
+			roomMsg = `{User} ${verbThirdPerson} {target}, doing absolutely nothing!`;
+		}
+	} else if (abilityName) {
 		// With ability: ability is the subject, always use "hits"
-		userMsg = `{RYour{x ${abilityName} hits {target} for ${damageStr} damage!`;
-		targetMsg = `{User}'s ${abilityName} hits {Ryou{x for ${damageStr} damage!`;
-		roomMsg = `{User}'s ${abilityName} hits {target} for ${damageStrPlain} damage!`;
+		userMsg = `{RYour{x ${abilityName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+		targetMsg = `{User}'s ${abilityName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
+		roomMsg = `{User}'s ${abilityName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
 	} else if (weaponName) {
 		// With weapon: weapon is the subject, so always use third person
 		userMsg = `{RYour{x ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
 		targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-		roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
+		roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
 	} else {
 		// Without weapon: user is the subject
 		// First person (user sees): "You punch"
 		userMsg = `{RYou{x ${verb} {target} for ${damageStr} damage!`;
 		// Third person (target/room see): "{User} punches"
 		targetMsg = `{User} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-		roomMsg = `{User} ${verbThirdPerson} {target} for ${damageStrPlain} damage!`;
+		roomMsg = `{User} ${verbThirdPerson} {target} for ${damageStr} damage!`;
 	}
 
 	damageMessage(
@@ -363,7 +386,7 @@ export function processThreatSwitching(npc: Mob): void {
 		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
 		if (highestThreat) {
 			// Use initiateCombat to properly set up combat with new target
-			initiateCombat(npc, highestThreat, npcRoom);
+			initiateCombat(npc, highestThreat, true);
 		}
 		return;
 	}
@@ -374,7 +397,7 @@ export function processThreatSwitching(npc: Mob): void {
 		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
 		if (highestThreat) {
 			// Use initiateCombat to properly set up combat with new target
-			initiateCombat(npc, highestThreat, npcRoom);
+			initiateCombat(npc, highestThreat, true);
 		} else {
 			// No valid target in room, clear target and remove from combat queue
 			npc.combatTarget = undefined;
@@ -394,9 +417,21 @@ export function processThreatSwitching(npc: Mob): void {
 	if (highestThreat >= graceThreshold) {
 		// Switch targets - we're already in combat, so just update the target
 		// Don't use initiateCombat here as it would send engagement messages again
-		initiateCombat(npc, highestThreatMob, npcRoom);
+		initiateCombat(npc, highestThreatMob, true);
 	}
 }
+
+const deathColorRepeatingTransformer = repeatingColorStringTransformer(
+	[
+		COLOR.OLIVE,
+		COLOR.MAROON,
+		COLOR.CRIMSON,
+		COLOR.YELLOW,
+		COLOR.CRIMSON,
+		COLOR.MAROON,
+	],
+	3
+);
 
 /**
  * Handles mob death, removing from combat and cleaning up.
@@ -458,9 +493,16 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 
 			// Create ASCII art for "SLAIN" (3 lines tall)
 			const slainArt = [
-				color(".-. .   .-. .-. . .", COLOR.CRIMSON),
-				color("`-. |   |-|  |  |\\|", COLOR.CRIMSON),
-				color("`-' `-' ` ' `-' ' `", COLOR.CRIMSON),
+				"@@@@@@   @@@        @@@@@@   @@@  @@@  @@@",
+				"@@@@@@@   @@@       @@@@@@@@  @@@  @@@@ @@@ ",
+				"!@@       @@!       @@!  @@@  @@!  @@!@!@@@ ",
+				"!@!       !@!       !@!  @!@  !@!  !@!!@!@! ",
+				"!!@@!!    @!!       @!@!@!@!  !!@  @!@ !!@! ",
+				" !!@!!!   !!!       !!!@!!!!  !!!  !@!  !!! ",
+				"     !:!  !!:       !!:  !!!  !!:  !!:  !!!  ",
+				"    !:!    :!:      :!:  !:!  :!:  :!:  !:!  ",
+				":::: ::    :: ::::  ::   :::   ::   ::   :: ",
+				":: : :    : :: : :   :   : :  :    ::    :  ",
 			];
 
 			// Build the message with "You have" on the left and mob name on the right of middle line
@@ -469,11 +511,38 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 
 			// Create the message lines
 			const messageLines: string[] = [];
-			messageLines.push(" ".repeat(leftText.length) + slainArt[0]); // Top line
-			messageLines.push(leftText + slainArt[1] + rightText); // Middle line with text
-			messageLines.push(" ".repeat(leftText.length) + slainArt[2]); // Bottom line
+			for (let i = 0; i < slainArt.length; i++) {
+				if (i === Math.ceil(slainArt.length / 2)) {
+					messageLines.push(leftText + slainArt[i] + rightText);
+				} else {
+					messageLines.push(
+						" ".repeat(leftText.length) +
+							slainArt[i] +
+							" ".repeat(rightText.length)
+					);
+				}
+			}
 
-			killer.sendMessage(messageLines.join("\n"), MESSAGE_GROUP.COMBAT);
+			const box = string.box({
+				input: messageLines,
+				width: 73,
+				color: deathColorRepeatingTransformer,
+				innerColor: (str) => stickyColor(str, COLOR.CRIMSON),
+				sizer: SIZER,
+				style: {
+					vPadding: 1,
+					titleHAlign: string.ALIGN.CENTER,
+					titleBorder: {
+						left: ">",
+						right: "<",
+					},
+					vertical: "****",
+					horizontal: "*",
+					hAlign: string.ALIGN.CENTER,
+				},
+			});
+
+			killer.sendMessage(box.join("\n"), MESSAGE_GROUP.COMBAT);
 			// Only players gain experience
 			const experienceGained = killer.awardKillExperience(deadMob.level);
 			if (experienceGained > 0) {
@@ -585,19 +654,32 @@ export function processCombatRound(): void {
  * @param defender The mob being attacked
  * @param room The room where combat is occurring
  */
-export function initiateCombat(attacker: Mob, defender: Mob, room: Room): void {
-	// Set attacker's target
-	attacker.combatTarget = defender;
-
-	// If defender is an NPC, add threat and potentially switch target
-	// addThreat will call processThreatSwitching, which will set defender's target if needed
-	if (!defender.character && defender.getThreat(attacker) === 0) {
-		// Initial threat from engagement
-		defender.addThreat(attacker, 1);
+export function initiateCombat(
+	attacker: Mob,
+	defender: Mob,
+	reaction: boolean = false
+): void {
+	if (attacker.combatTarget === defender) {
+		return;
 	}
 
-	// If defender doesn't have a target (e.g., defender is a player character), set attacker as target
-	if (!defender.combatTarget) {
-		initiateCombat(defender, attacker, room);
+	const originalTarget = attacker.combatTarget;
+	attacker.combatTarget = defender;
+	// not a reactionary initiation (backfoot)
+	if (!reaction) {
+		// defender	is an NPC? defender needs to consider us a threat
+		if (!defender.character) {
+			defender.addToThreatTable(attacker);
+		} else {
+			// defender is a character and not in combat? initiate combat
+			if (!defender.isInCombat()) {
+				initiateCombat(defender, attacker, true);
+			}
+		}
+
+		// we didn't have a target before, free round of combat
+		if (!originalTarget) {
+			processMobCombatRound(attacker);
+		}
 	}
 }

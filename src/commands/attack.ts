@@ -58,7 +58,7 @@ export default {
 		}
 
 		// Initiate combat
-		initiateCombat(actor, target, room);
+		initiateCombat(actor, target);
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {

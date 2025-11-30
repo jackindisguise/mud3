@@ -3409,14 +3409,20 @@ export class Room extends DungeonObject {
 					processThreatSwitching(inhabitant);
 				}
 
-				// Process aggressive behavior: generates threat instead of directly attacking
+				// Process aggressive behavior: player entering room with aggressive mob in it
 				if (inhabitant.hasBehavior(BEHAVIOR.AGGRESSIVE) && enterer.character) {
-					inhabitant.addThreat(enterer, 1);
+					if (!inhabitant.isInCombat()) {
+						initiateCombat(inhabitant, enterer);
+					}
+					inhabitant.addToThreatTable(enterer);
 				}
 
 				// Also check if the entering mob is aggressive - it should generate threat for character mobs in the room
 				if (enterer.hasBehavior(BEHAVIOR.AGGRESSIVE) && inhabitant.character) {
-					enterer.addThreat(inhabitant, 1);
+					if (!enterer.isInCombat()) {
+						initiateCombat(enterer, inhabitant);
+					}
+					enterer.addToThreatTable(inhabitant);
 				}
 			}
 		}
@@ -4992,6 +4998,7 @@ export class Mob extends Movable {
 	 */
 	public set combatTarget(target: Mob | undefined) {
 		this._combatTarget = target;
+		if (!this.character && target) this.addToThreatTable(target);
 		if (!target) removeFromCombatQueue(this);
 		else addToCombatQueue(this);
 	}
@@ -5045,6 +5052,16 @@ export class Mob extends Movable {
 
 		// Process threat switching to potentially switch target
 		processThreatSwitching(this);
+	}
+
+	public addToThreatTable(attacker: Mob): void {
+		if (!this._threatTable) {
+			this._threatTable = new Map<Mob, ThreatEntry>();
+		}
+		let currentEntry = this._threatTable.get(attacker);
+		if (!currentEntry) {
+			this.addThreat(attacker, 1);
+		}
 	}
 
 	/**
@@ -6740,13 +6757,13 @@ export class Mob extends Movable {
 
 		// Generate threat for NPCs
 		if (!this.character) {
-			this.addThreat(attacker, amount);
+			this.addThreat(attacker, Math.max(amount, 1));
 		} else if (
 			!this.isInCombat() &&
 			attacker.location === this.location &&
 			this.location instanceof Room
 		) {
-			initiateCombat(this, attacker, this.location);
+			initiateCombat(this, attacker, true);
 		}
 
 		// Handle death

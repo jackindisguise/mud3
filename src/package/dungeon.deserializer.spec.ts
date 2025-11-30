@@ -128,7 +128,14 @@ describe("package/dungeon.ts deserializers", () => {
 			const room = await deserializeRoom(data);
 
 			const defaultExits =
-				DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+				DIRECTION.NORTH |
+				DIRECTION.SOUTH |
+				DIRECTION.EAST |
+				DIRECTION.WEST |
+				DIRECTION.NORTHEAST |
+				DIRECTION.NORTHWEST |
+				DIRECTION.SOUTHEAST |
+				DIRECTION.SOUTHWEST;
 			assert.strictEqual(room.allowedExits, defaultExits);
 		});
 

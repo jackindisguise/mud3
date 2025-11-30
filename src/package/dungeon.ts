@@ -1705,7 +1705,14 @@ function hydrateSerializedRoomData(data: SerializedRoom): RoomOptions {
 	const base = hydrateSerializedDungeonObjectData(data);
 	// allowedExits is mandatory in serialized form, but handle legacy data
 	const defaultExits =
-		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+		DIRECTION.NORTH |
+		DIRECTION.SOUTH |
+		DIRECTION.EAST |
+		DIRECTION.WEST |
+		DIRECTION.NORTHEAST |
+		DIRECTION.NORTHWEST |
+		DIRECTION.SOUTHEAST |
+		DIRECTION.SOUTHWEST;
 	// coordinates is required, so we can safely cast back to RoomOptions
 	return pruneUndefined({
 		...base,
@@ -1884,7 +1891,14 @@ function hydrateRoomTemplateData(
 ): RoomTemplate {
 	const base = hydrateTemplateData(data, templateId);
 	const defaultExits =
-		DIRECTION.NORTH | DIRECTION.SOUTH | DIRECTION.EAST | DIRECTION.WEST;
+		DIRECTION.NORTH |
+		DIRECTION.SOUTH |
+		DIRECTION.EAST |
+		DIRECTION.WEST |
+		DIRECTION.NORTHEAST |
+		DIRECTION.NORTHWEST |
+		DIRECTION.SOUTHEAST |
+		DIRECTION.SOUTHWEST;
 	return pruneUndefined({
 		...base,
 		type: "Room",

@@ -368,33 +368,99 @@ async function main() {
 	// Check if we should use TypeScript files or compiled JavaScript
 	const useTypeScript =
 		process.argv.includes("--ts") || process.argv.includes("-t");
-	const sourceDir = useTypeScript
-		? join(projectRoot, "src")
-		: join(projectRoot, "dist", "src");
+	
+	// Extract test file arguments (anything that looks like a file path, not a flag)
+	const args = process.argv.slice(2);
+	const testFileArgs = args.filter(
+		(arg) => !arg.startsWith("--") && !arg.startsWith("-") && /\.(ts|js|spec\.(ts|js))$/.test(arg)
+	);
 
-	if (useTypeScript && !existsSync(join(projectRoot, "node_modules", "tsx"))) {
-		console.error(
-			"Error: tsx is required to run TypeScript tests. Install it with: npm install --save-dev tsx"
+	let testFiles = [];
+	let hasSpecificFiles = false;
+
+	if (testFileArgs.length > 0) {
+		hasSpecificFiles = true;
+		// User provided specific test files
+		const sourceDir = useTypeScript
+			? join(projectRoot, "src")
+			: join(projectRoot, "dist", "src");
+		
+		// Resolve each test file path
+		for (const testFileArg of testFileArgs) {
+			// Try as relative path first
+			let testFilePath = resolve(projectRoot, testFileArg);
+			
+			// If it doesn't exist, try in src or dist/src
+			if (!existsSync(testFilePath)) {
+				const srcPath = join(sourceDir, testFileArg);
+				if (existsSync(srcPath)) {
+					testFilePath = srcPath;
+				} else {
+					// Try with src/ prefix
+					const srcPrefixedPath = join(sourceDir, testFileArg.replace(/^src\//, ""));
+					if (existsSync(srcPrefixedPath)) {
+						testFilePath = srcPrefixedPath;
+					} else {
+						console.error(chalk.red(`Test file not found: ${testFileArg}`));
+						process.exit(1);
+					}
+				}
+			}
+			
+			// Verify it's actually a test file
+			if (!/\.spec\.(ts|js)$/.test(testFilePath)) {
+				console.error(
+					chalk.red(`File does not appear to be a test file (should end in .spec.ts or .spec.js): ${testFileArg}`)
+				);
+				process.exit(1);
+			}
+			
+			testFiles.push(testFilePath);
+		}
+		
+		// If using TypeScript mode, ensure tsx is available
+		if (useTypeScript && !existsSync(join(projectRoot, "node_modules", "tsx"))) {
+			console.error(
+				"Error: tsx is required to run TypeScript tests. Install it with: npm install --save-dev tsx"
+			);
+			process.exit(1);
+		}
+	} else {
+		// No specific files provided, find all test files
+		const sourceDir = useTypeScript
+			? join(projectRoot, "src")
+			: join(projectRoot, "dist", "src");
+
+		if (useTypeScript && !existsSync(join(projectRoot, "node_modules", "tsx"))) {
+			console.error(
+				"Error: tsx is required to run TypeScript tests. Install it with: npm install --save-dev tsx"
+			);
+			process.exit(1);
+		}
+
+		// Find test files
+		process.stdout.write(chalk.blue("Finding test files... "));
+		testFiles = await findTestFiles(sourceDir);
+		process.stdout.write(
+			chalk.green(`Found ${testFiles.length} test file(s)\n\n`)
 		);
-		process.exit(1);
+
+		if (testFiles.length === 0) {
+			console.error(chalk.red(`No test files found in ${sourceDir}`));
+			process.exit(1);
+		}
 	}
 
-	// Find test files
-	process.stdout.write(chalk.blue("Finding test files... "));
-	const testFiles = await findTestFiles(sourceDir);
-	process.stdout.write(
-		chalk.green(`Found ${testFiles.length} test file(s)\n\n`)
-	);
-
-	if (testFiles.length === 0) {
-		console.error(chalk.red(`No test files found in ${sourceDir}`));
-		process.exit(1);
+	// Print initial message
+	if (hasSpecificFiles) {
+		console.log(
+			chalk.blue(`Running ${testFiles.length} specified test file(s) in parallel...\n`)
+		);
+	} else {
+		console.log(
+			chalk.blue(`Running ${testFiles.length} test file(s) in parallel...\n`)
+		);
 	}
-
-	// Print initial message (we'll update with test count after parsing)
-	console.log(
-		chalk.blue(`Running ${testFiles.length} test file(s) in parallel...\n`)
-	);
 
 	// Track results and timing
 	const results = [];

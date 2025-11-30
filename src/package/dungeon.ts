@@ -416,11 +416,11 @@ export interface SerializedDungeonFormat {
 		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets). In-file ids are local (no "@").
 		resets?: SerializedReset[]; // Optional array of resets
 		resetMessage?: string;
-		exitOverrides?: Record<
-			string,
-			| number // allowedExits bitmask override
-			| { allowedExits?: number; roomLinks?: Record<DirectionText, string> } // allowedExits and/or roomLinks override
-		>; // Dictionary: "x,y,z" -> bitmask, roomLinks object, or both
+		exitOverrides?: Array<{
+			coordinates: { x: number; y: number; z: number };
+			allowedExits?: number; // allowedExits bitmask override
+			roomLinks?: Record<DirectionText, string>; // roomLinks override
+		}>; // Array of exit overrides with coordinate objects
 	};
 }
 
@@ -684,25 +684,24 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					// Apply exit override if present (before adding to dungeon)
 					// Store roomLinks from exitOverrides to process after room is added
 					let exitOverrideRoomLinks: Record<DirectionText, string> | undefined;
-					if (exitOverrides && typeof exitOverrides === "object") {
-						const coordKey = `${x},${y},${z}`;
-						const override = exitOverrides[coordKey];
-						if (override !== undefined) {
-							if (typeof override === "number") {
-								// Integer bitmask override for allowedExits
-								room.allowedExits = override;
-							} else if (typeof override === "object" && override !== null) {
-								// Object with allowedExits and/or roomLinks override
-								if (
-									"allowedExits" in override &&
-									typeof override.allowedExits === "number"
-								) {
-									room.allowedExits = override.allowedExits;
-								}
-								if (override.roomLinks) {
-									// Store roomLinks to process after room is added to dungeon
-									exitOverrideRoomLinks = override.roomLinks;
-								}
+					if (exitOverrides && Array.isArray(exitOverrides)) {
+						const override = exitOverrides.find(
+							(o) =>
+								o.coordinates &&
+								o.coordinates.x === x &&
+								o.coordinates.y === y &&
+								o.coordinates.z === z
+						);
+						if (override) {
+							if (
+								override.allowedExits !== undefined &&
+								typeof override.allowedExits === "number"
+							) {
+								room.allowedExits = override.allowedExits;
+							}
+							if (override.roomLinks) {
+								// Store roomLinks to process after room is added to dungeon
+								exitOverrideRoomLinks = override.roomLinks;
 							}
 						}
 					}

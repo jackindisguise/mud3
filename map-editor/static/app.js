@@ -136,6 +136,105 @@ class MapEditor {
 		return opposites[direction] || direction;
 	}
 
+	/**
+	 * Get exit override for a specific coordinate
+	 * @param {Object} dungeon - Dungeon object
+	 * @param {number} x - X coordinate
+	 * @param {number} y - Y coordinate
+	 * @param {number} z - Z coordinate
+	 * @returns {Object|null} Override object or null if not found
+	 */
+	getExitOverride(dungeon, x, y, z) {
+		if (!dungeon.exitOverrides || !Array.isArray(dungeon.exitOverrides)) {
+			return null;
+		}
+		return (
+			dungeon.exitOverrides.find(
+				(override) =>
+					override.coordinates &&
+					override.coordinates.x === x &&
+					override.coordinates.y === y &&
+					override.coordinates.z === z
+			) || null
+		);
+	}
+
+	/**
+	 * Set or update exit override for a specific coordinate
+	 * @param {Object} dungeon - Dungeon object
+	 * @param {number} x - X coordinate
+	 * @param {number} y - Y coordinate
+	 * @param {number} z - Z coordinate
+	 * @param {number|Object} value - Override value (number for allowedExits only, or object with allowedExits and/or roomLinks)
+	 */
+	setExitOverride(dungeon, x, y, z, value) {
+		if (!dungeon.exitOverrides || !Array.isArray(dungeon.exitOverrides)) {
+			dungeon.exitOverrides = [];
+		}
+
+		// Find existing override
+		const existingIndex = dungeon.exitOverrides.findIndex(
+			(override) =>
+				override.coordinates &&
+				override.coordinates.x === x &&
+				override.coordinates.y === y &&
+				override.coordinates.z === z
+		);
+
+		const override = {
+			coordinates: { x, y, z },
+		};
+
+		if (typeof value === "number") {
+			override.allowedExits = value;
+		} else if (typeof value === "object" && value !== null) {
+			if (value.allowedExits !== undefined) {
+				override.allowedExits = value.allowedExits;
+			}
+			if (value.roomLinks !== undefined) {
+				override.roomLinks = value.roomLinks;
+			}
+		}
+
+		if (existingIndex >= 0) {
+			dungeon.exitOverrides[existingIndex] = override;
+		} else {
+			dungeon.exitOverrides.push(override);
+		}
+	}
+
+	/**
+	 * Delete exit override for a specific coordinate
+	 * @param {Object} dungeon - Dungeon object
+	 * @param {number} x - X coordinate
+	 * @param {number} y - Y coordinate
+	 * @param {number} z - Z coordinate
+	 * @returns {boolean} True if an override was deleted, false otherwise
+	 */
+	deleteExitOverride(dungeon, x, y, z) {
+		if (!dungeon.exitOverrides || !Array.isArray(dungeon.exitOverrides)) {
+			return false;
+		}
+
+		const index = dungeon.exitOverrides.findIndex(
+			(override) =>
+				override.coordinates &&
+				override.coordinates.x === x &&
+				override.coordinates.y === y &&
+				override.coordinates.z === z
+		);
+
+		if (index >= 0) {
+			dungeon.exitOverrides.splice(index, 1);
+			if (dungeon.exitOverrides.length === 0) {
+				delete dungeon.exitOverrides;
+			}
+			return true;
+		}
+
+		return false;
+	}
+
 	async fetchHitTypesData() {
 		if (this.api?.getHitTypes) {
 			return this.api.getHitTypes();
@@ -1372,28 +1471,20 @@ class MapEditor {
 			if (!room) return null;
 
 			// Apply exit override if present (create a copy to avoid mutating template)
-			const coordKey = `${x},${y},${z}`;
-			if (
-				dungeon.exitOverrides &&
-				dungeon.exitOverrides[coordKey] !== undefined
-			) {
-				const override = dungeon.exitOverrides[coordKey];
+			const override = this.getExitOverride(dungeon, x, y, z);
+			if (override) {
 				// Handle both number (allowedExits only) and object (allowedExits and/or roomLinks) formats
 				let allowedExitsOverride = room.allowedExits;
 				let roomLinksOverride = room.roomLinks || {};
-				if (typeof override === "number") {
-					allowedExitsOverride = override;
-				} else if (typeof override === "object" && override !== null) {
-					if ("allowedExits" in override) {
-						allowedExitsOverride = override.allowedExits ?? room.allowedExits;
-					}
-					if ("roomLinks" in override) {
-						// Merge roomLinks from override with base room's roomLinks
-						roomLinksOverride = {
-							...(room.roomLinks || {}),
-							...(override.roomLinks || {}),
-						};
-					}
+				if (override.allowedExits !== undefined) {
+					allowedExitsOverride = override.allowedExits ?? room.allowedExits;
+				}
+				if (override.roomLinks !== undefined) {
+					// Merge roomLinks from override with base room's roomLinks
+					roomLinksOverride = {
+						...(room.roomLinks || {}),
+						...(override.roomLinks || {}),
+					};
 				}
 				// Return a copy with the override applied
 				return {
@@ -1641,11 +1732,7 @@ class MapEditor {
 					}
 
 					// Check if this cell has an exit override
-					const coordKey = `${x},${y},${this.currentLayer}`;
-					if (
-						dungeon.exitOverrides &&
-						dungeon.exitOverrides[coordKey] !== undefined
-					) {
+					if (this.getExitOverride(dungeon, x, y, this.currentLayer)) {
 						cell.classList.add("has-exit-override");
 						cell.title = (cell.title || "") + " (Exit Override)";
 					}
@@ -2047,6 +2134,9 @@ class MapEditor {
 							// Remove resets for this room
 							this.removeResetsAt(cell.x, cell.y, cell.z);
 
+							// Remove exit overrides for this room
+							this.deleteExitOverride(dungeon, cell.x, cell.y, cell.z);
+
 							// Check adjacent cells (up, down, left, right)
 							const directions = [
 								{ x: 0, y: -1, z: 0 }, // up
@@ -2076,6 +2166,15 @@ class MapEditor {
 								}
 							}
 						}
+					}
+
+					// Clean up empty exitOverrides array after paint delete
+					if (
+						dungeon.exitOverrides &&
+						Array.isArray(dungeon.exitOverrides) &&
+						dungeon.exitOverrides.length === 0
+					) {
+						delete dungeon.exitOverrides;
 					}
 
 					this.showToast(
@@ -2108,6 +2207,9 @@ class MapEditor {
 
 					// Also remove any resets for this room
 					this.removeResetsAt(x, y, z);
+
+					// Remove exit overrides for this room
+					this.deleteExitOverride(dungeon, x, y, z);
 
 					this.showToast(
 						`Deleted ${roomName}`,
@@ -2536,9 +2638,7 @@ class MapEditor {
 			const roomAtCell = this.getRoomAt(dungeon, x, y, z);
 
 			// Check if this cell has an exit override
-			const coordKey = `${x},${y},${z}`;
-			const hasOverride =
-				dungeon.exitOverrides && dungeon.exitOverrides[coordKey] !== undefined;
+			const hasOverride = !!this.getExitOverride(dungeon, x, y, z);
 			const templateAllowedExits = room.allowedExits || 0;
 			const currentAllowedExits = roomAtCell
 				? roomAtCell.allowedExits
@@ -2638,22 +2738,15 @@ class MapEditor {
 
 		const room = dungeon.rooms[roomIndex - 1];
 		const roomAtCell = this.getRoomAt(dungeon, x, y, z);
-		const coordKey = `${x},${y},${z}`;
 
-		// Get current override value (could be number or object)
-		const currentOverride = dungeon.exitOverrides?.[coordKey];
+		// Get current override value
+		const currentOverride = this.getExitOverride(dungeon, x, y, z);
 
 		// Get current allowedExits (from override if exists, otherwise template default)
 		const templateAllowedExits = room.allowedExits || 0;
 		let currentAllowedExitsValue = templateAllowedExits;
-		if (currentOverride !== undefined) {
-			if (typeof currentOverride === "number") {
-				currentAllowedExitsValue = currentOverride;
-			} else if (
-				typeof currentOverride === "object" &&
-				currentOverride !== null &&
-				"allowedExits" in currentOverride
-			) {
+		if (currentOverride) {
+			if (currentOverride.allowedExits !== undefined) {
 				currentAllowedExitsValue =
 					currentOverride.allowedExits ?? templateAllowedExits;
 			}
@@ -2666,18 +2759,13 @@ class MapEditor {
 
 		// Get current roomLinks (from override if exists)
 		let currentRoomLinks = {};
-		if (
-			currentOverride !== undefined &&
-			typeof currentOverride === "object" &&
-			currentOverride !== null &&
-			"roomLinks" in currentOverride
-		) {
+		if (currentOverride && currentOverride.roomLinks) {
 			currentRoomLinks = currentOverride.roomLinks || {};
 		}
 
 		// Initialize exitOverrides if it doesn't exist
 		if (!dungeon.exitOverrides) {
-			dungeon.exitOverrides = {};
+			dungeon.exitOverrides = [];
 		}
 
 		const DIRECTION = {
@@ -2721,16 +2809,25 @@ class MapEditor {
 					Template default: ${this.formatAllowedExits(templateAllowedExits)}
 				</p>
 				<div class="exit-buttons">
-					<button class="exit-btn" data-direction="north" style="padding: 0.5rem;">NORTH</button>
-					<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">SOUTH</button>
-					<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">EAST</button>
-					<button class="exit-btn" data-direction="west" style="padding: 0.5rem;">WEST</button>
-					<button class="exit-btn" data-direction="northeast" style="padding: 0.5rem;">NORTHEAST</button>
-					<button class="exit-btn" data-direction="northwest" style="padding: 0.5rem;">NORTHWEST</button>
-					<button class="exit-btn" data-direction="southeast" style="padding: 0.5rem;">SOUTHEAST</button>
-					<button class="exit-btn" data-direction="southwest" style="padding: 0.5rem;">SOUTHWEST</button>
-					<button class="exit-btn" data-direction="up" style="padding: 0.5rem;">UP</button>
-					<button class="exit-btn" data-direction="down" style="padding: 0.5rem;">DOWN</button>
+					<div class="exit-buttons-row">
+						<button class="exit-row-toggle-btn" data-row="0" title="Toggle all cardinals">⦿</button>
+						<button class="exit-btn" data-direction="north" style="padding: 0.5rem;">NORTH</button>
+						<button class="exit-btn" data-direction="south" style="padding: 0.5rem;">SOUTH</button>
+						<button class="exit-btn" data-direction="east" style="padding: 0.5rem;">EAST</button>
+						<button class="exit-btn" data-direction="west" style="padding: 0.5rem;">WEST</button>
+					</div>
+					<div class="exit-buttons-row">
+						<button class="exit-row-toggle-btn" data-row="1" title="Toggle all diagonals">⦿</button>
+						<button class="exit-btn" data-direction="northeast" style="padding: 0.5rem;">NORTHEAST</button>
+						<button class="exit-btn" data-direction="northwest" style="padding: 0.5rem;">NORTHWEST</button>
+						<button class="exit-btn" data-direction="southeast" style="padding: 0.5rem;">SOUTHEAST</button>
+						<button class="exit-btn" data-direction="southwest" style="padding: 0.5rem;">SOUTHWEST</button>
+					</div>
+					<div class="exit-buttons-row">
+						<button class="exit-row-toggle-btn" data-row="2" title="Toggle up/down">⦿</button>
+						<button class="exit-btn" data-direction="up" style="padding: 0.5rem;">UP</button>
+						<button class="exit-btn" data-direction="down" style="padding: 0.5rem;">DOWN</button>
+					</div>
 				</div>
 			</div>
 		`;
@@ -2866,6 +2963,44 @@ class MapEditor {
 
 				// Toggle the direction bit
 				currentAllowedExitsValue ^= dirFlag;
+				refreshExitButtons();
+			});
+		});
+
+		// Set up row toggle button handlers
+		document.querySelectorAll(".exit-row-toggle-btn").forEach((toggleBtn) => {
+			toggleBtn.addEventListener("click", () => {
+				const rowIndex = parseInt(toggleBtn.dataset.row);
+				const row = toggleBtn.closest(".exit-buttons-row");
+				if (!row) return;
+
+				// Get all exit buttons in this row (excluding the toggle button itself)
+				const rowExitButtons = Array.from(row.querySelectorAll(".exit-btn"));
+				if (rowExitButtons.length === 0) return;
+
+				// Check if all buttons in the row are enabled
+				const allEnabled = rowExitButtons.every((btn) => {
+					const direction = btn.dataset.direction;
+					const dirFlag = TEXT2DIR[direction];
+					if (!dirFlag) return false;
+					return (currentAllowedExitsValue & dirFlag) !== 0;
+				});
+
+				// Toggle all buttons in the row
+				rowExitButtons.forEach((btn) => {
+					const direction = btn.dataset.direction;
+					const dirFlag = TEXT2DIR[direction];
+					if (!dirFlag) return;
+
+					if (allEnabled) {
+						// Turn all off
+						currentAllowedExitsValue &= ~dirFlag;
+					} else {
+						// Turn all on
+						currentAllowedExitsValue |= dirFlag;
+					}
+				});
+
 				refreshExitButtons();
 			});
 		});
@@ -3047,15 +3182,13 @@ class MapEditor {
 				this.saveStateToHistory();
 
 				// Store the old value before updating
-				const oldValue =
-					dungeon.exitOverrides && dungeon.exitOverrides[coordKey] !== undefined
-						? dungeon.exitOverrides[coordKey]
-						: null;
-
-				// Initialize exitOverrides if it doesn't exist
-				if (!dungeon.exitOverrides) {
-					dungeon.exitOverrides = {};
-				}
+				const oldOverride = this.getExitOverride(dungeon, x, y, z);
+				const oldValue = oldOverride
+					? {
+							allowedExits: oldOverride.allowedExits,
+							roomLinks: oldOverride.roomLinks,
+					  }
+					: null;
 
 				// Collect roomLinks
 				const roomLinks = {};
@@ -3091,41 +3224,27 @@ class MapEditor {
 				});
 
 				// Store the override - use object if roomLinks exist, otherwise use number
-				if (Object.keys(roomLinks).length > 0) {
-					// Object with both allowedExits and roomLinks
-					dungeon.exitOverrides[coordKey] = {
-						allowedExits: currentAllowedExitsValue,
-						roomLinks: roomLinks,
-					};
-				} else {
-					// Just number (allowedExits only)
-					dungeon.exitOverrides[coordKey] = currentAllowedExitsValue;
-				}
+				const overrideValue =
+					Object.keys(roomLinks).length > 0
+						? {
+								allowedExits: currentAllowedExitsValue,
+								roomLinks: roomLinks,
+						  }
+						: currentAllowedExitsValue;
+
+				this.setExitOverride(dungeon, x, y, z, overrideValue);
 
 				// Re-render map to show updated exits
 				this.renderMap(dungeon);
 
 				this.makeChange({
 					action: EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE,
-					actionTarget: coordKey,
+					actionTarget: `${x},${y},${z}`,
 					newParameters: {
 						allowedExits: currentAllowedExitsValue,
 						...(Object.keys(roomLinks).length > 0 ? { roomLinks } : {}),
 					},
-					oldParameters:
-						oldValue !== null
-							? {
-									allowedExits:
-										typeof oldValue === "number"
-											? oldValue
-											: oldValue.allowedExits ?? null,
-									...(typeof oldValue === "object" &&
-									oldValue !== null &&
-									oldValue.roomLinks
-										? { roomLinks: oldValue.roomLinks }
-										: {}),
-							  }
-							: null,
+					oldParameters: oldValue,
 					metadata: {
 						coordinates: { x, y, z },
 						roomDisplay: room?.display || "Unknown",
@@ -3152,21 +3271,19 @@ class MapEditor {
 		document
 			.getElementById("exit-override-clear-btn")
 			.addEventListener("click", () => {
-				if (
-					!dungeon.exitOverrides ||
-					dungeon.exitOverrides[coordKey] === undefined
-				) {
+				const oldOverride = this.getExitOverride(dungeon, x, y, z);
+				if (!oldOverride) {
 					this.showToast("No override to clear", "");
 					return;
 				}
 
 				this.saveStateToHistory();
 
-				const oldValue = dungeon.exitOverrides[coordKey];
-				delete dungeon.exitOverrides[coordKey];
-				if (Object.keys(dungeon.exitOverrides).length === 0) {
-					delete dungeon.exitOverrides;
-				}
+				const oldValue = {
+					allowedExits: oldOverride.allowedExits,
+					roomLinks: oldOverride.roomLinks,
+				};
+				this.deleteExitOverride(dungeon, x, y, z);
 
 				// Re-render map
 				this.renderMap(dungeon);
@@ -4602,9 +4719,21 @@ class MapEditor {
 									(r) => r.roomRef !== roomRef
 								);
 							}
+
+							// Remove exit overrides for this room
+							this.deleteExitOverride(dungeon, x, y, z);
 						}
 					}
 				}
+			}
+
+			// Clean up empty exitOverrides array after template deletion
+			if (
+				dungeon.exitOverrides &&
+				Array.isArray(dungeon.exitOverrides) &&
+				dungeon.exitOverrides.length === 0
+			) {
+				delete dungeon.exitOverrides;
 			}
 
 			// Remove the room template
@@ -5272,6 +5401,26 @@ class MapEditor {
 			});
 		}
 
+		// Remove exit overrides outside new boundaries
+		if (dungeon.exitOverrides && Array.isArray(dungeon.exitOverrides)) {
+			dungeon.exitOverrides = dungeon.exitOverrides.filter((override) => {
+				const { x, y, z } = override.coordinates || {};
+				return x < width && y < height && z < layers;
+			});
+			// Clean up empty exitOverrides array
+			if (dungeon.exitOverrides.length === 0) {
+				delete dungeon.exitOverrides;
+			}
+		} else if (dungeon.exitOverrides && Array.isArray(dungeon.exitOverrides)) {
+			dungeon.exitOverrides = dungeon.exitOverrides.filter((override) => {
+				const { x, y, z } = override.coordinates || {};
+				return x < width && y < height && z < layers;
+			});
+			if (dungeon.exitOverrides.length === 0) {
+				delete dungeon.exitOverrides;
+			}
+		}
+
 		// Update UI
 		this.setupLayerSelector(layers);
 		this.renderMap(dungeon);
@@ -5693,22 +5842,19 @@ class MapEditor {
 		if (targetDungeonId === this.currentDungeonId) {
 			// Same dungeon - modify directly
 			const dungeon = this.yamlData.dungeon;
-			const targetCoordKey = `${targetX},${targetY},${targetZ}`;
 
-			if (!dungeon.exitOverrides) {
-				dungeon.exitOverrides = {};
-			}
-
-			let targetOverride = dungeon.exitOverrides[targetCoordKey];
-			if (!targetOverride || typeof targetOverride === "number") {
-				// Create new object override or convert number to object
+			let targetOverride = this.getExitOverride(
+				dungeon,
+				targetX,
+				targetY,
+				targetZ
+			);
+			if (!targetOverride) {
+				// Create new object override
 				const targetRoom = this.getRoomAt(dungeon, targetX, targetY, targetZ);
 				const baseAllowedExits = targetRoom?.allowedExits || 0;
 				targetOverride = {
-					allowedExits:
-						typeof targetOverride === "number"
-							? targetOverride
-							: baseAllowedExits,
+					allowedExits: baseAllowedExits,
 					roomLinks: {},
 				};
 			} else if (!targetOverride.roomLinks) {
@@ -5717,7 +5863,7 @@ class MapEditor {
 
 			// Add reciprocal link
 			targetOverride.roomLinks[oppositeDir] = reciprocalLink;
-			dungeon.exitOverrides[targetCoordKey] = targetOverride;
+			this.setExitOverride(dungeon, targetX, targetY, targetZ, targetOverride);
 
 			this.showToast(
 				"2-way link created",
@@ -5739,14 +5885,13 @@ class MapEditor {
 				const targetDungeon = targetYamlData.dungeon;
 
 				// Get or create exit override for target room
-				const targetCoordKey = `${targetX},${targetY},${targetZ}`;
-
-				if (!targetDungeon.exitOverrides) {
-					targetDungeon.exitOverrides = {};
-				}
-
-				let targetOverride = targetDungeon.exitOverrides[targetCoordKey];
-				if (!targetOverride || typeof targetOverride === "number") {
+				let targetOverride = this.getExitOverride(
+					targetDungeon,
+					targetX,
+					targetY,
+					targetZ
+				);
+				if (!targetOverride) {
 					// Temporarily set yamlData to access getRoomAt
 					const tempYamlData = this.yamlData;
 					this.yamlData = { dungeon: targetDungeon };
@@ -5760,10 +5905,7 @@ class MapEditor {
 
 					const baseAllowedExits = targetRoom?.allowedExits || 0;
 					targetOverride = {
-						allowedExits:
-							typeof targetOverride === "number"
-								? targetOverride
-								: baseAllowedExits,
+						allowedExits: baseAllowedExits,
 						roomLinks: {},
 					};
 				} else if (!targetOverride.roomLinks) {
@@ -5772,7 +5914,13 @@ class MapEditor {
 
 				// Add reciprocal link
 				targetOverride.roomLinks[oppositeDir] = reciprocalLink;
-				targetDungeon.exitOverrides[targetCoordKey] = targetOverride;
+				this.setExitOverride(
+					targetDungeon,
+					targetX,
+					targetY,
+					targetZ,
+					targetOverride
+				);
 
 				// Save target dungeon
 				const orderedRoot = {};
@@ -7287,6 +7435,9 @@ class MapEditor {
 				dungeon.resets = dungeon.resets.filter((r) => r.roomRef !== roomRef);
 			}
 
+			// Remove exit overrides for this room
+			this.deleteExitOverride(dungeon, x, y, z);
+
 			this.showToast(
 				`Deleted ${roomName}`,
 				`At coordinates (${x}, ${y}, ${z})`
@@ -7376,8 +7527,20 @@ class MapEditor {
 				if (dungeon.resets) {
 					dungeon.resets = dungeon.resets.filter((r) => r.roomRef !== roomRef);
 				}
+
+				// Remove exit overrides for this room
+				this.deleteExitOverride(dungeon, x, y, z);
 			}
 		});
+
+		// Clean up empty exitOverrides array after processing all deletions
+		if (
+			dungeon.exitOverrides &&
+			Array.isArray(dungeon.exitOverrides) &&
+			dungeon.exitOverrides.length === 0
+		) {
+			delete dungeon.exitOverrides;
+		}
 
 		if (deletedCount > 0) {
 			this.showToast(
@@ -8315,6 +8478,9 @@ class MapEditor {
 								(r) => r.roomRef !== roomRef
 							);
 						}
+
+						// Remove exit overrides for this room
+						this.deleteExitOverride(dungeon, targetX, targetY, targetZ);
 						changeOccurred = true;
 					}
 				} else {
@@ -8361,6 +8527,15 @@ class MapEditor {
 			message += ` (${skippedCount} out of bounds)`;
 		}
 		this.showToast("Pasted selection", message);
+
+		// Clean up empty exitOverrides array after paste
+		if (
+			dungeon.exitOverrides &&
+			Array.isArray(dungeon.exitOverrides) &&
+			dungeon.exitOverrides.length === 0
+		) {
+			delete dungeon.exitOverrides;
+		}
 
 		// Reload resets and re-render map
 		this.loadResets(dungeon);

@@ -53,18 +53,8 @@ export default {
 
 		const sourceRoom = room;
 
-		// Trigger exit event on source room
-		if (sourceRoom instanceof Room) {
-			sourceRoom.onExit(actor);
-		}
-
 		// Move to recall room
 		actor.move(recallRoom);
-
-		// Trigger enter event on destination room
-		if (recallRoom instanceof Room) {
-			recallRoom.onEnter(actor);
-		}
 
 		// Send messages
 		act(

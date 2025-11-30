@@ -78,7 +78,7 @@ class MapEditor {
 		this.changeIdCounter = 0; // Unique identifier for change entries
 		this.maxTrackedChanges = 50; // Keep change history manageable
 		this.initialChangeSnapshot = null; // Baseline state for history timeline
-		this.clipboard = null; // Stores copied cells data: { cells: [{x, y, z, roomIndex}], resets: [...] }
+		this.clipboard = null; // Stores copied cells data: { cells: [...], resets: [...], exitOverrides: [...] }
 		this.currentMousePosition = null; // {x, y, z} of cell mouse is over
 		this.projectVersion = null; // Project version from package.json
 		this.dungeonList = []; // List of available dungeon IDs
@@ -2020,6 +2020,7 @@ class MapEditor {
 			if (cell) {
 				cell.classList.add("selected");
 				this.selectedCell = { x, y, z };
+				this.updateActionButtonStates();
 			}
 		}
 
@@ -3290,7 +3291,7 @@ class MapEditor {
 
 				this.makeChange({
 					action: EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE,
-					actionTarget: coordKey,
+					actionTarget: `${x},${y},${z}`,
 					newParameters: null,
 					oldParameters: {
 						allowedExits: oldValue,
@@ -5438,6 +5439,301 @@ class MapEditor {
 		});
 	}
 
+	applyMobiusPerimeter() {
+		if (!this.yamlData || !this.currentDungeonId) {
+			this.showToast("No dungeon loaded", "Please select a dungeon first");
+			return;
+		}
+
+		// Save state to history before making changes (for undo)
+		this.saveStateToHistory();
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+		const { width, height, layers } = dungeon.dimensions;
+
+		// Store the previous state for the change entry
+		const previousState = this.cloneDungeonState(dungeon);
+
+		// Direction bitmask constants
+		const DIRECTION = {
+			NORTH: 1 << 0,
+			SOUTH: 1 << 1,
+			EAST: 1 << 2,
+			WEST: 1 << 3,
+			NORTHEAST: 1 << 4,
+			NORTHWEST: 1 << 5,
+			SOUTHEAST: 1 << 6,
+			SOUTHWEST: 1 << 7,
+			UP: 1 << 8,
+			DOWN: 1 << 9,
+		};
+
+		let linksCreated = 0;
+
+		// Process each layer
+		for (let z = 0; z < layers; z++) {
+			// Process north edge (y = 0) - rooms here link NORTH to south edge (y = height - 1) at same X
+			for (let x = 0; x < width; x++) {
+				const room = this.getRoomAt(dungeon, x, 0, z);
+				if (!room) continue;
+
+				const override = this.getExitOverride(dungeon, x, 0, z);
+				const currentRoomLinks = override?.roomLinks || room.roomLinks || {};
+				const newRoomLinks = { ...currentRoomLinks };
+				let currentAllowedExits = override?.allowedExits ?? room.allowedExits;
+				let updated = false;
+
+				// Add NORTH exit link if room has it
+				if (this.hasExit(room, "NORTH")) {
+					const targetX = x;
+					const targetY = height - 1;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.north = targetRef;
+					updated = true;
+					linksCreated++;
+				}
+
+				// Add diagonal exits on north edge - enable them and add links
+				if (x === 0) {
+					// Northwest corner - add northwest exit
+					const targetX = width - 1;
+					const targetY = height - 1;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.northwest = targetRef;
+					currentAllowedExits = currentAllowedExits | DIRECTION.NORTHWEST;
+					updated = true;
+					linksCreated++;
+				}
+				if (x === width - 1) {
+					// Northeast corner - add northeast exit
+					const targetX = 0;
+					const targetY = height - 1;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.northeast = targetRef;
+					currentAllowedExits = currentAllowedExits | DIRECTION.NORTHEAST;
+					updated = true;
+					linksCreated++;
+				}
+
+				if (updated) {
+					this.setExitOverride(dungeon, x, 0, z, {
+						allowedExits: currentAllowedExits,
+						roomLinks: newRoomLinks,
+					});
+				}
+			}
+
+			// Process south edge (y = height - 1) - rooms here link SOUTH to north edge (y = 0) at same X
+			for (let x = 0; x < width; x++) {
+				const room = this.getRoomAt(dungeon, x, height - 1, z);
+				if (!room) continue;
+
+				const override = this.getExitOverride(dungeon, x, height - 1, z);
+				const currentRoomLinks = override?.roomLinks || room.roomLinks || {};
+				const newRoomLinks = { ...currentRoomLinks };
+				let currentAllowedExits = override?.allowedExits ?? room.allowedExits;
+				let updated = false;
+
+				// Add SOUTH exit link if room has it
+				if (this.hasExit(room, "SOUTH")) {
+					const targetX = x;
+					const targetY = 0;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.south = targetRef;
+					updated = true;
+					linksCreated++;
+				}
+
+				// Add diagonal exits on south edge - enable them and add links
+				if (x === 0) {
+					// Southwest corner - add southwest exit
+					const targetX = width - 1;
+					const targetY = 0;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.southwest = targetRef;
+					currentAllowedExits = currentAllowedExits | DIRECTION.SOUTHWEST;
+					updated = true;
+					linksCreated++;
+				}
+				if (x === width - 1) {
+					// Southeast corner - add southeast exit
+					const targetX = 0;
+					const targetY = 0;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.southeast = targetRef;
+					currentAllowedExits = currentAllowedExits | DIRECTION.SOUTHEAST;
+					updated = true;
+					linksCreated++;
+				}
+
+				if (updated) {
+					this.setExitOverride(dungeon, x, height - 1, z, {
+						allowedExits: currentAllowedExits,
+						roomLinks: newRoomLinks,
+					});
+				}
+			}
+
+			// Process west edge (x = 0) - rooms here link WEST to east edge (x = width - 1) at same Y
+			for (let y = 0; y < height; y++) {
+				const room = this.getRoomAt(dungeon, 0, y, z);
+				if (!room) continue;
+
+				const override = this.getExitOverride(dungeon, 0, y, z);
+				const currentRoomLinks = override?.roomLinks || room.roomLinks || {};
+				const newRoomLinks = { ...currentRoomLinks };
+				let currentAllowedExits = override?.allowedExits ?? room.allowedExits;
+				let updated = false;
+
+				// Add WEST exit link if room has it
+				if (this.hasExit(room, "WEST")) {
+					const targetX = width - 1;
+					const targetY = y;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.west = targetRef;
+					updated = true;
+					linksCreated++;
+				}
+
+				// Add diagonal exits on west edge - enable them and add links (skip corners, already handled)
+				if (y === 0) {
+					// Northwest corner - already handled in north edge, skip
+				} else if (y === height - 1) {
+					// Southwest corner - already handled in south edge, skip
+				} else {
+					// West edge (not corners) - add northwest and southwest exits
+					// Northwest exit wraps to southeast edge
+					const targetXNW = width - 1;
+					const targetYNW = height - 1;
+					const targetRefNW = this.formatRoomRef(
+						dungeonId,
+						targetXNW,
+						targetYNW,
+						z
+					);
+					newRoomLinks.northwest = targetRefNW;
+					currentAllowedExits = currentAllowedExits | DIRECTION.NORTHWEST;
+
+					// Southwest exit wraps to northeast edge
+					const targetXSW = width - 1;
+					const targetYSW = 0;
+					const targetRefSW = this.formatRoomRef(
+						dungeonId,
+						targetXSW,
+						targetYSW,
+						z
+					);
+					newRoomLinks.southwest = targetRefSW;
+					currentAllowedExits = currentAllowedExits | DIRECTION.SOUTHWEST;
+
+					updated = true;
+					linksCreated += 2;
+				}
+
+				if (updated) {
+					this.setExitOverride(dungeon, 0, y, z, {
+						allowedExits: currentAllowedExits,
+						roomLinks: newRoomLinks,
+					});
+				}
+			}
+
+			// Process east edge (x = width - 1) - rooms here link EAST to west edge (x = 0) at same Y
+			for (let y = 0; y < height; y++) {
+				const room = this.getRoomAt(dungeon, width - 1, y, z);
+				if (!room) continue;
+
+				const override = this.getExitOverride(dungeon, width - 1, y, z);
+				const currentRoomLinks = override?.roomLinks || room.roomLinks || {};
+				const newRoomLinks = { ...currentRoomLinks };
+				let currentAllowedExits = override?.allowedExits ?? room.allowedExits;
+				let updated = false;
+
+				// Add EAST exit link if room has it
+				if (this.hasExit(room, "EAST")) {
+					const targetX = 0;
+					const targetY = y;
+					const targetRef = this.formatRoomRef(dungeonId, targetX, targetY, z);
+					newRoomLinks.east = targetRef;
+					updated = true;
+					linksCreated++;
+				}
+
+				// Add diagonal exits on east edge - enable them and add links (skip corners, already handled)
+				if (y === 0) {
+					// Northeast corner - already handled in north edge, skip
+				} else if (y === height - 1) {
+					// Southeast corner - already handled in south edge, skip
+				} else {
+					// East edge (not corners) - add northeast and southeast exits
+					// Northeast exit wraps to southwest edge
+					const targetXNE = 0;
+					const targetYNE = height - 1;
+					const targetRefNE = this.formatRoomRef(
+						dungeonId,
+						targetXNE,
+						targetYNE,
+						z
+					);
+					newRoomLinks.northeast = targetRefNE;
+					currentAllowedExits = currentAllowedExits | DIRECTION.NORTHEAST;
+
+					// Southeast exit wraps to northwest edge
+					const targetXSE = 0;
+					const targetYSE = 0;
+					const targetRefSE = this.formatRoomRef(
+						dungeonId,
+						targetXSE,
+						targetYSE,
+						z
+					);
+					newRoomLinks.southeast = targetRefSE;
+					currentAllowedExits = currentAllowedExits | DIRECTION.SOUTHEAST;
+
+					updated = true;
+					linksCreated += 2;
+				}
+
+				if (updated) {
+					this.setExitOverride(dungeon, width - 1, y, z, {
+						allowedExits: currentAllowedExits,
+						roomLinks: newRoomLinks,
+					});
+				}
+			}
+		}
+
+		// Re-render map to show new links
+		this.renderMap(dungeon);
+
+		// Create change entry for undo/redo
+		this.makeChange(
+			{
+				action: EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE,
+				actionTarget: "perimeter",
+				newParameters: {
+					mobiusPerimeter: true,
+					linksCreated,
+				},
+				metadata: {
+					dungeonId,
+					width,
+					height,
+					layers,
+				},
+			},
+			{
+				previousStateOverride: previousState,
+			}
+		);
+
+		this.showToast(
+			"Mobius perimeter applied",
+			`Created ${linksCreated} edge link${linksCreated !== 1 ? "s" : ""}`
+		);
+	}
+
 	showConfirmModal() {
 		return new Promise((resolve) => {
 			const modal = document.getElementById("confirm-modal");
@@ -6658,6 +6954,12 @@ class MapEditor {
 					e.preventDefault();
 					this.copySelection();
 				}
+			} else if (e.ctrlKey && e.key === "x" && !e.shiftKey) {
+				// Cut (Ctrl+X)
+				if (this.selectedCells.size > 0) {
+					e.preventDefault();
+					this.cutSelection();
+				}
 			} else if (e.ctrlKey && e.key === "v" && !e.shiftKey) {
 				// Paste (Ctrl+V)
 				if (this.clipboard) {
@@ -6668,6 +6970,10 @@ class MapEditor {
 				// Select all (Ctrl+A)
 				e.preventDefault();
 				this.selectAllCurrentLayer();
+			} else if (e.ctrlKey && e.key === "s" && !e.shiftKey) {
+				// Save dungeon (Ctrl+S)
+				e.preventDefault();
+				this.saveDungeon();
 			}
 		});
 
@@ -6722,6 +7028,13 @@ class MapEditor {
 			});
 		}
 
+		const mobiusPerimeterBtn = document.getElementById("mobius-perimeter-btn");
+		if (mobiusPerimeterBtn) {
+			mobiusPerimeterBtn.addEventListener("click", () => {
+				this.applyMobiusPerimeter();
+			});
+		}
+
 		// Toolbox buttons
 		document.querySelectorAll(".tool-btn").forEach((btn) => {
 			btn.addEventListener("click", (e) => {
@@ -6729,6 +7042,26 @@ class MapEditor {
 				this.setSelectionMode(tool, e.currentTarget);
 			});
 		});
+
+		// Clear action buttons
+		const clearResetsBtn = document.getElementById("clear-resets-btn");
+		if (clearResetsBtn) {
+			clearResetsBtn.addEventListener("click", () => {
+				this.clearResetsInSelection();
+			});
+		}
+
+		const clearExitOverridesBtn = document.getElementById(
+			"clear-exit-overrides-btn"
+		);
+		if (clearExitOverridesBtn) {
+			clearExitOverridesBtn.addEventListener("click", () => {
+				this.clearExitOverridesInSelection();
+			});
+		}
+
+		// Initialize button states
+		this.updateActionButtonStates();
 	}
 
 	clearSelectedTemplate() {
@@ -7359,6 +7692,9 @@ class MapEditor {
 			const cellKey = `${x},${y},${z}`;
 			cell.classList.toggle("selected-cell", this.selectedCells.has(cellKey));
 		});
+
+		// Update action button states based on selection
+		this.updateActionButtonStates();
 	}
 
 	getSelectionBounds() {
@@ -7565,6 +7901,133 @@ class MapEditor {
 		this.clearSelectedCells();
 	}
 
+	clearResetsInSelection() {
+		if (!this.yamlData) return;
+
+		// Get selected cells - either from selectedCells set or selectedCell
+		const cellsToProcess = new Set();
+		if (this.selectedCells.size > 0) {
+			this.selectedCells.forEach((cellKey) => cellsToProcess.add(cellKey));
+		} else if (this.selectedCell) {
+			const { x, y, z } = this.selectedCell;
+			cellsToProcess.add(`${x},${y},${z}`);
+		}
+
+		if (cellsToProcess.size === 0) return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+		let deletedCount = 0;
+
+		cellsToProcess.forEach((cellKey) => {
+			const [x, y, z] = cellKey.split(",").map(Number);
+			const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+
+			if (dungeon.resets) {
+				const beforeCount = dungeon.resets.length;
+				dungeon.resets = dungeon.resets.filter((r) => r.roomRef !== roomRef);
+				if (dungeon.resets.length < beforeCount) {
+					deletedCount++;
+				}
+			}
+		});
+
+		if (deletedCount > 0) {
+			this.showToast(
+				`Cleared ${deletedCount} reset${deletedCount !== 1 ? "s" : ""}`,
+				"From selected area"
+			);
+			this.loadResets(dungeon);
+			this.renderMap(dungeon);
+			this.makeChange({
+				action: EDITOR_ACTIONS.DELETE_RESET,
+				actionTarget: "selection",
+				oldParameters: {
+					deletedCount,
+				},
+				metadata: {
+					selectionSize: cellsToProcess.size,
+				},
+			});
+		}
+	}
+
+	clearExitOverridesInSelection() {
+		if (!this.yamlData) return;
+
+		// Get selected cells - either from selectedCells set or selectedCell
+		const cellsToProcess = new Set();
+		if (this.selectedCells.size > 0) {
+			this.selectedCells.forEach((cellKey) => cellsToProcess.add(cellKey));
+		} else if (this.selectedCell) {
+			const { x, y, z } = this.selectedCell;
+			cellsToProcess.add(`${x},${y},${z}`);
+		}
+
+		if (cellsToProcess.size === 0) return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		const dungeon = this.yamlData.dungeon;
+		let deletedCount = 0;
+
+		cellsToProcess.forEach((cellKey) => {
+			const [x, y, z] = cellKey.split(",").map(Number);
+			if (this.deleteExitOverride(dungeon, x, y, z)) {
+				deletedCount++;
+			}
+		});
+
+		// Clean up empty exitOverrides array
+		if (
+			dungeon.exitOverrides &&
+			Array.isArray(dungeon.exitOverrides) &&
+			dungeon.exitOverrides.length === 0
+		) {
+			delete dungeon.exitOverrides;
+		}
+
+		if (deletedCount > 0) {
+			this.showToast(
+				`Cleared ${deletedCount} exit override${deletedCount !== 1 ? "s" : ""}`,
+				"From selected area"
+			);
+			this.renderMap(dungeon);
+			this.makeChange({
+				action: EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE,
+				actionTarget: "selection",
+				oldParameters: {
+					deletedCount,
+				},
+				metadata: {
+					selectionSize: cellsToProcess.size,
+				},
+			});
+		}
+	}
+
+	updateActionButtonStates() {
+		const hasSelection =
+			this.selectedCells.size > 0 ||
+			(this.selectedCell !== null && this.selectedCell !== undefined);
+
+		const clearResetsBtn = document.getElementById("clear-resets-btn");
+		const clearExitOverridesBtn = document.getElementById(
+			"clear-exit-overrides-btn"
+		);
+
+		if (clearResetsBtn) {
+			clearResetsBtn.disabled = !hasSelection;
+		}
+		if (clearExitOverridesBtn) {
+			clearExitOverridesBtn.disabled = !hasSelection;
+		}
+	}
+
 	cloneDungeonState(dungeon) {
 		// Deep clone the dungeon state for history
 		return {
@@ -7573,6 +8036,7 @@ class MapEditor {
 			rooms: JSON.parse(JSON.stringify(dungeon.rooms || [])),
 			templates: JSON.parse(JSON.stringify(dungeon.templates || [])),
 			resets: JSON.parse(JSON.stringify(dungeon.resets || [])),
+			exitOverrides: JSON.parse(JSON.stringify(dungeon.exitOverrides || [])),
 			resetMessage: dungeon.resetMessage,
 			name: dungeon.name,
 			description: dungeon.description,
@@ -8086,6 +8550,21 @@ class MapEditor {
 		dungeon.rooms = state.rooms;
 		dungeon.templates = state.templates;
 		dungeon.resets = state.resets;
+		// Restore exitOverrides (handle undefined for old history entries)
+		if (state.exitOverrides !== undefined) {
+			dungeon.exitOverrides = state.exitOverrides;
+			// Clean up empty exitOverrides array if it exists but is empty
+			if (
+				dungeon.exitOverrides &&
+				Array.isArray(dungeon.exitOverrides) &&
+				dungeon.exitOverrides.length === 0
+			) {
+				delete dungeon.exitOverrides;
+			}
+		} else {
+			// Old history entry - delete exitOverrides to match old state
+			delete dungeon.exitOverrides;
+		}
 		dungeon.resetMessage = state.resetMessage;
 		dungeon.name = state.name;
 		dungeon.description = state.description;
@@ -8352,6 +8831,7 @@ class MapEditor {
 		const dungeonId = this.currentDungeonId;
 		const cells = [];
 		const resets = [];
+		const exitOverrides = [];
 
 		// Find the minimum x, y, z to calculate relative positions
 		let minX = Infinity,
@@ -8394,23 +8874,111 @@ class MapEditor {
 					});
 				});
 			}
+
+			// Copy exit overrides for this cell (if any)
+			const exitOverride = this.getExitOverride(dungeon, x, y, z);
+			if (exitOverride) {
+				exitOverrides.push({
+					relX: x - minX,
+					relY: y - minY,
+					relZ: z - minZ,
+					override: JSON.parse(JSON.stringify(exitOverride)), // Deep copy
+				});
+			}
 		});
 
 		this.clipboard = {
 			cells: cells,
 			resets: resets,
+			exitOverrides: exitOverrides,
 			minX: minX,
 			minY: minY,
 			minZ: minZ,
 		};
 
-		// Clear selection
-		this.clearSelectionTool();
+		// Do not clear selection tool - keep it active for pasting
 
 		this.showToast(
 			"Copied selection",
 			`${cells.length} cell${cells.length !== 1 ? "s" : ""}`
 		);
+	}
+
+	cutSelection() {
+		if (!this.yamlData || this.selectedCells.size === 0) return;
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		// Store cells to delete before copying (copySelection clears selection)
+		const cellsToDelete = Array.from(this.selectedCells);
+
+		// Copy the selection first (this will clear the selection)
+		this.copySelection();
+
+		// Then delete the cells from the grid
+		const dungeon = this.yamlData.dungeon;
+		const dungeonId = this.currentDungeonId;
+		let deletedCount = 0;
+
+		cellsToDelete.forEach((cellKey) => {
+			const [x, y, z] = cellKey.split(",").map(Number);
+			const layerIndex = dungeon.dimensions.layers - 1 - z;
+			const layer = dungeon.grid[layerIndex] || [];
+
+			if (!layer[y]) {
+				layer[y] = new Array(dungeon.dimensions.width).fill(0);
+			}
+
+			if (layer[y][x] > 0) {
+				layer[y][x] = 0;
+				deletedCount++;
+
+				// Remove resets for this room
+				const roomRef = `@${dungeonId}{${x},${y},${z}}`;
+				if (dungeon.resets) {
+					dungeon.resets = dungeon.resets.filter((r) => r.roomRef !== roomRef);
+				}
+
+				// Remove exit overrides for this room
+				this.deleteExitOverride(dungeon, x, y, z);
+			}
+		});
+
+		// Clean up empty exitOverrides array after cut
+		if (
+			dungeon.exitOverrides &&
+			Array.isArray(dungeon.exitOverrides) &&
+			dungeon.exitOverrides.length === 0
+		) {
+			delete dungeon.exitOverrides;
+		}
+
+		if (deletedCount > 0) {
+			const clipboardCellsCount = this.clipboard
+				? this.clipboard.cells.length
+				: 0;
+			this.showToast(
+				"Cut selection",
+				`Cut ${deletedCount} room${
+					deletedCount !== 1 ? "s" : ""
+				} (${clipboardCellsCount} cell${
+					clipboardCellsCount !== 1 ? "s" : ""
+				} copied)`
+			);
+			this.loadResets(dungeon);
+			this.renderMap(dungeon);
+			this.makeChange({
+				action: EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE,
+				actionTarget: "cut",
+				oldParameters: {
+					deletedCount,
+				},
+				metadata: {
+					selectionSize: cellsToDelete.length,
+				},
+			});
+		}
 	}
 
 	pasteSelection() {
@@ -8423,20 +8991,47 @@ class MapEditor {
 		const dungeon = this.yamlData.dungeon;
 		const dungeonId = this.currentDungeonId;
 
-		// Determine paste position
+		// Check if we're in PASTE INTO mode (selection exists)
+		const isPasteInto = this.selectedCells.size > 0;
 		let pasteX = 0,
 			pasteY = 0,
-			pasteZ = this.currentLayer; // Always use current layer
-		if (this.selectedCell) {
-			// Paste at selected cell position (but use current layer for Z)
-			pasteX = this.selectedCell.x;
-			pasteY = this.selectedCell.y;
-			pasteZ = this.currentLayer; // Always paste on current layer
-		} else {
-			// If no cell is selected, paste at (0, 0, currentLayer)
-			pasteX = 0;
-			pasteY = 0;
 			pasteZ = this.currentLayer;
+		let selectedCellsSet = null;
+
+		if (isPasteInto) {
+			// PASTE INTO mode: only paste into selected cells
+			// Find minimum x, y, z of selected cells to use as origin
+			let minX = Infinity,
+				minY = Infinity,
+				minZ = Infinity;
+			selectedCellsSet = new Set(this.selectedCells);
+			this.selectedCells.forEach((cellKey) => {
+				const [x, y, z] = cellKey.split(",").map(Number);
+				minX = Math.min(minX, x);
+				minY = Math.min(minY, y);
+				minZ = Math.min(minZ, z);
+			});
+			pasteX = minX;
+			pasteY = minY;
+			pasteZ = minZ;
+		} else {
+			// Normal paste mode: determine paste position
+			if (this.selectedCell) {
+				// Paste at selected cell position (but use current layer for Z)
+				pasteX = this.selectedCell.x;
+				pasteY = this.selectedCell.y;
+				pasteZ = this.currentLayer;
+			} else if (this.currentMousePosition) {
+				// Paste at current mouse position on grid
+				pasteX = this.currentMousePosition.x;
+				pasteY = this.currentMousePosition.y;
+				pasteZ = this.currentMousePosition.z;
+			} else {
+				// Default: paste at (0, 0, currentLayer)
+				pasteX = 0;
+				pasteY = 0;
+				pasteZ = this.currentLayer;
+			}
 		}
 
 		let pastedCount = 0;
@@ -8448,6 +9043,13 @@ class MapEditor {
 			const targetX = pasteX + cell.relX;
 			const targetY = pasteY + cell.relY;
 			const targetZ = pasteZ + cell.relZ;
+			const targetKey = `${targetX},${targetY},${targetZ}`;
+
+			// In PASTE INTO mode, only paste if target is in selected cells
+			if (isPasteInto && !selectedCellsSet.has(targetKey)) {
+				skippedCount++;
+				return;
+			}
 
 			// Check bounds
 			if (
@@ -8503,6 +9105,12 @@ class MapEditor {
 			const targetX = pasteX + resetData.relX;
 			const targetY = pasteY + resetData.relY;
 			const targetZ = pasteZ + resetData.relZ;
+			const targetKey = `${targetX},${targetY},${targetZ}`;
+
+			// In PASTE INTO mode, only paste resets if target is in selected cells
+			if (isPasteInto && !selectedCellsSet.has(targetKey)) {
+				return;
+			}
 
 			// Check bounds
 			if (
@@ -8521,12 +9129,68 @@ class MapEditor {
 			}
 		});
 
+		// Paste exit overrides
+		if (
+			this.clipboard.exitOverrides &&
+			Array.isArray(this.clipboard.exitOverrides)
+		) {
+			this.clipboard.exitOverrides.forEach((overrideData) => {
+				const targetX = pasteX + overrideData.relX;
+				const targetY = pasteY + overrideData.relY;
+				const targetZ = pasteZ + overrideData.relZ;
+				const targetKey = `${targetX},${targetY},${targetZ}`;
+
+				// In PASTE INTO mode, only paste exit overrides if target is in selected cells
+				if (isPasteInto && !selectedCellsSet.has(targetKey)) {
+					return;
+				}
+
+				// Check bounds
+				if (
+					targetX >= 0 &&
+					targetX < dungeon.dimensions.width &&
+					targetY >= 0 &&
+					targetY < dungeon.dimensions.height &&
+					targetZ >= 0 &&
+					targetZ < dungeon.dimensions.layers
+				) {
+					// Extract the override value (skip coordinates, only take allowedExits/roomLinks)
+					const override = overrideData.override;
+					const overrideValue = {};
+					if (override.allowedExits !== undefined) {
+						overrideValue.allowedExits = override.allowedExits;
+					}
+					if (override.roomLinks !== undefined) {
+						overrideValue.roomLinks = override.roomLinks;
+					}
+
+					// Only set if there's something to set
+					if (Object.keys(overrideValue).length > 0) {
+						this.setExitOverride(
+							dungeon,
+							targetX,
+							targetY,
+							targetZ,
+							overrideValue
+						);
+						changeOccurred = true;
+					}
+				}
+			});
+		}
+
 		// Show toast notification
 		let message = `Pasted ${pastedCount} cell${pastedCount !== 1 ? "s" : ""}`;
-		if (skippedCount > 0) {
-			message += ` (${skippedCount} out of bounds)`;
+		if (isPasteInto) {
+			message += ` into selection`;
 		}
-		this.showToast("Pasted selection", message);
+		if (skippedCount > 0) {
+			message += ` (${skippedCount} skipped)`;
+		}
+		this.showToast(
+			isPasteInto ? "Pasted into selection" : "Pasted selection",
+			message
+		);
 
 		// Clean up empty exitOverrides array after paste
 		if (

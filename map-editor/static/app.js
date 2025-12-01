@@ -4438,7 +4438,7 @@ class MapEditor {
 				if (job) newTemplate.job = job;
 				if (level) newTemplate.level = parseInt(level) || 1;
 
-				// Collect behaviors
+				// Collect behaviors - always set behaviors object to ensure disabled behaviors are cleared
 				const behaviors = {};
 				document.querySelectorAll(".behavior-btn").forEach((btn) => {
 					const behavior = btn.dataset.behavior;
@@ -4446,9 +4446,8 @@ class MapEditor {
 						behaviors[behavior] = true;
 					}
 				});
-				if (Object.keys(behaviors).length > 0) {
-					newTemplate.behaviors = behaviors;
-				}
+				// Always set behaviors, even if empty, so disabled behaviors are properly cleared
+				newTemplate.behaviors = behaviors;
 			}
 
 			// Add weapon-specific fields
@@ -4651,6 +4650,10 @@ class MapEditor {
 				if (mapColor === undefined) delete updated.mapColor;
 				dungeon.templates[existing] = updated;
 			} else {
+				// For new templates, remove behaviors if empty to avoid including empty object in YAML
+				if (templateType === "Mob" && newTemplate.behaviors && Object.keys(newTemplate.behaviors).length === 0) {
+					delete newTemplate.behaviors;
+				}
 				dungeon.templates.push(newTemplate);
 			}
 		}

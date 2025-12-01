@@ -556,6 +556,67 @@ suite("threat.ts", () => {
 			);
 		});
 
+		test("should not expire threat for mobs in the same room", () => {
+			// Create a third player in the same room
+			const player3 = createPlayerMob(3, room1);
+			// Move player2 to a different room so we can test expiration for them
+			player2.move(room2);
+			npc.damage(player1, 200); // In same room
+			npc.damage(player2, 150); // In different room
+			npc.damage(player3, 300); // In same room
+			// Don't set combat target
+			npc.combatTarget = undefined;
+
+			// First expiration cycle
+			(npc as any)._processThreatExpiration();
+
+			const threatEntry1 = npc.threatTable?.get(player1);
+			const threatEntry2 = npc.threatTable?.get(player2);
+			const threatEntry3 = npc.threatTable?.get(player3);
+
+			// Player1 and player3 are in same room - should not be marked for expiration
+			// Player2 is in different room - should be marked for expiration
+			assert.strictEqual(
+				threatEntry1?.shouldExpire,
+				false,
+				"Player1 in same room should not be marked for expiration"
+			);
+			assert.strictEqual(
+				threatEntry2?.shouldExpire,
+				true,
+				"Player2 in different room should be marked for expiration"
+			);
+			assert.strictEqual(
+				threatEntry3?.shouldExpire,
+				false,
+				"Player3 in same room should not be marked for expiration"
+			);
+
+			// Second expiration cycle - player2 should be reduced, player1 and player3 should not
+			(npc as any)._processThreatExpiration();
+
+			const threatEntry1After = npc.threatTable?.get(player1);
+			const threatEntry2After = npc.threatTable?.get(player2);
+			const threatEntry3After = npc.threatTable?.get(player3);
+
+			assert.strictEqual(
+				threatEntry1After?.value,
+				200,
+				"Player1 in same room threat should not be reduced"
+			);
+			const expectedValue2 = Math.floor(150 * 0.67); // 100
+			assert.strictEqual(
+				threatEntry2After?.value,
+				expectedValue2,
+				"Player2 in different room threat should be reduced"
+			);
+			assert.strictEqual(
+				threatEntry3After?.value,
+				300,
+				"Player3 in same room threat should not be reduced"
+			);
+		});
+
 		test("should remove destroyed mobs from threat table", () => {
 			npc.damage(player1, 200);
 			player1.destroy();

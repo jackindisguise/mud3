@@ -16,6 +16,12 @@ import { Mob } from "./dungeon.js";
 import { ActMessageTemplates } from "../act.js";
 
 /**
+ * Message templates for effects (onApply/onTick).
+ * Effects don't have a target, so target messages are not allowed.
+ */
+export type EffectMessageTemplates = Omit<ActMessageTemplates, "target">;
+
+/**
  * Base effect template that defines the properties of an effect.
  * This is the template used when creating effect instances.
  */
@@ -29,7 +35,7 @@ export interface BaseEffectTemplate {
 	/** Whether multiple instances of this effect can stack */
 	stackable: boolean;
 	/** Act message templates shown when this effect is applied */
-	onApply?: ActMessageTemplates;
+	onApply?: EffectMessageTemplates;
 }
 
 /**
@@ -71,7 +77,7 @@ export interface DamageOverTimeEffectTemplate extends BaseEffectTemplate {
 	/** Whether this effect is offensive (initiates combat when applied) */
 	isOffensive?: boolean;
 	/** Act message templates shown when this effect ticks */
-	onTick?: ActMessageTemplates;
+	onTick?: EffectMessageTemplates;
 }
 
 /**
@@ -87,7 +93,7 @@ export interface HealOverTimeEffectTemplate extends BaseEffectTemplate {
 	/** Total duration of the effect in seconds */
 	duration: number;
 	/** Act message templates shown when this effect ticks */
-	onTick?: ActMessageTemplates;
+	onTick?: EffectMessageTemplates;
 }
 
 /**

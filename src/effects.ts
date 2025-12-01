@@ -77,15 +77,6 @@ function replaceActPlaceholders(
 		}
 	}
 
-	if (result.target) {
-		for (const [key, value] of Object.entries(replacements)) {
-			result.target = result.target.replace(
-				new RegExp(`\\{${key}\\}`, "g"),
-				value
-			);
-		}
-	}
-
 	return result;
 }
 
@@ -119,7 +110,6 @@ function processEffect(mob: Mob, effect: EffectInstance, now: number): boolean {
 						templates,
 						{
 							user: mob, // The mob affected by the effect
-							target: effect.caster !== mob ? effect.caster : undefined, // The caster (if different from affected mob)
 							room: mob.location,
 						},
 						{
@@ -180,7 +170,6 @@ function processEffect(mob: Mob, effect: EffectInstance, now: number): boolean {
 							templates,
 							{
 								user: mob, // The mob affected by the effect
-								target: effect.caster !== mob ? effect.caster : undefined, // The caster (if different from affected mob)
 								room: mob.location,
 							},
 							{ messageGroup: MESSAGE_GROUP.INFO }

@@ -45,7 +45,7 @@ export interface ActMessageTemplates {
 	/** Message template for the user performing the action */
 	user?: string;
 	/** Message template for room observers (excluding user and target) */
-	room: string;
+	room?: string;
 	/** Optional message template for the target of the action */
 	target?: string;
 }
@@ -203,6 +203,12 @@ export function act(
 	context: ActContext,
 	options?: ActOptions
 ): void {
+	console.log(
+		templates,
+		context.room.coordinates,
+		context.user.display,
+		context.target?.display
+	);
 	const opts = { ...getDefaultOptions(), ...options };
 	const { user, target, room } = context;
 
@@ -236,34 +242,36 @@ export function act(
 		}
 	}
 
-	// Send message to room observers
-	const roomMessage = replacePlaceholders(
-		templates.room,
-		context,
-		opts.visibility
-	);
+	// Send message to room observers (only if room template exists)
+	if (templates.room) {
+		const roomMessage = replacePlaceholders(
+			templates.room,
+			context,
+			opts.visibility
+		);
 
-	for (const obj of room.contents) {
-		if (!(obj instanceof Mob)) continue;
-		if (!obj.character) continue;
+		for (const obj of room.contents) {
+			if (!(obj instanceof Mob)) continue;
+			if (!obj.character) continue;
 
-		// Skip user if excludeUser is true
-		if (opts.excludeUser && obj === user) continue;
+			// Skip user if excludeUser is true
+			if (opts.excludeUser && obj === user) continue;
 
-		// Skip target if excludeTarget is true
-		if (opts.excludeTarget && target && obj === target) continue;
+			// Skip target if excludeTarget is true
+			if (opts.excludeTarget && target && obj === target) continue;
 
-		// Check if observer is blocking the user
-		if (
-			user.character &&
-			obj.character.isBlocking(user.character.credentials.username)
-		) {
-			// Observer is blocking user, skip sending message
-			continue;
+			// Check if observer is blocking the user
+			if (
+				user.character &&
+				obj.character.isBlocking(user.character.credentials.username)
+			) {
+				// Observer is blocking user, skip sending message
+				continue;
+			}
+
+			// Send the room message to this observer
+			obj.character.sendMessage(roomMessage, opts.messageGroup);
 		}
-
-		// Send the room message to this observer
-		obj.character.sendMessage(roomMessage, opts.messageGroup);
 	}
 }
 

@@ -7171,7 +7171,6 @@ export class Mob extends Movable {
 				template.onApply,
 				{
 					user: this, // The mob affected by the effect
-					target: caster !== this ? caster : undefined, // The caster (if different from affected mob)
 					room: this.location,
 				},
 				{ messageGroup: MESSAGE_GROUP.INFO }

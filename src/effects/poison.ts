@@ -25,6 +25,6 @@ export const effectTemplate: DamageOverTimeEffectTemplate = {
 	},
 	onTick: {
 		user: "You take {damage} poison damage!",
-		room: "{User} takes {damage} poison damage!",
+		room: "{User} writhes in pain from the poison.",
 	},
 };

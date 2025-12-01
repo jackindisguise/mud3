@@ -171,6 +171,10 @@ function updateActivity(session: LoginSession): void {
 		logger.debug(
 			`Inactivity timeout for ${session.character?.credentials.username}`
 		);
+		session.character?.sendMessage(
+			"You have been disconnected due to inactivity.",
+			MESSAGE_GROUP.SYSTEM
+		);
 		await endPlayerSession(session);
 	}, timeoutMs);
 }

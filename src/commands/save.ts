@@ -34,8 +34,7 @@ export default {
 		}
 
 		// Save the character
-		actor.sendMessage("Saving character...", MESSAGE_GROUP.COMMAND_RESPONSE);
-		await saveCharacter(character);
+		saveCharacter(character);
 		actor.sendMessage("Character saved.", MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;

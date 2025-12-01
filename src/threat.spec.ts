@@ -455,6 +455,9 @@ suite("threat.ts", () => {
 		});
 
 		test("should set shouldExpire flag to true on first expiration cycle", () => {
+			// Move players to different room so threat can expire
+			player1.move(room2);
+			player2.move(room2);
 			npc.damage(player1, 200);
 			npc.damage(player2, 500);
 			const threatEntry = npc.threatTable!.get(player1);
@@ -480,6 +483,9 @@ suite("threat.ts", () => {
 		});
 
 		test("should reduce threat by 33% on second expiration cycle", () => {
+			// Move players to different room so threat can expire
+			player1.move(room2);
+			player2.move(room2);
 			npc.damage(player1, 600);
 			npc.damage(player2, 500);
 			(npc as any)._processThreatExpiration();
@@ -495,6 +501,9 @@ suite("threat.ts", () => {
 		});
 
 		test("should remove threat entry when reduced below 100", () => {
+			// Move players to different room so threat can expire
+			player1.move(room2);
+			player2.move(room2);
 			npc.damage(player1, 500);
 			npc.damage(player2, 335);
 			(npc as any)._processThreatExpiration();
@@ -517,6 +526,8 @@ suite("threat.ts", () => {
 		});
 
 		test("should not expire threat for current combat target", () => {
+			// Move player2 to different room so threat can expire for them
+			player2.move(room2);
 			npc.damage(player1, 200);
 			npc.damage(player2, 150);
 			processThreatSwitching(npc);
@@ -632,6 +643,8 @@ suite("threat.ts", () => {
 		});
 
 		test("should stop expiration timer when threat table becomes empty", () => {
+			// Move player to different room so threat can expire
+			player1.move(room2);
 			npc.damage(player1, 100);
 			npc.combatTarget = undefined;
 			(npc as any)._processThreatExpiration();
@@ -653,6 +666,8 @@ suite("threat.ts", () => {
 		});
 
 		test("should reset shouldExpire flag when threat is added", () => {
+			// Move player to different room so threat can expire
+			player1.move(room2);
 			npc.damage(player1, 200);
 			npc.combatTarget = undefined;
 			(npc as any)._processThreatExpiration();

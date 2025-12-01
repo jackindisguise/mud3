@@ -125,9 +125,18 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		this.setupSocketHandlers();
 	}
 
+	/**
+	 * Check if telnet negotiations are pending
+	 * @returns true if there are pending negotiations, false otherwise
+	 */
+	public hasPendingNegotiations(): boolean {
+		return this.negotiationManager.hasPendingNegotiations();
+	}
+
 	public on(event: "input", listener: (line: string) => void): this;
 	public on(event: "close", listener: () => void): this;
 	public on(event: "error", listener: (err: Error) => void): this;
+	public on(event: "negotiationsComplete", listener: () => void): this;
 	public on(event: string, listener: (...args: any[]) => void): this {
 		return super.on(event, listener);
 	}
@@ -135,6 +144,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	public once(event: "input", listener: (line: string) => void): this;
 	public once(event: "close", listener: () => void): this;
 	public once(event: "error", listener: (err: Error) => void): this;
+	public once(event: "negotiationsComplete", listener: () => void): this;
 	public once(event: string, listener: (...args: any[]) => void): this {
 		return super.once(event, listener);
 	}
@@ -142,6 +152,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	public emit(event: "input", line: string): boolean;
 	public emit(event: "close"): boolean;
 	public emit(event: "error", err: Error): boolean;
+	public emit(event: "negotiationsComplete"): boolean;
 	public emit(event: string, ...args: any[]): boolean {
 		return super.emit(event, ...args);
 	}
@@ -149,6 +160,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	public off(event: "input", listener: (line: string) => void): this;
 	public off(event: "close", listener: () => void): this;
 	public off(event: "error", listener: (err: Error) => void): this;
+	public off(event: "negotiationsComplete", listener: () => void): this;
 	public off(event: string, listener: (...args: any[]) => void): this {
 		return super.off(event, listener);
 	}
@@ -178,7 +190,7 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 
 		// TTYPE is enabled (we want to know client terminal type)
 		manager.configureProtocol(TELNET_OPTION.TTYPE, {
-			enabled: false,
+			enabled: true,
 		});
 
 		// MCCP2 is enabled (compression)
@@ -189,7 +201,15 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 
 		// NAWS is enabled (window size)
 		manager.configureProtocol(TELNET_OPTION.NAWS, {
-			enabled: false,
+			enabled: true,
+		});
+
+		// Register callback for when all telnet negotiations complete
+		manager.onAllNegotiationsComplete(() => {
+			logger.debug(
+				`StandardMudClient (${this.getAddress()}): all negotiations complete, emitting negotiationsComplete event`
+			);
+			this.emit("negotiationsComplete");
 		});
 
 		// Initiate negotiations on connection
@@ -263,12 +283,16 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 			// Write as Buffer and flush immediately
 			const data = Buffer.from(escaped, "utf8");
 			logger.debug(
-				`MCCP2 (${this.getAddress()}): writing ${data.length} bytes to compressor`
+				`MCCP2 (${this.getAddress()}): writing ${
+					data.length
+				} bytes to compressor`
 			);
 			compressor.write(data);
 			compressor.flush(constants.Z_SYNC_FLUSH);
 			logger.debug(
-				`MCCP2 (${this.getAddress()}): flushed compressor after writing ${data.length} bytes`
+				`MCCP2 (${this.getAddress()}): flushed compressor after writing ${
+					data.length
+				} bytes`
 			);
 		} else {
 			this.socket.write(escaped);
@@ -505,10 +529,88 @@ export class MudServer extends EventEmitter {
 		const client = new StandardMudClient(socket);
 		this.clients.add(client);
 
-		logger.info(
-			`Client connected: ${client.getAddress()} (${this.clients.size} total)`
+		logger.debug(
+			`MudServer (${client.getAddress()}): new socket connection, waiting for telnet negotiations`
 		);
-		this.emit("connection", client);
+
+		// Wait for all telnet protocol negotiations to complete before emitting connection
+		// This ensures all protocols (especially MCCP2 compression) are set up (or rejected) before any writes occur
+		const emitConnection = () => {
+			// Only emit if we haven't already emitted (prevent double emission)
+			if (this.clients.has(client)) {
+				logger.debug(
+					`MudServer (${client.getAddress()}): emitting connection event`
+				);
+				logger.info(
+					`Client connected: ${client.getAddress()} (${
+						this.clients.size
+					} total)`
+				);
+				this.emit("connection", client);
+			} else {
+				logger.debug(
+					`MudServer (${client.getAddress()}): skipping connection emission - client already removed`
+				);
+			}
+		};
+
+		// Set up event listener FIRST to catch the event if negotiations complete quickly
+		let connectionEmitted = false;
+		const onNegotiationsComplete = () => {
+			if (!connectionEmitted) {
+				logger.debug(
+					`MudServer (${client.getAddress()}): negotiations complete callback triggered`
+				);
+				connectionEmitted = true;
+				emitConnection();
+			} else {
+				logger.debug(
+					`MudServer (${client.getAddress()}): negotiations complete callback triggered but connection already emitted`
+				);
+			}
+		};
+		client.once("negotiationsComplete", onNegotiationsComplete);
+		logger.debug(
+			`MudServer (${client.getAddress()}): registered negotiationsComplete event listener`
+		);
+
+		// Check if negotiations are already complete (synchronous check)
+		const hasPending = client.hasPendingNegotiations();
+		logger.debug(
+			`MudServer (${client.getAddress()}): checking pending negotiations - hasPending: ${hasPending}`
+		);
+		if (!hasPending) {
+			// No negotiations pending, emit connection immediately
+			logger.debug(
+				`MudServer (${client.getAddress()}): no pending negotiations, emitting connection immediately`
+			);
+			onNegotiationsComplete();
+		} else {
+			logger.debug(
+				`MudServer (${client.getAddress()}): negotiations pending, waiting for completion`
+			);
+		}
+
+		// Timeout fallback: if negotiations don't complete within 2 seconds,
+		// emit connection anyway to avoid hanging
+		setTimeout(() => {
+			if (this.clients.has(client) && !connectionEmitted) {
+				const stillPending = client.hasPendingNegotiations();
+				logger.warn(
+					`MudServer (${client.getAddress()}): telnet negotiation timeout (still pending: ${stillPending}), emitting connection anyway`
+				);
+				connectionEmitted = true;
+				emitConnection();
+			} else if (connectionEmitted) {
+				logger.debug(
+					`MudServer (${client.getAddress()}): timeout reached but connection already emitted`
+				);
+			} else {
+				logger.debug(
+					`MudServer (${client.getAddress()}): timeout reached but client already removed`
+				);
+			}
+		}, 2000);
 
 		client.on("close", () => {
 			this.clients.delete(client);

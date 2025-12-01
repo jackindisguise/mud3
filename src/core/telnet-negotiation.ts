@@ -11,7 +11,13 @@
 import { Socket } from "net";
 import { buildIACCommand, IAC, TELNET_OPTION } from "./telnet.js";
 import logger from "../logger.js";
-import { createDeflate, createInflate, Deflate, Inflate } from "zlib";
+import {
+	createDeflate,
+	createInflate,
+	type Deflate,
+	type Inflate,
+	constants,
+} from "zlib";
 
 /**
  * Negotiation state for a protocol option
@@ -95,10 +101,58 @@ export class TelnetNegotiationManager {
 	private data: ProtocolData = {};
 	private socket: Socket;
 	private address: string;
+	private allNegotiationsCompleteCallback?: () => void;
+	private pendingProtocols: Set<TELNET_OPTION> = new Set();
 
 	constructor(socket: Socket, address: string) {
 		this.socket = socket;
 		this.address = address;
+	}
+
+	/**
+	 * Register a callback to be called when all telnet protocol negotiations complete
+	 */
+	public onAllNegotiationsComplete(callback: () => void): void {
+		logger.debug(
+			`Telnet negotiation (${this.address}): registering callback for all negotiations complete`
+		);
+		this.allNegotiationsCompleteCallback = callback;
+		// Check if already complete
+		//this.checkIfAllComplete();
+	}
+
+	/**
+	 * Check if all pending protocol negotiations are complete
+	 */
+	private checkIfAllComplete(): void {
+		const pendingCount = this.pendingProtocols.size;
+		logger.debug(
+			`Telnet negotiation (${this.address}): checking if complete - ${pendingCount} protocol(s) still pending`
+		);
+		if (
+			this.pendingProtocols.size === 0 &&
+			this.allNegotiationsCompleteCallback
+		) {
+			logger.debug(
+				`Telnet negotiation (${this.address}): all negotiations complete, calling callback`
+			);
+			this.allNegotiationsCompleteCallback();
+			this.allNegotiationsCompleteCallback = undefined; // Only call once
+		}
+	}
+
+	/**
+	 * Mark a protocol negotiation as complete (negotiated, rejected, or disabled)
+	 */
+	private markProtocolComplete(option: TELNET_OPTION): void {
+		if (this.pendingProtocols.has(option)) {
+			const state = this.getState(option);
+			logger.debug(
+				`Telnet negotiation (${this.address}): protocol ${option} completed with state "${state}", removing from pending`
+			);
+			this.pendingProtocols.delete(option);
+			this.checkIfAllComplete();
+		}
 	}
 
 	/**
@@ -133,6 +187,14 @@ export class TelnetNegotiationManager {
 	 */
 	public setState(option: TELNET_OPTION, state: NegotiationState): void {
 		this.states.set(option, state);
+		// If state is negotiated, rejected, or disabled, mark protocol as complete
+		if (
+			state === "negotiated" ||
+			state === "rejected" ||
+			state === "disabled"
+		) {
+			this.markProtocolComplete(option);
+		}
 	}
 
 	/**
@@ -157,13 +219,65 @@ export class TelnetNegotiationManager {
 	}
 
 	/**
+	 * Check if there are any pending protocol negotiations
+	 * @returns true if there are pending negotiations, false otherwise
+	 */
+	public hasPendingNegotiations(): boolean {
+		return this.pendingProtocols.size > 0;
+	}
+
+	/**
+	 * Get the MCCP2 compressor if compression is active
+	 * @returns The Deflate compressor if MCCP2 is negotiated, undefined otherwise
+	 */
+	public getCompressor(): Deflate | undefined {
+		const mccp2State = this.getState(TELNET_OPTION.MCCP2);
+		if (mccp2State === "negotiated") {
+			return this.data.mccp2?.compressor;
+		}
+		return undefined;
+	}
+
+	/**
+	 * Write data to the socket, using compression if MCCP2 is active
+	 * @param data The data to write
+	 * @returns true if the data was written successfully, false otherwise
+	 */
+	public write(data: Buffer): boolean {
+		const compressor = this.getCompressor();
+		if (compressor) {
+			// Write to compressor if MCCP2 is active
+			logger.debug(
+				`Telnet negotiation (${this.address}): writing ${data.length} bytes to compressor`
+			);
+			compressor.write(data);
+			compressor.flush(constants.Z_SYNC_FLUSH);
+			return true;
+		} else {
+			// Write directly to socket if compression is not active
+			if (!this.socket.destroyed && this.socket.writable) {
+				return this.socket.write(data);
+			}
+			return false;
+		}
+	}
+
+	/**
 	 * Initiate negotiations for all configured protocols on connection
 	 */
 	public initiateNegotiations(): void {
+		logger.debug(
+			`Telnet negotiation (${this.address}): initiating negotiations for all enabled protocols`
+		);
+		// Track which protocols we're initiating
+		const initiatedProtocols: TELNET_OPTION[] = [];
 		for (const [option, config] of this.configs.entries()) {
 			if (config.enabled && config.initiateOnConnect !== false) {
 				const handler = this.handlers.get(option);
 				if (handler && this.states.get(option) === "none") {
+					// Mark as pending - will be removed when negotiation completes
+					this.pendingProtocols.add(option);
+					initiatedProtocols.push(option);
 					this.initiateNegotiation(option);
 				}
 			} else if (!config.enabled) {
@@ -176,6 +290,13 @@ export class TelnetNegotiationManager {
 				}
 			}
 		}
+		logger.debug(
+			`Telnet negotiation (${this.address}): initiated ${
+				initiatedProtocols.length
+			} protocol(s): ${initiatedProtocols.join(", ")}`
+		);
+		// If no protocols were initiated, check if we're already complete
+		this.checkIfAllComplete();
 	}
 
 	/**
@@ -198,6 +319,8 @@ export class TelnetNegotiationManager {
 		if (handler.serverWillsOption) {
 			// Server offers: send WILL
 			this.setState(option, "pending_send");
+			// Note: Initial negotiation commands must be sent uncompressed
+			// (before MCCP2 is negotiated), so we write directly to socket
 			if (!this.socket.destroyed && this.socket.writable) {
 				this.socket.write(buildIACCommand(IAC.WILL, option));
 				logger.debug(
@@ -207,6 +330,8 @@ export class TelnetNegotiationManager {
 		} else {
 			// Server requests: send DO
 			this.setState(option, "pending_send");
+			// Note: Initial negotiation commands must be sent uncompressed
+			// (before MCCP2 is negotiated), so we write directly to socket
 			if (!this.socket.destroyed && this.socket.writable) {
 				this.socket.write(buildIACCommand(IAC.DO, option));
 				logger.debug(
@@ -229,14 +354,11 @@ export class TelnetNegotiationManager {
 		if (!handler) {
 			// No handler for this option - default behavior
 			// For unknown options, respond with WON'T or DON'T
+			// Use write() method to support compression if active
 			if (command === IAC.DO) {
-				if (!this.socket.destroyed && this.socket.writable) {
-					this.socket.write(buildIACCommand(IAC.WONT, option));
-				}
+				this.write(buildIACCommand(IAC.WONT, option));
 			} else if (command === IAC.WILL) {
-				if (!this.socket.destroyed && this.socket.writable) {
-					this.socket.write(buildIACCommand(IAC.DONT, option));
-				}
+				this.write(buildIACCommand(IAC.DONT, option));
 			}
 			return null; // Return null to indicate we handled it
 		}
@@ -245,24 +367,21 @@ export class TelnetNegotiationManager {
 		const config = this.configs.get(telnetOption);
 		if (config && !config.enabled) {
 			// Protocol is disabled - reject
+			// Use write() method to support compression if active
 			if (command === IAC.DO && handler.serverWillsOption) {
-				if (!this.socket.destroyed && this.socket.writable) {
-					this.socket.write(buildIACCommand(IAC.WONT, option));
-					logger.debug(
-						`Telnet negotiation (${this.address}): protocol ${option} is disabled, sent IAC WON'T`
-					);
-				}
+				this.write(buildIACCommand(IAC.WONT, option));
+				logger.debug(
+					`Telnet negotiation (${this.address}): protocol ${option} is disabled, sent IAC WON'T`
+				);
 				this.setState(telnetOption, "disabled");
 				if (handler.onRejected) {
 					handler.onRejected(this, this.socket);
 				}
 			} else if (command === IAC.WILL && !handler.serverWillsOption) {
-				if (!this.socket.destroyed && this.socket.writable) {
-					this.socket.write(buildIACCommand(IAC.DONT, option));
-					logger.debug(
-						`Telnet negotiation (${this.address}): protocol ${option} is disabled, sent IAC DON'T`
-					);
-				}
+				this.write(buildIACCommand(IAC.DONT, option));
+				logger.debug(
+					`Telnet negotiation (${this.address}): protocol ${option} is disabled, sent IAC DON'T`
+				);
 				this.setState(telnetOption, "disabled");
 				if (handler.onRejected) {
 					handler.onRejected(this, this.socket);

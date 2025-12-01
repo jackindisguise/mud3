@@ -46,12 +46,10 @@ export class SGAHandler implements ProtocolHandler {
 			} else if (state === "none") {
 				// Client initiated before we sent WILL SGA - respond with WILL SGA
 				manager.setState(this.option, "negotiated");
-				if (!socket.destroyed && socket.writable) {
-					socket.write(buildIACCommand(IAC.WILL, this.option));
-					logger.debug(
-						`SGA negotiation (${address}): received IAC DO SGA (client-initiated), responding with IAC WILL SGA (negotiation complete)`
-					);
-				}
+				manager.write(buildIACCommand(IAC.WILL, this.option));
+				logger.debug(
+					`SGA negotiation (${address}): received IAC DO SGA (client-initiated), responding with IAC WILL SGA (negotiation complete)`
+				);
 				if (this.onNegotiated) {
 					this.onNegotiated(manager, socket);
 				}
@@ -73,12 +71,10 @@ export class SGAHandler implements ProtocolHandler {
 			// Client doesn't want SGA
 			if (state === "pending_send" || state === "negotiated") {
 				manager.setState(this.option, "rejected");
-				if (!socket.destroyed && socket.writable) {
-					socket.write(buildIACCommand(IAC.WONT, this.option));
-					logger.debug(
-						`SGA negotiation (${address}): received IAC DON'T SGA, sent IAC WON'T SGA (negotiation rejected)`
-					);
-				}
+				manager.write(buildIACCommand(IAC.WONT, this.option));
+				logger.debug(
+					`SGA negotiation (${address}): received IAC DON'T SGA, sent IAC WON'T SGA (negotiation rejected)`
+				);
 				this.onRejected?.(manager, socket);
 			}
 		}
@@ -180,7 +176,7 @@ export class TTYPEHandler implements ProtocolHandler {
 			IAC.IAC,
 			IAC.SE,
 		]);
-		socket.write(sendRequest);
+		manager.write(sendRequest);
 		this.sentRequest = true;
 		logger.debug(`TTYPE (${manager.getAddress()}): sent SEND request`);
 	}
@@ -406,7 +402,6 @@ export class MCCP2Handler implements ProtocolHandler {
 		logger.debug(
 			`MCCP2 compressor (${manager.getAddress()}): writing empty string to initialize stream`
 		);
-		compressor.write("");
 
 		logger.info(
 			`MCCP2 (${manager.getAddress()}): compression active - outgoing data will be compressed`

@@ -719,6 +719,7 @@ export function initiateCombat(
 		}
 
 		// Send act() message for combat initiation or target switching
+		/*
 		if (room) {
 			if (!originalTarget) {
 				// New engagement
@@ -751,7 +752,7 @@ export function initiateCombat(
 					{ messageGroup: MESSAGE_GROUP.ACTION }
 				);
 			}
-		}
+		}*/
 
 		// we didn't have a target before, free round of combat
 		if (!originalTarget) {

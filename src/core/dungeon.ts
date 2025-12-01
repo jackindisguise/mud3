@@ -5360,6 +5360,7 @@ export class Mob extends Movable {
 
 		const threatTable = this._threatTable;
 		const currentTarget = this._combatTarget;
+		const npcRoom = this.location instanceof Room ? this.location : undefined;
 
 		// Process each threat entry
 		const entriesToRemove: Mob[] = [];
@@ -5373,6 +5374,11 @@ export class Mob extends Movable {
 
 			// 2. Skip current combat target
 			if (threatMob === currentTarget) {
+				continue;
+			}
+
+			// 2b. Skip mobs in the same room as the NPC
+			if (npcRoom && threatMob.location === npcRoom) {
 				continue;
 			}
 

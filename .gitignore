@@ -36,3 +36,6 @@ data/.lock
 
 # don't save markdown files
 *.md
+
+# ignore issues
+.issues

@@ -11,7 +11,7 @@
  * @module combat
  */
 
-import { Mob, Room, Weapon, EQUIPMENT_SLOT } from "./core/dungeon.js";
+import { Mob, Room, Weapon, EQUIPMENT_SLOT, BEHAVIOR } from "./core/dungeon.js";
 import { MESSAGE_GROUP } from "./core/character.js";
 import {
 	color,
@@ -363,6 +363,50 @@ export function getCombatQueue(): ReadonlyArray<Mob> {
 }
 
 /**
+ * Handles NPC behavior when leaving combat.
+ * If the NPC has mobs in the room with threat, switches to the highest threat target.
+ * If the NPC is aggro, checks the room for player mobs and attacks them.
+ *
+ * @param npc The NPC mob that just left combat
+ */
+export function handleNPCLeavingCombat(npc: Mob): void {
+	// Only process NPCs
+	if (npc.character) {
+		return;
+	}
+
+	const npcRoom = npc.location;
+	if (!(npcRoom instanceof Room)) {
+		return;
+	}
+
+	// Check for threat-based targets first
+	if (npc.threatTable && npc.threatTable.size > 0) {
+		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
+		if (highestThreat) {
+			// Switch to highest threat target - new engagement, gets free round
+			initiateCombat(npc, highestThreat, false);
+			return; // Don't check aggro if we found a threat target
+		}
+	}
+
+	// If no threat targets, check aggro behavior
+	if (npc.hasBehavior(BEHAVIOR.AGGRESSIVE)) {
+		// Look for character mobs in the room
+		for (const obj of npcRoom.contents) {
+			if (!(obj instanceof Mob)) continue;
+			const target = obj as Mob;
+			if (target === npc) continue; // Don't process self
+			if (!target.character) continue; // Only attack character mobs
+
+			// Found a player mob, initiate combat
+			initiateCombat(npc, target);
+			return; // Only attack one target
+		}
+	}
+}
+
+/**
  * Processes threat-based target switching for NPCs.
  * NPCs will switch targets if a new attacker has 10% more threat than the current target.
  * Only switches if the new target is in the same room as the NPC.
@@ -658,8 +702,9 @@ export function initiateCombat(
 	}
 
 	const originalTarget = attacker.combatTarget;
-	const room = attacker.location instanceof Room ? attacker.location : undefined;
-	
+	const room =
+		attacker.location instanceof Room ? attacker.location : undefined;
+
 	attacker.combatTarget = defender;
 	// not a reactionary initiation (backfoot)
 	if (!reaction) {

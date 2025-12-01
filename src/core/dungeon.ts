@@ -82,6 +82,7 @@ import {
 	initiateCombat,
 	addToCombatQueue,
 	processThreatSwitching,
+	handleNPCLeavingCombat,
 } from "../combat.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import {
@@ -5174,10 +5175,18 @@ export class Mob extends Movable {
 	 * @param target The target Mob to engage, or undefined to disengage
 	 */
 	public set combatTarget(target: Mob | undefined) {
+		const wasInCombat = this._combatTarget !== undefined;
 		this._combatTarget = target;
 		if (!this.character && target) this.addToThreatTable(target);
-		if (!target) removeFromCombatQueue(this);
-		else addToCombatQueue(this);
+		if (!target) {
+			removeFromCombatQueue(this);
+			// If NPC was in combat and is now leaving, handle target switching and aggro behavior
+			if (!this.character && wasInCombat) {
+				handleNPCLeavingCombat(this);
+			}
+		} else {
+			addToCombatQueue(this);
+		}
 	}
 
 	/**

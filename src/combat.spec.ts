@@ -68,10 +68,11 @@ suite("combat.ts", () => {
 	});
 
 	afterEach(() => {
-		attacker.combatTarget = undefined;
-		defender.combatTarget = undefined;
+		// Clear threat tables first to prevent handleNPCLeavingCombat from re-engaging
 		attacker.clearThreatTable();
 		defender.clearThreatTable();
+		attacker.combatTarget = undefined;
+		defender.combatTarget = undefined;
 	});
 
 	suite("Combat queue management", () => {

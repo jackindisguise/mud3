@@ -29,6 +29,7 @@
  */
 import archetypePkg from "./archetype.js";
 import abilityPkg from "./ability.js";
+import effectPkg from "./effect.js";
 import {
 	getRaceById,
 	getJobById,
@@ -37,6 +38,7 @@ import {
 } from "../registry/archetype.js";
 import type { Race, Job } from "../core/archetype.js";
 import { getAbilityById } from "../registry/ability.js";
+import { getEffectTemplateById } from "../registry/effect.js";
 import { Ability, getProficiencyAtUses } from "../core/ability.js";
 import {
 	registerDungeon,
@@ -58,7 +60,6 @@ import {
 	ItemTemplate,
 	DIRECTION,
 	Reset,
-	DUNGEON_REGISTRY,
 	dir2text,
 	text2dir,
 	dir2reverse,
@@ -100,7 +101,11 @@ import {
 	type ItemType,
 	type equipmentType,
 	DungeonOptions,
+	DUNGEON_REGISTRY,
 } from "../core/dungeon.js";
+import { SerializedEffect } from "../core/effect.js";
+import { EffectInstance, isPassiveEffect } from "../core/effect.js";
+import { addToEffectsSet } from "../effects.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
@@ -2272,6 +2277,73 @@ export async function deserializeMob(
 		logger.debug(`Mob deserialization complete`);
 	}
 
+	// Re-apply archetype passive effects (race and job passives)
+	// These are not serialized and must be re-applied on deserialization
+	mob.applyArchetypePassives();
+
+	// Restore effects (excluding archetype passives which are re-applied above)
+	if (normalized.effects && Array.isArray(normalized.effects)) {
+		logger.debug(`Restoring ${normalized.effects.length} effect(s)`);
+		for (const serializedEffect of normalized.effects) {
+			const template = getEffectTemplateById(serializedEffect.effectId);
+			if (!template) {
+				logger.warn(
+					`Effect template "${serializedEffect.effectId}" not found, skipping effect`
+				);
+				continue;
+			}
+
+			// Find caster by OID (search through all dungeons)
+			let caster: Mob | undefined;
+			for (const dungeon of DUNGEON_REGISTRY.values()) {
+				// Search through all objects in the dungeon
+				for (const obj of dungeon.contents) {
+					if (obj.oid === serializedEffect.casterOid && obj instanceof Mob) {
+						caster = obj;
+						break;
+					}
+				}
+				if (caster) break;
+			}
+
+			// If caster not found, use the mob itself as fallback (shouldn't happen for non-archetype effects)
+			if (!caster) {
+				logger.warn(
+					`Caster with OID ${serializedEffect.casterOid} not found for effect "${serializedEffect.effectId}", using mob itself as fallback`
+				);
+				caster = mob;
+			}
+
+			// Create effect instance
+			const instance: EffectInstance = {
+				template,
+				caster,
+				appliedAt: serializedEffect.appliedAt,
+				expiresAt: serializedEffect.expiresAt,
+				...(serializedEffect.nextTickAt !== undefined && {
+					nextTickAt: serializedEffect.nextTickAt,
+				}),
+				...(serializedEffect.ticksRemaining !== undefined && {
+					ticksRemaining: serializedEffect.ticksRemaining,
+				}),
+				...(serializedEffect.tickAmount !== undefined && {
+					tickAmount: serializedEffect.tickAmount,
+				}),
+			};
+
+			// Add effect to mob (using addEffect to ensure proper initialization)
+			// But we need to manually set the instance data since addEffect creates a new instance
+			const effects = mob.getEffects() as Set<EffectInstance>;
+			(effects as any).add(instance);
+			addToEffectsSet(mob);
+
+			// Recalculate attributes if this is a passive effect with modifiers
+			if (isPassiveEffect(template)) {
+				mob.recalculateDerivedAttributes();
+			}
+		}
+	}
+
 	// Register in wandering mobs cache if wander behavior is enabled
 	if (mob.hasBehavior(BEHAVIOR.WANDER) && !mob.character) {
 		addWanderingMob(mob);
@@ -2282,7 +2354,7 @@ export async function deserializeMob(
 
 export default {
 	name: "dungeon",
-	dependencies: [archetypePkg, abilityPkg],
+	dependencies: [archetypePkg, abilityPkg, effectPkg],
 	loader: async () => {
 		await logger.block("dungeon", async () => {
 			const dungeons = await loadDungeons();

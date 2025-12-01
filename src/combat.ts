@@ -190,6 +190,26 @@ export function oneHit(options: OneHitOptions): number {
 	);
 	damage *= damageMultiplier;
 
+	// Apply effect modifiers
+	// Check for outgoing damage multiplier on attacker
+	for (const effect of attacker.getEffects()) {
+		if (
+			effect.template.type === "passive" &&
+			effect.template.outgoingDamageMultiplier !== undefined
+		) {
+			damage *= effect.template.outgoingDamageMultiplier;
+		}
+	}
+	// Check for incoming damage multiplier on target
+	for (const effect of target.getEffects()) {
+		if (
+			effect.template.type === "passive" &&
+			effect.template.incomingDamageMultiplier !== undefined
+		) {
+			damage *= effect.template.incomingDamageMultiplier;
+		}
+	}
+
 	const finalDamage = Math.floor(damage);
 
 	// Send combat messages
@@ -697,6 +717,10 @@ export function initiateCombat(
 	defender: Mob,
 	reaction: boolean = false
 ): void {
+	// Prevent self-targeting
+	if (attacker === defender) {
+		return;
+	}
 	if (attacker.combatTarget === defender) {
 		return;
 	}

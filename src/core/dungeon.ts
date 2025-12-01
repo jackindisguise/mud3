@@ -98,6 +98,16 @@ import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
 import { addToRegenerationSet } from "../regeneration.js";
 import {
+	EffectInstance,
+	EffectTemplate,
+	isPassiveEffect,
+	isDamageOverTimeEffect,
+	isHealOverTimeEffect,
+	SerializedEffect,
+} from "./effect.js";
+import { addToEffectsSet } from "../effects.js";
+import { getEffectTemplateById } from "../registry/effect.js";
+import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
 	ResourceCapacities,
@@ -1704,6 +1714,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 	behaviors?: Record<string, boolean>;
 	/** Learned abilities map (ability id -> number of uses) */
 	learnedAbilities?: Record<string, number>;
+	/** Active effects (excluding archetype passives) */
+	effects?: SerializedEffect[];
 }
 
 /**
@@ -4969,6 +4981,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 	behaviors?: Record<string, boolean>;
 	/** Learned abilities map (ability id -> number of uses) */
 	learnedAbilities?: Record<string, number>;
+	/** Active effects (excluding archetype passives) */
+	effects?: SerializedEffect[];
 }
 
 /**
@@ -5042,6 +5056,9 @@ export class Mob extends Movable {
 	/** Map of ability ID to cached proficiency (0-100) */
 	/** @internal - Public for package deserializers */
 	public _proficiencySnapshot: Map<string, number>;
+	/** Active effects on this mob */
+	/** @internal - Public for package deserializers */
+	public _effects: Set<EffectInstance>;
 	constructor(options: MobOptions) {
 		super(options);
 
@@ -5060,6 +5077,9 @@ export class Mob extends Movable {
 		);
 		this._resourceCaps = sumResourceCaps();
 		this._resourceCapsView = createResourceCapsView(this._resourceCaps);
+
+		// Initialize effects before recalculateDerivedAttributes (which iterates over effects)
+		this._effects = new Set<EffectInstance>();
 
 		this._race = options.race;
 		this._job = options.job;
@@ -5101,6 +5121,10 @@ export class Mob extends Movable {
 				this._updateProficiencySnapshot(ability);
 			}
 		}
+
+		// Apply archetype passive effects (race and job passives)
+		// Note: _effects is already initialized earlier in constructor
+		this.applyArchetypePassives();
 
 		// Initialize combat properties
 		// Only NPCs (mobs without a character) have threat tables
@@ -5175,6 +5199,10 @@ export class Mob extends Movable {
 	 * @param target The target Mob to engage, or undefined to disengage
 	 */
 	public set combatTarget(target: Mob | undefined) {
+		// Prevent self-targeting
+		if (target === this) {
+			return;
+		}
 		const wasInCombat = this._combatTarget !== undefined;
 		this._combatTarget = target;
 		if (!this.character && target) this.addToThreatTable(target);
@@ -5877,13 +5905,37 @@ export class Mob extends Movable {
 			// Weapons are handled separately - their attack power is only used when that weapon is used
 		}
 
+		// Collect effect bonuses (from passive effects)
+		const effectAttributeBonuses: Partial<PrimaryAttributeSet>[] = [];
+		const effectResourceBonuses: Partial<ResourceCapacities>[] = [];
+		const effectSecondaryAttributeBonuses: Partial<SecondaryAttributeSet>[] =
+			[];
+		for (const effect of this._effects) {
+			if (isPassiveEffect(effect.template)) {
+				if (effect.template.primaryAttributeModifiers) {
+					effectAttributeBonuses.push(
+						effect.template.primaryAttributeModifiers
+					);
+				}
+				if (effect.template.secondaryAttributeModifiers) {
+					effectSecondaryAttributeBonuses.push(
+						effect.template.secondaryAttributeModifiers
+					);
+				}
+				if (effect.template.resourceCapacityModifiers) {
+					effectResourceBonuses.push(effect.template.resourceCapacityModifiers);
+				}
+			}
+		}
+
 		const rawPrimary = sumPrimaryAttributes(
 			race.startingAttributes,
 			job.startingAttributes,
 			multiplyPrimaryAttributes(race.attributeGrowthPerLevel, levelStages),
 			multiplyPrimaryAttributes(job.attributeGrowthPerLevel, levelStages),
 			this._attributeBonuses,
-			...equipmentAttributeBonuses
+			...equipmentAttributeBonuses,
+			...effectAttributeBonuses
 		);
 		this._primaryAttributes = {
 			strength: roundTo(rawPrimary.strength, ATTRIBUTE_ROUND_DECIMALS),
@@ -5910,18 +5962,22 @@ export class Mob extends Movable {
 		// The base attackPower only comes from strength-derived calculation
 		// Weapons contribute their attack power only when that specific weapon is used in an attack
 
-		// Apply equipment secondary attribute bonuses
-		if (equipmentSecondaryAttributeBonuses.length > 0) {
-			const equipmentSecondaryBonuses = sumSecondaryAttributes(
-				...equipmentSecondaryAttributeBonuses
+		// Apply equipment and effect secondary attribute bonuses
+		const allSecondaryBonuses = [
+			...equipmentSecondaryAttributeBonuses,
+			...effectSecondaryAttributeBonuses,
+		];
+		if (allSecondaryBonuses.length > 0) {
+			const combinedSecondaryBonuses = sumSecondaryAttributes(
+				...allSecondaryBonuses
 			);
 			// Add each bonus to the corresponding secondary attribute
 			(
-				Object.keys(equipmentSecondaryBonuses) as Array<
+				Object.keys(combinedSecondaryBonuses) as Array<
 					keyof SecondaryAttributeSet
 				>
 			).forEach((key) => {
-				const bonus = equipmentSecondaryBonuses[key];
+				const bonus = combinedSecondaryBonuses[key];
 				if (bonus !== 0) {
 					this._secondaryAttributes[key] = roundTo(
 						this._secondaryAttributes[key] + bonus,
@@ -5941,7 +5997,8 @@ export class Mob extends Movable {
 			multiplyResourceCaps(race.resourceGrowthPerLevel, levelStages),
 			multiplyResourceCaps(job.resourceGrowthPerLevel, levelStages),
 			this._resourceBonuses,
-			...equipmentResourceBonuses
+			...equipmentResourceBonuses,
+			...effectResourceBonuses
 		);
 
 		this._resourceCaps = {
@@ -7004,6 +7061,254 @@ export class Mob extends Movable {
 	}
 
 	/**
+	 * Gets all active effects on this mob.
+	 *
+	 * @returns Readonly set of effect instances
+	 */
+	public getEffects(): ReadonlySet<EffectInstance> {
+		return this._effects;
+	}
+
+	/**
+	 * Checks if this mob has an effect with the given ID.
+	 *
+	 * @param effectId The effect ID to check for
+	 * @returns True if the mob has an active effect with this ID
+	 */
+	public hasEffect(effectId: string): boolean {
+		for (const effect of this._effects) {
+			if (effect.template.id === effectId) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Gets all effects with the given ID.
+	 *
+	 * @param effectId The effect ID to find
+	 * @returns Array of effect instances with this ID
+	 */
+	public getEffectsById(effectId: string): EffectInstance[] {
+		const results: EffectInstance[] = [];
+		for (const effect of this._effects) {
+			if (effect.template.id === effectId) {
+				results.push(effect);
+			}
+		}
+		return results;
+	}
+
+	/**
+	 * Adds an effect to this mob.
+	 * If the effect is not stackable and an instance already exists, it replaces the old one.
+	 * For stackable effects, multiple instances can coexist.
+	 *
+	 * @param template The effect template to instantiate
+	 * @param caster The mob that applied this effect
+	 * @param overrides Optional overrides for effect properties (e.g., custom damage/heal amounts)
+	 * @returns The created effect instance
+	 */
+	public addEffect(
+		template: EffectTemplate,
+		caster: Mob,
+		overrides?: {
+			damage?: number;
+			heal?: number;
+			duration?: number;
+		}
+	): EffectInstance {
+		const now = Date.now();
+
+		// Handle non-stackable effects: remove existing instances
+		if (!template.stackable) {
+			const existing = this.getEffectsById(template.id);
+			for (const effect of existing) {
+				this._effects.delete(effect);
+			}
+		}
+
+		// Create effect instance
+		const instance: EffectInstance = {
+			template,
+			caster,
+			appliedAt: now,
+			expiresAt: now,
+		};
+
+		// Set up duration and expiration
+		let duration = 0;
+		if (isDamageOverTimeEffect(template)) {
+			duration = overrides?.duration ?? template.duration;
+			const intervalMs = template.interval * 1000;
+			const ticks = Math.floor(duration / template.interval);
+			instance.expiresAt = now + duration * 1000;
+			instance.nextTickAt = now + intervalMs;
+			instance.ticksRemaining = ticks;
+			instance.tickAmount = overrides?.damage ?? template.damage;
+		} else if (isHealOverTimeEffect(template)) {
+			duration = overrides?.duration ?? template.duration;
+			const intervalMs = template.interval * 1000;
+			const ticks = Math.floor(duration / template.interval);
+			instance.expiresAt = now + duration * 1000;
+			instance.nextTickAt = now + intervalMs;
+			instance.ticksRemaining = ticks;
+			instance.tickAmount = overrides?.heal ?? template.heal;
+		} else {
+			// Passive effects don't expire (duration is infinite)
+			// They can be removed manually or when the mob dies
+			instance.expiresAt = Number.MAX_SAFE_INTEGER;
+		}
+
+		// Add to effects set
+		this._effects.add(instance);
+		addToEffectsSet(this);
+
+		// Send onApply act message if template has one
+		if (template.onApply && this.location instanceof Room) {
+			act(
+				template.onApply,
+				{
+					user: this, // The mob affected by the effect
+					target: caster !== this ? caster : undefined, // The caster (if different from affected mob)
+					room: this.location,
+				},
+				{ messageGroup: MESSAGE_GROUP.INFO }
+			);
+		}
+
+		// Recalculate attributes if this is a passive effect with modifiers
+		if (isPassiveEffect(template)) {
+			this.recalculateDerivedAttributes();
+		}
+
+		// If this is an offensive effect and target is not in combat, initiate combat
+		// Check for offensive flag on both passive and DoT effects
+		const isOffensive =
+			(isPassiveEffect(template) && template.isOffensive) ||
+			(isDamageOverTimeEffect(template) && template.isOffensive);
+		if (
+			isOffensive &&
+			!this.isInCombat() &&
+			this.location instanceof Room &&
+			caster.location === this.location &&
+			caster !== this
+		) {
+			initiateCombat(this, caster, true);
+		}
+
+		return instance;
+	}
+
+	/**
+	 * Removes an effect instance from this mob.
+	 *
+	 * @param effect The effect instance to remove
+	 */
+	public removeEffect(effect: EffectInstance): void {
+		if (this._effects.delete(effect)) {
+			// Recalculate attributes if this was a passive effect with modifiers
+			if (isPassiveEffect(effect.template)) {
+				this.recalculateDerivedAttributes();
+			}
+		}
+	}
+
+	/**
+	 * Removes all effects with the given ID from this mob.
+	 *
+	 * @param effectId The effect ID to remove
+	 * @returns Number of effects removed
+	 */
+	public removeEffectsById(effectId: string): number {
+		const toRemove = this.getEffectsById(effectId);
+		let removed = 0;
+		for (const effect of toRemove) {
+			if (this._effects.delete(effect)) {
+				removed++;
+			}
+		}
+		if (removed > 0) {
+			// Recalculate attributes in case any were passive effects with modifiers
+			this.recalculateDerivedAttributes();
+		}
+		return removed;
+	}
+
+	/**
+	 * Removes all effects from this mob.
+	 */
+	public clearEffects(): void {
+		const hadPassiveEffects = Array.from(this._effects).some((e) =>
+			isPassiveEffect(e.template)
+		);
+		this._effects.clear();
+		if (hadPassiveEffects) {
+			this.recalculateDerivedAttributes();
+		}
+	}
+
+	/**
+	 * Applies passive effects from the mob's race and job archetypes.
+	 * Archetype passive effects are self-applied (caster is the mob itself)
+	 * and have no expiration. They are not serialized and will be re-applied
+	 * when the mob is deserialized.
+	 *
+	 * @internal - Public for package deserializers
+	 */
+	public applyArchetypePassives(): void {
+		// Remove any existing archetype passives first (in case race/job changed)
+		const archetypePassiveIds = new Set<string>();
+		for (const passiveId of this._race.passives) {
+			archetypePassiveIds.add(passiveId);
+		}
+		for (const passiveId of this._job.passives) {
+			archetypePassiveIds.add(passiveId);
+		}
+
+		// Remove existing archetype passives (identified by caster being self)
+		const toRemove: EffectInstance[] = [];
+		for (const effect of this._effects) {
+			if (
+				effect.caster === this &&
+				archetypePassiveIds.has(effect.template.id)
+			) {
+				toRemove.push(effect);
+			}
+		}
+		for (const effect of toRemove) {
+			this._effects.delete(effect);
+		}
+
+		// Apply race passives
+		for (const passiveId of this._race.passives) {
+			const template = getEffectTemplateById(passiveId);
+			if (template) {
+				// Archetype passives are self-applied and never expire
+				this.addEffect(template, this);
+			} else {
+				logger.warn(
+					`Race "${this._race.id}" references passive effect "${passiveId}" which was not found in effect template registry`
+				);
+			}
+		}
+
+		// Apply job passives
+		for (const passiveId of this._job.passives) {
+			const template = getEffectTemplateById(passiveId);
+			if (template) {
+				// Archetype passives are self-applied and never expire
+				this.addEffect(template, this);
+			} else {
+				logger.warn(
+					`Job "${this._job.id}" references passive effect "${passiveId}" which was not found in effect template registry`
+				);
+			}
+		}
+	}
+
+	/**
 	 * Serialize this Mob instance to a serializable format.
 	 * Includes all mob-specific properties: level, experience, race/job IDs,
 	 * bonuses, resources, and equipped items. Used for persistence and network transfer.
@@ -7048,6 +7353,30 @@ export class Mob extends Movable {
 			equipped[slot] = equipment.serialize(options);
 		}
 
+		// Serialize effects (excluding archetype passives where caster === this)
+		const serializedEffects: SerializedEffect[] = [];
+		for (const effect of this._effects) {
+			// Skip archetype passives (self-applied effects)
+			if (effect.caster === this) {
+				continue;
+			}
+			serializedEffects.push({
+				effectId: effect.template.id,
+				casterOid: effect.caster.oid,
+				appliedAt: effect.appliedAt,
+				expiresAt: effect.expiresAt,
+				...(effect.nextTickAt !== undefined && {
+					nextTickAt: effect.nextTickAt,
+				}),
+				...(effect.ticksRemaining !== undefined && {
+					ticksRemaining: effect.ticksRemaining,
+				}),
+				...(effect.tickAmount !== undefined && {
+					tickAmount: effect.tickAmount,
+				}),
+			});
+		}
+
 		const full: SerializedMob = {
 			...(uncompressed as SerializedDungeonObject),
 			type: "Mob",
@@ -7085,6 +7414,7 @@ export class Mob extends Movable {
 						) as Record<string, number>,
 				  }
 				: {}),
+			...(serializedEffects.length > 0 ? { effects: serializedEffects } : {}),
 		};
 
 		// If compressing, prefer template-aware compression and also prune equipped entries

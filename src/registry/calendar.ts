@@ -51,6 +51,22 @@ export interface CalendarTime {
 	second: number;
 }
 
+export function toOrdinal(date: number): string {
+	if (date === 11) return "11th";
+	if (date === 12) return "12th";
+	if (date === 13) return "13th";
+	const suffix = date % 10;
+	if (suffix === 1) {
+		return `${date}st`;
+	} else if (suffix === 2) {
+		return `${date}nd`;
+	} else if (suffix === 3) {
+		return `${date}rd`;
+	} else {
+		return `${date}th`;
+	}
+}
+
 // Calendar event emitter
 export const calendarEvents = new EventEmitter();
 

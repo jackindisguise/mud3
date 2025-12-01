@@ -27,6 +27,7 @@ import {
 	getCurrentHour,
 	getCurrentMinute,
 	getCurrentSecond,
+	toOrdinal,
 } from "../registry/calendar.js";
 
 export default {
@@ -64,12 +65,15 @@ export default {
 		// Build the calendar display
 		const lines: string[] = [];
 		lines.push("");
-		lines.push(
-			color(`Calendar: ${calendar.name}`, COLOR.CYAN)
-		);
+		lines.push(color(`Calendar: ${calendar.name}`, COLOR.CYAN));
 		lines.push("");
+		lines.push(`${color("Day of Week: ", COLOR.YELLOW)}${dayName}`);
+		lines.push(`${color("Month: ", COLOR.YELLOW)}${monthName}`);
+		lines.push(`${color("Day of Month: ", COLOR.YELLOW)}${time.day}`);
 		lines.push(
-			`${color("Date: ", COLOR.YELLOW)}${dayName}, ${monthName} ${time.day}, Year ${time.year + 1}`
+			`${color("Date: ", COLOR.YELLOW)}${dayName}, ${monthName} ${toOrdinal(
+				time.day
+			)}, Year ${time.year + 1}`
 		);
 		lines.push(
 			`${color("Time: ", COLOR.YELLOW)}${hourStr}:${minuteStr}:${secondStr}`
@@ -79,4 +83,3 @@ export default {
 		actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;
-

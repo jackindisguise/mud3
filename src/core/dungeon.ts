@@ -3411,17 +3411,19 @@ export class Room extends DungeonObject {
 				if (obj === enterer) continue;
 				const inhabitant = obj;
 
-				// Check threat table: if entering mob is in this mob's threat table, process threat switching
-				if (inhabitant.threatTable && inhabitant.threatTable.get(enterer)) {
-					processThreatSwitching(inhabitant);
-				}
-
 				// Process aggressive behavior: player entering room with aggressive mob in it
+				// This should happen first to ensure aggro mobs attack even if threat table exists
 				if (inhabitant.hasBehavior(BEHAVIOR.AGGRESSIVE) && enterer.character) {
 					if (!inhabitant.combatTarget) {
 						initiateCombat(inhabitant, enterer);
 					}
 					inhabitant.addToThreatTable(enterer);
+				}
+
+				// Check threat table: if entering mob is in this mob's threat table, process threat switching
+				// This handles cases where the mob has the enterer on threat table (e.g., after fleeing)
+				if (inhabitant.threatTable && inhabitant.threatTable.get(enterer)) {
+					processThreatSwitching(inhabitant);
 				}
 
 				// Also check if the entering mob is aggressive - it should generate threat for character mobs in the room
@@ -3430,6 +3432,11 @@ export class Room extends DungeonObject {
 						initiateCombat(enterer, inhabitant);
 					}
 					enterer.addToThreatTable(inhabitant);
+				}
+
+				// Check threat table for entering aggro mob: if inhabitant is in enterer's threat table, process threat switching
+				if (enterer.threatTable && enterer.threatTable.get(inhabitant)) {
+					processThreatSwitching(enterer);
 				}
 			}
 		}

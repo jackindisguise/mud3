@@ -385,8 +385,8 @@ export function processThreatSwitching(npc: Mob): void {
 		// No current target, pick highest threat that's in the same room
 		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
 		if (highestThreat) {
-			// Use initiateCombat to properly set up combat with new target
-			initiateCombat(npc, highestThreat, true);
+			// New engagement - should get free round
+			initiateCombat(npc, highestThreat, false);
 		}
 		return;
 	}
@@ -396,8 +396,8 @@ export function processThreatSwitching(npc: Mob): void {
 		// Current target left the room, find a new target that's actually in the room
 		const highestThreat = getHighestThreatInRoom(npc, npcRoom);
 		if (highestThreat) {
-			// Use initiateCombat to properly set up combat with new target
-			initiateCombat(npc, highestThreat, true);
+			// New engagement (previous target left) - should get free round
+			initiateCombat(npc, highestThreat, false);
 		} else {
 			// No valid target in room, clear target and remove from combat queue
 			npc.combatTarget = undefined;
@@ -658,6 +658,8 @@ export function initiateCombat(
 	}
 
 	const originalTarget = attacker.combatTarget;
+	const room = attacker.location instanceof Room ? attacker.location : undefined;
+	
 	attacker.combatTarget = defender;
 	// not a reactionary initiation (backfoot)
 	if (!reaction) {
@@ -668,6 +670,41 @@ export function initiateCombat(
 			// defender is a character and not in combat? initiate combat
 			if (!defender.isInCombat()) {
 				initiateCombat(defender, attacker, true);
+			}
+		}
+
+		// Send act() message for combat initiation or target switching
+		if (room) {
+			if (!originalTarget) {
+				// New engagement
+				act(
+					{
+						user: `You engage {target} in combat!`,
+						room: `{User} engages {target} in combat!`,
+						target: `{User} engages you in combat!`,
+					},
+					{
+						user: attacker,
+						target: defender,
+						room: room,
+					},
+					{ messageGroup: MESSAGE_GROUP.ACTION }
+				);
+			} else {
+				// Target switch
+				act(
+					{
+						user: `You switch targets to {target}!`,
+						room: `{User} switches targets to {target}!`,
+						target: `{User} switches targets to you!`,
+					},
+					{
+						user: attacker,
+						target: defender,
+						room: room,
+					},
+					{ messageGroup: MESSAGE_GROUP.ACTION }
+				);
 			}
 		}
 

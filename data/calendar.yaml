@@ -32,7 +32,7 @@ months:
     days: 30
   - name: December
     days: 31
-millisecondsPerSecond: 1000
-secondsPerMinute: 1
+millisecondsPerSecond: 16.666666666666667
+secondsPerMinute: 60
 minutesPerHour: 60
 hoursPerDay: 24

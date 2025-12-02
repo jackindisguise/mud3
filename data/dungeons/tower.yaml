@@ -556,15 +556,6 @@ dungeon:
       race: nobility
       job: warrior
       level: 1
-      behaviors: {aggressive: true}
-    - id: cake
-      type: Mob
-      display: qwe
-      description: qwe
-      keywords: qwe
-      race: goliath
-      job: warrior
-      level: 1
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{13,16,1}'

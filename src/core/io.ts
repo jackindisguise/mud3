@@ -239,9 +239,10 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	private handleData(data: Buffer): void {
 		// Process telnet negotiations and remove them from the stream
 		const cleaned = this.negotiationManager.processData(data);
+		logger.debug(`Client data (${this.getAddress()}): ${Array.from(cleaned)}`);
 
 		// Convert to UTF-8 string and add to buffer
-		this.buffer += cleaned.toString("utf8");
+		this.buffer += cleaned.toString("binary");
 
 		// Process complete lines
 		let newlineIndex: number;

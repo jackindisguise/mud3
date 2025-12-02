@@ -17,7 +17,8 @@
 
 import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { DIRECTIONS, DIRECTION, Room, dir2text } from "../core/dungeon.js";
+import { Mob, Room } from "../core/dungeon.js";
+import { DIRECTION, DIRECTIONS, dir2text } from "../direction.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
 

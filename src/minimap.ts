@@ -7,17 +7,14 @@
  * @module commands/minimap
  */
 
+import { Room, Dungeon, DungeonObject } from "./core/dungeon.js";
+import { DIRECTION, DIRECTIONS } from "./direction.js";
 import {
-	Room,
-	Dungeon,
-	DungeonObject,
-	DIRECTION,
-	DIRECTIONS,
 	isNorthward,
 	isSouthward,
 	isEastward,
 	isWestward,
-} from "./core/dungeon.js";
+} from "./direction.js";
 import { Mob } from "./core/dungeon.js";
 import { COLOR, color, SIZER } from "./core/color.js";
 import { string } from "mud-ext";

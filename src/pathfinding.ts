@@ -1,4 +1,5 @@
-import { DIRECTIONS, DIRECTION, Room } from "./core/dungeon.js";
+import { Room } from "./core/dungeon.js";
+import { DIRECTION, DIRECTIONS } from "./direction.js";
 
 export type PathCostFunction = (from: Room, to: Room, dir: DIRECTION) => number;
 

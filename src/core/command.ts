@@ -44,9 +44,11 @@
  * @module command
  */
 
-import { DungeonObject, Item, Room, DIRECTION, text2dir } from "./dungeon.js";
+import { DungeonObject, Item, Room } from "./dungeon.js";
+import { DIRECTION } from "../direction.js";
 import { Mob, Equipment } from "./dungeon.js";
-import { Character, MESSAGE_GROUP } from "./character.js";
+import { Character } from "./character.js";
+import { MESSAGE_GROUP } from "./character.js";
 import { forEachCharacter } from "../game.js";
 import logger from "../logger.js";
 

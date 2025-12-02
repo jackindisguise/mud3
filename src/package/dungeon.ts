@@ -58,12 +58,7 @@ import {
 	RoomTemplate,
 	MobTemplate,
 	ItemTemplate,
-	DIRECTION,
 	Reset,
-	dir2text,
-	text2dir,
-	dir2reverse,
-	DirectionText,
 	RoomLink,
 	getRoomByRef,
 	getDungeonById,
@@ -119,6 +114,14 @@ import { migrateArmorData } from "../migrations/armor/runner.js";
 import { migrateWeaponData } from "../migrations/weapon/runner.js";
 import { COLOR_NAME_TO_COLOR } from "../core/color.js";
 import assert from "assert";
+import {
+	DIRECTION,
+	DIRECTIONS,
+	dir2text,
+	text2dir,
+	dir2reverse,
+	DirectionText,
+} from "../direction.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");

@@ -9,7 +9,9 @@
 
 import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Room, DIRECTION, dir2text, Mob } from "../core/dungeon.js";
+import { Room, Mob } from "../core/dungeon.js";
+import { dir2text } from "../direction.js";
+import { DIRECTION } from "../direction.js";
 import { CommandObject } from "../package/commands.js";
 import { showRoom } from "./look.js";
 

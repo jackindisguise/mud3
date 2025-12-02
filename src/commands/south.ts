@@ -13,7 +13,7 @@
  */
 
 import { CommandContext, PRIORITY } from "../core/command.js";
-import { DIRECTION } from "../core/dungeon.js";
+import { DIRECTION } from "../direction.js";
 import { CommandObject } from "../package/commands.js";
 import {
 	DEFAULT_COMMAND_VALUES,

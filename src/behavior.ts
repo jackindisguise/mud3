@@ -6,14 +6,8 @@
  * @module behavior
  */
 
-import {
-	Mob,
-	Room,
-	DIRECTION,
-	DIRECTIONS,
-	WANDERING_MOBS,
-	BEHAVIOR,
-} from "./core/dungeon.js";
+import { Mob, Room, WANDERING_MOBS, BEHAVIOR } from "./core/dungeon.js";
+import { DIRECTION, DIRECTIONS } from "./direction.js";
 import { removeWanderingMob } from "./registry/dungeon.js";
 import {
 	initiateCombat,

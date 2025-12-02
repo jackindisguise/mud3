@@ -21,7 +21,6 @@ import {
 	Equipment,
 	Armor,
 	Weapon,
-	DIRECTION,
 	EQUIPMENT_SLOT,
 	SerializedDungeonObject,
 	SerializedRoom,
@@ -37,6 +36,7 @@ import archetypePkg from "./archetype.js";
 import abilitiesPkg from "./ability.js";
 import { getAllAbilities } from "../registry/ability.js";
 import { createMob } from "./dungeon.js";
+import { DIRECTION } from "../direction.js";
 
 describe("package/dungeon.ts deserializers", () => {
 	before(async () => {

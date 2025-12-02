@@ -23,13 +23,7 @@
 
 import { CommandContext } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import {
-	Room,
-	DIRECTION,
-	dir2text,
-	DIRECTIONS,
-	DungeonObject,
-} from "../core/dungeon.js";
+import { Room, DungeonObject } from "../core/dungeon.js";
 import { getEquipmentList } from "../core/equipment.js";
 import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
@@ -37,6 +31,8 @@ import { COLOR, color, SIZER } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
 import { generateMinimap, generateMinimapFromSteps } from "../minimap.js";
+import { DIRECTION, dir2text } from "../direction.js";
+import { DIRECTIONS } from "../direction.js";
 
 /**
  * Displays a room description to a player.

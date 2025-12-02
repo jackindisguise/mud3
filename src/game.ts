@@ -74,7 +74,6 @@ import {
 	processRegeneration,
 	REGENERATION_INTERVAL_MS,
 } from "./regeneration.js";
-import { processEffects, EFFECT_PROCESSING_INTERVAL_MS } from "./effects.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 
 // Default intervals/timeouts (milliseconds)
@@ -145,9 +144,6 @@ let wanderTimer: number | undefined;
 
 /** Regeneration interval timer */
 let regenerationTimer: number | undefined;
-
-/** Effects processing interval timer */
-let effectsTimer: number | undefined;
 
 /** Next connection ID */
 let nextConnectionId = 1;
@@ -1162,11 +1158,6 @@ async function start(): Promise<void> {
 	regenerationTimer = setAbsoluteInterval(() => {
 		processRegeneration();
 	}, REGENERATION_INTERVAL_MS);
-
-	// Set up effects processing timer (every 1 second)
-	effectsTimer = setAbsoluteInterval(() => {
-		processEffects();
-	}, EFFECT_PROCESSING_INTERVAL_MS);
 }
 
 /**
@@ -1222,13 +1213,6 @@ async function stop(): Promise<void> {
 		clearCustomInterval(regenerationTimer);
 		regenerationTimer = undefined;
 		logger.debug("Regeneration timer cleared");
-	}
-
-	// Clear effects timer
-	if (effectsTimer !== undefined) {
-		clearCustomInterval(effectsTimer);
-		effectsTimer = undefined;
-		logger.debug("Effects timer cleared");
 	}
 
 	// Save game state before shutdown

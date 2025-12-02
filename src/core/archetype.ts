@@ -1,3 +1,11 @@
+/**
+ * Core archetype module.
+ *
+ * Provides interfaces and functions for managing race and job archetypes.
+ * Archetypes define starting attributes, growth curves, skills, and passives.
+ *
+ * @module core/archetype
+ */
 import { PrimaryAttributeSet, ResourceCapacities } from "./attribute.js";
 import { DamageTypeRelationships } from "./damage-types.js";
 

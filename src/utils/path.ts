@@ -1,10 +1,12 @@
-//import { app } from "electron";
-import { join } from "path";
 /**
  * Returns the safe current working directory for runtime operations.
  * Prefers the `PORTABLE_EXECUTABLE_DIR` environment variable (set by
  * Electron portable builds) and falls back to `process.cwd()` otherwise.
  */
+
+//import { app } from "electron";
+import { join } from "path";
+
 export function getSafeRootDirectory(): string {
 	const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
 

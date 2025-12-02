@@ -1,5 +1,16 @@
+/**
+ * Registry: board - centralized board access
+ *
+ * Provides a centralized location for accessing registered boards.
+ * The registry is populated by the board package.
+ *
+ * @module registry/board
+ */
+
 import logger from "../logger.js";
 import { Board } from "../core/board.js";
+
+export { READONLY_BOARD_REGISTRY as BOARD_REGISTRY };
 
 /**
  * Global registry of loaded boards.
@@ -7,7 +18,6 @@ import { Board } from "../core/board.js";
  */
 const boardRegistry: Map<string, Board> = new Map();
 const READONLY_BOARD_REGISTRY: ReadonlyMap<string, Board> = boardRegistry;
-export { READONLY_BOARD_REGISTRY as BOARD_REGISTRY };
 
 /**
  * Sanitize board name for use as registry key.

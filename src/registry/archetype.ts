@@ -1,3 +1,12 @@
+/**
+ * Registry: archetype - centralized race and job access
+ *
+ * Provides a centralized location for accessing registered races and jobs.
+ * The registries are populated by the archetype package.
+ *
+ * @module registry/archetype
+ */
+
 import logger from "../logger.js";
 import {
 	Race,
@@ -6,13 +15,15 @@ import {
 	freezeArchetype,
 } from "../core/archetype.js";
 
+export { READONLY_RACE_REGISTRY as RACE_REGISTRY };
+export { READONLY_JOB_REGISTRY as JOB_REGISTRY };
+
 /**
  * Global registry of loaded races.
  * Maps race IDs to their race definitions.
  */
 const RACE_REGISTRY: Map<string, Race> = new Map();
 const READONLY_RACE_REGISTRY: ReadonlyMap<string, Race> = RACE_REGISTRY;
-export { READONLY_RACE_REGISTRY as RACE_REGISTRY };
 
 /**
  * Global registry of loaded jobs.
@@ -20,7 +31,6 @@ export { READONLY_RACE_REGISTRY as RACE_REGISTRY };
  */
 const JOB_REGISTRY: Map<string, Job> = new Map();
 const READONLY_JOB_REGISTRY: ReadonlyMap<string, Job> = JOB_REGISTRY;
-export { READONLY_JOB_REGISTRY as JOB_REGISTRY };
 
 /**
  * Register a race in the global registry.

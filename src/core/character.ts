@@ -51,7 +51,7 @@
  *   in-world entity can reference its player (and vice versa).
  * - `serialize()` returns a plain object suitable for JSON/YAML persistence; runtime
  *   fields like the active session and MudClient are intentionally excluded.
- * @module character
+ * @module core/character
  */
 
 import { Mob, SerializedMob } from "./dungeon.js";

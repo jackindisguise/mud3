@@ -7,7 +7,7 @@
  * - MCCP1/MCCP2 (Mud Client Compression Protocol)
  * - NAWS (Negotiate About Window Size)
  *
- * @module telnet-protocol-handlers
+ * @module core/telnet-protocol-handlers
  */
 
 import { Socket } from "net";

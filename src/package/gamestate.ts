@@ -40,13 +40,12 @@ import {
 	GameState,
 } from "../registry/gamestate.js";
 
+export type { SerializedGameState };
+export { GAME_STATE, GAME_STATE_DEFAULT };
+
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const GAMESTATE_PATH = join(DATA_DIRECTORY, "gamestate.yaml");
-
-// Re-export types and constants for backwards compatibility
-export type { SerializedGameState };
-export { GAME_STATE, GAME_STATE_DEFAULT };
 
 /**
  * Get the next available character ID and increment the counter.

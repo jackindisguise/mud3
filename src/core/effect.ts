@@ -4,7 +4,7 @@
  * Effects can modify mob state, deal damage over time, heal over time, or
  * provide dynamic modifiers that other systems can check.
  *
- * @module effect
+ * @module core/effect
  */
 
 import {

@@ -5,7 +5,7 @@
  * It supports configurable protocol enable/disable states, handles negotiation cycles,
  * and stores protocol-specific data (like TTYPE client info, MCCP compression streams).
  *
- * @module telnet-negotiation
+ * @module core/telnet-negotiation
  */
 
 import { Socket } from "net";

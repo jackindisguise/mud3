@@ -1,8 +1,11 @@
 /**
+ * Core color module.
+ *
  * Color encoding module for MUD text.
  * Uses {letter} syntax for color codes, where {{ escapes to a literal {.
+ *
+ * @module core/color
  */
-
 import { FG, BG, STYLE } from "./telnet.js";
 import { string } from "mud-ext";
 
@@ -79,12 +82,6 @@ export const COLORS: string[] = [
 ] as const;
 
 /**
- * Type representing valid color name strings.
- * Derived from the values in COLOR_NAMES for type safety.
- */
-export type ColorName = (typeof COLOR_NAMES)[COLOR];
-
-/**
  * Reverse mapping from color name strings to COLOR enum values.
  * Provides type-safe conversion from color names to enum values.
  */
@@ -106,6 +103,12 @@ export const COLOR_NAME_TO_COLOR: Record<ColorName, COLOR> = {
 	[COLOR_NAMES[COLOR.CYAN]]: COLOR.CYAN,
 	[COLOR_NAMES[COLOR.WHITE]]: COLOR.WHITE,
 } as const;
+
+/**
+ * Type representing valid color name strings.
+ * Derived from the values in COLOR_NAMES for type safety.
+ */
+export type ColorName = (typeof COLOR_NAMES)[COLOR];
 
 /**
  * Available background colors.

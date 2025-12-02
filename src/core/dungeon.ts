@@ -59,7 +59,7 @@
  * - Serialization helpers on `DungeonObject` and subclasses capture hierarchy and types;
  *   deserialization reconstructs objects.
  *
- * @module dungeon
+ * @module core/dungeon
  */
 
 import { string } from "mud-ext";
@@ -105,7 +105,12 @@ import {
 	isHealOverTimeEffect,
 	SerializedEffect,
 } from "./effect.js";
-import { addToEffectsSet } from "../effects.js";
+import {
+	addToEffectsSet,
+	removeFromEffectsSet,
+	setupEffectTimers,
+	clearEffectTimersForEffect,
+} from "../effects.js";
 import { getEffectTemplateById } from "../registry/effect.js";
 import {
 	PrimaryAttributeSet,
@@ -141,6 +146,7 @@ import {
 	isEastward,
 	isWestward,
 } from "../direction.js";
+import { assert } from "console";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
@@ -4110,11 +4116,9 @@ export class Weapon extends Equipment {
 			if (typeof options.hitType === "string") {
 				// Look up in common hit types
 				const common = COMMON_HIT_TYPES.get(options.hitType.toLowerCase());
-				this._hitType = common ?? {
-					verb: options.hitType,
-					damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
-					color: COLOR.WHITE,
-				};
+				if (!common)
+					throw new Error(`Common hit type ${options.hitType} not found`);
+				this._hitType = common;
 			} else {
 				this._hitType = options.hitType;
 			}
@@ -4234,11 +4238,11 @@ export class Weapon extends Equipment {
 				const common = COMMON_HIT_TYPES.get(
 					weaponTemplate.hitType.toLowerCase()
 				);
-				this._hitType = common ?? {
-					verb: weaponTemplate.hitType,
-					damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
-					color: COLOR.WHITE,
-				};
+				if (!common)
+					throw new Error(
+						`Common hit type ${weaponTemplate.hitType} not found`
+					);
+				this._hitType = common;
 			} else {
 				this._hitType = weaponTemplate.hitType;
 			}
@@ -6556,6 +6560,9 @@ export class Mob extends Movable {
 		this._effects.add(instance);
 		addToEffectsSet(this);
 
+		// Set up timers for this effect
+		setupEffectTimers(this, instance);
+
 		// Send onApply act message if template has one
 		if (template.onApply && this.location instanceof Room) {
 			act(
@@ -6598,9 +6605,17 @@ export class Mob extends Movable {
 	 */
 	public removeEffect(effect: EffectInstance): void {
 		if (this._effects.delete(effect)) {
+			// Clear timers for this effect
+			clearEffectTimersForEffect(effect);
+
 			// Recalculate attributes if this was a passive effect with modifiers
 			if (isPassiveEffect(effect.template)) {
 				this.recalculateDerivedAttributes();
+			}
+
+			// If no effects remain, remove from effects set
+			if (this._effects.size === 0) {
+				removeFromEffectsSet(this);
 			}
 		}
 	}
@@ -6616,12 +6631,19 @@ export class Mob extends Movable {
 		let removed = 0;
 		for (const effect of toRemove) {
 			if (this._effects.delete(effect)) {
+				// Clear timers for this effect
+				clearEffectTimersForEffect(effect);
 				removed++;
 			}
 		}
 		if (removed > 0) {
 			// Recalculate attributes in case any were passive effects with modifiers
 			this.recalculateDerivedAttributes();
+
+			// If no effects remain, remove from effects set
+			if (this._effects.size === 0) {
+				removeFromEffectsSet(this);
+			}
 		}
 		return removed;
 	}
@@ -6743,11 +6765,20 @@ export class Mob extends Movable {
 			equipped[slot] = equipment.serialize(options);
 		}
 
-		// Serialize effects (excluding archetype passives where caster === this)
+		// Serialize effects (excluding archetype passives)
+		// Build set of archetype passive IDs from race and job
+		const archetypePassiveIds = new Set<string>();
+		for (const passiveId of this._race.passives) {
+			archetypePassiveIds.add(passiveId);
+		}
+		for (const passiveId of this._job.passives) {
+			archetypePassiveIds.add(passiveId);
+		}
+
 		const serializedEffects: SerializedEffect[] = [];
 		for (const effect of this._effects) {
-			// Skip archetype passives (self-applied effects)
-			if (effect.caster === this) {
+			// Skip archetype passives (identified by template ID being in race/job passives)
+			if (archetypePassiveIds.has(effect.template.id)) {
 				continue;
 			}
 			serializedEffects.push({
@@ -6811,6 +6842,10 @@ export class Mob extends Movable {
 		if (options?.compress) {
 			// Compress the mob object against its baseline (template or type)
 			const compressed = compressSerializedObject(full, base.templateId);
+			// Always preserve effects if they exist (compression might remove them if baseline has no effects)
+			if (serializedEffects.length > 0) {
+				(compressed as any).effects = serializedEffects;
+			}
 			return compressed;
 		}
 

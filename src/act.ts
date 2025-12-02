@@ -203,12 +203,6 @@ export function act(
 	context: ActContext,
 	options?: ActOptions
 ): void {
-	console.log(
-		templates,
-		context.room.coordinates,
-		context.user.display,
-		context.target?.display
-	);
 	const opts = { ...getDefaultOptions(), ...options };
 	const { user, target, room } = context;
 

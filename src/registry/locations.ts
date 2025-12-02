@@ -10,6 +10,8 @@
 import { getRoomByRef, Room } from "../core/dungeon.js";
 import { DeepReadonly } from "../utils/types.js";
 
+export { READONLY_LOCATIONS as LOCATIONS };
+
 /**
  * Enum for location keys.
  * Provides type-safe access to location references.
@@ -39,7 +41,6 @@ const LOCATIONS: Locations = {
 
 // export a readonly version of the locations
 const READONLY_LOCATIONS: DeepReadonly<Locations> = LOCATIONS;
-export { READONLY_LOCATIONS as LOCATIONS };
 
 /**
  * Set the locations object.

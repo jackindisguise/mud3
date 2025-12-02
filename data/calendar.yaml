@@ -32,7 +32,8 @@ months:
     days: 30
   - name: December
     days: 31
-millisecondsPerSecond: 16.666666666666667
-secondsPerMinute: 60
-minutesPerHour: 60
-hoursPerDay: 24
+millisecondsPerSecond: 16.666666666666667 # 60 in-game seconds per IRL second
+secondsPerMinute: 60 # 1 in-game minute per IRL second
+minutesPerHour: 60 # 1 in-game hour per IRL minute
+hoursPerDay: 24 # 1 in-game day per IRL 24 minutes
+# 60 in-game days per IRL day

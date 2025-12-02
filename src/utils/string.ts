@@ -1,3 +1,7 @@
+/**
+ * String manipulation utilities for combining and formatting text boxes.
+ */
+
 import { string } from "mud-ext";
 
 export function combineHorizontalBoxes(options: {

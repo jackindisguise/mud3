@@ -10,6 +10,8 @@
 import logger from "../logger.js";
 import { DeepReadonly } from "../utils/types.js";
 
+export { READONLY_GAME_STATE as GAME_STATE };
+
 export interface SerializedGameState {
 	elapsedTime: number;
 	lastSaved?: string;
@@ -37,7 +39,6 @@ const GAME_STATE: GameState = {
 
 // export a readonly version of the game state
 const READONLY_GAME_STATE: DeepReadonly<GameState> = GAME_STATE;
-export { READONLY_GAME_STATE as GAME_STATE };
 
 /**
  * Timestamp when the current session started (for calculating session elapsed time).

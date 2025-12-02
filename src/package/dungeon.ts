@@ -100,7 +100,7 @@ import {
 } from "../core/dungeon.js";
 import { SerializedEffect } from "../core/effect.js";
 import { EffectInstance, isPassiveEffect } from "../core/effect.js";
-import { addToEffectsSet } from "../effects.js";
+import { addToEffectsSet, setupEffectTimers } from "../effects.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
@@ -128,6 +128,69 @@ const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
 const DUNGEON_DIR = join(DATA_DIRECTORY, "dungeons");
 
 /**
+ * Pending room links to be processed after all dungeons are loaded.
+ */
+const pendingRoomLinks: PendingRoomLink[] = [];
+
+/**
+ * Serialized reset format (for YAML persistence).
+ * Only includes fields that differ from defaults (minCount=1, maxCount=1).
+ */
+export interface SerializedReset {
+	templateId: string;
+	roomRef: string;
+	minCount?: number;
+	maxCount?: number;
+	equipped?: string[];
+	inventory?: string[];
+}
+
+/**
+ * Serialized dungeon format structure.
+ */
+export interface SerializedDungeonFormat {
+	version?: string;
+	dungeon: {
+		id?: string;
+		name?: string;
+		description?: string;
+		dimensions: MapDimensions;
+		grid: number[][][];
+		rooms: Array<Omit<RoomTemplate, "id" | "type">>;
+		templates?: DungeonObjectTemplate[];
+		resets?: SerializedReset[];
+		resetMessage?: string;
+		exitOverrides?: Array<{
+			coordinates: { x: number; y: number; z: number };
+			allowedExits?: number;
+			roomLinks?: Record<DirectionText, string>;
+		}>;
+	};
+}
+
+/**
+ * Pending room links to be processed after all dungeons are loaded.
+ * Stores room coordinates and their roomLinks data.
+ */
+interface PendingRoomLink {
+	roomRef: string;
+	direction: DirectionText;
+	targetRoomRef: string;
+}
+
+/**
+ * Type alias for Movable options (currently same as DungeonObjectOptions).
+ * Defined for type safety and future extensibility.
+ */
+type MovableOptions = DungeonObjectOptions;
+
+/**
+ * Type alias for Item options (currently same as DungeonObjectOptions).
+ * Defined for type safety and future extensibility.
+ */
+type ItemOptions = MovableOptions;
+
+/**
  * Factory function to create a DungeonObject with an auto-generated OID.
  * This is the preferred way to create objects in package modules.
  */
@@ -137,6 +200,9 @@ export function createDungeonInstance(options: DungeonOptions): Dungeon {
 	return dungeon;
 }
 
+/**
+ * Factory function to create a DungeonObject with an auto-generated OID.
+ */
 export function createDungeonObject(
 	options?: Omit<DungeonObjectOptions, "oid">
 ): DungeonObject {
@@ -385,66 +451,27 @@ export function createRoomFromTemplate(
 }
 
 /**
- * Pending room links to be processed after all dungeons are loaded.
- * Stores room coordinates and their roomLinks data.
+ * Sanitize dungeon ID for use as filename.
+ * Allows alphanumerics, underscore, hyphen. Replaces others with underscore.
  */
-interface PendingRoomLink {
-	roomRef: string; // Room reference for the source room
-	direction: DirectionText; // Direction name
-	targetRoomRef: string; // Room reference for the destination room
-}
-
-const pendingRoomLinks: PendingRoomLink[] = [];
-
-/**
- * Serialized reset format (for YAML persistence).
- * Only includes fields that differ from defaults (minCount=1, maxCount=1).
- */
-export interface SerializedReset {
-	templateId: string;
-	roomRef: string;
-	minCount?: number;
-	maxCount?: number;
-	equipped?: string[];
-	inventory?: string[];
-}
-
-/**
- * Serialized dungeon format structure.
- */
-export interface SerializedDungeonFormat {
-	version?: string; // Project version when this file was saved
-	dungeon: {
-		id?: string;
-		name?: string;
-		description?: string;
-		dimensions: MapDimensions;
-		grid: number[][][]; // [z][y][x] - layers, rows, columns
-		rooms: Array<Omit<RoomTemplate, "id" | "type">>; // Room templates without id/type
-		templates?: DungeonObjectTemplate[]; // Optional array of object templates (for resets). In-file ids are local (no "@").
-		resets?: SerializedReset[]; // Optional array of resets
-		resetMessage?: string;
-		exitOverrides?: Array<{
-			coordinates: { x: number; y: number; z: number };
-			allowedExits?: number; // allowedExits bitmask override
-			roomLinks?: Record<DirectionText, string>; // roomLinks override
-		}>; // Array of exit overrides with coordinate objects
-	};
-}
-
 function sanitizeDungeonId(id: string): string {
-	// Allow alphanumerics, underscore, hyphen. Replace others with underscore.
 	return id
 		.trim()
 		.toLowerCase()
 		.replace(/[^a-z0-9_-]/gi, "_");
 }
 
+/**
+ * Get the file path for a dungeon by its ID.
+ */
 function getDungeonFilePath(id: string): string {
 	const safe = sanitizeDungeonId(id);
 	return join(DUNGEON_DIR, `${safe}.yaml`);
 }
 
+/**
+ * Ensure the dungeon directory exists, creating it if needed.
+ */
 async function ensureDir(): Promise<void> {
 	try {
 		await access(DUNGEON_DIR, FS_CONSTANTS.F_OK);
@@ -456,6 +483,9 @@ async function ensureDir(): Promise<void> {
 	}
 }
 
+/**
+ * Check if a file exists at the given path.
+ */
 async function fileExists(path: string): Promise<boolean> {
 	try {
 		await access(path, FS_CONSTANTS.F_OK);
@@ -465,11 +495,14 @@ async function fileExists(path: string): Promise<boolean> {
 	}
 }
 
+/**
+ * Convert a global template ID to a local one if it matches the dungeon.
+ * If already global and matches dungeon, strip prefix.
+ */
 function localizeTemplateId(
 	globalOrLocalId: string,
 	dungeonId: string
 ): string {
-	// If already global and matches dungeon, strip prefix
 	const m = globalOrLocalId.match(/^@([^:]+):(.+)$/);
 	if (m) {
 		const [, did, local] = m;
@@ -478,11 +511,14 @@ function localizeTemplateId(
 	return globalOrLocalId;
 }
 
+/**
+ * Convert a local template ID to a global one by prefixing with dungeon ID.
+ * If missing '@', prefix with @<dungeonId>:.
+ */
 function globalizeTemplateId(
 	globalOrLocalId: string,
 	dungeonId: string
 ): string {
-	// If missing '@', prefix with @<dungeonId>:
 	if (!globalOrLocalId.includes("@")) {
 		return `@${dungeonId}:${globalOrLocalId}`;
 	}
@@ -1692,18 +1728,6 @@ function hydrateSerializedDungeonObjectData(
 }
 
 /**
- * Type alias for Movable options (currently same as DungeonObjectOptions).
- * Defined for type safety and future extensibility.
- */
-type MovableOptions = DungeonObjectOptions;
-
-/**
- * Type alias for Item options (currently same as DungeonObjectOptions).
- * Defined for type safety and future extensibility.
- */
-type ItemOptions = MovableOptions;
-
-/**
  * Hydrates a SerializedRoom into RoomOptions.
  * Calls DungeonObject hydration and adds Room-specific fields (coordinates, allowedExits, dense).
  * Follows the class hierarchy: Room -> DungeonObject.
@@ -2339,6 +2363,9 @@ export async function deserializeMob(
 			const effects = mob.getEffects() as Set<EffectInstance>;
 			(effects as any).add(instance);
 			addToEffectsSet(mob);
+
+			// Set up timers for the restored effect
+			setupEffectTimers(mob, instance);
 
 			// Recalculate attributes if this is a passive effect with modifiers
 			if (isPassiveEffect(template)) {

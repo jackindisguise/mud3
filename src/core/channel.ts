@@ -1,3 +1,10 @@
+/**
+ * Core channel module.
+ *
+ * Provides communication channel definitions, configurations, and formatting utilities.
+ *
+ * @module core/channel
+ */
 import { COLOR, colorToTag, stickyColor } from "./color.js";
 
 /**
@@ -13,6 +20,11 @@ export enum CHANNEL {
 	SAY = "SAY",
 	WHISPER = "WHISPER",
 }
+
+/**
+ * Array of all channel values for convenient runtime iteration.
+ */
+export const CHANNELS: readonly CHANNEL[] = Object.values(CHANNEL);
 
 /**
  * Configuration information for a communication channel.
@@ -102,11 +114,6 @@ export const CHANNEL_INFO: Record<CHANNEL, ChannelInfo> = {
 			"$primary[$tag] $highlight$speaker$primary: $highlight$message{x",
 	},
 };
-
-/**
- * Array of all channel values for convenient runtime iteration.
- */
-export const CHANNELS: readonly CHANNEL[] = Object.values(CHANNEL);
 
 /**
  * Formats a channel message with appropriate colors using the channel's pattern.

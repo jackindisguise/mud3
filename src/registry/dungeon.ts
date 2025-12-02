@@ -10,6 +10,10 @@
 
 import { Dungeon, Room, RoomLink, Mob } from "../core/dungeon.js";
 
+export { READONLY_DUNGEON_REGISTRY as DUNGEON_REGISTRY };
+export { READONLY_WANDERING_MOBS as WANDERING_MOBS };
+export { READONLY_ROOM_LINKS as ROOM_LINKS };
+
 /**
  * Registry of dungeons by their optional persistent ID.
  * Only dungeons with an assigned `id` are present in this map.
@@ -21,7 +25,6 @@ const SAFE_DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
  */
 const READONLY_DUNGEON_REGISTRY: ReadonlyMap<string, Dungeon> =
 	SAFE_DUNGEON_REGISTRY;
-export { READONLY_DUNGEON_REGISTRY as DUNGEON_REGISTRY };
 
 /**
  * Global cache of mobs that have the WANDER behavior enabled.
@@ -34,7 +37,6 @@ const SAFE_WANDERING_MOBS: Set<Mob> = new Set();
  * Readonly view of the wandering mobs cache.
  */
 const READONLY_WANDERING_MOBS: ReadonlySet<Mob> = SAFE_WANDERING_MOBS;
-export { READONLY_WANDERING_MOBS as WANDERING_MOBS };
 
 /**
  * Global registry of created RoomLink instances.
@@ -48,7 +50,6 @@ const SAFE_ROOM_LINKS: RoomLink[] = [];
  * Readonly view of the room links registry.
  */
 const READONLY_ROOM_LINKS: ReadonlyArray<RoomLink> = SAFE_ROOM_LINKS;
-export { READONLY_ROOM_LINKS as ROOM_LINKS };
 
 /**
  * Register a dungeon in the registry.

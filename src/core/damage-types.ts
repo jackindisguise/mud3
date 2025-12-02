@@ -1,11 +1,12 @@
 /**
- * Damage types and relationships system.
+ * Core damage-types module.
  *
  * Defines damage types (physical and magical), damage relationships (resist, immune, vulnerable),
  * and provides utilities for calculating damage based on these relationships.
  *
- * @module damage-types
+ * @module core/damage-types
  */
+import { COLOR } from "./color.js";
 
 /**
  * Physical damage types.
@@ -35,11 +36,6 @@ export enum MAGICAL_DAMAGE_TYPE {
 }
 
 /**
- * All damage types combined.
- */
-export type DAMAGE_TYPE = PHYSICAL_DAMAGE_TYPE | MAGICAL_DAMAGE_TYPE;
-
-/**
  * Damage relationship types that determine how damage is modified.
  */
 export enum DAMAGE_RELATIONSHIP {
@@ -52,6 +48,11 @@ export enum DAMAGE_RELATIONSHIP {
 }
 
 /**
+ * All damage types combined.
+ */
+export type DAMAGE_TYPE = PHYSICAL_DAMAGE_TYPE | MAGICAL_DAMAGE_TYPE;
+
+/**
  * Damage type relationships map.
  * Each key is a damage type, and each value is the relationship (RESIST, IMMUNE, or VULNERABLE).
  * Missing damage types are treated as normal (no modification).
@@ -59,8 +60,6 @@ export enum DAMAGE_RELATIONSHIP {
 export type DamageTypeRelationships = Partial<
 	Record<DAMAGE_TYPE, DAMAGE_RELATIONSHIP>
 >;
-
-import { COLOR } from "./color.js";
 
 /**
  * Hit type definition.
@@ -75,31 +74,11 @@ export interface HitType {
 	/** The verb in base form for first person ("You punch") */
 	verb: string;
 	/** Optional third person singular form ("punches"). If not provided, auto-conjugates by adding 's' or 'es'. */
-	verbThirdPerson?: string;
+	verbThirdPerson: string;
 	/** The damage type associated with this hit type */
 	damageType: DAMAGE_TYPE;
 	/** Optional color for the verb in combat messages. Defaults to COLOR.WHITE if not specified. */
 	color?: COLOR;
-}
-
-/**
- * Conjugates a verb to third person singular form.
- * Handles regular verbs (adds 's' or 'es') and can be overridden with verbThirdPerson.
- *
- * @param verb The base verb form
- * @returns Third person singular form
- */
-function conjugateThirdPerson(verb: string): string {
-	// Handle verbs ending in s, x, z, ch, sh (add 'es')
-	if (/[sxz]|[cs]h$/.test(verb)) {
-		return `${verb}es`;
-	}
-	// Handle verbs ending in y preceded by a consonant (change y to ies)
-	if (/[^aeiou]y$/.test(verb)) {
-		return `${verb.slice(0, -1)}ies`;
-	}
-	// Default: add 's'
-	return `${verb}s`;
 }
 
 /**
@@ -111,16 +90,6 @@ export const DEFAULT_HIT_TYPE: HitType = {
 	damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
 	color: COLOR.WHITE,
 };
-
-/**
- * Gets the third person singular form of a verb from a hit type.
- *
- * @param hitType The hit type containing the verb
- * @returns Third person singular form of the verb
- */
-export function getThirdPersonVerb(hitType: HitType): string {
-	return hitType.verbThirdPerson ?? conjugateThirdPerson(hitType.verb);
-}
 
 /**
  * Common hit type mappings.

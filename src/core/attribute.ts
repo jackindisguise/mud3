@@ -12,6 +12,60 @@
  */
 
 /**
+ * Factors for calculating secondary attributes from primary attributes.
+ * Each secondary attribute is derived from a weighted combination of primary attributes.
+ */
+export const SECONDARY_ATTRIBUTE_FACTORS: Readonly<
+	Record<keyof SecondaryAttributeSet, Partial<PrimaryAttributeSet>>
+> = Object.freeze({
+	attackPower: { strength: 0.5 },
+	vitality: { strength: 0.5 },
+	defense: { strength: 0.5 },
+	critRate: { agility: 0.2 },
+	avoidance: { agility: 0.2 },
+	accuracy: { agility: 0.2 },
+	endurance: { agility: 1 },
+	spellPower: { intelligence: 0.5 },
+	wisdom: { intelligence: 0.5 },
+	resilience: { intelligence: 0.5 },
+	spirit: {}, // Spirit does not scale with primary attributes
+});
+
+/**
+ * Base values for secondary attributes before primary attribute contributions.
+ */
+export const SECONDARY_ATTRIBUTE_BASE: Readonly<
+	Record<keyof SecondaryAttributeSet, number>
+> = Object.freeze({
+	attackPower: 0,
+	vitality: 0,
+	defense: 0,
+	critRate: 0,
+	avoidance: 0,
+	accuracy: 0,
+	endurance: 0,
+	spellPower: 0,
+	wisdom: 0,
+	resilience: 0,
+	spirit: 0,
+});
+
+/**
+ * Health points gained per point of vitality.
+ */
+export const HEALTH_PER_VITALITY = 2;
+
+/**
+ * Mana points gained per point of wisdom.
+ */
+export const MANA_PER_WISDOM = 2;
+
+/**
+ * Number of decimal places to round attributes to.
+ */
+export const ATTRIBUTE_ROUND_DECIMALS = 2;
+
+/**
  * Primary attribute set representing the three core stats for mobs.
  * These are the base attributes that determine all other derived stats.
  *
@@ -133,60 +187,6 @@ export interface ResourceSnapshot {
 	mana: number;
 	exhaustion: number;
 }
-
-/**
- * Factors for calculating secondary attributes from primary attributes.
- * Each secondary attribute is derived from a weighted combination of primary attributes.
- */
-export const SECONDARY_ATTRIBUTE_FACTORS: Readonly<
-	Record<keyof SecondaryAttributeSet, Partial<PrimaryAttributeSet>>
-> = Object.freeze({
-	attackPower: { strength: 0.5 },
-	vitality: { strength: 0.5 },
-	defense: { strength: 0.5 },
-	critRate: { agility: 0.2 },
-	avoidance: { agility: 0.2 },
-	accuracy: { agility: 0.2 },
-	endurance: { agility: 1 },
-	spellPower: { intelligence: 0.5 },
-	wisdom: { intelligence: 0.5 },
-	resilience: { intelligence: 0.5 },
-	spirit: {}, // Spirit does not scale with primary attributes
-});
-
-/**
- * Base values for secondary attributes before primary attribute contributions.
- */
-export const SECONDARY_ATTRIBUTE_BASE: Readonly<
-	Record<keyof SecondaryAttributeSet, number>
-> = Object.freeze({
-	attackPower: 0,
-	vitality: 0,
-	defense: 0,
-	critRate: 0,
-	avoidance: 0,
-	accuracy: 0,
-	endurance: 0,
-	spellPower: 0,
-	wisdom: 0,
-	resilience: 0,
-	spirit: 0,
-});
-
-/**
- * Health points gained per point of vitality.
- */
-export const HEALTH_PER_VITALITY = 2;
-
-/**
- * Mana points gained per point of wisdom.
- */
-export const MANA_PER_WISDOM = 2;
-
-/**
- * Number of decimal places to round attributes to.
- */
-export const ATTRIBUTE_ROUND_DECIMALS = 2;
 
 /**
  * Clamps a number between min and max values.

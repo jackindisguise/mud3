@@ -57,43 +57,24 @@ import { executeSocial, onSocialError } from "../commands/_social.js";
 import { Mob } from "../core/dungeon.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 
-/**
- * Interface for command objects (JavaScript or TypeScript plain objects)
- */
 export interface CommandObject {
-	/** Command matching pattern */
 	pattern: string;
-	/** Optional aliases for the command */
 	aliases?: string[];
-	/** Priority level for command execution order */
 	priority?: PRIORITY;
-	/** Optional cooldown (ms) or resolver for action commands */
 	cooldown?:
 		| number
 		| ((context: CommandContext, args: Map<string, any>) => number | undefined);
-	/** Execute handler invoked after successful parse */
 	execute: (context: CommandContext, args: Map<string, any>) => void;
-	/** Optional parse error handler */
 	onError?: (context: CommandContext, result: ParseResult) => void;
 }
 
-/**
- * Interface for YAML command structure
- */
 export interface YAMLCommandDefinition {
-	/** Command matching pattern */
 	pattern: string;
-	/** Optional aliases for the command */
 	aliases?: string[];
-	/** Execute script as string (run in VM sandbox) */
 	execute: string;
-	/** Optional error handler script as string (run in VM sandbox) */
 	onError?: string;
 }
 
-/**
- * Adapter class to convert JavaScript command objects into Command instances
- */
 export class JavaScriptCommandAdapter extends Command {
 	private executeFunction: (
 		context: CommandContext,
@@ -146,10 +127,6 @@ export class JavaScriptCommandAdapter extends Command {
 	}
 }
 
-/**
- * Adapter class to convert YAML command definitions into Command instances.
- * Executes command scripts in a sandboxed VM environment with minimal access.
- */
 export class YAMLCommandAdapter extends Command {
 	private executeScript: string;
 	private errorScript?: string;

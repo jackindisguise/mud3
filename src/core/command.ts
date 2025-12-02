@@ -41,7 +41,7 @@
  * - Implement `onError()` to customize parsing failure messages for your command.
  * - You can call `parse()` directly for custom flows, but `CommandRegistry` is preferred.
  *
- * @module command
+ * @module core/command
  */
 
 import { DungeonObject, Item, Room } from "./dungeon.js";
@@ -70,6 +70,58 @@ import logger from "../logger.js";
  * };
  * ```
  */
+/**
+ * Supported argument types for command patterns.
+ *
+ * This enum defines all the valid argument types that can be used in command
+ * patterns. Each type has specific parsing logic and validation rules.
+ *
+ * - TEXT: Captures all remaining input text (greedy). Use for messages, descriptions,
+ *         or any freeform text. Should be the final argument in a pattern.
+ * - WORD: Captures a single word (non-whitespace). Use for names, identifiers, keywords.
+ * - NUMBER: Parses an integer. Returns undefined if input is not a valid integer.
+ * - OBJECT: Looks up a DungeonObject by keywords. Respects \@source modifiers.
+ * - MOB: Looks up a Mob in the current room by keywords.
+ * - ITEM: Looks up an Item by keywords. Respects \@source modifiers.
+ * - EQUIPMENT: Looks up an Equipment item by keywords. Respects \@source modifiers.
+ * - DIRECTION: Parses direction names/abbreviations into DIRECTION values.
+ *
+ * @example
+ * ```typescript
+ * ARGUMENT_TYPE.TEXT       // "hello world" -> "hello world"
+ * ARGUMENT_TYPE.WORD       // "hello world" -> "hello", `"north wind"` -> "north wind"
+ * ARGUMENT_TYPE.NUMBER     // "42 items" -> 42
+ * ARGUMENT_TYPE.OBJECT     // "sword" -> DungeonObject (if found)
+ * ARGUMENT_TYPE.MOB        // "bob" -> Mob (if found in room)
+ * ARGUMENT_TYPE.ITEM       // "potion" -> Item (if found)
+ * ARGUMENT_TYPE.EQUIPMENT  // "helmet" -> Equipment (if found)
+ * ARGUMENT_TYPE.DIRECTION  // "north" or "n" -> DIRECTION.NORTH
+ * ARGUMENT_TYPE.CHARACTER  // "alice" -> Character (online player)
+ * ```
+ */
+export enum ARGUMENT_TYPE {
+	TEXT = "text",
+	WORD = "word",
+	NUMBER = "number",
+	OBJECT = "object",
+	MOB = "mob",
+	ITEM = "item",
+	EQUIPMENT = "equipment",
+	DIRECTION = "direction",
+	CHARACTER = "character",
+}
+
+/**
+ * Priority levels for command execution order.
+ * Commands with higher priority are tried before commands with lower priority.
+ * Within the same priority level, commands are sorted by pattern length (longest first).
+ */
+export enum PRIORITY {
+	LOW = 0,
+	NORMAL = 1,
+	HIGH = 2,
+}
+
 export interface CommandContext {
 	actor: Mob;
 	room?: Room;
@@ -114,47 +166,6 @@ export interface ParseResult {
 }
 
 /**
- * Supported argument types for command patterns.
- *
- * This enum defines all the valid argument types that can be used in command
- * patterns. Each type has specific parsing logic and validation rules.
- *
- * - TEXT: Captures all remaining input text (greedy). Use for messages, descriptions,
- *         or any freeform text. Should be the final argument in a pattern.
- * - WORD: Captures a single word (non-whitespace). Use for names, identifiers, keywords.
- * - NUMBER: Parses an integer. Returns undefined if input is not a valid integer.
- * - OBJECT: Looks up a DungeonObject by keywords. Respects \@source modifiers.
- * - MOB: Looks up a Mob in the current room by keywords.
- * - ITEM: Looks up an Item by keywords. Respects \@source modifiers.
- * - EQUIPMENT: Looks up an Equipment item by keywords. Respects \@source modifiers.
- * - DIRECTION: Parses direction names/abbreviations into DIRECTION values.
- *
- * @example
- * ```typescript
- * ARGUMENT_TYPE.TEXT       // "hello world" -> "hello world"
- * ARGUMENT_TYPE.WORD       // "hello world" -> "hello", `"north wind"` -> "north wind"
- * ARGUMENT_TYPE.NUMBER     // "42 items" -> 42
- * ARGUMENT_TYPE.OBJECT     // "sword" -> DungeonObject (if found)
- * ARGUMENT_TYPE.MOB        // "bob" -> Mob (if found in room)
- * ARGUMENT_TYPE.ITEM       // "potion" -> Item (if found)
- * ARGUMENT_TYPE.EQUIPMENT  // "helmet" -> Equipment (if found)
- * ARGUMENT_TYPE.DIRECTION  // "north" or "n" -> DIRECTION.NORTH
- * ARGUMENT_TYPE.CHARACTER  // "alice" -> Character (online player)
- * ```
- */
-export enum ARGUMENT_TYPE {
-	TEXT = "text",
-	WORD = "word",
-	NUMBER = "number",
-	OBJECT = "object",
-	MOB = "mob",
-	ITEM = "item",
-	EQUIPMENT = "equipment",
-	DIRECTION = "direction",
-	CHARACTER = "character",
-}
-
-/**
  * Configuration for a command argument extracted from a pattern.
  *
  * This interface represents the parsed configuration of an argument placeholder
@@ -194,17 +205,6 @@ export interface ArgumentConfig {
 	type: ARGUMENT_TYPE;
 	required?: boolean;
 	source?: "room" | "inventory" | "all" | string; // string = argument name reference
-}
-
-/**
- * Priority levels for command execution order.
- * Commands with higher priority are tried before commands with lower priority.
- * Within the same priority level, commands are sorted by pattern length (longest first).
- */
-export enum PRIORITY {
-	LOW = 0,
-	NORMAL = 1,
-	HIGH = 2,
 }
 
 export interface CommandOptions {

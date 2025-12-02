@@ -1,3 +1,10 @@
+/**
+ * Core equipment module.
+ *
+ * Provides utilities for managing and displaying equipment.
+ *
+ * @module core/equipment
+ */
 import { EQUIPMENT_SLOT, Mob } from "./dungeon.js";
 import { COLOR, color, SIZER, stickyColor } from "./color.js";
 import { string } from "mud-ext";

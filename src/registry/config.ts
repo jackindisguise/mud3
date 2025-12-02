@@ -9,25 +9,7 @@
 
 import { DeepReadonly } from "../utils/types.js";
 
-export type GameConfig = {
-	name: string;
-	creator: string;
-};
-
-export type ServerConfig = {
-	port: number;
-	inactivity_timeout: number;
-};
-
-export type SecurityConfig = {
-	password_salt: string;
-};
-
-export type Config = {
-	game: GameConfig;
-	server: ServerConfig;
-	security: SecurityConfig;
-};
+export { READONLY_CONFIG as CONFIG };
 
 export const CONFIG_DEFAULT: Config = {
 	game: {
@@ -52,7 +34,26 @@ const CONFIG: Config = {
 
 // export a readonly version of the config
 const READONLY_CONFIG: DeepReadonly<Config> = CONFIG;
-export { READONLY_CONFIG as CONFIG };
+
+export type GameConfig = {
+	name: string;
+	creator: string;
+};
+
+export type ServerConfig = {
+	port: number;
+	inactivity_timeout: number;
+};
+
+export type SecurityConfig = {
+	password_salt: string;
+};
+
+export type Config = {
+	game: GameConfig;
+	server: ServerConfig;
+	security: SecurityConfig;
+};
 
 /**
  * Set the config object.

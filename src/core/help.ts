@@ -1,4 +1,12 @@
 /**
+ * Core helpfile module.
+ *
+ * Provides interfaces for helpfile data structures.
+ *
+ * @module core/help
+ */
+
+/**
  * Represents a single helpfile entry.
  */
 export interface Helpfile {

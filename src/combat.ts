@@ -26,11 +26,7 @@ import logger from "./logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { act, damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
-import {
-	DEFAULT_HIT_TYPE,
-	getDamageMultiplier,
-	getThirdPersonVerb,
-} from "./core/damage-types.js";
+import { DEFAULT_HIT_TYPE, getDamageMultiplier } from "./core/damage-types.js";
 import { ability as PURE_POWER } from "./abilities/pure-power.js";
 import { string } from "mud-ext";
 
@@ -217,7 +213,7 @@ export function oneHit(options: OneHitOptions): number {
 
 	// Get verb forms for different perspectives
 	const verbBase = hitType.verb; // First person: "You punch"
-	const verbThirdPersonBase = getThirdPersonVerb(hitType); // Third person: "punches"
+	const verbThirdPersonBase = hitType.verbThirdPerson; // Third person: "punches"
 
 	// Color the verbs based on hit type color (default to WHITE)
 	let verbColor = hitType.color ?? COLOR.WHITE;
@@ -230,7 +226,7 @@ export function oneHit(options: OneHitOptions): number {
 		weaponName = weapon.display;
 		verbColor = weapon.hitType.color ?? COLOR.WHITE;
 		verb = color(weapon.hitType.verb, verbColor);
-		verbThirdPerson = color(getThirdPersonVerb(weapon.hitType), verbColor);
+		verbThirdPerson = color(verbThirdPersonBase, verbColor);
 	}
 
 	// Build message templates based on whether ability, weapon, or default verb is used

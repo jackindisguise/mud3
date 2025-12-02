@@ -1,3 +1,12 @@
+/**
+ * Registry: help - centralized helpfile access
+ *
+ * Provides a centralized location for accessing registered helpfiles.
+ * The registry is populated by the help package.
+ *
+ * @module registry/help
+ */
+
 import logger from "../logger.js";
 import { Helpfile } from "../core/help.js";
 

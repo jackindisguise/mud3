@@ -1,4 +1,13 @@
 /**
+ * Core ability module.
+ *
+ * Provides the Ability interface and utility functions for managing ability proficiency.
+ * Abilities are skills that mobs can learn and use in the game.
+ *
+ * @module core/ability
+ */
+
+/**
  * Ability interface representing skills that mobs can learn.
  * Abilities are things that mobs can learn and use in the game.
  *

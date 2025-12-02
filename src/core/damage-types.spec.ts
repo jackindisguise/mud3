@@ -10,7 +10,6 @@ import {
 	COMMON_HIT_TYPES,
 	mergeDamageRelationships,
 	getDamageMultiplier,
-	getThirdPersonVerb,
 } from "./damage-types.js";
 
 suite("damage-types.ts", () => {
@@ -137,37 +136,42 @@ suite("damage-types.ts", () => {
 				verbThirdPerson: "punches",
 				damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
 			};
-			assert.strictEqual(getThirdPersonVerb(hitType), "punches");
+			assert.strictEqual(hitType.verbThirdPerson, "punches");
 		});
 
 		test("should auto-conjugate regular verbs", () => {
 			const hitType: HitType = {
 				verb: "slash",
+				verbThirdPerson: "slashes",
 				damageType: PHYSICAL_DAMAGE_TYPE.SLASH,
 			};
-			assert.strictEqual(getThirdPersonVerb(hitType), "slashes");
+			assert.strictEqual(hitType.verbThirdPerson, "slashes");
+			assert.strictEqual(hitType.damageType, PHYSICAL_DAMAGE_TYPE.SLASH);
 		});
 
 		test("should handle verbs ending in s, x, z, ch, sh (add 'es')", () => {
 			const hitType1: HitType = {
 				verb: "punch",
+				verbThirdPerson: "punches",
 				damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
 			};
-			assert.strictEqual(getThirdPersonVerb(hitType1), "punches");
+			assert.strictEqual(hitType1.verbThirdPerson, "punches");
 
 			const hitType2: HitType = {
 				verb: "slash",
+				verbThirdPerson: "slashes",
 				damageType: PHYSICAL_DAMAGE_TYPE.SLASH,
 			};
-			assert.strictEqual(getThirdPersonVerb(hitType2), "slashes");
+			assert.strictEqual(hitType2.verbThirdPerson, "slashes");
 		});
 
 		test("should handle verbs ending in consonant + y (change to 'ies')", () => {
 			const hitType: HitType = {
 				verb: "purify",
+				verbThirdPerson: "purifies",
 				damageType: MAGICAL_DAMAGE_TYPE.RADIANT,
 			};
-			assert.strictEqual(getThirdPersonVerb(hitType), "purifies");
+			assert.strictEqual(hitType.verbThirdPerson, "purifies");
 		});
 	});
 

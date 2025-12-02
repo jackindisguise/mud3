@@ -1,10 +1,20 @@
+/**
+ * Registry: ability - centralized ability access
+ *
+ * Provides a centralized location for accessing registered abilities.
+ * The registry is populated by the ability package.
+ *
+ * @module registry/ability
+ */
+
 import { Ability } from "../core/ability.js";
+
+export { READONLY_ABILITY_REGISTRY as ABILITY_REGISTRY };
 
 /** Registry of all loaded abilities by ID */
 const ABILITY_REGISTRY = new Map<string, Ability>();
 export const READONLY_ABILITY_REGISTRY: ReadonlyMap<string, Ability> =
 	ABILITY_REGISTRY;
-export { READONLY_ABILITY_REGISTRY as ABILITY_REGISTRY };
 
 /**
  * Gets the ability registry.

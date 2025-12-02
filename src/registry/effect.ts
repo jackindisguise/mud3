@@ -1,4 +1,15 @@
+/**
+ * Registry: effect - centralized effect template access
+ *
+ * Provides a centralized location for accessing registered effect templates.
+ * The registry is populated by the effect package.
+ *
+ * @module registry/effect
+ */
+
 import { EffectTemplate } from "../core/effect.js";
+
+export { READONLY_EFFECT_TEMPLATE_REGISTRY as EFFECT_TEMPLATE_REGISTRY };
 
 /** Registry of all loaded effect templates by ID */
 const EFFECT_TEMPLATE_REGISTRY = new Map<string, EffectTemplate>();
@@ -6,7 +17,6 @@ export const READONLY_EFFECT_TEMPLATE_REGISTRY: ReadonlyMap<
 	string,
 	EffectTemplate
 > = EFFECT_TEMPLATE_REGISTRY;
-export { READONLY_EFFECT_TEMPLATE_REGISTRY as EFFECT_TEMPLATE_REGISTRY };
 
 /**
  * Gets the effect template registry.
@@ -52,4 +62,3 @@ export function getAllEffectTemplates(): EffectTemplate[] {
 export function hasEffectTemplate(id: string): boolean {
 	return EFFECT_TEMPLATE_REGISTRY.has(id);
 }
-

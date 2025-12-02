@@ -1,8 +1,11 @@
 /**
+ * Core telnet module.
+ *
  * Telnet color code utilities for MUD text formatting.
  * Provides ANSI escape sequences for foreground and background colors.
+ *
+ * @module core/telnet
  */
-
 import { isAscii } from "buffer";
 
 /** ANSI escape sequence prefix */
@@ -68,54 +71,6 @@ export const STYLE = {
 	HIDDEN: `${ESC}8m`,
 	STRIKETHROUGH: `${ESC}9m`,
 } as const;
-
-/**
- * Helper function to create a 256-color foreground code
- */
-export function fg256(code: number): string {
-	if (code < 0 || code > 255) {
-		throw new Error("Color code must be between 0 and 255");
-	}
-	return `${ESC}38;5;${code}m`;
-}
-
-/**
- * Helper function to create a 256-color background code
- */
-export function bg256(code: number): string {
-	if (code < 0 || code > 255) {
-		throw new Error("Color code must be between 0 and 255");
-	}
-	return `${ESC}48;5;${code}m`;
-}
-
-/**
- * Helper function to create an RGB foreground code
- */
-export function fgRGB(r: number, g: number, b: number): string {
-	if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
-		throw new Error("RGB values must be between 0 and 255");
-	}
-	return `${ESC}38;2;${r};${g};${b}m`;
-}
-
-/**
- * Helper function to create an RGB background code
- */
-export function bgRGB(r: number, g: number, b: number): string {
-	if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
-		throw new Error("RGB values must be between 0 and 255");
-	}
-	return `${ESC}48;2;${r};${g};${b}m`;
-}
-
-/**
- * Strip all ANSI color codes from text
- */
-export function stripColors(text: string): string {
-	// eslint-disable-next-line no-control-regex
-	return text.replace(/\x1B\[[0-9;]*m/g, "");
-}
 
 export enum IAC {
 	IAC = 255,
@@ -266,6 +221,54 @@ export const TELNET_OPTION_NAMES: Record<TELNET_OPTION, string> = {
 	[TELNET_OPTION.MXP]: "MXP",
 	[TELNET_OPTION.GMCP]: "GMCP",
 };
+
+/**
+ * Helper function to create a 256-color foreground code
+ */
+export function fg256(code: number): string {
+	if (code < 0 || code > 255) {
+		throw new Error("Color code must be between 0 and 255");
+	}
+	return `${ESC}38;5;${code}m`;
+}
+
+/**
+ * Helper function to create a 256-color background code
+ */
+export function bg256(code: number): string {
+	if (code < 0 || code > 255) {
+		throw new Error("Color code must be between 0 and 255");
+	}
+	return `${ESC}48;5;${code}m`;
+}
+
+/**
+ * Helper function to create an RGB foreground code
+ */
+export function fgRGB(r: number, g: number, b: number): string {
+	if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+		throw new Error("RGB values must be between 0 and 255");
+	}
+	return `${ESC}38;2;${r};${g};${b}m`;
+}
+
+/**
+ * Helper function to create an RGB background code
+ */
+export function bgRGB(r: number, g: number, b: number): string {
+	if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+		throw new Error("RGB values must be between 0 and 255");
+	}
+	return `${ESC}48;2;${r};${g};${b}m`;
+}
+
+/**
+ * Strip all ANSI color codes from text
+ */
+export function stripColors(text: string): string {
+	// eslint-disable-next-line no-control-regex
+	return text.replace(/\x1B\[[0-9;]*m/g, "");
+}
 
 /**
  * Get the human-readable name for a telnet option code

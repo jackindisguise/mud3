@@ -1,12 +1,12 @@
 /**
- * Message board system for persistent notes and announcements.
+ * Core board module.
  *
+ * Message board system for persistent notes and announcements.
  * Boards can be permanent (keep messages forever) or time-based
  * (automatically expire messages after a certain duration).
  *
- * @module board
+ * @module core/board
  */
-
 import { forEachCharacter } from "../game.js";
 import { Character, MESSAGE_GROUP } from "./character.js";
 

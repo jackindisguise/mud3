@@ -74,10 +74,7 @@ import {
 	processRegeneration,
 	REGENERATION_INTERVAL_MS,
 } from "./regeneration.js";
-import {
-	processEffects,
-	EFFECT_PROCESSING_INTERVAL_MS,
-} from "./effects.js";
+import { processEffects, EFFECT_PROCESSING_INTERVAL_MS } from "./effects.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 
 // Default intervals/timeouts (milliseconds)

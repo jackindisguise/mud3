@@ -9,7 +9,12 @@
  */
 
 import { Socket } from "net";
-import { buildIACCommand, IAC, TELNET_OPTION } from "./telnet.js";
+import {
+	buildIACCommand,
+	IAC,
+	TELNET_OPTION,
+	getProtocolName,
+} from "./telnet.js";
 import logger from "../logger.js";
 import {
 	createDeflate,
@@ -148,7 +153,9 @@ export class TelnetNegotiationManager {
 		if (this.pendingProtocols.has(option)) {
 			const state = this.getState(option);
 			logger.debug(
-				`Telnet negotiation (${this.address}): protocol ${option} completed with state "${state}", removing from pending`
+				`Telnet negotiation (${this.address}): protocol ${getProtocolName(
+					option
+				)} completed with state "${state}", removing from pending`
 			);
 			this.pendingProtocols.delete(option);
 			this.checkIfAllComplete();
@@ -293,7 +300,7 @@ export class TelnetNegotiationManager {
 		logger.debug(
 			`Telnet negotiation (${this.address}): initiated ${
 				initiatedProtocols.length
-			} protocol(s): ${initiatedProtocols.join(", ")}`
+			} protocol(s): ${initiatedProtocols.map(getProtocolName).join(", ")}`
 		);
 		// If no protocols were initiated, check if we're already complete
 		this.checkIfAllComplete();
@@ -306,7 +313,9 @@ export class TelnetNegotiationManager {
 		const handler = this.handlers.get(option);
 		if (!handler) {
 			logger.warn(
-				`No handler registered for protocol ${option} (${this.address})`
+				`No handler registered for protocol ${getProtocolName(option)} (${
+					this.address
+				})`
 			);
 			return;
 		}
@@ -324,7 +333,9 @@ export class TelnetNegotiationManager {
 			if (!this.socket.destroyed && this.socket.writable) {
 				this.socket.write(buildIACCommand(IAC.WILL, option));
 				logger.debug(
-					`Telnet negotiation (${this.address}): sent IAC WILL ${option}`
+					`Telnet negotiation (${
+						this.address
+					}): sent IAC WILL ${getProtocolName(option)}`
 				);
 			}
 		} else {
@@ -335,7 +346,9 @@ export class TelnetNegotiationManager {
 			if (!this.socket.destroyed && this.socket.writable) {
 				this.socket.write(buildIACCommand(IAC.DO, option));
 				logger.debug(
-					`Telnet negotiation (${this.address}): sent IAC DO ${option}`
+					`Telnet negotiation (${this.address}): sent IAC DO ${getProtocolName(
+						option
+					)}`
 				);
 			}
 		}
@@ -353,14 +366,59 @@ export class TelnetNegotiationManager {
 
 		if (!handler) {
 			// No handler for this option - default behavior
-			// For unknown options, respond with WON'T or DON'T
+			// For unknown options, respond with WON'T or DON'T and mark as rejected
+			// Always handle unhandled protocols to ensure IAC commands are removed from input stream
 			// Use write() method to support compression if active
-			if (command === IAC.DO) {
-				this.write(buildIACCommand(IAC.WONT, option));
-			} else if (command === IAC.WILL) {
-				this.write(buildIACCommand(IAC.DONT, option));
+			const currentState = this.getState(telnetOption);
+
+			// Only respond if we haven't already rejected it (to avoid duplicate responses)
+			if (currentState !== "rejected") {
+				if (command === IAC.DO) {
+					// Client asking us to enable a protocol we don't support
+					this.write(buildIACCommand(IAC.WONT, option));
+					logger.debug(
+						`Telnet negotiation (${
+							this.address
+						}): unhandled protocol ${getProtocolName(
+							option
+						)}, received IAC DO, sent IAC WON'T, marking as rejected`
+					);
+					this.setState(telnetOption, "rejected");
+				} else if (command === IAC.WILL) {
+					// Client offering a protocol we don't support
+					this.write(buildIACCommand(IAC.DONT, option));
+					logger.debug(
+						`Telnet negotiation (${
+							this.address
+						}): unhandled protocol ${getProtocolName(
+							option
+						)}, received IAC WILL, sent IAC DON'T, marking as rejected`
+					);
+					this.setState(telnetOption, "rejected");
+				} else if (command === IAC.DONT || command === IAC.WONT) {
+					// For DONT/WONT on unknown protocols, just mark as rejected without responding
+					// (client is already saying they don't want it)
+					this.setState(telnetOption, "rejected");
+					logger.debug(
+						`Telnet negotiation (${
+							this.address
+						}): unhandled protocol ${getProtocolName(option)}, received ${
+							command === IAC.DONT ? "IAC DON'T" : "IAC WON'T"
+						}, marking as rejected`
+					);
+				}
+			} else {
+				// Already rejected, but still acknowledge to ensure command is processed and removed
+				logger.debug(
+					`Telnet negotiation (${
+						this.address
+					}): unhandled protocol ${getProtocolName(
+						option
+					)} already rejected, ignoring duplicate command`
+				);
 			}
-			return null; // Return null to indicate we handled it
+			// Always return null to indicate we handled it (command will be removed from stream by processData)
+			return null;
 		}
 
 		// Check if protocol is disabled
@@ -371,7 +429,9 @@ export class TelnetNegotiationManager {
 			if (command === IAC.DO && handler.serverWillsOption) {
 				this.write(buildIACCommand(IAC.WONT, option));
 				logger.debug(
-					`Telnet negotiation (${this.address}): protocol ${option} is disabled, sent IAC WON'T`
+					`Telnet negotiation (${this.address}): protocol ${getProtocolName(
+						option
+					)} is disabled, sent IAC WON'T`
 				);
 				this.setState(telnetOption, "disabled");
 				if (handler.onRejected) {
@@ -380,7 +440,9 @@ export class TelnetNegotiationManager {
 			} else if (command === IAC.WILL && !handler.serverWillsOption) {
 				this.write(buildIACCommand(IAC.DONT, option));
 				logger.debug(
-					`Telnet negotiation (${this.address}): protocol ${option} is disabled, sent IAC DON'T`
+					`Telnet negotiation (${this.address}): protocol ${getProtocolName(
+						option
+					)} is disabled, sent IAC DON'T`
 				);
 				this.setState(telnetOption, "disabled");
 				if (handler.onRejected) {
@@ -406,7 +468,9 @@ export class TelnetNegotiationManager {
 			handler.handleSubnegotiation(data, this, this.socket);
 		} else {
 			logger.debug(
-				`Telnet subnegotiation (${this.address}): unhandled subnegotiation for option ${option}`
+				`Telnet subnegotiation (${
+					this.address
+				}): unhandled subnegotiation for option ${getProtocolName(option)}`
 			);
 		}
 	}
@@ -420,10 +484,28 @@ export class TelnetNegotiationManager {
 		let result = binary;
 		let i = 0;
 
+		logger.debug(
+			`Telnet negotiation (${this.address}): processData called with ${
+				data.length
+			} bytes: ${Array.from(data).join(",")}`
+		);
+
 		while (i < binary.length) {
 			// Look for IAC byte (0xFF)
-			if (binary.charCodeAt(i) === IAC.IAC && i + 1 < binary.length) {
+			const charCode = binary.charCodeAt(i);
+			if (charCode === IAC.IAC && i + 1 < binary.length) {
 				const nextByte = binary.charCodeAt(i + 1);
+				logger.debug(
+					`Telnet negotiation (${
+						this.address
+					}): found IAC byte at position ${i}, next byte: ${nextByte}, buffer length: ${
+						binary.length
+					}, remaining bytes: ${Array.from(
+						Buffer.from(binary.substring(i), "binary")
+					)
+						.slice(0, 5)
+						.join(",")}`
+				);
 
 				// Handle IAC IAC (escaped IAC byte)
 				if (nextByte === IAC.IAC) {
@@ -443,13 +525,25 @@ export class TelnetNegotiationManager {
 				) {
 					if (i + 2 < binary.length) {
 						const option = binary.charCodeAt(i + 2);
+						logger.debug(
+							`Telnet negotiation (${this.address}): processing IAC command ${nextByte} ${option} at position ${i}, removing from stream`
+						);
 						this.handleCommand(nextByte, option);
 
 						// Remove the command from the stream
 						result = result.substring(0, i) + result.substring(i + 3);
 						binary = result;
+						logger.debug(
+							`Telnet negotiation (${this.address}): removed IAC command, result length: ${result.length}, original length: ${data.length}`
+						);
 						i = 0; // Reset to start to reprocess
 						continue;
+					} else {
+						// Incomplete IAC command, wait for more data
+						logger.debug(
+							`Telnet negotiation (${this.address}): incomplete IAC command at position ${i}, waiting for more data`
+						);
+						break;
 					}
 				}
 
@@ -457,6 +551,7 @@ export class TelnetNegotiationManager {
 				if (nextByte === IAC.SB) {
 					// IAC SB
 					let subEnd = i + 2;
+					let foundSE = false;
 					// Find IAC SE (0xFF 0xF0)
 					while (subEnd < binary.length - 1) {
 						if (
@@ -464,6 +559,7 @@ export class TelnetNegotiationManager {
 							binary.charCodeAt(subEnd + 1) === IAC.SE
 						) {
 							// Found IAC SE
+							foundSE = true;
 							const option = binary.charCodeAt(i + 2);
 							const subData = Buffer.from(
 								binary.substring(i + 3, subEnd),
@@ -474,15 +570,28 @@ export class TelnetNegotiationManager {
 							// Remove subnegotiation from stream
 							result = result.substring(0, i) + result.substring(subEnd + 2);
 							binary = result;
-							i = 0; // Reset to start
+							logger.debug(
+								`Telnet negotiation (${
+									this.address
+								}): removed subnegotiation, remaining buffer length: ${
+									result.length
+								}, bytes: ${Array.from(Buffer.from(result, "binary")).join(
+									","
+								)}`
+							);
+							i = 0; // Reset to start to reprocess remaining data
 							break;
 						}
 						subEnd++;
 					}
-					if (subEnd >= binary.length - 1) {
+					if (!foundSE) {
 						// Incomplete subnegotiation, wait for more data
+						logger.debug(
+							`Telnet negotiation (${this.address}): incomplete subnegotiation, waiting for more data`
+						);
 						break;
 					}
+					// If we found and processed the subnegotiation, continue to check for more IAC commands
 					continue;
 				}
 
@@ -496,15 +605,29 @@ export class TelnetNegotiationManager {
 				}
 
 				// Unknown IAC command - remove it
+				logger.debug(
+					`Telnet negotiation (${this.address}): unknown IAC command ${nextByte} at position ${i}, removing single byte`
+				);
 				result = result.substring(0, i) + result.substring(i + 1);
 				binary = result;
-				i++;
+				i = 0; // Reset to start after removal
 				continue;
 			}
 
+			// Not an IAC byte, move to next position
 			i++;
 		}
 
-		return Buffer.from(result, "binary");
+		const cleaned = Buffer.from(result, "binary");
+		if (cleaned.length !== data.length) {
+			logger.debug(
+				`Telnet negotiation (${this.address}): processData removed ${
+					data.length - cleaned.length
+				} bytes, returning ${cleaned.length} bytes: ${Array.from(cleaned).join(
+					","
+				)}`
+			);
+		}
+		return cleaned;
 	}
 }

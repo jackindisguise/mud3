@@ -12,6 +12,40 @@ import { DeepReadonly } from "../utils/types.js";
 import { getElapsedTime } from "./gamestate.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 
+// Calendar event emitter
+export const calendarEvents = new EventEmitter();
+
+// Calendar data
+let CALENDAR: Calendar | null = null;
+let DERIVED: CalendarDerived | null = null;
+
+// Interval IDs for calendar events (from setAbsoluteInterval)
+let minuteInterval: number | undefined;
+let hourInterval: number | undefined;
+let dayInterval: number | undefined;
+let weekInterval: number | undefined;
+let monthInterval: number | undefined;
+let yearInterval: number | undefined;
+let morningInterval: number | undefined;
+let nightInterval: number | undefined;
+
+// Timeout IDs for initial delays (from setSafeTimeout)
+// Arrays track all timeout IDs in case of chained timeouts
+let minuteTimeouts: NodeJS.Timeout[] = [];
+let hourTimeouts: NodeJS.Timeout[] = [];
+let dayTimeouts: NodeJS.Timeout[] = [];
+let weekTimeouts: NodeJS.Timeout[] = [];
+let monthTimeouts: NodeJS.Timeout[] = [];
+let yearTimeouts: NodeJS.Timeout[] = [];
+let morningTimeouts: NodeJS.Timeout[] = [];
+let nightTimeouts: NodeJS.Timeout[] = [];
+
+/**
+ * Maximum safe timeout value for setTimeout (32-bit signed integer max).
+ * setTimeout will overflow if given a value larger than this.
+ */
+const MAX_TIMEOUT_MS = 2147483647;
+
 export interface CalendarDay {
 	name: string;
 }
@@ -50,50 +84,6 @@ export interface CalendarTime {
 	minute: number;
 	second: number;
 }
-
-export function toOrdinal(date: number): string {
-	if (date === 11) return "11th";
-	if (date === 12) return "12th";
-	if (date === 13) return "13th";
-	const suffix = date % 10;
-	if (suffix === 1) {
-		return `${date}st`;
-	} else if (suffix === 2) {
-		return `${date}nd`;
-	} else if (suffix === 3) {
-		return `${date}rd`;
-	} else {
-		return `${date}th`;
-	}
-}
-
-// Calendar event emitter
-export const calendarEvents = new EventEmitter();
-
-// Calendar data
-let CALENDAR: Calendar | null = null;
-let DERIVED: CalendarDerived | null = null;
-
-// Interval IDs for calendar events (from setAbsoluteInterval)
-let minuteInterval: number | undefined;
-let hourInterval: number | undefined;
-let dayInterval: number | undefined;
-let weekInterval: number | undefined;
-let monthInterval: number | undefined;
-let yearInterval: number | undefined;
-let morningInterval: number | undefined;
-let nightInterval: number | undefined;
-
-// Timeout IDs for initial delays (from setSafeTimeout)
-// Arrays track all timeout IDs in case of chained timeouts
-let minuteTimeouts: NodeJS.Timeout[] = [];
-let hourTimeouts: NodeJS.Timeout[] = [];
-let dayTimeouts: NodeJS.Timeout[] = [];
-let weekTimeouts: NodeJS.Timeout[] = [];
-let monthTimeouts: NodeJS.Timeout[] = [];
-let yearTimeouts: NodeJS.Timeout[] = [];
-let morningTimeouts: NodeJS.Timeout[] = [];
-let nightTimeouts: NodeJS.Timeout[] = [];
 
 /**
  * Calculate derived calendar properties.
@@ -299,10 +289,25 @@ export function getCurrentTime(): CalendarTime | null {
 }
 
 /**
- * Maximum safe timeout value for setTimeout (32-bit signed integer max).
- * setTimeout will overflow if given a value larger than this.
+ * Convert a date number to its ordinal form (1st, 2nd, 3rd, etc.).
+ * @param date - The date number to convert
+ * @returns The ordinal form of the date
  */
-const MAX_TIMEOUT_MS = 2147483647;
+export function toOrdinal(date: number): string {
+	if (date === 11) return "11th";
+	if (date === 12) return "12th";
+	if (date === 13) return "13th";
+	const suffix = date % 10;
+	if (suffix === 1) {
+		return `${date}st`;
+	} else if (suffix === 2) {
+		return `${date}nd`;
+	} else if (suffix === 3) {
+		return `${date}rd`;
+	} else {
+		return `${date}th`;
+	}
+}
 
 /**
  * Set a timeout that handles values larger than MAX_TIMEOUT_MS by breaking

@@ -19,7 +19,7 @@ import { CommandObject } from "../package/commands.js";
 import { getAbilityById } from "../registry/ability.js";
 
 export default {
-	pattern: "learn~ <abilityId:word>",
+	pattern: "learn~ <abilityId:text>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const abilityId = args.get("abilityId") as string;
 		const { actor } = context;

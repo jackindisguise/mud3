@@ -33,7 +33,7 @@
  * - The module intentionally does not perform telnet option negotiation; keep
  *   the socket-level behavior minimal and predictable for tests.
  *
- * @module io
+ * @module core/io
  */
 
 import { EventEmitter } from "events";
@@ -611,7 +611,7 @@ export class MudServer extends EventEmitter {
 					`MudServer (${client.getAddress()}): timeout reached but client already removed`
 				);
 			}
-		}, 2000);
+		}, 3000);
 
 		client.on("close", () => {
 			this.clients.delete(client);

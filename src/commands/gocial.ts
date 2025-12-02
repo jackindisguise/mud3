@@ -80,16 +80,14 @@ export default {
 		const targetDisplay = target?.credentials.username;
 
 		// Format messages
-		const userMessage = formatSocialMessage(
-			messages.user || messages.room,
-			userDisplay,
-			targetDisplay
-		);
-		const roomMessage = formatSocialMessage(
-			messages.room,
-			userDisplay,
-			targetDisplay
-		);
+		const userMessage = messages.user
+			? formatSocialMessage(messages.user, userDisplay, targetDisplay)
+			: messages.room
+			? formatSocialMessage(messages.room, userDisplay, targetDisplay)
+			: undefined;
+		const roomMessage = messages.room
+			? formatSocialMessage(messages.room, userDisplay, targetDisplay)
+			: undefined;
 		const targetMessage =
 			target && messages.target
 				? formatSocialMessage(messages.target, userDisplay, targetDisplay)
@@ -104,22 +102,28 @@ export default {
 			}
 
 			// Determine which message to send
-			let messageToSend: string;
-			if (recipient === character) {
+			let messageToSend: string | undefined;
+			if (recipient === character && userMessage) {
 				messageToSend = userMessage;
-			} else if (target && recipient === target) {
-				messageToSend = targetMessage || roomMessage;
-			} else {
+			} else if (
+				target &&
+				recipient === target &&
+				(targetMessage || roomMessage)
+			) {
+				messageToSend = (targetMessage || roomMessage)!;
+			} else if (roomMessage) {
 				messageToSend = roomMessage;
 			}
 
 			// Format as channel message and send
-			const formatted = formatChannelMessage(
-				CHANNEL.GOCIAL,
-				userDisplay,
-				messageToSend
-			);
-			recipient.sendMessage(formatted, MESSAGE_GROUP.CHANNELS);
+			if (messageToSend) {
+				const formatted = formatChannelMessage(
+					CHANNEL.GOCIAL,
+					userDisplay,
+					messageToSend
+				);
+				recipient.sendMessage(formatted, MESSAGE_GROUP.CHANNELS);
+			}
 		});
 	},
 

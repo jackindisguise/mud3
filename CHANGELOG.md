@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.23.0](https://github.com/jackindisguise/mud3/compare/v1.22.0...v1.23.0) (2025-12-02)
+
+
+### Features
+
+* **calendar:** added calendar system with time tracking and events ([040724b](https://github.com/jackindisguise/mud3/commit/040724bfb3bb00935c8b897f4bc10ba9cb150c55)), closes [#25](https://github.com/jackindisguise/mud3/issues/25)
+* **combat:** added NPC target switching and aggro behavior when leaving combat ([c3742c3](https://github.com/jackindisguise/mud3/commit/c3742c397c4c23a61057a9913db4de2156935ba3))
+* **combat:** prevented self-targeting in combat ([de8ecf4](https://github.com/jackindisguise/mud3/commit/de8ecf4f1cab73bb8b1c65660ba0339ab69a2a41))
+* **commands:** added effects command to list active effects ([bcbf2d6](https://github.com/jackindisguise/mud3/commit/bcbf2d67ab779ae58dfdbd78e2b4339ecea9e6f0))
+* **dungeon:** integrate room migration system into deserialization ([40f9677](https://github.com/jackindisguise/mud3/commit/40f9677af1f51c4ff932ec4b29f6966024f97fad))
+* **dungeon:** made diagonal directions independent bit flags ([b631280](https://github.com/jackindisguise/mud3/commit/b6312800a57eef2d7d5a2b2d277f4e20fe4f37f7))
+* **dungeon:** updated default allowed exits to include diagonals ([5a1695f](https://github.com/jackindisguise/mud3/commit/5a1695fbdcadeb9623b4650c372bf453d629d252))
+* **effects:** added adaptable effect template for human race ([3153cf9](https://github.com/jackindisguise/mud3/commit/3153cf978424dca0f1186696d7cbaebe2db4668d))
+* **effects:** added effect serialization and deserialization ([5ee0798](https://github.com/jackindisguise/mud3/commit/5ee0798e020eaef7191ea5d8b8ebb341a44775b6))
+* **effects:** added poison effect template ([669a4bc](https://github.com/jackindisguise/mud3/commit/669a4bcf35d408bc5cdb8ed766a8464b091aa05b))
+* **effects:** implemented core effect system ([8234517](https://github.com/jackindisguise/mud3/commit/82345178086638f0f406464127a95a34a69979eb))
+* implementing telnet protocols ([fa3d046](https://github.com/jackindisguise/mud3/commit/fa3d046c8158b5a2cc057d22c0c29cee631b4790))
+* **io:** wait for telnet negotiations before emitting client connection ([90d8dd8](https://github.com/jackindisguise/mud3/commit/90d8dd828b327e35e5a48d88a3d15cbce838732b))
+* **map-editor:** add make 2-way button for room links ([dff9f22](https://github.com/jackindisguise/mud3/commit/dff9f22ade5e9e56c01c6ec7512977895102cc7e))
+* **map-editor:** added Clear Resets and Clear Exit Overrides buttons to UI ([a99b5a2](https://github.com/jackindisguise/mud3/commit/a99b5a2fed4f1bad80212b83e65a7e3f81f6b55c))
+* **map-editor:** reorganized exit buttons layout in room editor modal ([3980fd3](https://github.com/jackindisguise/mud3/commit/3980fd3256e00b314d4ce5a4c19b08734d0a7522))
+* **migrations:** add room migration system ([8a84b22](https://github.com/jackindisguise/mud3/commit/8a84b222d40ce102f9831ad779566beb50a0b3e2))
+* **migrations:** add separate dungeonVersion field for dungeon migrations ([cf223a8](https://github.com/jackindisguise/mud3/commit/cf223a82572fcc4f7430a09b91f8434e7532bb29))
+* **mob:** integrated effect system into Mob class ([18a860f](https://github.com/jackindisguise/mud3/commit/18a860feee5f8322d9a2033c2172c6dadb8d4e89))
+* **telnet:** add comprehensive telnet option definitions and improve negotiation ([c2cb1d3](https://github.com/jackindisguise/mud3/commit/c2cb1d3ebdd4b7a6b6c5d76f3a874457ab67d69f))
+* **telnet:** protocol handlers now use MCCP2 compression when active ([80ad90c](https://github.com/jackindisguise/mud3/commit/80ad90cf6676cf84768233a9c827e5952bdccd97))
+* **utils:** added assertion utilities with comparison operators ([4ba9aaf](https://github.com/jackindisguise/mud3/commit/4ba9aaf235b2302222c1389b9f0f7006e50a9b09))
+
+
+### Bug Fixes
+
+* **character:** use getCurrentDungeonVersion for character serialization ([cb0a376](https://github.com/jackindisguise/mud3/commit/cb0a37635d87a4247518f94e1dce555aeff09dc5))
+* **combat:** fixed threat and aggro system to properly initiate combat with free rounds ([f91af15](https://github.com/jackindisguise/mud3/commit/f91af15cd572c01c7c3b11dfb00aceddf1d4884f)), closes [#24](https://github.com/jackindisguise/mud3/issues/24)
+* **combat:** prevent threat expiration for mobs in same room as NPC ([da6de63](https://github.com/jackindisguise/mud3/commit/da6de63ef9d75b2b89c737b4060629889f7a7f40))
+* **commands:** changed learn command to accept text instead of word ([91237ab](https://github.com/jackindisguise/mud3/commit/91237ab4dd7de2301ede64c974333eae03789dbe))
+* **commands:** handle undefined messages in gocial command ([addabdf](https://github.com/jackindisguise/mud3/commit/addabdf5185ce5460417ac38b9923facb4732082))
+* **core:** changed IO encoding to binary and added debug logging ([5c54bec](https://github.com/jackindisguise/mud3/commit/5c54becd4d17f532d972a8d0e66e6c0c5018a5a0))
+* **dungeon:** changed combat check from isInCombat to combatTarget ([1a64868](https://github.com/jackindisguise/mud3/commit/1a64868836687876861127ca8e589af38e555f40))
+* **dungeon:** preserve oid field during object deserialization ([13ab54c](https://github.com/jackindisguise/mud3/commit/13ab54c14e744490e0dff5b34ddd3912c718c589))
+* **effects:** removed target from effect message templates ([c252567](https://github.com/jackindisguise/mud3/commit/c252567caf0bf332394ccbd7cc470918b5756b31))
+* **game:** fix race condition and close client on inactivity timeout ([6727c55](https://github.com/jackindisguise/mud3/commit/6727c5517a52501257fda3ff8b2808da0ac840f8))
+* **io:** increased telnet negotiation timeout to 3 seconds ([c9443bb](https://github.com/jackindisguise/mud3/commit/c9443bb9ae7b3f165eb92cfb4a0d586092c89526))
+* **io:** only send GA messages for prompts without linebreaks ([7370e64](https://github.com/jackindisguise/mud3/commit/7370e64deb0c2eb746fc6c568c407712eb910d74))
+* **map-editor:** corrected Mobius perimeter and added exit override features ([7d601c7](https://github.com/jackindisguise/mud3/commit/7d601c7a66c8afda1c55699bdf7538d5c8d98eb2))
+* **map-editor:** save mob template behavior button states ([a7f5e72](https://github.com/jackindisguise/mud3/commit/a7f5e72ea7dab7f3677ead383ad548871287de46))
+* **test:** clear threat tables before clearing combat targets in combat tests ([af7baa5](https://github.com/jackindisguise/mud3/commit/af7baa59078004a88a1d3971dddab3da8ee6e84a))
+* **test:** updated threat expiration tests to account for same-room prevention ([18ac020](https://github.com/jackindisguise/mud3/commit/18ac0200f46524b5fa64f4be06034dbfa3964448))
+
 ## [1.22.0](https://github.com/jackindisguise/mud3/compare/v1.21.0...v1.22.0) (2025-11-27)
 
 

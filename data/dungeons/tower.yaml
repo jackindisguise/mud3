@@ -558,6 +558,13 @@ dungeon:
       job: warrior
       level: 1
       value: 999
+    - id: haversack
+      type: Item
+      display: a haversack
+      description: It's a haversack.
+      roomDescription: A haversack is lying on the floor.
+      keywords: haversack sack
+      isContainer: true
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{13,16,1}'
@@ -784,6 +791,10 @@ dungeon:
       minCount: 20
       maxCount: 100
     - templateId: tower-sword
+      roomRef: '@tower{9,19,0}'
+      minCount: 1
+      maxCount: 1
+    - templateId: haversack
       roomRef: '@tower{9,19,0}'
       minCount: 1
       maxCount: 1

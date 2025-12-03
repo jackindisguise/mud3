@@ -1024,6 +1024,7 @@ export interface DungeonObjectOptions {
 	baseWeight?: number;
 	templateId?: string;
 	value?: number;
+	isContainer?: boolean;
 }
 
 /**
@@ -1047,6 +1048,10 @@ export interface RoomOptions extends DungeonObjectOptions {
 	coordinates: Coordinates;
 	allowedExits?: DIRECTION; // Bitmask of allowed exit directions (defaults to NSEW + diagonals if not provided)
 	dense?: boolean; // Whether this room is dense (solid/impassable)
+}
+
+export interface ItemOptions extends DungeonObjectOptions {
+	isContainer?: boolean;
 }
 
 /**
@@ -1144,7 +1149,8 @@ export interface LevelUpChanges {
  * Currently identical to base form but defined for type safety and future extensions.
  */
 export interface SerializedItem extends SerializedDungeonObject {
-	type: "Item";
+	type: "Item" | equipmentType;
+	isContainer?: boolean;
 }
 
 /**
@@ -1171,7 +1177,7 @@ export type equipmentType = "Equipment" | "Armor" | "Weapon";
  * @property resourceBonuses - Optional resource capacity bonuses
  * @property secondaryAttributeBonuses - Optional secondary attribute bonuses
  */
-export interface SerializedEquipment extends SerializedDungeonObject {
+export interface SerializedEquipment extends SerializedItem {
 	type: equipmentType;
 	slot: EQUIPMENT_SLOT;
 	attributeBonuses?: Partial<PrimaryAttributeSet>;
@@ -1179,24 +1185,16 @@ export interface SerializedEquipment extends SerializedDungeonObject {
 	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
 }
 
-export interface SerializedArmor extends SerializedDungeonObject {
+export interface SerializedArmor extends SerializedEquipment {
 	type: "Armor";
-	slot: EQUIPMENT_SLOT;
 	defense: number;
-	attributeBonuses?: Partial<PrimaryAttributeSet>;
-	resourceBonuses?: Partial<ResourceCapacities>;
-	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
 }
 
-export interface SerializedWeapon extends SerializedDungeonObject {
+export interface SerializedWeapon extends SerializedEquipment {
 	type: "Weapon";
-	slot: EQUIPMENT_SLOT;
 	attackPower: number;
 	hitType?: string;
 	weaponType?: WeaponType;
-	attributeBonuses?: Partial<PrimaryAttributeSet>;
-	resourceBonuses?: Partial<ResourceCapacities>;
-	secondaryAttributeBonuses?: Partial<SecondaryAttributeSet>;
 }
 /**
  * Union type representing valid serialized object types.
@@ -1262,6 +1260,7 @@ export interface DungeonObjectTemplate {
 	mapText?: string;
 	mapColor?: string; // Color name string (e.g., "red", "blue")
 	baseWeight?: number;
+	value?: number;
 	/**
 	 * Optional cached baseline serialization produced by this template.
 	 * When present, compression/normalization can diff against this
@@ -1292,6 +1291,7 @@ export type ItemType = "Item" | equipmentType;
 
 export interface ItemTemplate extends DungeonObjectTemplate {
 	type: ItemType;
+	isContainer?: boolean;
 }
 
 /**
@@ -2439,6 +2439,9 @@ export class DungeonObject {
 			this.baseWeight = template.baseWeight;
 			this.currentWeight = template.baseWeight;
 		}
+		if (template.value !== undefined) {
+			this.value = template.value;
+		}
 	}
 
 	/**
@@ -3516,6 +3519,13 @@ export class Prop extends DungeonObject {}
  */
 export class Item extends Movable {
 	/**
+	 * Whether this item can act as a container for other items.
+	 * Only items with isContainer=true can be targeted by "put x in container" and "get x from container" commands.
+	 * Defaults to false.
+	 */
+	isContainer: boolean = false;
+
+	/**
 	 * Set the location (container) of this item.
 	 * When an item's location changes, it clears reset tracking.
 	 * This allows items to be picked up and moved without the reset system tracking them.
@@ -3541,6 +3551,47 @@ export class Item extends Movable {
 	 */
 	override get location() {
 		return super.location;
+	}
+
+	/**
+	 * Constructor for Item.
+	 * @param options Optional initialization values including isContainer flag
+	 */
+	constructor(options?: ItemOptions) {
+		super(options);
+		if (options?.isContainer !== undefined) {
+			this.isContainer = options.isContainer;
+		}
+	}
+
+	/**
+	 * Serialize this item, including isContainer if it's true.
+	 */
+	override serialize(options?: {
+		compress?: boolean;
+		version?: string;
+	}): SerializedItem {
+		const base = super.serialize(options);
+		const result: SerializedItem = {
+			...base,
+			type: "Item",
+			...(this.isContainer && { isContainer: true }),
+		};
+		return result;
+	}
+
+	/**
+	 * Override applyTemplate to handle Item-specific properties.
+	 * Applies the isContainer value from the template if present.
+	 *
+	 * @param template - Template object containing item properties
+	 */
+	override applyTemplate(template: ItemTemplate): void {
+		super.applyTemplate(template);
+		const itemTemplate = template;
+		if (itemTemplate.isContainer !== undefined) {
+			this.isContainer = itemTemplate.isContainer;
+		}
 	}
 }
 
@@ -3705,7 +3756,7 @@ export enum EQUIPMENT_SLOT {
  * });
  * ```
  */
-export interface EquipmentOptions extends DungeonObjectOptions {
+export interface EquipmentOptions extends ItemOptions {
 	/** The equipment slot this item occupies when equipped. */
 	slot?: EQUIPMENT_SLOT;
 	/** Defense value provided by this equipment. */
@@ -3907,7 +3958,7 @@ export class Equipment extends Item {
 			...super.serialize(options),
 		};
 		const uncompressed: SerializedEquipment = {
-			...(base as SerializedDungeonObject),
+			...base,
 			type: "Equipment",
 			slot: this._slot,
 			...(Object.keys(this._attributeBonuses).length > 0
@@ -3920,12 +3971,13 @@ export class Equipment extends Item {
 				? { secondaryAttributeBonuses: this._secondaryAttributeBonuses }
 				: {}),
 		};
-		return options?.compress
+		const etc = (options?.compress
 			? (compressSerializedObject(
 					uncompressed,
-					(base as SerializedDungeonObject).templateId
-			  ) as SerializedEquipment)
-			: uncompressed;
+					base.templateId
+			  ))
+			: uncompressed);
+		return etc;
 	}
 
 	/**
@@ -3948,7 +4000,7 @@ export class Equipment extends Item {
 	 * ```
 	 */
 	override applyTemplate(
-		template: DungeonObjectTemplate | EquipmentTemplate
+		template: EquipmentTemplate
 	): void {
 		// Call parent to apply base properties
 		super.applyTemplate(template);
@@ -4101,10 +4153,10 @@ export class Armor extends Equipment {
 	 * @param template - Template object containing armor properties
 	 */
 	override applyTemplate(
-		template: DungeonObjectTemplate | ArmorTemplate
+		template: ArmorTemplate
 	): void {
 		super.applyTemplate(template);
-		const armorTemplate = template as ArmorTemplate;
+		const armorTemplate = template;
 		if (armorTemplate.defense !== undefined) {
 			this._defense = armorTemplate.defense;
 		}
@@ -4287,10 +4339,10 @@ export class Weapon extends Equipment {
 	 * @param template - Template object containing weapon properties
 	 */
 	override applyTemplate(
-		template: DungeonObjectTemplate | WeaponTemplate
+		template: WeaponTemplate
 	): void {
 		super.applyTemplate(template);
-		const weaponTemplate = template as WeaponTemplate;
+		const weaponTemplate = template;
 		if (weaponTemplate.attackPower !== undefined) {
 			this._attackPower = weaponTemplate.attackPower;
 		}
@@ -6741,7 +6793,18 @@ export class Mob extends Movable {
 			}
 
 			// Calculate how much this shield can absorb
-			const absorbed = Math.min(remainingDamage, remainingAbsorption);
+			// First, apply absorption rate to determine how much damage the shield will try to absorb
+			const absorptionRate = shieldTemplate.absorptionRate ?? 1.0;
+			const effectiveDamageToAbsorb = remainingDamage * absorptionRate;
+			
+			// Then, limit by remaining absorption capacity
+			let maxAbsorbable = remainingAbsorption;
+			// Then, limit by maxAbsorptionPerHit if specified
+			if (shieldTemplate.maxAbsorptionPerHit !== undefined) {
+				maxAbsorbable = Math.min(maxAbsorbable, shieldTemplate.maxAbsorptionPerHit);
+			}
+			// Finally, limit by effective damage to absorb
+			const absorbed = Math.min(effectiveDamageToAbsorb, maxAbsorbable);
 			remainingDamage -= absorbed;
 
 			// Update shield absorption
@@ -6766,7 +6829,7 @@ export class Mob extends Movable {
 
 			// Remove shield if depleted
 			if (shieldEffect.remainingAbsorption <= 0) {
-				this.removeEffect(shieldEffect, false);
+				this.removeEffect(shieldEffect, true);
 			}
 		}
 

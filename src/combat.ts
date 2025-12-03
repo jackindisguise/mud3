@@ -269,9 +269,6 @@ export function oneHit(options: OneHitOptions): number {
 
 	let finalDamage = Math.floor(damage);
 
-	// Apply damage variation
-	finalDamage = applyDamageVariation(finalDamage, options.damageVariation);
-
 	// Send combat messages
 	const damageStr = color(String(finalDamage), COLOR.CRIMSON);
 
@@ -398,6 +395,7 @@ export function oneMagicHit(options: OneMagicHitOptions): number {
 		hitType = DEFAULT_HIT_TYPE,
 		spellPowerBonus = 0,
 		spellPowerMultiplier = 1,
+		damageVariation,
 	} = options;
 
 	// Get the room where combat is occurring
@@ -452,6 +450,9 @@ export function oneMagicHit(options: OneMagicHitOptions): number {
 
 	// Apply spell power bonus and multiplier (from abilities, etc.)
 	damage = (damage + spellPowerBonus) * spellPowerMultiplier;
+
+	// Apply damage variation
+	damage = applyDamageVariation(damage, damageVariation);
 
 	// Apply resilience reduction (magical resistance)
 	const resilienceReduction = target.resilience * 0.05; // 5% damage reduction per resilience point

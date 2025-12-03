@@ -1769,7 +1769,12 @@ function hydrateSerializedMovableData(
  * Accepts SerializedDungeonObject since SerializedItem doesn't add fields beyond base.
  */
 function hydrateSerializedItemData(data: SerializedDungeonObject): ItemOptions {
-	return hydrateSerializedMovableData(data);
+	const base = hydrateSerializedMovableData(data);
+	const itemData = data as SerializedItem;
+	return {
+		...base,
+		...(itemData.isContainer !== undefined && { isContainer: itemData.isContainer }),
+	};
 }
 
 /**

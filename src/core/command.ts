@@ -1216,7 +1216,13 @@ export abstract class Command {
 
 		// Add inventory if needed
 		if (resolvedSource === "inventory" || resolvedSource === "all") {
-			searchLocations.push(...context.actor.contents);
+			// Filter out equipped items from inventory
+			let inventoryItems = context.actor.contents;
+			if (context.actor instanceof Mob) {
+				const equippedItems = context.actor.getAllEquipped() as DungeonObject[];
+				inventoryItems = inventoryItems.filter((item) => !equippedItems.includes(item));
+			}
+			searchLocations.push(...inventoryItems);
 		}
 
 		const matches = searchLocations.filter((obj) =>

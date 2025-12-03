@@ -97,6 +97,7 @@ export default {
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {
+		console.log(Date.now(), result);
 		if (result.error === "Missing required argument: target") {
 			context.actor.sendMessage(
 				"Who do you want to whisper to?",
@@ -104,6 +105,15 @@ export default {
 			);
 			return;
 		}
+
+		if (result.error === "Could not parse argument: target") {
+			context.actor.sendMessage(
+				"That player is not online.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+
 		if (result.error === "Missing required argument: message") {
 			context.actor.sendMessage(
 				"What do you want to whisper?",

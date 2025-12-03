@@ -130,6 +130,8 @@ export default {
 			modifiers: string[];
 			details: string;
 			source: string;
+			appliedAt: number;
+			isAncestryOrDiscipline: boolean;
 		}> = [];
 
 		// Build sets of archetype passive IDs from race and job
@@ -347,12 +349,16 @@ export default {
 				typeStr = color("Shield", COLOR.CYAN);
 				const remaining = effect.remainingAbsorption ?? template.absorption;
 				const total = template.absorption;
-				const detailParts: string[] = [];
-				detailParts.push(`${remaining}/${total} absorption remaining`);
+				modifiers.push(`${remaining}/${total} absorption`);
 				if (template.damageType) {
-					detailParts.push(`Filters: ${template.damageType}`);
+					modifiers.push(`Filter: ${template.damageType}`);
 				}
-				details = detailParts.join(" | ");
+				if (template.maxAbsorptionPerHit !== undefined) {
+					modifiers.push(`Max/hit: ${template.maxAbsorptionPerHit}`);
+				}
+				const absorptionRate = template.absorptionRate ?? 1.0;
+				const ratePercent = Math.round(absorptionRate * 100);
+				modifiers.push(`Rate: ${ratePercent}%`);
 			} else {
 				typeStr = "Unknown";
 			}
@@ -374,11 +380,23 @@ export default {
 				modifiers,
 				details,
 				source: sourceStr,
+				appliedAt: effect.appliedAt,
+				isAncestryOrDiscipline: isRaceEffect || isJobEffect,
 			});
 		}
 
-		// Sort by name
-		effectData.sort((a, b) => a.name.localeCompare(b.name));
+		// Sort: ancestry/discipline effects first (by appliedAt), then others (by appliedAt)
+		effectData.sort((a, b) => {
+			// Ancestry and discipline effects always come first
+			if (a.isAncestryOrDiscipline && !b.isAncestryOrDiscipline) {
+				return -1;
+			}
+			if (!a.isAncestryOrDiscipline && b.isAncestryOrDiscipline) {
+				return 1;
+			}
+			// Within the same category, sort by when they were applied (oldest first)
+			return a.appliedAt - b.appliedAt;
+		});
 
 		// Build output lines
 		const lines: string[] = [];
@@ -415,7 +433,7 @@ export default {
 					const right = modifiers[i + 1];
 					if (right) {
 						lines.push(
-							`  ${string.pad(left, columnWidth, string.ALIGN.LEFT)}${right}`
+							`  ${string.pad(left, columnWidth, string.ALIGN.LEFT, " ", SIZER)}|${right}`
 						);
 					} else {
 						lines.push(`  ${left}`);

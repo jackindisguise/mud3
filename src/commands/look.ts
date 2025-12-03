@@ -22,22 +22,23 @@
  */
 
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Room, DungeonObject } from "../core/dungeon.js";
+import { Room, DungeonObject, Item } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { DIRECTION, dir2text } from "../direction.js";
-import { CommandContext, PRIORITY } from "../core/command.js";
+import { CommandContext, PRIORITY, ParseResult } from "../core/command.js";
 import {
 	showRoom,
 	showObject,
 	showContainerContents,
 } from "../utils/display.js";
+import logger from "../logger.js";
 
 export default {
 	pattern: "look~",
 	aliases: [
 		"look~ <target:object@all>",
 		"look~ <direction:direction>",
-		"look~ in~ <container:object@all>",
+		"look~ in~ <container:item@all>",
 	],
 	priority: PRIORITY.HIGH,
 	execute(context: CommandContext, args: Map<string, any>): void {
@@ -57,6 +58,15 @@ export default {
 
 		// If container specified, show its contents
 		if (container) {
+			// Check if it's actually a container
+			if (!(container instanceof Item) || !container.isContainer) {
+				actor.sendMessage(
+					`${container.display || container.keywords} is not a container.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
 			// Check if container is accessible (in room or in actor's inventory)
 			const containerLocation = container.location;
 			if (containerLocation !== room && containerLocation !== actor) {
@@ -111,5 +121,31 @@ export default {
 
 		// If nothing specified, show current room
 		showRoom(actor, room);
+	},
+
+	onError(context: CommandContext, result: ParseResult): void {
+		if (result.error?.includes("Could not parse argument")) {
+			// Check if it's the container argument that failed
+			if (result.error?.includes("container")) {
+				context.actor.sendMessage(
+					"You don't see that container.",
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+			// For other arguments (target, direction)
+			context.actor.sendMessage(
+				"You don't see that here.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+		if (result.error?.includes("Missing required argument")) {
+			context.actor.sendMessage(
+				"What do you want to look at?",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
 	},
 } satisfies CommandObject;

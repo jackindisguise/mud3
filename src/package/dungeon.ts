@@ -119,6 +119,7 @@ import {
 	dir2reverse,
 	DirectionText,
 } from "../direction.js";
+import { EffectOverrides } from "../core/effect.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -2340,22 +2341,34 @@ export async function deserializeMob(
 
 			// Restore effect using addEffect with restoration overrides
 			// This ensures proper initialization, timer setup, and type safety
-			mob.addEffect(template, caster, {
-				appliedAt: serializedEffect.appliedAt,
-				expiresAt: serializedEffect.expiresAt,
-				...(serializedEffect.nextTickAt !== undefined && {
-					nextTickAt: serializedEffect.nextTickAt,
-				}),
-				...(serializedEffect.ticksRemaining !== undefined && {
-					ticksRemaining: serializedEffect.ticksRemaining,
-				}),
-				...(serializedEffect.tickAmount !== undefined && {
-					tickAmount: serializedEffect.tickAmount,
-				}),
-				...(serializedEffect.remainingAbsorption !== undefined && {
-					remainingAbsorption: serializedEffect.remainingAbsorption,
-				}),
-			});
+			const now = Date.now();
+			const overrides: EffectOverrides = {};
+
+			// Calculate expiresAt from remainingDuration
+			if (serializedEffect.remainingDuration !== undefined) {
+				overrides.expiresAt = now + serializedEffect.remainingDuration;
+			} else {
+				// Permanent effect
+				overrides.expiresAt = Number.MAX_SAFE_INTEGER;
+			}
+
+			// Calculate nextTickAt from nextTickIn
+			if (serializedEffect.nextTickIn !== undefined) {
+				overrides.nextTickAt = now + serializedEffect.nextTickIn;
+			}
+
+			// Include other optional fields
+			if (serializedEffect.ticksRemaining !== undefined) {
+				overrides.ticksRemaining = serializedEffect.ticksRemaining;
+			}
+			if (serializedEffect.tickAmount !== undefined) {
+				overrides.tickAmount = serializedEffect.tickAmount;
+			}
+			if (serializedEffect.remainingAbsorption !== undefined) {
+				overrides.remainingAbsorption = serializedEffect.remainingAbsorption;
+			}
+
+			mob.addEffect(template, caster, overrides);
 		}
 	}
 

@@ -17,9 +17,28 @@ import { CommandContext } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { getAbilityById } from "../registry/ability.js";
-import { color, COLOR, SIZER } from "../core/color.js";
+import { color, COLOR } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
+
+function getProficiencyLevel(proficiency: number): string {
+	if (proficiency === 100) {
+		return "Master";
+	} else if (proficiency >= 75) {
+		return "Expert";
+	} else if (proficiency >= 50) {
+		return "Skilled";
+	} else if (proficiency >= 25) {
+		return "Adept";
+	} else {
+		return "Novice";
+	}
+}
+
+function formatProficiency(proficiency: number): string {
+	// Format as "(XXX%)" with fixed width: "(  1%)", "( 80%)", "(100%)"
+	return `${proficiency.toString()}%`;
+}
 
 export default {
 	pattern: "abilities~",
@@ -67,80 +86,52 @@ export default {
 		// Sort by name
 		abilityData.sort((a, b) => a.name.localeCompare(b.name));
 
-		// Build table
+		// Build output lines
 		const lines: string[] = [];
 		lines.push(color("=== Learned Abilities ===", COLOR.YELLOW));
 
-		// Table header
-		const header = `${string.pad(
-			"Ability",
-			30,
-			string.ALIGN.LEFT
-		)} ${string.pad("Uses", 10, string.ALIGN.CENTER)} ${string.pad(
-			"Proficiency",
-			12,
-			string.ALIGN.CENTER
-		)}`;
-		lines.push(color(header, COLOR.CYAN));
-
-		// Table rows
-		for (const { name, proficiency, uses } of abilityData) {
-			const proficiencyStr = `${proficiency}%`;
+		// Format abilities as "Ability Name - Level (percentage%)"
+		const abilityStrings: string[] = [];
+		for (const { name, proficiency } of abilityData) {
+			const level = getProficiencyLevel(proficiency);
 			const proficiencyColor =
-				proficiency >= 75
+				proficiency === 100
+					? COLOR.YELLOW
+					: proficiency >= 75
 					? COLOR.LIME
 					: proficiency >= 50
-					? COLOR.YELLOW
+					? COLOR.DARK_GREEN
 					: proficiency >= 25
-					? COLOR.OLIVE
-					: COLOR.SILVER;
+					? COLOR.TEAL
+					: COLOR.GREY;
 
-			const abilityName = color(name, COLOR.WHITE);
-			const usesStr = color(uses.toString(), COLOR.CYAN);
-			const proficiencyColored = color(proficiencyStr, proficiencyColor);
+			const abilityName = color(
+				string.pad(name, 18, string.ALIGN.CENTER),
+				COLOR.WHITE
+			);
+			const levelColored = color(level, proficiencyColor);
+			const percentFormatted = formatProficiency(proficiency);
+			const percentColored = color(percentFormatted, proficiencyColor);
 
-			const row = `${string.pad({
-				string: abilityName,
-				width: 30,
-				sizer: SIZER,
-				textAlign: string.ALIGN.LEFT,
-			})} ${string.pad({
-				string: usesStr,
-				width: 10,
-				sizer: SIZER,
-				textAlign: string.ALIGN.CENTER,
-			})} ${string.pad({
-				string: proficiencyColored,
-				width: 12,
-				sizer: SIZER,
-				textAlign: string.ALIGN.CENTER,
-			})}`;
-			lines.push(row);
+			abilityStrings.push(
+				` ${abilityName} (${levelColored}) <${percentColored}>`
+			);
 		}
 
-		// Footer
-		lines.push("");
-		lines.push(
-			color(
-				`Total: ${abilityData.length} abilit${
-					abilityData.length === 1 ? "y" : "ies"
-				}`,
-				COLOR.SILVER
-			)
-		);
+		// Display in 2 columns
+		const columnWidth = 40;
+		for (let i = 0; i < abilityStrings.length; i += 2) {
+			const left = abilityStrings[i];
+			const right = abilityStrings[i + 1];
+			if (right) {
+				lines.push(
+					`${string.pad(left, columnWidth, string.ALIGN.LEFT)}${right}`
+				);
+			} else {
+				lines.push(left);
+			}
+		}
 
-		// Box the output
-		const boxed = string.box({
-			input: lines,
-			width: 80,
-			sizer: SIZER,
-			style: {
-				...string.BOX_STYLES.PLAIN,
-				hPadding: 1,
-				vPadding: 1,
-			},
-		});
-
-		actor.sendMessage(boxed.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;

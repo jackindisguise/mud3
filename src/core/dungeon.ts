@@ -7154,26 +7154,49 @@ export class Mob extends Movable {
 		}
 
 		const serializedEffects: SerializedEffect[] = [];
+		const now = Date.now();
 		for (const effect of this._effects) {
 			// Skip archetype passives (identified by template ID being in race/job passives)
 			if (archetypePassiveIds.has(effect.template.id)) {
 				continue;
 			}
-			serializedEffects.push({
+			const serialized: SerializedEffect = {
 				effectId: effect.template.id,
 				casterOid: effect.caster.oid,
-				appliedAt: effect.appliedAt,
-				expiresAt: effect.expiresAt,
-				...(effect.nextTickAt !== undefined && {
-					nextTickAt: effect.nextTickAt,
-				}),
-				...(effect.ticksRemaining !== undefined && {
-					ticksRemaining: effect.ticksRemaining,
-				}),
-				...(effect.tickAmount !== undefined && {
-					tickAmount: effect.tickAmount,
-				}),
-			});
+			};
+
+			// Calculate remaining duration (undefined for permanent effects)
+			if (effect.expiresAt !== Number.MAX_SAFE_INTEGER) {
+				const remaining = effect.expiresAt - now;
+				if (remaining > 0) {
+					serialized.remainingDuration = remaining;
+				}
+				// If remaining <= 0, effect is expired, skip serializing it
+				else {
+					continue;
+				}
+			}
+
+			// Calculate time until next tick for DoT/HoT effects
+			if (effect.nextTickAt !== undefined) {
+				const nextTickIn = effect.nextTickAt - now;
+				if (nextTickIn > 0) {
+					serialized.nextTickIn = nextTickIn;
+				}
+			}
+
+			// Include other optional fields
+			if (effect.ticksRemaining !== undefined) {
+				serialized.ticksRemaining = effect.ticksRemaining;
+			}
+			if (effect.tickAmount !== undefined) {
+				serialized.tickAmount = effect.tickAmount;
+			}
+			if (effect.remainingAbsorption !== undefined) {
+				serialized.remainingAbsorption = effect.remainingAbsorption;
+			}
+
+			serializedEffects.push(serialized);
 		}
 
 		const full: SerializedMob = {
@@ -7403,11 +7426,12 @@ export class RoomLink {
 			fromRoom.getRoomRef() || `${fromRoom.x},${fromRoom.y},${fromRoom.z}`;
 		const toRef = toRoom.getRoomRef() || `${toRoom.x},${toRoom.y},${toRoom.z}`;
 		const dirText = dir2text(direction);
-		logger.debug(
-			`Created ${
-				oneWay ? "one-way" : "bidirectional"
-			} room link: ${fromRef} ${dirText} -> ${toRef}`
-		);
+		logger.debug("Created room link", {
+			type: oneWay ? "one-way" : "bidirectional",
+			from: fromRef,
+			direction: dirText,
+			to: toRef,
+		});
 
 		return link;
 	}
@@ -7494,11 +7518,12 @@ export class RoomLink {
 			this._to.room.getRoomRef() ||
 			`${this._to.room.x},${this._to.room.y},${this._to.room.z}`;
 		const dirText = dir2text(this._from.direction);
-		logger.debug(
-			`Removing ${
-				this._oneWay ? "one-way" : "bidirectional"
-			} room link: ${fromRef} ${dirText} -> ${toRef}`
-		);
+		logger.debug("Removing room link", {
+			type: this._oneWay ? "one-way" : "bidirectional",
+			from: fromRef,
+			direction: dirText,
+			to: toRef,
+		});
 
 		// Remove from connected rooms
 		this._from.room.removeLink(this);

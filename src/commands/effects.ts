@@ -58,7 +58,14 @@ function formatTimeRemaining(expiresAt: number): string {
 	return formatDuration(remaining);
 }
 
-function formatAttributeModifier(
+function formatAttributeName(name: string): string {
+	return name
+		.replace(/([A-Z])/g, " $1")
+		.replace(/^./, (str) => str.toUpperCase())
+		.trim();
+}
+
+function formatCompactModifier(
 	attributeName: string,
 	value: number,
 	reverseColor: boolean = false
@@ -71,14 +78,13 @@ function formatAttributeModifier(
 		: isPositive
 		? COLOR.LIME
 		: COLOR.CRIMSON;
-	const action = isPositive ? "Increases" : "Decreases";
-	const absValue = Math.abs(value);
-	const coloredName = color(attributeName, colorCode);
-	const coloredValue = color(String(absValue), colorCode);
-	return `${action} ${coloredName} by ${coloredValue}.`;
+	const sign = isPositive ? "+" : "";
+	const formattedName = formatAttributeName(attributeName);
+	const coloredValue = color(`${sign}${value}`, colorCode);
+	return `${coloredValue} ${formattedName}`;
 }
 
-function formatPercentageModifier(
+function formatCompactPercentageModifier(
 	attributeName: string,
 	multiplier: number,
 	reverseColor: boolean = false
@@ -92,11 +98,13 @@ function formatPercentageModifier(
 		: isPositive
 		? COLOR.LIME
 		: COLOR.CRIMSON;
-	const action = isPositive ? "Increases" : "Decreases";
-	const absPercent = Math.abs(percent);
-	const coloredName = color(attributeName, colorCode);
-	const coloredPercent = color(`${absPercent}%`, colorCode);
-	return `${action} ${coloredName} by ${coloredPercent}.`;
+	// Format name with proper capitalization (e.g., "incomingDamage" -> "Incoming Damage")
+	const formattedName = formatAttributeName(attributeName);
+	const coloredPercent = color(
+		`${percent > 0 ? "+" : ""}${percent}%`,
+		colorCode
+	);
+	return `${coloredPercent} ${formattedName}`;
 }
 
 export default {
@@ -119,8 +127,8 @@ export default {
 			name: string;
 			type: string;
 			timeRemaining: string;
+			modifiers: string[];
 			details: string;
-			description: string | undefined;
 			source: string;
 		}> = [];
 
@@ -141,77 +149,186 @@ export default {
 
 			// Determine effect type
 			let typeStr: string;
+			let modifiers: string[] = [];
 			let details: string = "";
+
 			if (isPassiveEffect(template)) {
 				typeStr = color("Passive", COLOR.CYAN);
-				const detailParts: string[] = [];
 
 				// Primary attributes
 				if (template.primaryAttributeModifiers) {
-					const primaryModifiers: Array<[string, number | undefined]> = [
-						["strength", template.primaryAttributeModifiers.strength],
-						["agility", template.primaryAttributeModifiers.agility],
-						["intelligence", template.primaryAttributeModifiers.intelligence],
-					];
-					for (const [name, value] of primaryModifiers) {
-						if (value) {
-							detailParts.push(formatAttributeModifier(name, value));
-						}
+					if (template.primaryAttributeModifiers.strength) {
+						modifiers.push(
+							formatCompactModifier(
+								"strength",
+								template.primaryAttributeModifiers.strength
+							)
+						);
+					}
+					if (template.primaryAttributeModifiers.agility) {
+						modifiers.push(
+							formatCompactModifier(
+								"agility",
+								template.primaryAttributeModifiers.agility
+							)
+						);
+					}
+					if (template.primaryAttributeModifiers.intelligence) {
+						modifiers.push(
+							formatCompactModifier(
+								"intelligence",
+								template.primaryAttributeModifiers.intelligence
+							)
+						);
 					}
 				}
 
 				// Secondary attributes
 				if (template.secondaryAttributeModifiers) {
-					const secondaryModifiers: Array<[string, number | undefined]> = [
-						["attack power", template.secondaryAttributeModifiers.attackPower],
-						["defense", template.secondaryAttributeModifiers.defense],
-						["crit rate", template.secondaryAttributeModifiers.critRate],
-						["avoidance", template.secondaryAttributeModifiers.avoidance],
-						["accuracy", template.secondaryAttributeModifiers.accuracy],
-						["spell power", template.secondaryAttributeModifiers.spellPower],
-						["resilience", template.secondaryAttributeModifiers.resilience],
-						["vitality", template.secondaryAttributeModifiers.vitality],
-						["wisdom", template.secondaryAttributeModifiers.wisdom],
-						["endurance", template.secondaryAttributeModifiers.endurance],
-						["spirit", template.secondaryAttributeModifiers.spirit],
-					];
-					for (const [name, value] of secondaryModifiers) {
-						if (value !== undefined) {
-							detailParts.push(formatAttributeModifier(name, value));
-						}
+					if (template.secondaryAttributeModifiers.attackPower !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"attackPower",
+								template.secondaryAttributeModifiers.attackPower
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.defense !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"defense",
+								template.secondaryAttributeModifiers.defense
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.critRate !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"critRate",
+								template.secondaryAttributeModifiers.critRate
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.avoidance !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"avoidance",
+								template.secondaryAttributeModifiers.avoidance
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.accuracy !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"accuracy",
+								template.secondaryAttributeModifiers.accuracy
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.spellPower !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"spellPower",
+								template.secondaryAttributeModifiers.spellPower
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.resilience !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"resilience",
+								template.secondaryAttributeModifiers.resilience
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.vitality !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"vitality",
+								template.secondaryAttributeModifiers.vitality
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.wisdom !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"wisdom",
+								template.secondaryAttributeModifiers.wisdom
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.endurance !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"endurance",
+								template.secondaryAttributeModifiers.endurance
+							)
+						);
+					}
+					if (template.secondaryAttributeModifiers.spirit !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"spirit",
+								template.secondaryAttributeModifiers.spirit
+							)
+						);
 					}
 				}
 
 				// Resource capacities
 				if (template.resourceCapacityModifiers) {
-					const resourceModifiers: Array<[string, number | undefined]> = [
-						["max health", template.resourceCapacityModifiers.maxHealth],
-						["max mana", template.resourceCapacityModifiers.maxMana],
-					];
-					for (const [name, value] of resourceModifiers) {
-						if (value !== undefined) {
-							detailParts.push(formatAttributeModifier(name, value));
-						}
+					if (template.resourceCapacityModifiers.maxHealth !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"maxHealth",
+								template.resourceCapacityModifiers.maxHealth
+							)
+						);
 					}
-				}
-
-				// Dynamic modifiers
-				const percentageModifiers: Array<[string, number | undefined]> = [
-					["incoming damage", template.incomingDamageMultiplier],
-					["outgoing damage", template.outgoingDamageMultiplier],
-					["healing received", template.healingReceivedMultiplier],
-					["healing given", template.healingGivenMultiplier],
-				];
-				for (const [name, multiplier] of percentageModifiers) {
-					if (multiplier !== undefined) {
-						const reverseColor = name === "incoming damage";
-						detailParts.push(
-							formatPercentageModifier(name, multiplier, reverseColor)
+					if (template.resourceCapacityModifiers.maxMana !== undefined) {
+						modifiers.push(
+							formatCompactModifier(
+								"maxMana",
+								template.resourceCapacityModifiers.maxMana
+							)
 						);
 					}
 				}
 
-				details = detailParts.join(" | ");
+				// Percentage modifiers
+				if (template.incomingDamageMultiplier !== undefined) {
+					modifiers.push(
+						formatCompactPercentageModifier(
+							"incomingDamage",
+							template.incomingDamageMultiplier,
+							true
+						)
+					);
+				}
+				if (template.outgoingDamageMultiplier !== undefined) {
+					modifiers.push(
+						formatCompactPercentageModifier(
+							"outgoingDamage",
+							template.outgoingDamageMultiplier
+						)
+					);
+				}
+				if (template.healingReceivedMultiplier !== undefined) {
+					modifiers.push(
+						formatCompactPercentageModifier(
+							"healingReceived",
+							template.healingReceivedMultiplier
+						)
+					);
+				}
+				if (template.healingGivenMultiplier !== undefined) {
+					modifiers.push(
+						formatCompactPercentageModifier(
+							"healingGiven",
+							template.healingGivenMultiplier
+						)
+					);
+				}
 			} else if (isDamageOverTimeEffect(template)) {
 				typeStr = color("DoT", COLOR.CRIMSON);
 				const damage = effect.tickAmount ?? template.damage;
@@ -254,8 +371,8 @@ export default {
 				name: template.name,
 				type: typeStr,
 				timeRemaining: formatTimeRemaining(effect.expiresAt),
-				details: details,
-				description: template.description,
+				modifiers,
+				details,
 				source: sourceStr,
 			});
 		}
@@ -263,99 +380,58 @@ export default {
 		// Sort by name
 		effectData.sort((a, b) => a.name.localeCompare(b.name));
 
-		// Build table
+		// Build output lines
 		const lines: string[] = [];
 		lines.push(color("=== Active Effects ===", COLOR.YELLOW));
 
-		// Table header
-		const header = `${string.pad("Effect", 25, string.ALIGN.LEFT)} ${string.pad(
-			"Type",
-			10,
-			string.ALIGN.CENTER
-		)} ${string.pad("Time Remaining", 18, string.ALIGN.CENTER)} ${string.pad(
-			"Source",
-			20,
-			string.ALIGN.LEFT
-		)}`;
-		lines.push(color(header, COLOR.CYAN));
-
-		// Table rows
+		// Display each effect
 		for (const {
 			name,
 			type,
 			timeRemaining,
+			modifiers,
 			details,
-			description,
 			source,
 		} of effectData) {
 			const effectName = color(name, COLOR.WHITE);
 			const sourceColored = color(source, COLOR.SILVER);
 
-			const row = `${string.pad({
-				string: effectName,
-				width: 25,
-				sizer: SIZER,
-				textAlign: string.ALIGN.LEFT,
-			})} ${string.pad({
-				string: type,
-				width: 10,
-				sizer: SIZER,
-				textAlign: string.ALIGN.CENTER,
-			})} ${string.pad({
-				string: timeRemaining,
-				width: 18,
-				sizer: SIZER,
-				textAlign: string.ALIGN.CENTER,
-			})} ${string.pad({
-				string: sourceColored,
-				width: 20,
-				sizer: SIZER,
-				textAlign: string.ALIGN.LEFT,
-			})}`;
-			lines.push(row);
+			// Effect header: Name (duration) [Type] <Source>
+			lines.push(
+				` ${effectName} ${color("(", COLOR.SILVER)}${timeRemaining}${color(
+					")",
+					COLOR.SILVER
+				)} ${type} ${color("<", COLOR.SILVER)}${sourceColored}${color(
+					">",
+					COLOR.SILVER
+				)}`
+			);
 
-			// Add description if present
-			if (description) {
-				lines.push(`  ${color(description, COLOR.SILVER)}`);
-			}
-
-			// Add details lines if present
-			if (details) {
-				const detailLines = details.split(" | ");
-				for (const line of detailLines) {
-					lines.push(`  ${line}`);
+			// Display modifiers in 2 columns for passive effects
+			if (modifiers.length > 0) {
+				const columnWidth = 40;
+				for (let i = 0; i < modifiers.length; i += 2) {
+					const left = modifiers[i];
+					const right = modifiers[i + 1];
+					if (right) {
+						lines.push(
+							`  ${string.pad(left, columnWidth, string.ALIGN.LEFT)}${right}`
+						);
+					} else {
+						lines.push(`  ${left}`);
+					}
 				}
 			}
 
-			// Add blank line between effects if there's any content
-			if (description || details) {
-				lines.push("");
+			// Display details for DoT/HoT/Shield
+			if (details) {
+				lines.push(`  ${details}`);
 			}
+
+			// Add blank line between effects
+			lines.push("");
 		}
 
-		// Footer
-		lines.push("");
-		lines.push(
-			color(
-				`Total: ${effectData.length} effect${
-					effectData.length === 1 ? "" : "s"
-				}`,
-				COLOR.SILVER
-			)
-		);
-
-		// Box the output
-		const boxed = string.box({
-			input: lines,
-			width: 80,
-			sizer: SIZER,
-			style: {
-				...string.BOX_STYLES.PLAIN,
-				hPadding: 1,
-				vPadding: 1,
-			},
-		});
-
-		actor.sendMessage(boxed.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;

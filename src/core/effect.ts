@@ -231,23 +231,24 @@ export interface EffectOverrides {
 	tickAmount?: number;
 	/** Restoration field: remaining absorption capacity (for shield effects) */
 	remainingAbsorption?: number;
+	/** Restoration field: time until next tick (for DoT/HoT effects, used during deserialization) */
+	nextTickIn?: number;
 }
 
 /**
  * Serialized form for effect instances.
  * Stores effect template ID, caster OID, and runtime data.
+ * Uses remaining durations instead of absolute timestamps to preserve effect duration across save/load.
  */
 export interface SerializedEffect {
 	/** Effect template ID */
 	effectId: string;
 	/** OID of the mob that applied this effect (caster) */
 	casterOid: number;
-	/** Timestamp when this effect was applied (milliseconds since epoch) */
-	appliedAt: number;
-	/** Timestamp when this effect expires (milliseconds since epoch) */
-	expiresAt: number;
-	/** For DoT/HoT effects: timestamp of the next tick (milliseconds since epoch) */
-	nextTickAt?: number;
+	/** Remaining duration until effect expires (milliseconds), or undefined for permanent effects */
+	remainingDuration?: number;
+	/** For DoT/HoT effects: time until next tick (milliseconds) */
+	nextTickIn?: number;
 	/** For DoT/HoT effects: number of ticks remaining */
 	ticksRemaining?: number;
 	/** For DoT/HoT effects: actual damage/heal amount per tick */

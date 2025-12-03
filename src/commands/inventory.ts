@@ -15,16 +15,18 @@
  * @module commands/inventory
  */
 
-import { CommandContext } from "../core/command.js";
+import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Item } from "../core/dungeon.js";
 import { Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { color, COLOR } from "../core/color.js";
+import { formatNumber } from "../utils/number.js";
 
 export default {
 	pattern: "inventory~",
+	priority: PRIORITY.HIGH,
 	execute(context: CommandContext): void {
 		const { actor } = context;
 
@@ -43,17 +45,15 @@ export default {
 
 		const lines = ["You are carrying:"];
 
-		if (unequippedItems.length === 0) {
+		if (unequippedItems.length === 0 && actor.value === 0) {
 			lines.push(" Nothing.");
 		} else {
 			// Format inventory list
-			const itemList = unequippedItems.map((item) => `${item.display}`);
-			lines.push(...itemList.map((item) => ` ${item}`));
+			const itemList = unequippedItems.map((item) => ` ${item.display}`);
+			lines.push(...itemList);
+			if (actor.value > 0)
+				lines.push(` ${color(`${formatNumber(actor.value)} gold`, COLOR.YELLOW)}`);
 		}
-
-		lines.push(
-			`You're carrying ${color(`${actor.value} gold`, COLOR.YELLOW)}.`
-		);
 
 		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},

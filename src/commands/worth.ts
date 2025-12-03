@@ -17,6 +17,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { color, COLOR } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
+import { formatNumber } from "../utils/number.js";
 
 export default {
 	pattern: "worth~",
@@ -26,7 +27,7 @@ export default {
 		const totalBaseExperience = actor.calculateTotalBaseExperience();
 
 		const lines = [
-			`${color("Gold:", COLOR.YELLOW)} ${actor.value}`,
+			`${color("Gold:", COLOR.YELLOW)} ${formatNumber(actor.value)}`,
 			`${color("Level:", COLOR.CYAN)} ${actor.level}`,
 			`${color("Experience:", COLOR.CYAN)} ${actor.experience}`,
 			`${color("Total Base Experience:", COLOR.CYAN)} ${totalBaseExperience}`,

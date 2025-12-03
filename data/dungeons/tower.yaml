@@ -540,6 +540,7 @@ dungeon:
       attributeBonuses: {strength: 20, agility: 20, intelligence: 20}
       roomDescription: The Guardian Force is lying here, humming with violence.
       weaponType: maul
+      value: 999
     - id: tower-helmet
       type: Armor
       keywords: helmet head armor
@@ -556,6 +557,7 @@ dungeon:
       race: nobility
       job: warrior
       level: 1
+      value: 999
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{13,16,1}'

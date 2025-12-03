@@ -112,9 +112,8 @@ export class JavaScriptCommandAdapter extends Command {
 	onError(context: CommandContext, result: ParseResult): void {
 		if (this.errorFunction) {
 			this.errorFunction(context, result);
-		} else {
-			logger.error(`Command error: ${result.error}`);
 		}
+		// If no error handler, do nothing - the registry will treat this as unmatched
 	}
 
 	override getActionCooldownMs(
@@ -204,9 +203,8 @@ export class YAMLCommandAdapter extends Command {
 				);
 				context.actor.sendLine(result.error ?? "Invalid command");
 			}
-		} else {
-			logger.error(`Command error: ${result.error}`);
 		}
+		// If no error handler, do nothing - the registry will treat this as unmatched
 	}
 }
 

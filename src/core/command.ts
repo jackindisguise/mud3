@@ -51,6 +51,10 @@ import { Character } from "./character.js";
 import { MESSAGE_GROUP } from "./character.js";
 import { forEachCharacter } from "../game.js";
 import logger from "../logger.js";
+import {
+	JavaScriptCommandAdapter,
+	YAMLCommandAdapter,
+} from "../package/commands.js";
 
 /**
  * Context provided to command execution.
@@ -921,6 +925,7 @@ export abstract class Command {
 	 */
 	private buildRegex(pattern: string): RegExp {
 		let regexStr = pattern;
+		const quotedStringReplacements: string[] = [];
 
 		// Replace optional patterns first (with ? suffix) - use placeholders to avoid escaping
 		regexStr = regexStr
@@ -936,10 +941,58 @@ export abstract class Command {
 			.replace(/<[^:>]+:number>/g, "___OPTIONAL_NUMBER___")
 			.replace(/<[^:>]+:[^>]+>/g, "___OPTIONAL_GENERIC___");
 
-		// Escape special regex characters in the literal parts
+		// Handle quoted string literals (both single and double quotes)
+		// This must happen before escaping special characters
+		// Pattern: 'text'~ or "text"~ for autocomplete, or 'text' or "text" for exact match
+		regexStr = regexStr.replace(
+			/(['"])([^'"]+)\1(~)?/g,
+			(match, quote, content, autocomplete) => {
+				const placeholder = `___QUOTED_STRING_${quotedStringReplacements.length}___`;
+
+				if (autocomplete === "~") {
+					// Build autocomplete pattern for the entire quoted string
+					// Match partial input from left to right
+					// Example: 'radiant burst'~ matches "r", "rad", "radiant", "radiant ", "radiant b", etc.
+					// Build pattern that matches progressively more characters
+					// For "radiant burst": r(?:a(?:d(?:i(?:a(?:n(?:t(?: (?:b(?:u(?:r(?:s(?:t)?)?)?)?)?)?)?)?)?)?)?)?)?
+					let charPattern = "";
+					for (let i = 0; i < content.length; i++) {
+						const char = content[i];
+						const escapedChar = char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+						if (i === 0) {
+							charPattern = escapedChar;
+						} else {
+							charPattern += `(?:${escapedChar}`;
+						}
+					}
+					charPattern += ")?".repeat(content.length - 1);
+
+					// Match either quoted or unquoted input
+					// User can type: r, rad, radiant burst, 'r', 'rad', 'radiant burst', "r", etc.
+					const escapedContent = content.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+					quotedStringReplacements.push(
+						`(?:['"]?${charPattern}['"]?|${escapedContent})`
+					);
+				} else {
+					// Exact match: match the literal text, optionally with quotes
+					// User can type: "is a" or 'is a' or is a
+					const escapedContent = content.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+					quotedStringReplacements.push(`(?:['"]?${escapedContent}['"]?)`);
+				}
+
+				return placeholder;
+			}
+		);
+
+		// Escape special regex characters in the remaining literal parts
 		regexStr = regexStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-		// Handle autocomplete suffix (~) for literal words
+		// Replace quoted string placeholders with their regex patterns
+		quotedStringReplacements.forEach((replacement, index) => {
+			regexStr = regexStr.replace(`___QUOTED_STRING_${index}___`, replacement);
+		});
+
+		// Handle autocomplete suffix (~) for literal words (non-quoted)
 		// Convert "word~" into a pattern that matches partial input
 		// Example: "ooc~" becomes "o(?:o(?:c)?)?" which matches "o", "oo", or "ooc"
 		regexStr = regexStr.replace(/([a-z]+)~/gi, (match, word) => {
@@ -1646,9 +1699,8 @@ export class AbilityCommand extends Command {
 	onError(context: CommandContext, result: ParseResult): void {
 		if (this.errorFunction) {
 			this.errorFunction(context, result);
-		} else {
-			logger.error(`Command error: ${result.error}`);
 		}
+		// If no error handler, do nothing - the registry will treat this as unmatched
 	}
 
 	override getActionCooldownMs(
@@ -1840,10 +1892,13 @@ export class CommandRegistry {
 				result.error !== "Input does not match pattern" &&
 				result.error !== "Input does not match command pattern"
 			) {
-				if (command.onError) {
-					command.onError(context, result);
+				// Check if command has a meaningful error handler
+				if (this.hasErrorHandler(command)) {
+					command.onError!(context, result);
+					return true;
 				}
-				return true;
+				// If onError is not implemented, continue searching other commands
+				continue;
 			}
 		}
 
@@ -1977,6 +2032,32 @@ export class CommandRegistry {
 			room:
 				actor.location instanceof Room ? (actor.location as Room) : undefined,
 		};
+	}
+
+	/**
+	 * Check if a command has a meaningful error handler.
+	 * For adapter commands, checks if they actually have an error handler configured.
+	 */
+	private hasErrorHandler(command: Command): boolean {
+		if (!command.onError) {
+			return false;
+		}
+		// Check if this is an adapter command and if it has an actual error handler configured
+		const commandType = command.constructor.name;
+		if (
+			command instanceof JavaScriptCommandAdapter ||
+			command instanceof AbilityCommand
+		) {
+			// Access private field via type assertion - this is a bit hacky but necessary
+			const adapter = command as any;
+			return !!adapter.errorFunction;
+		}
+		if (command instanceof YAMLCommandAdapter) {
+			const adapter = command as any;
+			return !!adapter.errorScript;
+		}
+		// For other command types, if onError exists, it's meaningful
+		return true;
 	}
 
 	/**

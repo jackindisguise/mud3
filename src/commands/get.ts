@@ -22,8 +22,9 @@
 
 import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Item, DungeonObject } from "../core/dungeon.js";
+import { Item, DungeonObject, Currency } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
+import { act } from "../act.js";
 
 function getItemFromRoom(
 	item: Item | undefined,
@@ -63,12 +64,37 @@ function getItemFromRoom(
 		return false;
 	}
 
+	// Handle Currency items specially - add value to mob and remove the item
+	if (item instanceof Currency) {
+		actor.value += item.value;
+		item.location = undefined; // Remove from room
+		act(
+			{
+				user: `You pick up ${item.display}.`,
+				room: `{User} picks up ${item.display}.`,
+			},
+			{
+				user: actor,
+				room: room,
+			}
+		);
+		actor.sendMessage(`You gain ${item.value} gold.`, MESSAGE_GROUP.ACTION);
+		return true;
+	}
+
 	// Move item to actor's inventory
 	actor.add(item);
 
-	actor.sendMessage(
-		`You pick up ${item.display}.`,
-		MESSAGE_GROUP.COMMAND_RESPONSE
+	act(
+		{
+			user: `You pick up ${item.display}.`,
+			room: `{User} picks up ${item.display}.`,
+		},
+		{
+			user: actor,
+			room: room,
+		},
+		{ messageGroup: MESSAGE_GROUP.ACTION }
 	);
 	return true;
 }
@@ -130,12 +156,37 @@ function getItemFromContainer(
 		return false;
 	}
 
+	// Handle Currency items specially - add value to mob and remove the item
+	if (item instanceof Currency) {
+		actor.value += item.value;
+		item.location = undefined; // Remove from container
+		act(
+			{
+				user: `You get ${item.display} from ${container.display}.`,
+				room: `{User} gets ${item.display} from ${container.display}.`,
+			},
+			{
+				user: actor,
+				room: room,
+			},
+			{ messageGroup: MESSAGE_GROUP.ACTION }
+		);
+		return true;
+	}
+
 	// Move item to actor's inventory
 	actor.add(item);
 
-	actor.sendMessage(
-		`You get ${item.display} from ${container.display}.`,
-		MESSAGE_GROUP.COMMAND_RESPONSE
+	act(
+		{
+			user: `You get ${item.display} from ${container.display}.`,
+			room: `{User} gets ${item.display} from ${container.display}.`,
+		},
+		{
+			user: actor,
+			room: room,
+		},
+		{ messageGroup: MESSAGE_GROUP.ACTION }
 	);
 	return true;
 }

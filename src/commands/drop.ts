@@ -18,15 +18,103 @@
 
 import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Item } from "../core/dungeon.js";
+import { Item, Currency } from "../core/dungeon.js";
 import { Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
+import { act } from "../act.js";
 
 export default {
 	pattern: "drop~ <item:item@inventory>",
+	aliases: ["drop~ <amount:number> gold?"],
 	execute(context: CommandContext, args: Map<string, any>): void {
-		const item = args.get("item") as Item;
+		const amount = args.get("amount") as number | undefined;
+		const item = args.get("item") as Item | undefined;
 		const { actor, room } = context;
+
+		// Handle currency drop pattern: "drop X gold/gil/etc"
+		if (amount !== undefined) {
+			// Check if actor is in a room
+			if (!room) {
+				actor.sendMessage(
+					"You are not in a room.",
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			// Validate amount
+			if (amount <= 0) {
+				actor.sendMessage(
+					"You must drop a positive amount of currency.",
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			// Check if actor has enough value
+			if ((actor.value || 0) < amount) {
+				actor.sendMessage(
+					`You don't have enough value. You have ${actor.value || 0}.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			// Create currency item and drop it
+			// Determine display string based on amount
+			const currencyName = "gold";
+			let keywords: string = currencyName;
+			let display: string;
+			let roomDescription: string;
+			if (amount === 1) {
+				display = `a single ${currencyName} coin.`;
+				roomDescription = `A single ${currencyName} coin is here.`;
+			} else if (amount < 10) {
+				display = `a few ${currencyName} coins.`;
+				roomDescription = `A few ${currencyName} coins are here.`;
+			} else if (amount <= 100) {
+				keywords += " pile";
+				display = `a pile of ${currencyName} coins.`;
+				roomDescription = `A pile of ${currencyName} coins are here.`;
+			} else {
+				keywords += " huge pile";
+				display = `a huge pile of ${currencyName} coins.`;
+				roomDescription = `A huge pile of ${currencyName} coins are here.`;
+			}
+
+			const currency = new Currency({
+				value: amount,
+				keywords: keywords,
+				display: display,
+				roomDescription: roomDescription,
+			});
+			room.add(currency);
+
+			// Deduct value from actor
+			actor.value = (actor.value || 0) - amount;
+
+			act(
+				{
+					user: `You drop ${currency.display}`,
+					room: `{User} drops ${currency.display}`,
+				},
+				{
+					user: actor,
+					room: room,
+				},
+				{ messageGroup: MESSAGE_GROUP.ACTION }
+			);
+			return;
+		}
+
+		// Handle regular item drop
+		if (!item) {
+			context.actor.sendMessage(
+				"You don't have that.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
 
 		// Check if actor is in a room
 		if (!room) {
@@ -61,9 +149,16 @@ export default {
 		// Move item to room
 		room.add(item);
 
-		actor.sendMessage(
-			`You drop ${item.display}.`,
-			MESSAGE_GROUP.COMMAND_RESPONSE
+		act(
+			{
+				user: `You drop ${item.display}.`,
+				room: `{User} drops ${item.display}.`,
+			},
+			{
+				user: actor,
+				room: room,
+			},
+			{ messageGroup: MESSAGE_GROUP.ACTION }
 		);
 	},
 

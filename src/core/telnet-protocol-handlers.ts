@@ -289,9 +289,6 @@ export class MCCP2Handler implements ProtocolHandler {
 			// Client accepts MCCP2 compression
 			if (state === "pending_send") {
 				manager.setState(this.option, "negotiated");
-				logger.info(
-					`MCCP2 negotiation (${address}): received IAC DO MCCP2, starting compression`
-				);
 				// Send subnegotiation to start compression: IAC SB MCCP2 IAC SE
 				this.startCompression(manager, socket);
 				if (this.onNegotiated) {
@@ -299,17 +296,11 @@ export class MCCP2Handler implements ProtocolHandler {
 				}
 			} else if (state === "negotiated") {
 				// Already negotiated, ignore duplicate
-				logger.debug(
-					`MCCP2 negotiation (${address}): received duplicate IAC DO MCCP2, ignoring`
-				);
 			}
 		} else if (command === IAC.DONT) {
 			// Client rejects MCCP2 compression
 			if (state === "pending_send" || state === "negotiated") {
 				manager.setState(this.option, "rejected");
-				logger.debug(
-					`MCCP2 negotiation (${address}): received IAC DON'T MCCP2, negotiation rejected`
-				);
 				this.onRejected?.(manager, socket);
 			}
 		}
@@ -337,9 +328,6 @@ export class MCCP2Handler implements ProtocolHandler {
 			IAC.SE,
 		]);
 		socket.write(startCompression);
-		logger.debug(
-			`MCCP2 (${manager.getAddress()}): sent subnegotiation to start compression`
-		);
 
 		// Create compression streams
 		const protocolData = manager.getData();
@@ -355,37 +343,15 @@ export class MCCP2Handler implements ProtocolHandler {
 		// Use setNoDelay to disable Nagle's algorithm for immediate transmission
 		socket.setNoDelay(true);
 		compressor.on("data", (chunk: Buffer) => {
-			logger.debug(
-				`MCCP2 compressor (${manager.getAddress()}): emitted ${
-					chunk.length
-				} bytes of compressed data`
-			);
 			if (!socket.destroyed && socket.writable) {
 				const flushed = socket.write(chunk);
-				logger.debug(
-					`MCCP2 compressor (${manager.getAddress()}): wrote ${
-						chunk.length
-					} bytes to socket, flushed: ${flushed}`
-				);
 				// If socket buffer is full, pause the compressor
 				if (!flushed) {
-					logger.debug(
-						`MCCP2 compressor (${manager.getAddress()}): socket buffer full, pausing compressor`
-					);
 					compressor.pause();
 					socket.once("drain", () => {
-						logger.debug(
-							`MCCP2 compressor (${manager.getAddress()}): socket drained, resuming compressor`
-						);
 						compressor.resume();
 					});
 				}
-			} else {
-				logger.debug(
-					`MCCP2 compressor (${manager.getAddress()}): socket not writable, ignoring ${
-						chunk.length
-					} bytes`
-				);
 			}
 		});
 
@@ -399,13 +365,6 @@ export class MCCP2Handler implements ProtocolHandler {
 		protocolData.mccp2.compressor = compressor;
 
 		// Write empty string to initialize/flush the compressor stream
-		logger.debug(
-			`MCCP2 compressor (${manager.getAddress()}): writing empty string to initialize stream`
-		);
-
-		logger.info(
-			`MCCP2 (${manager.getAddress()}): compression active - outgoing data will be compressed`
-		);
 	}
 
 	public handleSubnegotiation?(
@@ -414,21 +373,17 @@ export class MCCP2Handler implements ProtocolHandler {
 		socket: Socket
 	): void {
 		// MCCP2 clients may send subnegotiations, but we don't need to respond
-		// Just log it for debugging
-		logger.debug(
-			`MCCP2 (${manager.getAddress()}): received subnegotiation, ignoring`
-		);
 	}
 
 	public onNegotiated?(
 		manager: TelnetNegotiationManager,
 		socket: Socket
 	): void {
-		logger.info(`MCCP2 enabled for ${manager.getAddress()}`);
+		// MCCP2 enabled
 	}
 
 	public onRejected?(manager: TelnetNegotiationManager, socket: Socket): void {
-		logger.debug(`MCCP2 disabled for ${manager.getAddress()}`);
+		// MCCP2 disabled
 	}
 }
 

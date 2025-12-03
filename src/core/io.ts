@@ -283,18 +283,8 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		if (compressor) {
 			// Write as Buffer and flush immediately
 			const data = Buffer.from(escaped, "utf8");
-			logger.debug(
-				`MCCP2 (${this.getAddress()}): writing ${
-					data.length
-				} bytes to compressor`
-			);
 			compressor.write(data);
 			compressor.flush(constants.Z_SYNC_FLUSH);
-			logger.debug(
-				`MCCP2 (${this.getAddress()}): flushed compressor after writing ${
-					data.length
-				} bytes`
-			);
 		} else {
 			this.socket.write(escaped);
 		}

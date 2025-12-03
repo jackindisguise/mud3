@@ -35,6 +35,20 @@ function getProficiencyLevel(proficiency: number): string {
 	}
 }
 
+function getProficiencyColor(proficiency: number): COLOR {
+	if (proficiency === 100) {
+		return COLOR.YELLOW;
+	} else if (proficiency >= 75) {
+		return COLOR.LIME;
+	} else if (proficiency >= 50) {
+		return COLOR.DARK_GREEN;
+	} else if (proficiency >= 25) {
+		return COLOR.TEAL;
+	} else {
+		return COLOR.OLIVE;
+	}
+}
+
 function formatProficiency(proficiency: number): string {
 	// Format as "(XXX%)" with fixed width: "(  1%)", "( 80%)", "(100%)"
 	return `${proficiency.toString()}%`;
@@ -94,16 +108,7 @@ export default {
 		const abilityStrings: string[] = [];
 		for (const { name, proficiency } of abilityData) {
 			const level = getProficiencyLevel(proficiency);
-			const proficiencyColor =
-				proficiency === 100
-					? COLOR.YELLOW
-					: proficiency >= 75
-					? COLOR.LIME
-					: proficiency >= 50
-					? COLOR.DARK_GREEN
-					: proficiency >= 25
-					? COLOR.TEAL
-					: COLOR.GREY;
+			const proficiencyColor = getProficiencyColor(proficiency);
 
 			const abilityName = color(
 				string.pad(name, 18, string.ALIGN.CENTER),

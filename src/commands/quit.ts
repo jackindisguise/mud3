@@ -45,32 +45,20 @@ export default {
 		}
 
 		// Save the character
-		saveCharacter(character)
-			.then(() => {
-				actor.sendMessage(
-					"Character saved. Goodbye!",
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
+		saveCharacter(character);
+		actor.sendMessage(
+			"Character saved. Goodbye!",
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
 
-				// Close the client connection (this will trigger handleDisconnection
-				// which calls endPlayerSession and cleans up properly)
-				const client = character.session?.client;
-				if (client) {
-					// Small delay to ensure the save message is sent before disconnecting
-					setTimeout(() => {
-						client.close();
-					}, 100);
-				}
-			})
-			.catch((error) => {
-				actor.sendMessage(
-					"Error saving character. Please try again.",
-					MESSAGE_GROUP.COMMAND_RESPONSE
-				);
-				// Log the error but don't disconnect on save failure
-				logger.error(
-					`Failed to save character ${character.credentials.username}: ${error}`
-				);
-			});
+		// Close the client connection (this will trigger handleDisconnection
+		// which calls endPlayerSession and cleans up properly)
+		const client = character.session?.client;
+		if (client) {
+			// Small delay to ensure the save message is sent before disconnecting
+			setTimeout(() => {
+				client.close();
+			}, 100);
+		}
 	},
 } satisfies CommandObject;

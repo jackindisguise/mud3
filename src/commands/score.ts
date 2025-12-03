@@ -97,6 +97,9 @@ export default {
 					.toString()
 					.padStart(3, "0")
 					.padEnd(10)}`,
+				`${color("Gold:      ", COLOR.YELLOW)} ${actor.value
+					.toString()
+					.padStart(10, " ")}`,
 			],
 			width: 76,
 			sizer: SIZER,

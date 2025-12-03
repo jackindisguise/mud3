@@ -49,6 +49,15 @@ export default {
 			return;
 		}
 
+		// Check if container is an Item and has isContainer flag
+		if (container instanceof Item && !container.isContainer) {
+			actor.sendMessage(
+				`${container.display} is not a container.`,
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+
 		// Check if container is accessible (in room or in actor's inventory)
 		const containerLocation = container.location;
 		if (containerLocation !== room && containerLocation !== actor) {

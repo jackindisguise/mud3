@@ -25,6 +25,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { Item, DungeonObject, Currency } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
+import { formatNumber } from "../utils/number.js";
 
 function getItemFromRoom(
 	item: Item | undefined,
@@ -78,7 +79,7 @@ function getItemFromRoom(
 				room: room,
 			}
 		);
-		actor.sendMessage(`You gain ${item.value} gold.`, MESSAGE_GROUP.ACTION);
+		actor.sendMessage(`You gain ${formatNumber(item.value)} gold.`, MESSAGE_GROUP.ACTION);
 		return true;
 	}
 
@@ -137,6 +138,15 @@ function getItemFromContainer(
 		return false;
 	}
 
+	// Check if container is an Item and has isContainer flag
+	if (container instanceof Item && !container.isContainer) {
+		actor.sendMessage(
+			`${container.display} is not a container.`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return false;
+	}
+
 	// Check if container is accessible (in room or in actor's inventory)
 	const containerLocation = container.location;
 	if (containerLocation !== room && containerLocation !== actor) {
@@ -171,6 +181,7 @@ function getItemFromContainer(
 			},
 			{ messageGroup: MESSAGE_GROUP.ACTION }
 		);
+		actor.sendMessage(`You gain ${formatNumber(item.value)} gold.`, MESSAGE_GROUP.ACTION);
 		return true;
 	}
 

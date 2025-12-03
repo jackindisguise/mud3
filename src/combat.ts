@@ -11,7 +11,16 @@
  * @module combat
  */
 import { number } from "mud-ext";
-import { Mob, Room, Weapon, EQUIPMENT_SLOT, BEHAVIOR } from "./core/dungeon.js";
+import {
+	Mob,
+	Room,
+	Weapon,
+	EQUIPMENT_SLOT,
+	BEHAVIOR,
+	Prop,
+	Item,
+	Equipment,
+} from "./core/dungeon.js";
 import { MESSAGE_GROUP } from "./core/character.js";
 import {
 	color,
@@ -26,6 +35,7 @@ import logger from "./logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { act, damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
+import { createItem, createProp } from "./package/dungeon.js";
 import {
 	DEFAULT_HIT_TYPE,
 	getDamageMultiplier,
@@ -1069,6 +1079,36 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 		}
 	}
 
+	// Create corpse and move inventory/equipment to it
+	const corpse = createItem({
+		keywords: `corpse ${deadMob.keywords}`,
+		display: `the corpse of ${deadMob.display}`,
+		description: `The lifeless body of ${deadMob.display} lies here.`,
+		roomDescription: `The corpse of ${deadMob.display} is here.`,
+	});
+
+	// Get all inventory items (Items in contents)
+	const inventoryItems = deadMob.contents.filter(
+		(obj) => obj instanceof Item
+	) as Item[];
+
+	// Get all equipped items
+	const equippedItems = deadMob.getAllEquipped();
+
+	// Unequip all equipped items
+	for (const equipment of equippedItems) {
+		deadMob.unequip(equipment);
+	}
+
+	// Move all items (inventory + previously equipped) to corpse
+	const allItems = [...inventoryItems, ...equippedItems];
+	for (const item of allItems) {
+		corpse.add(item);
+	}
+
+	// Drop corpse in room (always drop it, even if empty)
+	room.add(corpse);
+
 	// delete NPCs
 	if (!deadMob.character) {
 		logger.debug("Destroying NPC mob", {
@@ -1091,8 +1131,6 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	} catch (error) {
 		logger.warn(`Failed to move ${deadMob.display} to graveyard: ${error}`);
 	}
-
-	// TODO: Handle loot, etc.
 }
 
 /**

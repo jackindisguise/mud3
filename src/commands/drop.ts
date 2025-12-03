@@ -22,13 +22,15 @@ import { Item, Currency } from "../core/dungeon.js";
 import { Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
+import logger from "../logger.js";
 
 export default {
 	pattern: "drop~ <item:item@inventory>",
-	aliases: ["drop~ <amount:number> gold?"],
+	aliases: ["drop~ <amount:number> gold"],
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const amount = args.get("amount") as number | undefined;
 		const item = args.get("item") as Item | undefined;
+		//logger.debug(`Drop command`, { amount, item });
 		const { actor, room } = context;
 
 		// Handle currency drop pattern: "drop X gold/gil/etc"

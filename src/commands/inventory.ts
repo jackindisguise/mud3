@@ -21,6 +21,7 @@ import { Item } from "../core/dungeon.js";
 import { Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../core/telnet.js";
+import { color, COLOR } from "../core/color.js";
 
 export default {
 	pattern: "inventory~",
@@ -40,19 +41,17 @@ export default {
 			(item) => !(item instanceof Equipment) || !equippedItems.includes(item)
 		);
 
+		const lines = [`${color("Gold:", COLOR.YELLOW)} ${actor.value}`];
+
 		if (unequippedItems.length === 0) {
-			actor.sendMessage(
-				"You are carrying nothing.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
+			lines.push("", "You are carrying nothing.");
+		} else {
+			// Format inventory list
+			const itemList = unequippedItems.map((item) => `${item.display}`);
+			lines.push("", "You are carrying:");
+			lines.push(...itemList);
 		}
 
-		// Format inventory list
-		const itemList = unequippedItems.map((item) => `${item.display}`);
-
-		const lines = ["You are carrying:"];
-		lines.push(...itemList);
 		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},
 } satisfies CommandObject;

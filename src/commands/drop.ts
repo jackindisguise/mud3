@@ -23,6 +23,7 @@ import { Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
 import logger from "../logger.js";
+import { createGold } from "../utils/currency.js";
 
 export default {
 	pattern: "drop~ <item:item@inventory>",
@@ -63,32 +64,8 @@ export default {
 			}
 
 			// Create currency item and drop it
-			// Determine display string based on amount
-			const currencyName = "gold";
-			let keywords: string = currencyName;
-			let display: string;
-			let roomDescription: string;
-			if (amount === 1) {
-				display = `a single ${currencyName} coin.`;
-				roomDescription = `A single ${currencyName} coin is here.`;
-			} else if (amount < 10) {
-				display = `a few ${currencyName} coins.`;
-				roomDescription = `A few ${currencyName} coins are here.`;
-			} else if (amount <= 100) {
-				keywords += " pile";
-				display = `a pile of ${currencyName} coins.`;
-				roomDescription = `A pile of ${currencyName} coins are here.`;
-			} else {
-				keywords += " huge pile";
-				display = `a huge pile of ${currencyName} coins.`;
-				roomDescription = `A huge pile of ${currencyName} coins are here.`;
-			}
-
-			const currency = new Currency({
-				value: amount,
-				keywords: keywords,
-				display: display,
-				roomDescription: roomDescription,
+			const currency = createGold(amount, {
+				includeRoomDescription: true,
 			});
 			room.add(currency);
 
@@ -97,8 +74,8 @@ export default {
 
 			act(
 				{
-					user: `You drop ${currency.display}`,
-					room: `{User} drops ${currency.display}`,
+					user: `You drop ${currency.display}.`,
+					room: `{User} drops ${currency.display}.`,
 				},
 				{
 					user: actor,

@@ -1722,6 +1722,7 @@ function hydrateSerializedDungeonObjectData(
 				: undefined,
 		baseWeight: data.baseWeight,
 		templateId: data.templateId,
+		value: data.value,
 	});
 }
 
@@ -2204,6 +2205,7 @@ export async function deserializeMob(
 	migrate: boolean = true,
 	parentVersion?: string
 ): Promise<Mob> {
+	logger.debug(`Deserializing Mob`, data);
 	const version = data.version || parentVersion;
 	logger.debug(
 		`Deserializing Mob${data.keywords ? `: "${data.keywords}"` : ""} (race: ${
@@ -2225,11 +2227,14 @@ export async function deserializeMob(
 		}
 	}
 
+	logger.debug(`Migrated data`, migratedData);
 	const normalized = normalizeSerializedData(migratedData) as SerializedMob;
+	logger.debug(`Normalized data`, normalized);
 	const { equipped, learnedAbilities: learnedAbilitiesData, type } = normalized;
 
 	// Use hydration function to convert serialized data to MobOptions
 	const mobOptions = hydrateSerializedMobData(normalized);
+	logger.debug(`Mob options`, mobOptions);
 
 	const mob = new Mob(mobOptions);
 	logger.debug(`Mob instance created successfully`);

@@ -5672,6 +5672,52 @@ export class Mob extends Movable {
 	}
 
 	/**
+	 * Calculates the total base experience required to reach the current level.
+	 * This accounts for growth modifiers at each level, which reduce the effective
+	 * experience gained. The calculation iterates through each level from 1 to
+	 * current-1 and calculates how much base experience was needed to gain 100
+	 * adjusted experience at each level.
+	 *
+	 * @returns Total base experience required to reach current level
+	 *
+	 * @example
+	 * ```typescript
+	 * const mob = new Mob({ level: 5, experience: 50 });
+	 * const baseXP = mob.calculateTotalBaseExperience();
+	 * console.log(`You've earned ${baseXP} base experience to reach level 5`);
+	 * ```
+	 */
+	public calculateTotalBaseExperience(): number {
+		const EXPERIENCE_THRESHOLD = 100;
+		let totalBaseExperience = 0;
+
+		// Calculate base experience for each level from 1 to current-1
+		for (let level = 1; level < this._level; level++) {
+			const raceModifier = evaluateGrowthModifier(
+				this._race.growthModifier,
+				level
+			);
+			const jobModifier = evaluateGrowthModifier(
+				this._job.growthModifier,
+				level
+			);
+			const combinedModifier = raceModifier * jobModifier;
+			const modifier = combinedModifier > 0 ? combinedModifier : 1;
+
+			// To gain 100 adjusted experience at this level, need baseExperience = 100 * modifier
+			totalBaseExperience += EXPERIENCE_THRESHOLD * modifier;
+		}
+
+		// Add base experience for current level's current experience
+		if (this._experience > 0) {
+			const currentModifier = this.resolveGrowthModifier();
+			totalBaseExperience += this._experience * currentModifier;
+		}
+
+		return Math.floor(totalBaseExperience);
+	}
+
+	/**
 	 * Gets the current level of this mob.
 	 * Level affects attribute growth and experience requirements.
 	 *

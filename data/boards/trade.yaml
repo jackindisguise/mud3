@@ -3,4 +3,5 @@ displayName: Trade
 description: Trade!
 permanent: false
 expirationMs: 604800000
+writePermission: all
 nextMessageId: 1

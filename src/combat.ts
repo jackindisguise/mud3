@@ -10,7 +10,7 @@
  *
  * @module combat
  */
-
+import { number } from "mud-ext";
 import { Mob, Room, Weapon, EQUIPMENT_SLOT, BEHAVIOR } from "./core/dungeon.js";
 import { MESSAGE_GROUP } from "./core/character.js";
 import {
@@ -26,9 +26,38 @@ import logger from "./logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { act, damageMessage } from "./act.js";
 import { showRoom } from "./commands/look.js";
-import { DEFAULT_HIT_TYPE, getDamageMultiplier } from "./core/damage-types.js";
+import {
+	DEFAULT_HIT_TYPE,
+	getDamageMultiplier,
+	HitType,
+} from "./core/damage-types.js";
 import { ability as PURE_POWER } from "./abilities/pure-power.js";
+import { ability as SECOND_ATTACK } from "./abilities/second-attack.js";
+import { ability as THIRD_ATTACK } from "./abilities/third-attack.js";
 import { string } from "mud-ext";
+import {
+	EFFECT_DAMAGE_CATEGORY,
+	EffectInstance,
+	isDamageOverTimeEffect,
+} from "./core/effect.js";
+
+/**
+ * Options for damage variation.
+ */
+export interface DamageVariationOptions {
+	/** Variation range as a percentage (default: 5%). A value of 5 means ±2.5% (97.5% to 102.5%) */
+	variationRange?: number;
+	/** Minimum damage multiplier (default: calculated from variationRange) */
+	minMultiplier?: number;
+	/** Maximum damage multiplier (default: calculated from variationRange) */
+	maxMultiplier?: number;
+	/** Modifier to apply to the general variation range */
+	variationRangeModifier?: number;
+	/** Modifier to apply to the minimum multiplier */
+	minMultiplierModifier?: number;
+	/** Modifier to apply to the maximum multiplier */
+	maxMultiplierModifier?: number;
+}
 
 /**
  * Options for the oneHit function.
@@ -48,6 +77,30 @@ export interface OneHitOptions {
 	attackPowerBonus?: number;
 	/** Optional multiplier to apply to attack power before damage calculation */
 	attackPowerMultiplier?: number;
+	/** Optional damage variation options */
+	damageVariation?: DamageVariationOptions;
+}
+
+/**
+ * Options for the oneMagicHit function.
+ */
+export interface OneMagicHitOptions {
+	/** The mob performing the magical attack */
+	attacker: Mob;
+	/** The mob being hit */
+	target: Mob;
+	/** If true, the attack will never miss (guaranteed hit) */
+	guaranteedHit?: boolean;
+	/** Ability name to use in damage messages (required - magical attacks are always tied to specific abilities) */
+	abilityName: string;
+	/** Optional hit type to use for the magical attack */
+	hitType?: HitType;
+	/** Optional flat bonus to add to spell power before damage calculation */
+	spellPowerBonus?: number;
+	/** Optional multiplier to apply to spell power before damage calculation */
+	spellPowerMultiplier?: number;
+	/** Optional damage variation options */
+	damageVariation?: DamageVariationOptions;
 }
 
 /**
@@ -106,6 +159,11 @@ export function oneHit(options: OneHitOptions): number {
 	// Verify target is in the same room
 	if (target.location !== room) {
 		return 0; // Target not in same room
+	}
+
+	// Check if target is dead or destroyed
+	if (target.health <= 0) {
+		return 0; // Target is dead
 	}
 
 	// Check if attack hits (accuracy vs avoidance)
@@ -169,6 +227,9 @@ export function oneHit(options: OneHitOptions): number {
 	// Apply attack power bonus and multiplier (from abilities, etc.)
 	damage = (damage + attackPowerBonus) * finalAttackPowerMultiplier;
 
+	// vary damage based on options
+	damage = applyDamageVariation(damage, options.damageVariation);
+
 	// Apply defense reduction
 	const defenseReduction = target.defense * 0.05; // 5% damage reduction per defense point
 	damage = Math.max(0, Math.floor(damage - defenseReduction));
@@ -206,7 +267,10 @@ export function oneHit(options: OneHitOptions): number {
 		}
 	}
 
-	const finalDamage = Math.floor(damage);
+	let finalDamage = Math.floor(damage);
+
+	// Apply damage variation
+	finalDamage = applyDamageVariation(finalDamage, options.damageVariation);
 
 	// Send combat messages
 	const damageStr = color(String(finalDamage), COLOR.CRIMSON);
@@ -236,35 +300,35 @@ export function oneHit(options: OneHitOptions): number {
 
 	if (finalDamage <= 0) {
 		if (abilityName) {
-			userMsg = `{RYour{x ${abilityName}'s ${verb} {target}, having no effect!`;
+			userMsg = `Your ${abilityName}'s ${verb} {R{target}{x, having no effect!`;
 			targetMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {Ryou{x, having no effect!`;
-			roomMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {target}, having no effect!`;
+			roomMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {R{target}{x, having no effect!`;
 		} else if (weaponName) {
-			userMsg = `{RYou{x ${weaponName}'s ${verb} does absolutely nothing to {target}!`;
+			userMsg = `You ${weaponName}'s ${verb} does absolutely nothing to {R{target}{x!`;
 			targetMsg = `{User}'s ${weaponName}'s ${verbThirdPerson} does absolutely nothing to {Ryou{x!`;
-			roomMsg = `{User}'s ${weaponName}'s ${verbThirdPerson} does absolutely nothing to {target}!`;
+			roomMsg = `{User}'s ${weaponName}'s ${verbThirdPerson} does absolutely nothing to {R{target}{x!`;
 		} else {
-			userMsg = `{RYou{x ${verb} {target}, doing absolutely nothing!`;
+			userMsg = `You ${verb} {R{target}{x, doing absolutely nothing!`;
 			targetMsg = `{User} ${verbThirdPerson} {Ryou{x, doing absolutely nothing!`;
-			roomMsg = `{User} ${verbThirdPerson} {target}, doing absolutely nothing!`;
+			roomMsg = `{User} ${verbThirdPerson} {R{target}{x, doing absolutely nothing!`;
 		}
 	} else if (abilityName) {
 		// With ability: ability is the subject, always use "hits"
-		userMsg = `{RYour{x ${abilityName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+		userMsg = `Your ${abilityName} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
 		targetMsg = `{User}'s ${abilityName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-		roomMsg = `{User}'s ${abilityName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+		roomMsg = `{User}'s ${abilityName} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
 	} else if (weaponName) {
 		// With weapon: weapon is the subject, so always use third person
-		userMsg = `{RYour{x ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+		userMsg = `Your ${weaponName} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
 		targetMsg = `{User}'s ${weaponName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-		roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+		roomMsg = `{User}'s ${weaponName} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
 	} else {
 		// Without weapon: user is the subject
 		// First person (user sees): "You punch"
-		userMsg = `{RYou{x ${verb} {target} for ${damageStr} damage!`;
+		userMsg = `You ${verb} {R{target}{x for ${damageStr} damage!`;
 		// Third person (target/room see): "{User} punches"
 		targetMsg = `{User} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
-		roomMsg = `{User} ${verbThirdPerson} {target} for ${damageStr} damage!`;
+		roomMsg = `{User} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
 	}
 
 	damageMessage(
@@ -284,7 +348,366 @@ export function oneHit(options: OneHitOptions): number {
 	);
 
 	// Deal the damage (this handles threat generation, death, and combat initiation)
-	target.damage(attacker, finalDamage);
+	// Pass damage type for shield filtering
+	target.damage(attacker, finalDamage, hitType.damageType);
+
+	logger.debug("Combat hit", {
+		attacker: attacker.display,
+		attackerId: attacker.oid,
+		target: target.display,
+		targetId: target.oid,
+		damage: finalDamage,
+		targetHealth: target.health,
+	});
+
+	return finalDamage;
+}
+
+/**
+ * Performs a magical hit attempt against a target, checking accuracy and dealing damage if successful.
+ * This function is for magical attacks and uses spell power and resilience instead of attack power and defense.
+ * It checks accuracy vs avoidance, and if the hit succeeds, calculates damage based on spell power,
+ * resilience, critical hits, and damage type relationships. It also handles threat generation and death
+ * if the target's health reaches 0.
+ *
+ * @param options Options for the magical hit, including attacker, target, and spell power modifiers
+ * @returns The damage amount that was dealt (0 if missed, otherwise >= 0)
+ *
+ * @example
+ * ```typescript
+ * const attacker = new Mob();
+ * const defender = new Mob();
+ * const hitType = COMMON_HIT_TYPES.get("burn")!;
+ *
+ * // oneMagicHit handles accuracy checks internally
+ * const damage = oneMagicHit({
+ *   attacker: attacker,
+ *   target: defender,
+ *   hitType: hitType,
+ *   spellPowerMultiplier: 1.5
+ * });
+ * // Damage has already been dealt and messages sent (or miss message if missed)
+ * ```
+ */
+export function oneMagicHit(options: OneMagicHitOptions): number {
+	const {
+		attacker,
+		target,
+		guaranteedHit = false,
+		abilityName,
+		hitType = DEFAULT_HIT_TYPE,
+		spellPowerBonus = 0,
+		spellPowerMultiplier = 1,
+	} = options;
+
+	// Get the room where combat is occurring
+	const room = attacker.location;
+	if (!room || !(room instanceof Room)) {
+		return 0; // Can't hit if not in a room
+	}
+
+	// Verify target is in the same room
+	if (target.location !== room) {
+		return 0; // Target not in same room
+	}
+
+	// Check if target is dead or destroyed
+	if (target.health <= 0) {
+		return 0; // Target is dead
+	}
+
+	// Check if attack hits (accuracy vs avoidance)
+	// Skip miss check if guaranteedHit is true
+	if (!guaranteedHit) {
+		// Base hit chance is 50%, modified by the difference between accuracy and avoidance
+		// accuracy 10 vs avoidance 10 = 50% hit chance
+		const hitChance = 50 + (attacker.accuracy - target.avoidance);
+		// Clamp hit chance to reasonable bounds (5% to 95%)
+		const clampedHitChance = Math.max(5, Math.min(95, hitChance));
+		const roll = Math.random() * 100;
+
+		if (roll > clampedHitChance) {
+			// Miss - send miss message
+			act(
+				{
+					user: `Your ${abilityName} misses {R{target}{x!`,
+					target: `{User}'s ${abilityName} misses {Ryou{x!`,
+					room: `{User}'s ${abilityName} misses {R{target}{x!`,
+				},
+				{
+					user: attacker,
+					target: target,
+					room: room,
+				},
+				{ messageGroup: MESSAGE_GROUP.COMBAT }
+			);
+			return 0;
+		}
+	}
+
+	// Attack hits - proceed with damage calculation
+	// Calculate base damage using spell power
+	const baseSpellPower = attacker.spellPower;
+	let damage = baseSpellPower;
+
+	// Apply spell power bonus and multiplier (from abilities, etc.)
+	damage = (damage + spellPowerBonus) * spellPowerMultiplier;
+
+	// Apply resilience reduction (magical resistance)
+	const resilienceReduction = target.resilience * 0.05; // 5% damage reduction per resilience point
+	damage = Math.max(0, Math.floor(damage - resilienceReduction));
+
+	// Check for critical hit (using critRate, same as physical attacks)
+	if (Math.random() * 100 < attacker.critRate) {
+		damage *= 2;
+	}
+
+	// Apply damage type relationships (resist, immune, vulnerable)
+	const targetRelationships = target.getDamageRelationships();
+	const damageMultiplier = getDamageMultiplier(
+		hitType.damageType,
+		targetRelationships
+	);
+	damage *= damageMultiplier;
+
+	// Apply effect modifiers
+	// Check for outgoing damage multiplier on attacker
+	for (const effect of attacker.getEffects()) {
+		if (
+			effect.template.type === "passive" &&
+			effect.template.outgoingDamageMultiplier !== undefined
+		) {
+			damage *= effect.template.outgoingDamageMultiplier;
+		}
+	}
+	// Check for incoming damage multiplier on target
+	for (const effect of target.getEffects()) {
+		if (
+			effect.template.type === "passive" &&
+			effect.template.incomingDamageMultiplier !== undefined
+		) {
+			damage *= effect.template.incomingDamageMultiplier;
+		}
+	}
+
+	let finalDamage = Math.floor(damage);
+
+	// Send combat messages
+	const damageStr = color(String(finalDamage), COLOR.CRIMSON);
+
+	// Get verb forms for different perspectives
+	const verbBase = hitType.verb; // First person: "You burn"
+	const verbThirdPersonBase = hitType.verbThirdPerson; // Third person: "burns"
+
+	// Color the verbs based on hit type color (default to WHITE)
+	const verbColor = hitType.color ?? COLOR.WHITE;
+	const verb = color(verbBase, verbColor);
+	const verbThirdPerson = color(verbThirdPersonBase, verbColor);
+
+	// Build message templates - ability name is always required for magical attacks
+	let userMsg: string;
+	let targetMsg: string;
+	let roomMsg: string;
+
+	if (finalDamage <= 0) {
+		userMsg = `Your ${abilityName}'s ${verb} {R{target}{x, having no effect!`;
+		targetMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {Ryou{x, having no effect!`;
+		roomMsg = `{User}'s ${abilityName}'s ${verbThirdPerson} {R{target}{x, having no effect!`;
+	} else {
+		// With ability: ability is the subject, always use third person
+		userMsg = `Your ${abilityName} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
+		targetMsg = `{User}'s ${abilityName} ${verbThirdPerson} {Ryou{x for ${damageStr} damage!`;
+		roomMsg = `{User}'s ${abilityName} ${verbThirdPerson} {R{target}{x for ${damageStr} damage!`;
+	}
+
+	damageMessage(
+		{
+			user: userMsg,
+			target: targetMsg,
+			room: roomMsg,
+		},
+		{
+			user: attacker,
+			target: target,
+			room: room,
+		},
+		target,
+		finalDamage,
+		{ messageGroup: MESSAGE_GROUP.COMBAT }
+	);
+
+	// Deal the damage (this handles threat generation, death, and combat initiation)
+	// Pass damage type for shield filtering
+	target.damage(attacker, finalDamage, hitType.damageType);
+
+	logger.debug("Combat hit (magical)", {
+		attacker: attacker.display,
+		attackerId: attacker.oid,
+		target: target.display,
+		targetId: target.oid,
+		damage: finalDamage,
+		abilityName,
+		targetHealth: target.health,
+	});
+
+	return finalDamage;
+}
+
+/**
+ * Options for processing effect damage.
+ */
+export interface ProcessEffectDamageOptions {
+	/** The mob taking damage from the effect */
+	target: Mob;
+	/** The effect instance dealing the damage */
+	effect: EffectInstance;
+	/** The base damage amount before mitigation */
+	damage: number;
+	/** Optional damage variation options */
+	damageVariation?: DamageVariationOptions;
+}
+
+/**
+ * Default damage variation range as a percentage (default: 20%). A value of 20 means ±10% (90% to 110%)
+ */
+export const DEFAULT_DAMAGE_VARIATION_RANGE = 20;
+
+/**
+ * Applies damage variation to a damage value.
+ * Default variation is 5% (97.5% to 102.5% of initial damage).
+ * Minimum damage is always at least 1 less than initial damage, maximum is always at least 1 more.
+ *
+ * @param damage The base damage value to apply variation to
+ * @param options Optional damage variation configuration
+ * @returns The damage value after applying variation
+ */
+export function applyDamageVariation(
+	damage: number,
+	options?: DamageVariationOptions
+): number {
+	if (damage <= 0) {
+		return damage;
+	}
+
+	const variationRange =
+		(options?.variationRange ?? DEFAULT_DAMAGE_VARIATION_RANGE) +
+		(options?.variationRangeModifier ?? 0);
+
+	// Calculate base multipliers from variation range
+	// A range of 5% means -2.5% to +2.5%, so 0.975 to 1.025
+	const baseMinMultiplier = 1 - variationRange / 200;
+	const baseMaxMultiplier = 1 + variationRange / 200;
+
+	// Apply individual modifiers if provided, otherwise use base multipliers
+	let minMultiplier = options?.minMultiplier ?? baseMinMultiplier;
+	if (options?.minMultiplierModifier !== undefined) {
+		minMultiplier += options.minMultiplierModifier;
+	}
+
+	let maxMultiplier = options?.maxMultiplier ?? baseMaxMultiplier;
+	if (options?.maxMultiplierModifier !== undefined) {
+		maxMultiplier += options.maxMultiplierModifier;
+	}
+
+	// Calculate minimum and maximum damage values
+	const minDamageFromMultiplier = Math.floor(damage * minMultiplier);
+	const maxDamageFromMultiplier = Math.floor(damage * maxMultiplier);
+
+	// Maximum minimum damage is the base damage itself
+	const actualMinDamage = Math.min(minDamageFromMultiplier, damage);
+
+	// Minimum maximum damage is the base damage itself
+	const actualMaxDamage = Math.max(maxDamageFromMultiplier, damage);
+
+	// Ensure min is not greater than max
+	const finalMinDamage = Math.max(
+		0,
+		Math.min(actualMinDamage, actualMaxDamage)
+	);
+	const finalMaxDamage = Math.max(actualMinDamage, actualMaxDamage);
+
+	// Apply random variation
+	const randomDamage = number.randomInt(finalMinDamage, finalMaxDamage);
+	return Math.floor(randomDamage);
+}
+
+/**
+ * Processes damage from an effect (DoT).
+ * Effects don't come from an attacker - they come from the effect itself.
+ * This function handles damage calculation using the appropriate defense attribute
+ * (defense for physical, resilience for magical) based on the effect's damage category.
+ * Effect damage cannot miss, and messages are handled by the effect's onTick template.
+ *
+ * @param options Options for processing effect damage
+ * @returns The final damage amount that was dealt (after mitigation)
+ *
+ * @example
+ * ```typescript
+ * const mob = new Mob();
+ * const effect = mob.getEffectsById("poison")[0];
+ * const damage = processEffectDamage({
+ *   target: mob,
+ *   effect: effect,
+ *   damage: 10
+ * });
+ * // Damage has been dealt and messages sent via effect's onTick template
+ * ```
+ */
+export function processEffectDamage(
+	options: ProcessEffectDamageOptions
+): number {
+	const { target, effect, damage: baseDamage } = options;
+
+	if (baseDamage <= 0) {
+		return 0;
+	}
+
+	// Only process DoT effects
+	if (!isDamageOverTimeEffect(effect.template)) {
+		return 0;
+	}
+
+	const template = effect.template;
+	let damage = baseDamage;
+
+	// Apply mitigation based on damage category
+	if (template.damageCategory === EFFECT_DAMAGE_CATEGORY.PHYSICAL) {
+		// Physical damage uses defense
+		const defenseReduction = target.defense * 0.05; // 5% damage reduction per defense point
+		damage = Math.max(0, Math.floor(damage - defenseReduction));
+	} else {
+		// Magical damage uses resilience
+		const resilienceReduction = target.resilience * 0.05; // 5% damage reduction per resilience point
+		damage = Math.max(0, Math.floor(damage - resilienceReduction));
+	}
+
+	// Apply damage type relationships (resist, immune, vulnerable)
+	const targetRelationships = target.getDamageRelationships();
+	const damageMultiplier = getDamageMultiplier(
+		template.hitType.damageType,
+		targetRelationships
+	);
+	damage *= damageMultiplier;
+
+	// Apply effect modifiers
+	// Check for incoming damage multiplier on target
+	for (const targetEffect of target.getEffects()) {
+		if (
+			targetEffect.template.type === "passive" &&
+			targetEffect.template.incomingDamageMultiplier !== undefined
+		) {
+			damage *= targetEffect.template.incomingDamageMultiplier;
+		}
+	}
+
+	let finalDamage = Math.floor(damage);
+
+	// Apply damage variation
+	finalDamage = applyDamageVariation(finalDamage, options.damageVariation);
+
+	// Deal the damage (this handles threat generation, death, and combat initiation)
+	// Pass damage type for shield filtering
+	target.damage(effect.caster, finalDamage, template.hitType.damageType);
 
 	return finalDamage;
 }
@@ -339,6 +762,14 @@ export function removeFromCombatQueue(mob: Mob): void {
 	const wasInCombat = combatQueue.has(mob);
 	combatQueue.delete(mob);
 
+	if (wasInCombat) {
+		logger.debug("Mob removed from combat queue", {
+			mob: mob.display,
+			mobId: mob.oid,
+			stillInCombat: mob.isInCombat(),
+		});
+	}
+
 	// If this is a player character that just exited combat and has combat busy mode enabled,
 	// dump their queued messages
 	if (
@@ -391,6 +822,11 @@ export function handleNPCLeavingCombat(npc: Mob): void {
 		return;
 	}
 
+	// Don't process dead NPCs
+	if (npc.health <= 0) {
+		return;
+	}
+
 	const npcRoom = npc.location;
 	if (!(npcRoom instanceof Room)) {
 		return;
@@ -431,6 +867,11 @@ export function handleNPCLeavingCombat(npc: Mob): void {
  */
 export function processThreatSwitching(npc: Mob): void {
 	if (!npc.threatTable || npc.character) {
+		return;
+	}
+
+	// Don't process dead NPCs
+	if (npc.health <= 0) {
 		return;
 	}
 
@@ -508,6 +949,14 @@ const deathColorRepeatingTransformer = repeatingColorStringTransformer(
  * ```
  */
 export function handleDeath(deadMob: Mob, killer?: Mob): void {
+	logger.debug("Mob dying", {
+		deadMob: deadMob.display,
+		deadMobId: deadMob.oid,
+		killer: killer?.display,
+		killerId: killer?.oid,
+		isCharacter: !!deadMob.character,
+	});
+
 	const room = deadMob.location;
 	if (!room || !(room instanceof Room)) {
 		return; // Can't handle death if not in a room
@@ -519,10 +968,14 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	// Clear threat table
 	deadMob.clearThreatTable();
 
-	// Remove threat from other mobs' threat tables
+	// Remove threat from other mobs' threat tables and clear their combatTarget if they were targeting the dead mob
 	for (const mob of room.contents) {
 		if (mob instanceof Mob) {
 			mob.removeThreat(deadMob);
+			// Clear combatTarget if this mob was targeting the dead mob
+			if (mob.combatTarget === deadMob) {
+				mob.combatTarget = undefined;
+			}
 		}
 	}
 
@@ -617,6 +1070,10 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 
 	// delete NPCs
 	if (!deadMob.character) {
+		logger.debug("Destroying NPC mob", {
+			mob: deadMob.display,
+			mobId: deadMob.oid,
+		});
 		deadMob.destroy();
 		return;
 	}
@@ -660,6 +1117,12 @@ function processMobCombatRound(mob: Mob): void {
 		return;
 	}
 
+	// Check if target is dead or destroyed
+	if (mob.combatTarget.health <= 0) {
+		mob.combatTarget = undefined;
+		return;
+	}
+
 	// Process threat switching for NPCs
 	if (!mob.character) {
 		processThreatSwitching(mob);
@@ -679,6 +1142,28 @@ function processMobCombatRound(mob: Mob): void {
 	const weaponOff = offHand instanceof Weapon ? offHand : undefined;
 	if (weaponOff)
 		oneHit({ attacker: mob, target: mob.combatTarget, weapon: weaponOff });
+
+	// second attack: extra round of attacks
+	if (
+		mob.knowsAbilityById(SECOND_ATTACK.id) &&
+		mob.combatTarget &&
+		mob.combatTarget.health > 0
+	) {
+		oneHit({ attacker: mob, target: mob.combatTarget, weapon });
+		if (weaponOff)
+			oneHit({ attacker: mob, target: mob.combatTarget, weapon: weaponOff });
+	}
+
+	// third attack: extra round of attacks
+	if (
+		mob.knowsAbilityById(THIRD_ATTACK.id) &&
+		mob.combatTarget &&
+		mob.combatTarget.health > 0
+	) {
+		oneHit({ attacker: mob, target: mob.combatTarget, weapon });
+		if (weaponOff)
+			oneHit({ attacker: mob, target: mob.combatTarget, weapon: weaponOff });
+	}
 }
 
 /**
@@ -720,6 +1205,19 @@ export function initiateCombat(
 	if (attacker.combatTarget === defender) {
 		return;
 	}
+
+	// Prevent dead mobs from initiating combat
+	if (attacker.health <= 0 || defender.health <= 0) {
+		return;
+	}
+
+	logger.debug("Combat initiated", {
+		attacker: attacker.display,
+		attackerId: attacker.oid,
+		defender: defender.display,
+		defenderId: defender.oid,
+		reaction,
+	});
 
 	const originalTarget = attacker.combatTarget;
 	const room =

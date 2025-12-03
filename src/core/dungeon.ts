@@ -75,7 +75,7 @@ import {
 } from "../registry/dungeon.js";
 import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
-import { act } from "../act.js";
+import { act, damageMessage } from "../act.js";
 import { forEachCharacter } from "../game.js";
 import {
 	removeFromCombatQueue,
@@ -93,16 +93,21 @@ import {
 	PHYSICAL_DAMAGE_TYPE,
 	mergeDamageRelationships,
 	DamageTypeRelationships,
+	DAMAGE_TYPE,
 } from "./damage-types.js";
 import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
+import { getAbilityById } from "../registry/ability.js";
 import { addToRegenerationSet } from "../regeneration.js";
 import {
 	EffectInstance,
 	EffectTemplate,
+	EffectOverrides,
 	isPassiveEffect,
 	isDamageOverTimeEffect,
 	isHealOverTimeEffect,
+	isShieldEffect,
+	isEffectExpired,
 	SerializedEffect,
 } from "./effect.js";
 import {
@@ -1113,6 +1118,23 @@ export interface SerializedMob extends SerializedDungeonObject {
 	learnedAbilities?: Record<string, number>;
 	/** Active effects (excluding archetype passives) */
 	effects?: SerializedEffect[];
+}
+
+/**
+ * Represents the changes that occurred when a mob leveled up.
+ * Contains before/after comparisons of attributes, capacities, and newly learned abilities.
+ */
+export interface LevelUpChanges {
+	oldPrimary: Readonly<PrimaryAttributeSet>;
+	newPrimary: Readonly<PrimaryAttributeSet>;
+	oldSecondary: Readonly<SecondaryAttributeSet>;
+	newSecondary: Readonly<SecondaryAttributeSet>;
+	oldMaxHealth: number;
+	newMaxHealth: number;
+	oldMaxMana: number;
+	newMaxMana: number;
+	newLevel: number;
+	newlyLearnedAbilities: Ability[];
 }
 
 /**
@@ -4476,6 +4498,10 @@ export class Mob extends Movable {
 		// Initialize effects before recalculateDerivedAttributes (which iterates over effects)
 		this._effects = new Set<EffectInstance>();
 
+		// Initialize learned abilities map BEFORE experience setter
+		this._learnedAbilities = new Map<Ability, number>();
+		this._proficiencySnapshot = new Map<string, number>();
+
 		this._race = options.race;
 		this._job = options.job;
 		const providedLevel = Math.floor(Number(options?.level ?? 1));
@@ -4503,10 +4529,6 @@ export class Mob extends Movable {
 				}
 			}
 		}
-
-		// Initialize learned abilities map (ability id -> uses)
-		this._learnedAbilities = new Map<Ability, number>();
-		this._proficiencySnapshot = new Map<string, number>();
 		// Note: learnedAbilities from options should be provided as Map<Ability, number>
 		// For deserialization, abilities are resolved in package layer
 		if (options?.learnedAbilities) {
@@ -4520,6 +4542,9 @@ export class Mob extends Movable {
 		// Apply archetype passive effects (race and job passives)
 		// Note: _effects is already initialized earlier in constructor
 		this.applyArchetypePassives();
+
+		// Check and teach archetype abilities for starting level
+		this.checkArchetypeAbilities();
 
 		// Initialize combat properties
 		// Only NPCs (mobs without a character) have threat tables
@@ -5215,6 +5240,8 @@ export class Mob extends Movable {
 
 		// Handle Mob-specific properties
 		const mobTemplate = template as MobTemplate;
+
+		// Apply properties that might trigger attribute recalculation
 		if (mobTemplate.level !== undefined) {
 			this.level = mobTemplate.level;
 		}
@@ -5227,15 +5254,22 @@ export class Mob extends Movable {
 		if (mobTemplate.resourceBonuses !== undefined) {
 			this.setResourceBonuses(mobTemplate.resourceBonuses);
 		}
+
+		// Apply health/mana if explicitly set in template (after potential recalculation)
 		if (mobTemplate.health !== undefined) {
 			this.health = mobTemplate.health;
+		} else {
+			this.health = this.maxHealth;
 		}
 		if (mobTemplate.mana !== undefined) {
 			this.mana = mobTemplate.mana;
+		} else {
+			this.mana = this.maxMana;
 		}
 		if (mobTemplate.exhaustion !== undefined) {
 			this.exhaustion = mobTemplate.exhaustion;
 		}
+
 		if (mobTemplate.behaviors !== undefined) {
 			// Apply behavior flags from template
 			for (const [key, value] of Object.entries(mobTemplate.behaviors)) {
@@ -5429,11 +5463,159 @@ export class Mob extends Movable {
 		this.exhaustion = this.exhaustion;
 	}
 
-	private applyLevelDelta(delta: number): void {
-		if (delta === 0) return;
+	private applyLevelDelta(delta: number): LevelUpChanges | null {
+		if (delta === 0) return null;
+
+		// Capture displayed attributes and capacities before leveling (from view objects)
+		const oldPrimary = { ...this.primaryAttributes };
+		const oldSecondary = { ...this.secondaryAttributes };
+		const oldMaxHealth = this.maxHealth;
+		const oldMaxMana = this.maxMana;
+
 		const ratios = this.captureResourceRatios();
 		this._level = Math.max(1, this._level + delta);
 		this.recalculateDerivedAttributes(ratios);
+
+		// Get newly learned abilities
+		const newlyLearnedAbilities = this.checkArchetypeAbilities();
+
+		// Get new displayed values
+		const newPrimary = this.primaryAttributes;
+		const newSecondary = this.secondaryAttributes;
+		const newMaxHealth = this.maxHealth;
+		const newMaxMana = this.maxMana;
+
+		return {
+			oldPrimary,
+			newPrimary,
+			oldSecondary,
+			newSecondary,
+			oldMaxHealth,
+			newMaxHealth,
+			oldMaxMana,
+			newMaxMana,
+			newLevel: this._level,
+			newlyLearnedAbilities,
+		};
+	}
+
+	private sendLevelUpMessages(levelUpData: LevelUpChanges): void {
+		const {
+			oldPrimary,
+			newPrimary,
+			oldSecondary,
+			newSecondary,
+			oldMaxHealth,
+			newMaxHealth,
+			oldMaxMana,
+			newMaxMana,
+			newLevel,
+			newlyLearnedAbilities,
+		} = levelUpData;
+
+		const messages: string[] = [];
+		messages.push(color(`You have reached level ${newLevel}!`, COLOR.YELLOW));
+
+		// Primary attribute changes (comparing displayed integer values)
+		const primaryChanges: string[] = [];
+		if (newPrimary.strength !== oldPrimary.strength) {
+			const diff = newPrimary.strength - oldPrimary.strength;
+			primaryChanges.push(`STR ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newPrimary.agility !== oldPrimary.agility) {
+			const diff = newPrimary.agility - oldPrimary.agility;
+			primaryChanges.push(`AGI ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newPrimary.intelligence !== oldPrimary.intelligence) {
+			const diff = newPrimary.intelligence - oldPrimary.intelligence;
+			primaryChanges.push(`INT ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (primaryChanges.length > 0) {
+			messages.push(`Primary Attributes: ${primaryChanges.join(", ")}`);
+		}
+
+		// Secondary attribute changes (comparing displayed integer values)
+		const secondaryChanges: string[] = [];
+		if (newSecondary.attackPower !== oldSecondary.attackPower) {
+			const diff = newSecondary.attackPower - oldSecondary.attackPower;
+			secondaryChanges.push(`AP ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.defense !== oldSecondary.defense) {
+			const diff = newSecondary.defense - oldSecondary.defense;
+			secondaryChanges.push(`DEF ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.critRate !== oldSecondary.critRate) {
+			const diff = newSecondary.critRate - oldSecondary.critRate;
+			secondaryChanges.push(`CRIT ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.avoidance !== oldSecondary.avoidance) {
+			const diff = newSecondary.avoidance - oldSecondary.avoidance;
+			secondaryChanges.push(`AVO ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.accuracy !== oldSecondary.accuracy) {
+			const diff = newSecondary.accuracy - oldSecondary.accuracy;
+			secondaryChanges.push(`ACC ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.spellPower !== oldSecondary.spellPower) {
+			const diff = newSecondary.spellPower - oldSecondary.spellPower;
+			secondaryChanges.push(`SP ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.resilience !== oldSecondary.resilience) {
+			const diff = newSecondary.resilience - oldSecondary.resilience;
+			secondaryChanges.push(`RES ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.vitality !== oldSecondary.vitality) {
+			const diff = newSecondary.vitality - oldSecondary.vitality;
+			secondaryChanges.push(`VIT ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.wisdom !== oldSecondary.wisdom) {
+			const diff = newSecondary.wisdom - oldSecondary.wisdom;
+			secondaryChanges.push(`WIS ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.endurance !== oldSecondary.endurance) {
+			const diff = newSecondary.endurance - oldSecondary.endurance;
+			secondaryChanges.push(`END ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newSecondary.spirit !== oldSecondary.spirit) {
+			const diff = newSecondary.spirit - oldSecondary.spirit;
+			secondaryChanges.push(`SPI ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (secondaryChanges.length > 0) {
+			messages.push(`Secondary Attributes: ${secondaryChanges.join(", ")}`);
+		}
+
+		// Capacity changes (comparing displayed integer values)
+		const capacityChanges: string[] = [];
+		if (newMaxHealth !== oldMaxHealth) {
+			const diff = newMaxHealth - oldMaxHealth;
+			capacityChanges.push(`MaxHP ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (newMaxMana !== oldMaxMana) {
+			const diff = newMaxMana - oldMaxMana;
+			capacityChanges.push(`MaxMP ${diff > 0 ? "+" : ""}${diff}`);
+		}
+		if (capacityChanges.length > 0) {
+			messages.push(`Capacities: ${capacityChanges.join(", ")}`);
+		}
+
+		// Newly learned abilities
+		if (newlyLearnedAbilities.length > 0) {
+			const abilityNames = newlyLearnedAbilities
+				.map((a) => color(a.name, COLOR.CYAN))
+				.join(", ");
+			messages.push(`New Abilities: ${abilityNames}`);
+		}
+
+		// Send level-up summary
+		this.sendMessage(messages.join("\n"), MESSAGE_GROUP.INFO);
+
+		// Send individual ability learning messages
+		for (const ability of newlyLearnedAbilities) {
+			this.sendMessage(
+				`You have learned ${ability.name}! ${ability.description}`,
+				MESSAGE_GROUP.INFO
+			);
+		}
 	}
 
 	public resolveGrowthModifier(): number {
@@ -5583,7 +5765,10 @@ export class Mob extends Movable {
 		// Store experience as integer
 		this._experience = Math.floor(total);
 		if (levels > 0) {
-			this.applyLevelDelta(levels);
+			const levelUpData = this.applyLevelDelta(levels);
+			if (levelUpData && this.character) {
+				this.sendLevelUpMessages(levelUpData);
+			}
 		}
 
 		return adjustedInt;
@@ -6417,9 +6602,11 @@ export class Mob extends Movable {
 	/**
 	 * Takes damage from an attacker, reducing health and handling death if necessary.
 	 * Generates threat for NPCs and handles all death-related cleanup.
+	 * Shield effects are checked and can absorb damage before it reaches health.
 	 *
 	 * @param attacker The mob dealing the damage
 	 * @param amount The amount of damage to take
+	 * @param damageType Optional damage type for shield filtering
 	 *
 	 * @example
 	 * ```typescript
@@ -6429,15 +6616,80 @@ export class Mob extends Movable {
 	 * // Defender's health is reduced, threat is generated, death is handled if needed
 	 * ```
 	 */
-	public damage(attacker: Mob, amount: number): void {
+	public damage(attacker: Mob, amount: number, damageType?: DAMAGE_TYPE): void {
 		if (amount <= 0) {
 			return;
 		}
 
-		// Reduce health
-		this.health = Math.max(0, this.health - amount);
+		let remainingDamage = amount;
+		const room = this.location instanceof Room ? this.location : undefined;
 
-		// Generate threat for NPCs
+		// Check for shield effects that can absorb this damage
+		const shieldEffects = Array.from(this._effects).filter((effect) =>
+			isShieldEffect(effect.template)
+		);
+
+		// Process shields in order (first shield absorbs first)
+		for (const shieldEffect of shieldEffects) {
+			if (remainingDamage <= 0) {
+				break; // All damage absorbed
+			}
+
+			const shieldTemplate = shieldEffect.template;
+			if (!isShieldEffect(shieldTemplate)) {
+				continue;
+			}
+
+			// Check if shield applies to this damage type
+			if (
+				shieldTemplate.damageType !== undefined &&
+				shieldTemplate.damageType !== damageType
+			) {
+				continue; // Shield doesn't apply to this damage type
+			}
+
+			const remainingAbsorption =
+				shieldEffect.remainingAbsorption ?? shieldTemplate.absorption;
+			if (remainingAbsorption <= 0) {
+				continue; // Shield is depleted
+			}
+
+			// Calculate how much this shield can absorb
+			const absorbed = Math.min(remainingDamage, remainingAbsorption);
+			remainingDamage -= absorbed;
+
+			// Update shield absorption
+			shieldEffect.remainingAbsorption = remainingAbsorption - absorbed;
+
+			// Send damage message for shield absorption
+			if (room) {
+				const shieldName = color(shieldTemplate.name, COLOR.CYAN);
+				const damageStr = color(String(absorbed), COLOR.CRIMSON);
+				act(
+					{
+						user: `Your ${shieldName} absorbs ${damageStr} damage!`,
+						room: `{User}'s  ${shieldName} absorbs some damage.`,
+					},
+					{
+						user: this,
+						room: room,
+					},
+					{ messageGroup: MESSAGE_GROUP.COMBAT }
+				);
+			}
+
+			// Remove shield if depleted
+			if (shieldEffect.remainingAbsorption <= 0) {
+				this.removeEffect(shieldEffect, false);
+			}
+		}
+
+		// Apply remaining damage to health
+		if (remainingDamage > 0) {
+			this.health = Math.max(0, this.health - remainingDamage);
+		}
+
+		// Generate threat for NPCs (use original amount for threat calculation)
 		if (!this.character) {
 			this.addThreat(attacker, Math.max(amount, 1));
 		} else if (
@@ -6508,11 +6760,7 @@ export class Mob extends Movable {
 	public addEffect(
 		template: EffectTemplate,
 		caster: Mob,
-		overrides?: {
-			damage?: number;
-			heal?: number;
-			duration?: number;
-		}
+		overrides?: EffectOverrides
 	): EffectInstance {
 		const now = Date.now();
 
@@ -6528,32 +6776,79 @@ export class Mob extends Movable {
 		const instance: EffectInstance = {
 			template,
 			caster,
-			appliedAt: now,
-			expiresAt: now,
+			appliedAt: overrides?.appliedAt ?? now,
+			expiresAt: overrides?.expiresAt ?? now,
 		};
 
 		// Set up duration and expiration
-		let duration = 0;
+		// If restoration fields are provided, use them; otherwise calculate from template
 		if (isDamageOverTimeEffect(template)) {
-			duration = overrides?.duration ?? template.duration;
-			const intervalMs = template.interval * 1000;
-			const ticks = Math.floor(duration / template.interval);
-			instance.expiresAt = now + duration * 1000;
-			instance.nextTickAt = now + intervalMs;
-			instance.ticksRemaining = ticks;
-			instance.tickAmount = overrides?.damage ?? template.damage;
+			if (overrides?.expiresAt !== undefined) {
+				// Restoration mode: use provided values
+				instance.expiresAt = overrides.expiresAt;
+				if (overrides.nextTickAt !== undefined) {
+					instance.nextTickAt = overrides.nextTickAt;
+				}
+				if (overrides.ticksRemaining !== undefined) {
+					instance.ticksRemaining = overrides.ticksRemaining;
+				}
+				if (overrides.tickAmount !== undefined) {
+					instance.tickAmount = overrides.tickAmount;
+				}
+			} else {
+				// Normal mode: calculate from template
+				const duration = overrides?.duration ?? template.duration;
+				const intervalMs = template.interval * 1000;
+				const ticks = Math.floor(duration / template.interval);
+				instance.expiresAt = now + duration * 1000;
+				instance.nextTickAt = now + intervalMs;
+				instance.ticksRemaining = ticks;
+				instance.tickAmount = overrides?.damage ?? template.damage;
+			}
 		} else if (isHealOverTimeEffect(template)) {
-			duration = overrides?.duration ?? template.duration;
-			const intervalMs = template.interval * 1000;
-			const ticks = Math.floor(duration / template.interval);
-			instance.expiresAt = now + duration * 1000;
-			instance.nextTickAt = now + intervalMs;
-			instance.ticksRemaining = ticks;
-			instance.tickAmount = overrides?.heal ?? template.heal;
+			if (overrides?.expiresAt !== undefined) {
+				// Restoration mode: use provided values
+				instance.expiresAt = overrides.expiresAt;
+				if (overrides.nextTickAt !== undefined) {
+					instance.nextTickAt = overrides.nextTickAt;
+				}
+				if (overrides.ticksRemaining !== undefined) {
+					instance.ticksRemaining = overrides.ticksRemaining;
+				}
+				if (overrides.tickAmount !== undefined) {
+					instance.tickAmount = overrides.tickAmount;
+				}
+			} else {
+				// Normal mode: calculate from template
+				const duration = overrides?.duration ?? template.duration;
+				const intervalMs = template.interval * 1000;
+				const ticks = Math.floor(duration / template.interval);
+				instance.expiresAt = now + duration * 1000;
+				instance.nextTickAt = now + intervalMs;
+				instance.ticksRemaining = ticks;
+				instance.tickAmount = overrides?.heal ?? template.heal;
+			}
+		} else if (isShieldEffect(template)) {
+			// Shield effects don't expire (duration is infinite)
+			// They are removed when absorption is depleted
+			instance.expiresAt = overrides?.expiresAt ?? Number.MAX_SAFE_INTEGER;
+			instance.remainingAbsorption =
+				overrides?.remainingAbsorption ?? template.absorption;
 		} else {
-			// Passive effects don't expire (duration is infinite)
-			// They can be removed manually or when the mob dies
-			instance.expiresAt = Number.MAX_SAFE_INTEGER;
+			// Passive effects: check if duration is provided via overrides
+			// If expiresAt is explicitly provided (restoration), use it
+			// If duration is provided, calculate expiresAt from it
+			// Otherwise, effect is permanent (never expires)
+			if (overrides?.expiresAt !== undefined) {
+				// Restoration mode: use provided expiresAt
+				instance.expiresAt = overrides.expiresAt;
+			} else if (overrides?.duration !== undefined) {
+				// Normal mode with duration: calculate expiresAt
+				instance.expiresAt = now + overrides.duration * 1000;
+			} else {
+				// No duration provided: effect is permanent
+				instance.expiresAt = Number.MAX_SAFE_INTEGER;
+			}
 		}
 
 		// Add to effects set
@@ -6563,8 +6858,12 @@ export class Mob extends Movable {
 		// Set up timers for this effect
 		setupEffectTimers(this, instance);
 
-		// Send onApply act message if template has one
-		if (template.onApply && this.location instanceof Room) {
+		// Check if this is a restoration (appliedAt is in the past or explicitly set)
+		const isRestoration =
+			overrides?.appliedAt !== undefined && overrides.appliedAt < now;
+
+		// Send onApply act message if template has one (skip during restoration)
+		if (!isRestoration && template.onApply && this.location instanceof Room) {
 			act(
 				template.onApply,
 				{
@@ -6582,17 +6881,20 @@ export class Mob extends Movable {
 
 		// If this is an offensive effect and target is not in combat, initiate combat
 		// Check for offensive flag on both passive and DoT effects
-		const isOffensive =
-			(isPassiveEffect(template) && template.isOffensive) ||
-			(isDamageOverTimeEffect(template) && template.isOffensive);
-		if (
-			isOffensive &&
-			!this.isInCombat() &&
-			this.location instanceof Room &&
-			caster.location === this.location &&
-			caster !== this
-		) {
-			initiateCombat(this, caster, true);
+		// Skip combat initiation during restoration
+		if (!isRestoration) {
+			const isOffensive =
+				(isPassiveEffect(template) && template.isOffensive) ||
+				(isDamageOverTimeEffect(template) && template.isOffensive);
+			if (
+				isOffensive &&
+				!this.isInCombat() &&
+				this.location instanceof Room &&
+				caster.location === this.location &&
+				caster !== this
+			) {
+				initiateCombat(this, caster, true);
+			}
 		}
 
 		return instance;
@@ -6602,9 +6904,35 @@ export class Mob extends Movable {
 	 * Removes an effect instance from this mob.
 	 *
 	 * @param effect The effect instance to remove
+	 * @param showExpireMessage Whether to show the expiration message (defaults to checking if effect has expired)
 	 */
-	public removeEffect(effect: EffectInstance): void {
+	public removeEffect(
+		effect: EffectInstance,
+		showExpireMessage?: boolean
+	): void {
 		if (this._effects.delete(effect)) {
+			// Send onExpire act message if template has one
+			// Show message if explicitly requested, or if effect has expired naturally
+			const now = Date.now();
+			const shouldShowMessage =
+				showExpireMessage !== undefined
+					? showExpireMessage
+					: isEffectExpired(effect, now);
+			if (
+				shouldShowMessage &&
+				effect.template.onExpire &&
+				this.location instanceof Room
+			) {
+				act(
+					effect.template.onExpire,
+					{
+						user: this, // The mob affected by the effect
+						room: this.location,
+					},
+					{ messageGroup: MESSAGE_GROUP.INFO }
+				);
+			}
+
 			// Clear timers for this effect
 			clearEffectTimersForEffect(effect);
 
@@ -6630,6 +6958,7 @@ export class Mob extends Movable {
 		const toRemove = this.getEffectsById(effectId);
 		let removed = 0;
 		for (const effect of toRemove) {
+			// Remove effect without showing expiration message (manual removal)
 			if (this._effects.delete(effect)) {
 				// Clear timers for this effect
 				clearEffectTimersForEffect(effect);
@@ -6718,6 +7047,55 @@ export class Mob extends Movable {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Checks archetype abilities (from race and job) and teaches abilities
+	 * when the mob reaches the appropriate level.
+	 * Returns an array of newly learned abilities.
+	 */
+	private checkArchetypeAbilities(): Ability[] {
+		const currentLevel = this._level;
+		const allAbilities: Array<{ id: string; level: number }> = [];
+		const newlyLearned: Ability[] = [];
+
+		// Collect abilities from race
+		for (const abilityDef of this._race.skills) {
+			allAbilities.push(abilityDef);
+		}
+
+		// Collect abilities from job
+		for (const abilityDef of this._job.skills) {
+			allAbilities.push(abilityDef);
+		}
+
+		// Check each ability to see if it should be learned at current level
+		for (const abilityDef of allAbilities) {
+			// Skip if the ability level requirement is higher than current level
+			if (abilityDef.level > currentLevel) {
+				continue;
+			}
+
+			// Skip if already learned
+			if (this.knowsAbilityById(abilityDef.id)) {
+				continue;
+			}
+
+			// Get the ability from registry
+			const ability = getAbilityById(abilityDef.id);
+			if (!ability) {
+				logger.warn(
+					`Archetype references ability "${abilityDef.id}" which was not found in ability registry`
+				);
+				continue;
+			}
+
+			// Teach the ability
+			this.addAbility(ability, 0);
+			newlyLearned.push(ability);
+		}
+
+		return newlyLearned;
 	}
 
 	/**
@@ -6859,6 +7237,13 @@ export class Mob extends Movable {
 	 * - Stop threat expiration timer
 	 */
 	override destroy(destroyContents: boolean = true): void {
+		logger.debug("Mob being destroyed", {
+			mob: this.display,
+			mobId: this.oid,
+			isCharacter: !!this.character,
+			destroyContents,
+		});
+
 		// Stop threat expiration timer
 		this._stopThreatExpirationCycle();
 

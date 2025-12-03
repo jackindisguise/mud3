@@ -98,9 +98,6 @@ import {
 	DungeonOptions,
 	DUNGEON_REGISTRY,
 } from "../core/dungeon.js";
-import { SerializedEffect } from "../core/effect.js";
-import { EffectInstance, isPassiveEffect } from "../core/effect.js";
-import { addToEffectsSet, setupEffectTimers } from "../effects.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
@@ -2341,10 +2338,9 @@ export async function deserializeMob(
 				caster = mob;
 			}
 
-			// Create effect instance
-			const instance: EffectInstance = {
-				template,
-				caster,
+			// Restore effect using addEffect with restoration overrides
+			// This ensures proper initialization, timer setup, and type safety
+			mob.addEffect(template, caster, {
 				appliedAt: serializedEffect.appliedAt,
 				expiresAt: serializedEffect.expiresAt,
 				...(serializedEffect.nextTickAt !== undefined && {
@@ -2356,21 +2352,10 @@ export async function deserializeMob(
 				...(serializedEffect.tickAmount !== undefined && {
 					tickAmount: serializedEffect.tickAmount,
 				}),
-			};
-
-			// Add effect to mob (using addEffect to ensure proper initialization)
-			// But we need to manually set the instance data since addEffect creates a new instance
-			const effects = mob.getEffects() as Set<EffectInstance>;
-			(effects as any).add(instance);
-			addToEffectsSet(mob);
-
-			// Set up timers for the restored effect
-			setupEffectTimers(mob, instance);
-
-			// Recalculate attributes if this is a passive effect with modifiers
-			if (isPassiveEffect(template)) {
-				mob.recalculateDerivedAttributes();
-			}
+				...(serializedEffect.remainingAbsorption !== undefined && {
+					remainingAbsorption: serializedEffect.remainingAbsorption,
+				}),
+			});
 		}
 	}
 

@@ -3766,7 +3766,11 @@ class MapEditor {
 			const isWeapon = template.type === "Weapon";
 			const isArmor = template.type === "Armor";
 			const isEquipment = template.type === "Equipment";
+			const isItem = template.type === "Item";
+			const isProp = template.type === "Prop";
 			const isEquipmentType = isWeapon || isArmor || isEquipment;
+			const isItemType = isItem || isEquipmentType;
+			const isObjectType = isItem || isEquipmentType || isProp;
 			const hitTypeSelector = isWeapon
 				? this.generateHitTypeSelector(template.hitType)
 				: "";
@@ -3785,6 +3789,7 @@ class MapEditor {
 					<label>Type</label>
 					<select id="template-type">
 						<option value="Mob" ${template.type === "Mob" ? "selected" : ""}>Mob</option>
+						<option value="Item" ${template.type === "Item" ? "selected" : ""}>Item</option>
 						<option value="Equipment" ${
 							template.type === "Equipment" ? "selected" : ""
 						}>Equipment</option>
@@ -3864,6 +3869,12 @@ class MapEditor {
 						</div>
 					</div>
 				</div>
+				<div class="form-group">
+					<label>Gold</label>
+					<input type="number" id="template-gold" value="${
+						template.value || ""
+					}" placeholder="0" min="0" step="1">
+				</div>
 				</div>
 				<div id="weapon-fields" style="display: ${isWeapon ? "block" : "none"};">
 					<div class="form-group">
@@ -3900,6 +3911,28 @@ class MapEditor {
 				</div>
 				<div id="equipment-fields" style="display: ${isEquipment ? "block" : "none"};">
 					${bonusesSection}
+				</div>
+				<div id="item-fields" style="display: ${isItemType ? "block" : "none"};">
+					<div class="form-group">
+						<label>Container</label>
+						<div class="exits-container">
+							<div class="exits-buttons">
+								<button type="button" class="exit-btn ${
+									template.isContainer ? "enabled" : "disabled"
+								}" id="template-is-container-btn" data-is-container="${
+				template.isContainer ? "true" : "false"
+			}">CONTAINER</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="object-value-field" style="display: ${isObjectType ? "block" : "none"};">
+					<div class="form-group">
+						<label>Value</label>
+						<input type="number" id="template-value" value="${
+							template.value || ""
+						}" placeholder="0" min="0" step="1">
+					</div>
 				</div>
 				<div class="form-group">
 					<label>Map Text (1 letter)</label>
@@ -4097,13 +4130,15 @@ class MapEditor {
 			}
 		}
 
-		// Set up type selector handler to show/hide mob, weapon, armor, and equipment fields
+		// Set up type selector handler to show/hide mob, weapon, armor, equipment, item, and object fields
 		const typeSelect = document.getElementById("template-type");
 		if (typeSelect) {
 			const mobFields = document.getElementById("mob-fields");
 			const weaponFields = document.getElementById("weapon-fields");
 			const armorFields = document.getElementById("armor-fields");
 			const equipmentFields = document.getElementById("equipment-fields");
+			const itemFields = document.getElementById("item-fields");
+			const objectValueField = document.getElementById("object-value-field");
 			typeSelect.onchange = () => {
 				const newType = typeSelect.value;
 				if (mobFields) {
@@ -4118,6 +4153,14 @@ class MapEditor {
 				if (equipmentFields) {
 					equipmentFields.style.display =
 						newType === "Equipment" ? "block" : "none";
+				}
+				if (itemFields) {
+					const isItemType = newType === "Item" || newType === "Equipment" || newType === "Weapon" || newType === "Armor";
+					itemFields.style.display = isItemType ? "block" : "none";
+				}
+				if (objectValueField) {
+					const isObjectType = newType === "Item" || newType === "Equipment" || newType === "Weapon" || newType === "Armor" || newType === "Prop";
+					objectValueField.style.display = isObjectType ? "block" : "none";
 				}
 				// Recalculate if switching to Mob
 				if (newType === "Mob") {
@@ -4155,6 +4198,23 @@ class MapEditor {
 					}
 				};
 			});
+		}
+
+		// Set up container toggle button handler
+		const containerBtn = document.getElementById("template-is-container-btn");
+		if (containerBtn) {
+			containerBtn.onclick = (e) => {
+				const isEnabled = e.target.classList.contains("enabled");
+				if (isEnabled) {
+					e.target.classList.remove("enabled");
+					e.target.classList.add("disabled");
+					e.target.dataset.isContainer = "false";
+				} else {
+					e.target.classList.remove("disabled");
+					e.target.classList.add("enabled");
+					e.target.dataset.isContainer = "true";
+				}
+			};
 		}
 
 		// Set up mob attribute calculation handlers
@@ -4434,9 +4494,19 @@ class MapEditor {
 				const race = document.getElementById("template-race")?.value;
 				const job = document.getElementById("template-job")?.value;
 				const level = document.getElementById("template-level")?.value;
+				const gold = document.getElementById("template-gold")?.value;
 				if (race) newTemplate.race = race;
 				if (job) newTemplate.job = job;
 				if (level) newTemplate.level = parseInt(level) || 1;
+				if (gold !== undefined && gold !== "") {
+					const goldValue = parseInt(gold);
+					if (!isNaN(goldValue)) {
+						if (goldValue > 0) {
+							newTemplate.value = goldValue;
+						}
+						// If goldValue is 0 or negative, don't include value field (defaults to 0)
+					}
+				}
 
 				// Collect behaviors - always set behaviors object to ensure disabled behaviors are cleared
 				const behaviors = {};
@@ -4480,6 +4550,42 @@ class MapEditor {
 					const defValue = parseFloat(defense);
 					if (!isNaN(defValue)) {
 						newTemplate.defense = defValue;
+					}
+				}
+			}
+
+			// Add isContainer for Item, Equipment, Weapon, and Armor
+			if (
+				templateType === "Item" ||
+				templateType === "Weapon" ||
+				templateType === "Armor" ||
+				templateType === "Equipment"
+			) {
+				const containerBtn = document.getElementById("template-is-container-btn");
+				if (containerBtn) {
+					const isContainer = containerBtn.classList.contains("enabled");
+					if (isContainer) {
+						newTemplate.isContainer = true;
+					}
+				}
+			}
+
+			// Add value for Item, Equipment, Weapon, Armor, and Prop
+			if (
+				templateType === "Item" ||
+				templateType === "Weapon" ||
+				templateType === "Armor" ||
+				templateType === "Equipment" ||
+				templateType === "Prop"
+			) {
+				const value = document.getElementById("template-value")?.value;
+				if (value !== undefined && value !== "") {
+					const valueNum = parseInt(value);
+					if (!isNaN(valueNum)) {
+						if (valueNum > 0) {
+							newTemplate.value = valueNum;
+						}
+						// If valueNum is 0 or negative, don't include value field (defaults to 0)
 					}
 				}
 			}

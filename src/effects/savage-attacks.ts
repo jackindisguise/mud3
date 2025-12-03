@@ -28,3 +28,5 @@ export const effectTemplate: PassiveEffectTemplate = {
 	outgoingDamageMultiplier: 1.08,
 };
 
+
+

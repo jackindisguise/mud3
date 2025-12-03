@@ -33,7 +33,7 @@ export const effectTemplate = {
 const COOLDOWN_MS = 3000;
 
 export const command: CommandObject = {
-	pattern: "poison blast <target:mob>",
+	pattern: "'poison blast'~ <target:mob?>",
 	cooldown(context: CommandContext, args: Map<string, any>) {
 		const { actor, room } = context;
 		if (!actor.knowsAbilityById(ABILITY_ID)) {
@@ -42,6 +42,9 @@ export const command: CommandObject = {
 		if (!room) {
 			return 0;
 		}
+		let target = args.get("target") as Mob | undefined;
+		if (!target) target = actor.combatTarget;
+		if (!target) return 0;
 		return COOLDOWN_MS;
 	},
 
@@ -67,7 +70,8 @@ export const command: CommandObject = {
 		}
 
 		// Get target
-		const target = args.get("target") as Mob | undefined;
+		let target = args.get("target") as Mob | undefined;
+		if (!target) target = actor.combatTarget;
 		if (!target) {
 			actor.sendMessage(
 				"You need to specify a target.",
@@ -80,15 +84,6 @@ export const command: CommandObject = {
 		if (target.location !== room) {
 			actor.sendMessage(
 				"They are not in the same room as you.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Check if target is alive
-		if (target.health <= 0) {
-			actor.sendMessage(
-				"They are already dead.",
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

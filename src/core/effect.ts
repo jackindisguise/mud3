@@ -14,9 +14,10 @@ import {
 } from "./attribute.js";
 import { Mob } from "./dungeon.js";
 import { ActMessageTemplates } from "../act.js";
+import { DAMAGE_TYPE, HitType } from "./damage-types.js";
 
 /**
- * Message templates for effects (onApply/onTick).
+ * Message templates for effects (onApply/onTick/onExpire).
  * Effects don't have a target, so target messages are not allowed.
  */
 export type EffectMessageTemplates = Omit<ActMessageTemplates, "target">;
@@ -36,6 +37,8 @@ export interface BaseEffectTemplate {
 	stackable: boolean;
 	/** Act message templates shown when this effect is applied */
 	onApply?: EffectMessageTemplates;
+	/** Act message templates shown when this effect expires */
+	onExpire?: EffectMessageTemplates;
 }
 
 /**
@@ -63,6 +66,15 @@ export interface PassiveEffectTemplate extends BaseEffectTemplate {
 }
 
 /**
+ * Damage category for effect damage.
+ * Determines which defense attribute is used (defense for physical, resilience for magical).
+ */
+export enum EFFECT_DAMAGE_CATEGORY {
+	PHYSICAL = "PHYSICAL",
+	MAGICAL = "MAGICAL",
+}
+
+/**
  * Damage over time effect template.
  * Deals damage at regular intervals for a specified duration.
  */
@@ -74,6 +86,10 @@ export interface DamageOverTimeEffectTemplate extends BaseEffectTemplate {
 	interval: number;
 	/** Total duration of the effect in seconds */
 	duration: number;
+	/** Hit type that determines the damage type for this DoT */
+	hitType: HitType;
+	/** Damage category - determines which defense attribute is used (defense vs resilience) */
+	damageCategory: EFFECT_DAMAGE_CATEGORY;
 	/** Whether this effect is offensive (initiates combat when applied) */
 	isOffensive?: boolean;
 	/** Act message templates shown when this effect ticks */
@@ -97,12 +113,26 @@ export interface HealOverTimeEffectTemplate extends BaseEffectTemplate {
 }
 
 /**
+ * Shield effect template.
+ * A passive effect that absorbs a fixed amount of damage.
+ * Once the absorption potential is met, the effect is removed.
+ */
+export interface ShieldEffectTemplate extends BaseEffectTemplate {
+	type: "shield";
+	/** Amount of damage this shield can absorb */
+	absorption: number;
+	/** Optional damage type filter - if specified, only absorbs this damage type */
+	damageType?: DAMAGE_TYPE;
+}
+
+/**
  * Union type of all effect templates.
  */
 export type EffectTemplate =
 	| PassiveEffectTemplate
 	| DamageOverTimeEffectTemplate
-	| HealOverTimeEffectTemplate;
+	| HealOverTimeEffectTemplate
+	| ShieldEffectTemplate;
 
 /**
  * Active effect instance that is applied to a mob.
@@ -123,6 +153,8 @@ export interface EffectInstance {
 	ticksRemaining?: number;
 	/** For DoT/HoT effects: actual damage/heal amount per tick (may differ from template) */
 	tickAmount?: number;
+	/** For shield effects: remaining absorption capacity */
+	remainingAbsorption?: number;
 }
 
 /**
@@ -153,6 +185,15 @@ export function isHealOverTimeEffect(
 }
 
 /**
+ * Checks if an effect template is a shield effect.
+ */
+export function isShieldEffect(
+	effect: EffectTemplate
+): effect is ShieldEffectTemplate {
+	return effect.type === "shield";
+}
+
+/**
  * Checks if an effect instance has expired.
  */
 export function isEffectExpired(effect: EffectInstance, now: number): boolean {
@@ -165,6 +206,31 @@ export function isEffectExpired(effect: EffectInstance, now: number): boolean {
 export function shouldEffectTick(effect: EffectInstance, now: number): boolean {
 	if (!effect.nextTickAt) return false;
 	return now >= effect.nextTickAt && (effect.ticksRemaining ?? 0) > 0;
+}
+
+/**
+ * Override options for adding an effect to a mob.
+ * Used to customize effect properties during application or restoration.
+ */
+export interface EffectOverrides {
+	/** Override damage amount for damage-over-time effects */
+	damage?: number;
+	/** Override heal amount for heal-over-time effects */
+	heal?: number;
+	/** Override duration for timed effects */
+	duration?: number;
+	/** Restoration field: timestamp when effect was applied (for deserialization) */
+	appliedAt?: number;
+	/** Restoration field: timestamp when effect expires (for deserialization) */
+	expiresAt?: number;
+	/** Restoration field: timestamp of next tick (for DoT/HoT effects) */
+	nextTickAt?: number;
+	/** Restoration field: number of ticks remaining (for DoT/HoT effects) */
+	ticksRemaining?: number;
+	/** Restoration field: actual tick amount (for DoT/HoT effects) */
+	tickAmount?: number;
+	/** Restoration field: remaining absorption capacity (for shield effects) */
+	remainingAbsorption?: number;
 }
 
 /**
@@ -186,4 +252,6 @@ export interface SerializedEffect {
 	ticksRemaining?: number;
 	/** For DoT/HoT effects: actual damage/heal amount per tick */
 	tickAmount?: number;
+	/** For shield effects: remaining absorption capacity */
+	remainingAbsorption?: number;
 }

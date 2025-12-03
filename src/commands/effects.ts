@@ -23,6 +23,7 @@ import {
 	isPassiveEffect,
 	isDamageOverTimeEffect,
 	isHealOverTimeEffect,
+	isShieldEffect,
 } from "../core/effect.js";
 
 function formatDuration(ms: number): string {
@@ -57,6 +58,47 @@ function formatTimeRemaining(expiresAt: number): string {
 	return formatDuration(remaining);
 }
 
+function formatAttributeModifier(
+	attributeName: string,
+	value: number,
+	reverseColor: boolean = false
+): string {
+	const isPositive = value > 0;
+	const colorCode = reverseColor
+		? isPositive
+			? COLOR.CRIMSON
+			: COLOR.LIME
+		: isPositive
+		? COLOR.LIME
+		: COLOR.CRIMSON;
+	const action = isPositive ? "Increases" : "Decreases";
+	const absValue = Math.abs(value);
+	const coloredName = color(attributeName, colorCode);
+	const coloredValue = color(String(absValue), colorCode);
+	return `${action} ${coloredName} by ${coloredValue}.`;
+}
+
+function formatPercentageModifier(
+	attributeName: string,
+	multiplier: number,
+	reverseColor: boolean = false
+): string {
+	const percent = Math.round((multiplier - 1) * 100);
+	const isPositive = percent > 0;
+	const colorCode = reverseColor
+		? isPositive
+			? COLOR.CRIMSON
+			: COLOR.LIME
+		: isPositive
+		? COLOR.LIME
+		: COLOR.CRIMSON;
+	const action = isPositive ? "Increases" : "Decreases";
+	const absPercent = Math.abs(percent);
+	const coloredName = color(attributeName, colorCode);
+	const coloredPercent = color(`${absPercent}%`, colorCode);
+	return `${action} ${coloredName} by ${coloredPercent}.`;
+}
+
 export default {
 	pattern: "effects~",
 	execute(context: CommandContext): void {
@@ -78,12 +120,24 @@ export default {
 			type: string;
 			timeRemaining: string;
 			details: string;
-			caster: string;
+			description: string | undefined;
+			source: string;
 		}> = [];
+
+		// Build sets of archetype passive IDs from race and job
+		const racePassiveIds = new Set<string>();
+		for (const passiveId of actor.race.passives) {
+			racePassiveIds.add(passiveId);
+		}
+		const jobPassiveIds = new Set<string>();
+		for (const passiveId of actor.job.passives) {
+			jobPassiveIds.add(passiveId);
+		}
 
 		for (const effect of effects) {
 			const template = effect.template;
-			const isArchetype = effect.caster === actor;
+			const isRaceEffect = racePassiveIds.has(template.id);
+			const isJobEffect = jobPassiveIds.has(template.id);
 
 			// Determine effect type
 			let typeStr: string;
@@ -94,150 +148,67 @@ export default {
 
 				// Primary attributes
 				if (template.primaryAttributeModifiers) {
-					const mods: string[] = [];
-					if (template.primaryAttributeModifiers.strength)
-						mods.push(
-							`STR ${
-								template.primaryAttributeModifiers.strength > 0 ? "+" : ""
-							}${template.primaryAttributeModifiers.strength}`
-						);
-					if (template.primaryAttributeModifiers.agility)
-						mods.push(
-							`AGI ${
-								template.primaryAttributeModifiers.agility > 0 ? "+" : ""
-							}${template.primaryAttributeModifiers.agility}`
-						);
-					if (template.primaryAttributeModifiers.intelligence)
-						mods.push(
-							`INT ${
-								template.primaryAttributeModifiers.intelligence > 0 ? "+" : ""
-							}${template.primaryAttributeModifiers.intelligence}`
-						);
-					if (mods.length > 0) detailParts.push(mods.join(", "));
+					const primaryModifiers: Array<[string, number | undefined]> = [
+						["strength", template.primaryAttributeModifiers.strength],
+						["agility", template.primaryAttributeModifiers.agility],
+						["intelligence", template.primaryAttributeModifiers.intelligence],
+					];
+					for (const [name, value] of primaryModifiers) {
+						if (value) {
+							detailParts.push(formatAttributeModifier(name, value));
+						}
+					}
 				}
 
 				// Secondary attributes
 				if (template.secondaryAttributeModifiers) {
-					const mods: string[] = [];
-					if (template.secondaryAttributeModifiers.attackPower !== undefined)
-						mods.push(
-							`AP ${
-								template.secondaryAttributeModifiers.attackPower > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.attackPower}`
-						);
-					if (template.secondaryAttributeModifiers.defense !== undefined)
-						mods.push(
-							`DEF ${
-								template.secondaryAttributeModifiers.defense > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.defense}`
-						);
-					if (template.secondaryAttributeModifiers.critRate !== undefined)
-						mods.push(
-							`CRIT ${
-								template.secondaryAttributeModifiers.critRate > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.critRate}`
-						);
-					if (template.secondaryAttributeModifiers.avoidance !== undefined)
-						mods.push(
-							`AVO ${
-								template.secondaryAttributeModifiers.avoidance > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.avoidance}`
-						);
-					if (template.secondaryAttributeModifiers.accuracy !== undefined)
-						mods.push(
-							`ACC ${
-								template.secondaryAttributeModifiers.accuracy > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.accuracy}`
-						);
-					if (template.secondaryAttributeModifiers.spellPower !== undefined)
-						mods.push(
-							`SP ${
-								template.secondaryAttributeModifiers.spellPower > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.spellPower}`
-						);
-					if (template.secondaryAttributeModifiers.resilience !== undefined)
-						mods.push(
-							`RES ${
-								template.secondaryAttributeModifiers.resilience > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.resilience}`
-						);
-					if (template.secondaryAttributeModifiers.vitality !== undefined)
-						mods.push(
-							`VIT ${
-								template.secondaryAttributeModifiers.vitality > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.vitality}`
-						);
-					if (template.secondaryAttributeModifiers.wisdom !== undefined)
-						mods.push(
-							`WIS ${
-								template.secondaryAttributeModifiers.wisdom > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.wisdom}`
-						);
-					if (template.secondaryAttributeModifiers.endurance !== undefined)
-						mods.push(
-							`END ${
-								template.secondaryAttributeModifiers.endurance > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.endurance}`
-						);
-					if (template.secondaryAttributeModifiers.spirit !== undefined)
-						mods.push(
-							`SPI ${
-								template.secondaryAttributeModifiers.spirit > 0 ? "+" : ""
-							}${template.secondaryAttributeModifiers.spirit}`
-						);
-					if (mods.length > 0) detailParts.push(mods.join(", "));
+					const secondaryModifiers: Array<[string, number | undefined]> = [
+						["attack power", template.secondaryAttributeModifiers.attackPower],
+						["defense", template.secondaryAttributeModifiers.defense],
+						["crit rate", template.secondaryAttributeModifiers.critRate],
+						["avoidance", template.secondaryAttributeModifiers.avoidance],
+						["accuracy", template.secondaryAttributeModifiers.accuracy],
+						["spell power", template.secondaryAttributeModifiers.spellPower],
+						["resilience", template.secondaryAttributeModifiers.resilience],
+						["vitality", template.secondaryAttributeModifiers.vitality],
+						["wisdom", template.secondaryAttributeModifiers.wisdom],
+						["endurance", template.secondaryAttributeModifiers.endurance],
+						["spirit", template.secondaryAttributeModifiers.spirit],
+					];
+					for (const [name, value] of secondaryModifiers) {
+						if (value !== undefined) {
+							detailParts.push(formatAttributeModifier(name, value));
+						}
+					}
 				}
 
 				// Resource capacities
 				if (template.resourceCapacityModifiers) {
-					const mods: string[] = [];
-					if (template.resourceCapacityModifiers.maxHealth !== undefined)
-						mods.push(
-							`MaxHP ${
-								template.resourceCapacityModifiers.maxHealth > 0 ? "+" : ""
-							}${template.resourceCapacityModifiers.maxHealth}`
-						);
-					if (template.resourceCapacityModifiers.maxMana !== undefined)
-						mods.push(
-							`MaxMP ${
-								template.resourceCapacityModifiers.maxMana > 0 ? "+" : ""
-							}${template.resourceCapacityModifiers.maxMana}`
-						);
-					if (mods.length > 0) detailParts.push(mods.join(", "));
+					const resourceModifiers: Array<[string, number | undefined]> = [
+						["max health", template.resourceCapacityModifiers.maxHealth],
+						["max mana", template.resourceCapacityModifiers.maxMana],
+					];
+					for (const [name, value] of resourceModifiers) {
+						if (value !== undefined) {
+							detailParts.push(formatAttributeModifier(name, value));
+						}
+					}
 				}
 
 				// Dynamic modifiers
-				if (template.incomingDamageMultiplier !== undefined) {
-					const mult = template.incomingDamageMultiplier;
-					detailParts.push(
-						`Incoming Damage: ${mult > 1 ? "+" : ""}${Math.round(
-							(mult - 1) * 100
-						)}%`
-					);
-				}
-				if (template.outgoingDamageMultiplier !== undefined) {
-					const mult = template.outgoingDamageMultiplier;
-					detailParts.push(
-						`Outgoing Damage: ${mult > 1 ? "+" : ""}${Math.round(
-							(mult - 1) * 100
-						)}%`
-					);
-				}
-				if (template.healingReceivedMultiplier !== undefined) {
-					const mult = template.healingReceivedMultiplier;
-					detailParts.push(
-						`Healing Received: ${mult > 1 ? "+" : ""}${Math.round(
-							(mult - 1) * 100
-						)}%`
-					);
-				}
-				if (template.healingGivenMultiplier !== undefined) {
-					const mult = template.healingGivenMultiplier;
-					detailParts.push(
-						`Healing Given: ${mult > 1 ? "+" : ""}${Math.round(
-							(mult - 1) * 100
-						)}%`
-					);
+				const percentageModifiers: Array<[string, number | undefined]> = [
+					["incoming damage", template.incomingDamageMultiplier],
+					["outgoing damage", template.outgoingDamageMultiplier],
+					["healing received", template.healingReceivedMultiplier],
+					["healing given", template.healingGivenMultiplier],
+				];
+				for (const [name, multiplier] of percentageModifiers) {
+					if (multiplier !== undefined) {
+						const reverseColor = name === "incoming damage";
+						detailParts.push(
+							formatPercentageModifier(name, multiplier, reverseColor)
+						);
+					}
 				}
 
 				details = detailParts.join(" | ");
@@ -255,24 +226,37 @@ export default {
 				details = `${heal} heal per tick, ${ticks} tick${
 					ticks !== 1 ? "s" : ""
 				} remaining`;
+			} else if (isShieldEffect(template)) {
+				typeStr = color("Shield", COLOR.CYAN);
+				const remaining = effect.remainingAbsorption ?? template.absorption;
+				const total = template.absorption;
+				const detailParts: string[] = [];
+				detailParts.push(`${remaining}/${total} absorption remaining`);
+				if (template.damageType) {
+					detailParts.push(`Filters: ${template.damageType}`);
+				}
+				details = detailParts.join(" | ");
 			} else {
 				typeStr = "Unknown";
 			}
 
-			// Determine caster
-			let casterStr: string;
-			if (isArchetype) {
-				casterStr = color("Racial/Job", COLOR.SILVER);
+			// Determine source
+			let sourceStr: string;
+			if (isRaceEffect) {
+				sourceStr = color("Ancestry", COLOR.SILVER);
+			} else if (isJobEffect) {
+				sourceStr = color("Discipline", COLOR.SILVER);
 			} else {
-				casterStr = effect.caster.display;
+				sourceStr = effect.caster.display;
 			}
 
 			effectData.push({
 				name: template.name,
 				type: typeStr,
 				timeRemaining: formatTimeRemaining(effect.expiresAt),
-				details: details || template.description,
-				caster: casterStr,
+				details: details,
+				description: template.description,
+				source: sourceStr,
 			});
 		}
 
@@ -289,16 +273,23 @@ export default {
 			10,
 			string.ALIGN.CENTER
 		)} ${string.pad("Time Remaining", 18, string.ALIGN.CENTER)} ${string.pad(
-			"Caster",
+			"Source",
 			20,
 			string.ALIGN.LEFT
 		)}`;
 		lines.push(color(header, COLOR.CYAN));
 
 		// Table rows
-		for (const { name, type, timeRemaining, details, caster } of effectData) {
+		for (const {
+			name,
+			type,
+			timeRemaining,
+			details,
+			description,
+			source,
+		} of effectData) {
 			const effectName = color(name, COLOR.WHITE);
-			const casterColored = color(caster, COLOR.SILVER);
+			const sourceColored = color(source, COLOR.SILVER);
 
 			const row = `${string.pad({
 				string: effectName,
@@ -316,22 +307,29 @@ export default {
 				sizer: SIZER,
 				textAlign: string.ALIGN.CENTER,
 			})} ${string.pad({
-				string: casterColored,
+				string: sourceColored,
 				width: 20,
 				sizer: SIZER,
 				textAlign: string.ALIGN.LEFT,
 			})}`;
 			lines.push(row);
 
-			// Add details line if present
+			// Add description if present
+			if (description) {
+				lines.push(`  ${color(description, COLOR.SILVER)}`);
+			}
+
+			// Add details lines if present
 			if (details) {
-				const detailsLine = string.pad({
-					string: color(`  > ${details}`, COLOR.SILVER),
-					width: 80,
-					sizer: SIZER,
-					textAlign: string.ALIGN.LEFT,
-				});
-				lines.push(detailsLine);
+				const detailLines = details.split(" | ");
+				for (const line of detailLines) {
+					lines.push(`  ${line}`);
+				}
+			}
+
+			// Add blank line between effects if there's any content
+			if (description || details) {
+				lines.push("");
 			}
 		}
 

@@ -40,6 +40,10 @@ export const command: CommandObject = {
 		if (!room) {
 			return 0;
 		}
+		const enemies = room.contents.filter(
+			(obj) => obj instanceof Mob && obj !== actor && obj.health > 0
+		);
+		if (enemies.length === 0) return 0;
 		return COOLDOWN_MS;
 	},
 

@@ -5,7 +5,11 @@
  * the poison is applied and when it ticks.
  */
 
-import { DamageOverTimeEffectTemplate } from "../core/effect.js";
+import {
+	DamageOverTimeEffectTemplate,
+	EFFECT_DAMAGE_CATEGORY,
+} from "../core/effect.js";
+import { COMMON_HIT_TYPES } from "../core/damage-types.js";
 
 export const EFFECT_TEMPLATE_ID = "poison";
 
@@ -18,13 +22,15 @@ export const effectTemplate: DamageOverTimeEffectTemplate = {
 	damage: 10,
 	interval: 2, // 2 second interval
 	duration: 12, // 12 seconds total (6 ticks)
+	hitType: COMMON_HIT_TYPES.get("poison")!,
+	damageCategory: EFFECT_DAMAGE_CATEGORY.MAGICAL,
 	isOffensive: true,
 	onApply: {
 		user: "You feel a toxic poison coursing through your veins!",
 		room: "{User} has been poisoned!",
 	},
 	onTick: {
-		user: "You take {damage} poison damage!",
+		user: "You feel your insides burning, dealing {damage} poison damage!",
 		room: "{User} writhes in pain from the poison.",
 	},
 };

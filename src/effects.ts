@@ -18,7 +18,7 @@ import {
 	shouldEffectTick,
 } from "./core/effect.js";
 import { act, ActMessageTemplates } from "./act.js";
-import { initiateCombat } from "./combat.js";
+import { initiateCombat, processEffectDamage } from "./combat.js";
 import { Room } from "./core/dungeon.js";
 
 /**
@@ -128,12 +128,13 @@ function processEffectTick(mob: Mob, effect: EffectInstance): void {
 	// Process the tick
 	if (isDamageOverTimeEffect(effect.template)) {
 		// Process damage over time tick
-		const damage = effect.tickAmount ?? effect.template.damage;
-		if (damage > 0) {
-			// Send onTick act message if template has one
+		const baseDamage = effect.tickAmount ?? effect.template.damage;
+		if (baseDamage > 0) {
+			// Send onTick act message if template has one (before damage calculation)
+			// This allows the message to show the base damage amount
 			if (effect.template.onTick && mob.location instanceof Room) {
 				const templates = replaceActPlaceholders(effect.template.onTick, {
-					damage: String(damage),
+					damage: String(baseDamage),
 				});
 
 				act(
@@ -150,7 +151,7 @@ function processEffectTick(mob: Mob, effect: EffectInstance): void {
 				);
 			} else {
 				// Fallback to old message format if no onTick template
-				const damageStr = color(String(damage), COLOR.CRIMSON);
+				const damageStr = color(String(baseDamage), COLOR.CRIMSON);
 				const effectName = color(effect.template.name, COLOR.LIME);
 				mob.sendMessage(
 					`You take ${damageStr} damage from ${effectName}.`,
@@ -158,8 +159,12 @@ function processEffectTick(mob: Mob, effect: EffectInstance): void {
 				);
 			}
 
-			// Deal damage
-			mob.damage(effect.caster, damage);
+			// Process effect damage (handles mitigation, damage type relationships, etc.)
+			processEffectDamage({
+				target: mob,
+				effect: effect,
+				damage: baseDamage,
+			});
 
 			// If this is an offensive effect and target is not in combat, initiate combat
 			if (
@@ -179,7 +184,7 @@ function processEffectTick(mob: Mob, effect: EffectInstance): void {
 			effect.nextTickAt = now + intervalMs;
 		} else {
 			// All ticks done, effect expires
-			mob.removeEffect(effect);
+			mob.removeEffect(effect, true);
 		}
 	} else if (isHealOverTimeEffect(effect.template)) {
 		// Process heal over time tick
@@ -223,7 +228,7 @@ function processEffectTick(mob: Mob, effect: EffectInstance): void {
 			effect.nextTickAt = now + intervalMs;
 		} else {
 			// All ticks done, effect expires
-			mob.removeEffect(effect);
+			mob.removeEffect(effect, true);
 		}
 	}
 }

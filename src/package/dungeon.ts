@@ -1908,6 +1908,7 @@ function hydrateTemplateData(
 		mapText: data.mapText,
 		mapColor: data.mapColor, // Keep as string (color name)
 		baseWeight: data.baseWeight,
+		value: data.value,
 	});
 	return {
 		id: templateId,
@@ -1995,10 +1996,13 @@ function hydrateItemTemplateData(
 	templateId: string
 ): ItemTemplate {
 	const base = hydrateTemplateData(data, templateId);
-	return {
+	const itemData = data as SerializedItem;
+	return pruneUndefined({
 		...base,
 		type: data.type as ItemType,
-	};
+		isContainer: itemData.isContainer,
+		value: itemData.value,
+	}) as ItemTemplate;
 }
 
 /**

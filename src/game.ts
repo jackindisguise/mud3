@@ -39,7 +39,7 @@ import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./core/dungeon.js";
 import { isNameBlocked } from "./registry/reserved-names.js";
 import { createMob } from "./package/dungeon.js";
 import { Race, Job } from "./core/archetype.js";
-import { showRoom } from "./commands/look.js";
+import { showRoom } from "./utils/display.js";
 import { CONFIG } from "./registry/config.js";
 import {
 	saveCharacter as saveCharacterFile,

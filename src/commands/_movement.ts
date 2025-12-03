@@ -13,7 +13,7 @@ import { Room, Mob } from "../core/dungeon.js";
 import { dir2text } from "../direction.js";
 import { DIRECTION } from "../direction.js";
 import { CommandObject } from "../package/commands.js";
-import { showRoom } from "./look.js";
+import { showRoom } from "../utils/display.js";
 
 const DEFAULT_COOLDOWN_MS = 100;
 

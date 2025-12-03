@@ -34,8 +34,9 @@ import { LINEBREAK } from "./core/telnet.js";
 import logger from "./logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { act, damageMessage } from "./act.js";
-import { showRoom } from "./commands/look.js";
+import { showRoom } from "./utils/display.js";
 import { createItem, createProp } from "./package/dungeon.js";
+import { createGold } from "./utils/currency.js";
 import {
 	DEFAULT_HIT_TYPE,
 	getDamageMultiplier,
@@ -946,6 +947,29 @@ const deathColorRepeatingTransformer = repeatingColorStringTransformer(
 );
 
 /**
+ * Creates a corpse item from a dead mob.
+ * The corpse is marked as a container so items can be put into it and retrieved from it.
+ *
+ * @param deadMob The mob that died
+ * @returns A new Item representing the corpse
+ *
+ * @example
+ * ```typescript
+ * const corpse = createCorpse(deadMob);
+ * room.add(corpse);
+ * ```
+ */
+export function createCorpse(deadMob: Mob): Item {
+	return createItem({
+		keywords: `corpse ${deadMob.keywords}`,
+		display: `the corpse of ${deadMob.display}`,
+		description: `The lifeless body of ${deadMob.display} lies here.`,
+		roomDescription: `The corpse of ${deadMob.display} is here.`,
+		isContainer: true,
+	});
+}
+
+/**
  * Handles mob death, removing from combat and cleaning up.
  * This is a central function for all death handling logic.
  *
@@ -1080,12 +1104,7 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	}
 
 	// Create corpse and move inventory/equipment to it
-	const corpse = createItem({
-		keywords: `corpse ${deadMob.keywords}`,
-		display: `the corpse of ${deadMob.display}`,
-		description: `The lifeless body of ${deadMob.display} lies here.`,
-		roomDescription: `The corpse of ${deadMob.display} is here.`,
-	});
+	const corpse = createCorpse(deadMob);
 
 	// Get all inventory items (Items in contents)
 	const inventoryItems = deadMob.contents.filter(
@@ -1104,6 +1123,17 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	const allItems = [...inventoryItems, ...equippedItems];
 	for (const item of allItems) {
 		corpse.add(item);
+	}
+
+	// Generate gold coin pile from mob's value and add to corpse
+	const mobValue = deadMob.value || 0;
+	if (mobValue > 0) {
+		const goldPile = createGold(mobValue, {
+			includeRoomDescription: true,
+		});
+		corpse.add(goldPile);
+		// Clear the mob's value since it's now in the corpse
+		deadMob.value = 0;
 	}
 
 	// Drop corpse in room (always drop it, even if empty)

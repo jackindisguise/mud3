@@ -16,7 +16,7 @@ import { Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { getLocation, LOCATION } from "../registry/locations.js";
 import { act } from "../act.js";
-import { showRoom } from "./look.js";
+import { showRoom } from "../utils/display.js";
 
 export default {
 	pattern: "recall~",

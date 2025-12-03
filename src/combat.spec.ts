@@ -10,9 +10,16 @@ import {
 	getCombatQueue,
 	processCombatRound,
 	oneHit,
+	applyDamageVariation,
 } from "./combat.js";
 import { DAMAGE_RELATIONSHIP, COMMON_HIT_TYPES } from "./core/damage-types.js";
 import { freezeArchetype } from "./core/archetype.js";
+import {
+	greaterThan,
+	greaterThanOrEqual,
+	lessThan,
+	lessThanOrEqual,
+} from "./utils/assert.js";
 
 const testJob = freezeArchetype({
 	id: "test_job",
@@ -437,6 +444,374 @@ suite("combat.ts", () => {
 
 			assert(!isInCombatQueue(attacker));
 			assert.ok(attacker.combatTarget === undefined);
+		});
+	});
+
+	suite("applyDamageVariation", () => {
+		test("should return 0 for zero or negative damage", () => {
+			assert.strictEqual(applyDamageVariation(0), 0);
+			assert.strictEqual(applyDamageVariation(-10), -10);
+		});
+
+		test("should apply default 20% variation (90% to 110%)", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// Run multiple times to check range
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			// With default 20% variation, damage should range from 90 to 110 (90% to 110% of 100)
+			// Minimum cannot exceed 100 (base damage), maximum must be at least 100 (base damage)
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage) - it's an upper limit
+			lessThanOrEqual(
+				minResult,
+				100,
+				`Minimum damage ${minResult} should not exceed 100 (base damage)`
+			);
+			// Maximum should be at least 100 (base damage) - it's a lower limit
+			greaterThanOrEqual(
+				maxResult,
+				100,
+				`Maximum damage ${maxResult} should be at least 100 (base damage)`
+			);
+			// With default variation, should also respect the 90% to 110% range
+			greaterThanOrEqual(
+				minResult,
+				90,
+				`Minimum damage ${minResult} should be at least 90 (90% of base)`
+			);
+			lessThanOrEqual(
+				maxResult,
+				110,
+				`Maximum damage ${maxResult} should not exceed 110 (110% of base)`
+			);
+		});
+
+		test("should ensure minimum does not exceed base damage", () => {
+			const baseDamage = 50;
+			const results: number[] = [];
+
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			// Minimum should not exceed 50 (base damage) - it's an upper limit
+			lessThanOrEqual(
+				minResult,
+				50,
+				`Minimum damage ${minResult} should not exceed 50 (base damage)`
+			);
+		});
+
+		test("should ensure maximum is at least base damage", () => {
+			const baseDamage = 50;
+			const results: number[] = [];
+
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			const maxResult = Math.max(...results);
+			// Maximum should be at least 50 (base damage)
+			greaterThanOrEqual(
+				maxResult,
+				50,
+				`Maximum damage ${maxResult} should be at least 50 (base damage)`
+			);
+		});
+
+		test("should handle custom variation range", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// 10% variation (95% to 105%)
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage, {
+					variationRange: 10,
+				});
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage) - it's an upper limit
+			lessThanOrEqual(minResult, 100, `Minimum should not exceed 100`);
+			// Maximum should be at least 100 (base damage) - it's a lower limit
+			greaterThanOrEqual(maxResult, 100, `Maximum should be at least 100`);
+			// With 10% variation, we'd expect 95-105, but min is capped at 100, max is at least 100
+		});
+
+		test("should handle custom min and max multipliers", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// Custom range: 0.5 to 1.5 (50% to 150%)
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage, {
+					minMultiplier: 0.5,
+					maxMultiplier: 1.5,
+				});
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage), and 0.5 * 100 = 50, so we use 50
+			lessThanOrEqual(minResult, 100, `Minimum should not exceed 100`);
+			greaterThanOrEqual(
+				minResult,
+				50,
+				`Minimum should be at least 50 (50% of base)`
+			);
+			// Maximum should be at least 100 (base damage), and 1.5 * 100 = 150, so we use 150
+			greaterThanOrEqual(maxResult, 100, `Maximum should be at least 100`);
+			lessThanOrEqual(maxResult, 150, `Maximum should not exceed 150`);
+		});
+
+		test("should handle variation range modifier", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// Default 5% + 5% modifier = 10% variation
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage, {
+					variationRangeModifier: 5,
+				});
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage) - it's an upper limit
+			lessThanOrEqual(minResult, 100, `Minimum should not exceed 100`);
+			// Maximum should be at least 100 (base damage) - it's a lower limit
+			greaterThanOrEqual(maxResult, 100, `Maximum should be at least 100`);
+		});
+
+		test("should handle min and max multiplier modifiers", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// Default multipliers with modifiers
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage, {
+					minMultiplierModifier: -0.1, // Reduce min by 10%
+					maxMultiplierModifier: 0.1, // Increase max by 10%
+				});
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage) - it's an upper limit
+			lessThanOrEqual(minResult, 100, `Minimum should not exceed 100`);
+			// Maximum should be at least 100 (base damage) - it's a lower limit
+			greaterThanOrEqual(maxResult, 100, `Maximum should be at least 100`);
+		});
+
+		test("should handle chain lightning example (1 to initial damage)", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// Chain lightning: 1% to 100% of initial damage
+			// Minimum cannot exceed 100 (base damage), but can be as low as 1 (0.01 * 100)
+			// Maximum must be at least 100 (base damage), even though 1.0 * 100 = 100
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage, {
+					minMultiplier: 0.01, // 1%
+					maxMultiplier: 1.0, // 100%
+				});
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage) - it's an upper limit
+			// But 0.01 * 100 = 1, so we can actually get 1 damage
+			lessThanOrEqual(
+				minResult,
+				100,
+				`Minimum damage ${minResult} should not exceed 100 (base damage)`
+			);
+			greaterThanOrEqual(
+				minResult,
+				1,
+				`Minimum damage ${minResult} should be at least 1 (1% of base)`
+			);
+			// Maximum should be at least 100 (base damage) - it's a lower limit
+			// 1.0 * 100 = 100, so we use 100
+			greaterThanOrEqual(
+				maxResult,
+				100,
+				`Maximum damage ${maxResult} should be at least 100 (base damage)`
+			);
+			lessThanOrEqual(
+				maxResult,
+				100,
+				`Maximum damage ${maxResult} should not exceed 100 (100% of base)`
+			);
+		});
+
+		test("should handle very low damage values", () => {
+			const baseDamage = 2;
+			const results: number[] = [];
+
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 2 (base damage) - it's an upper limit
+			lessThanOrEqual(
+				minResult,
+				2,
+				`Minimum damage ${minResult} should not exceed 2 (base damage)`
+			);
+			// Maximum should be at least 2 (base damage) - it's a lower limit
+			greaterThanOrEqual(
+				maxResult,
+				2,
+				`Maximum damage ${maxResult} should be at least 2 (base damage)`
+			);
+		});
+
+		test("should handle damage of 1", () => {
+			const baseDamage = 1;
+			const results: number[] = [];
+
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 1 (base damage) - it's an upper limit
+			lessThanOrEqual(
+				minResult,
+				1,
+				`Minimum damage ${minResult} should not exceed 1 (base damage)`
+			);
+			// Maximum should be at least 1 (base damage) - it's a lower limit
+			greaterThanOrEqual(
+				maxResult,
+				1,
+				`Maximum damage ${maxResult} should be at least 1 (base damage)`
+			);
+		});
+
+		test("should handle very high damage values", () => {
+			const baseDamage = 10000;
+			const results: number[] = [];
+
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 10000 (base damage) - it's an upper limit
+			lessThanOrEqual(
+				minResult,
+				10000,
+				`Minimum damage ${minResult} should not exceed 10000 (base damage)`
+			);
+			// Maximum should be at least 10000 (base damage) - it's a lower limit
+			greaterThanOrEqual(
+				maxResult,
+				10000,
+				`Maximum damage ${maxResult} should be at least 10000 (base damage)`
+			);
+		});
+
+		test("should handle extreme variation ranges", () => {
+			const baseDamage = 100;
+			const results: number[] = [];
+
+			// Very wide variation: 50% to 200%
+			for (let i = 0; i < 1000; i++) {
+				const result = applyDamageVariation(baseDamage, {
+					minMultiplier: 0.5, // 50%
+					maxMultiplier: 2.0, // 200%
+				});
+				results.push(result);
+			}
+
+			const minResult = Math.min(...results);
+			const maxResult = Math.max(...results);
+
+			// Minimum should not exceed 100 (base damage) - it's an upper limit
+			// But 0.5 * 100 = 50, so we can actually get 50 damage
+			lessThanOrEqual(
+				minResult,
+				100,
+				`Minimum damage ${minResult} should not exceed 100 (base damage)`
+			);
+			greaterThanOrEqual(
+				minResult,
+				50,
+				`Minimum damage ${minResult} should be at least 50 (50% of base)`
+			);
+			// Maximum should be at least 100 (base damage) - it's a lower limit
+			// And 2.0 * 100 = 200, so we can get up to 200
+			greaterThanOrEqual(
+				maxResult,
+				100,
+				`Maximum damage ${maxResult} should be at least 100 (base damage)`
+			);
+			lessThanOrEqual(
+				maxResult,
+				200,
+				`Maximum damage ${maxResult} should not exceed 200 (200% of base)`
+			);
+		});
+
+		test("should produce consistent results within expected range", () => {
+			const baseDamage = 100;
+			const iterations = 10000;
+			const results: number[] = [];
+
+			for (let i = 0; i < iterations; i++) {
+				const result = applyDamageVariation(baseDamage);
+				results.push(result);
+			}
+
+			// All results should be within the expected range
+			// With default 20% variation: 90% to 110% = 90 to 110
+			// But min is capped at 100 (base damage), max is at least 100 (base damage)
+			// So final range is 97-103 (the constraints don't change the range, they just constrain the multipliers)
+			for (const result of results) {
+				greaterThanOrEqual(
+					result,
+					90,
+					`Result ${result} should be at least 90 for default 20% variation`
+				);
+				lessThanOrEqual(
+					result,
+					110,
+					`Result ${result} should not exceed 110 for default 20% variation`
+				);
+			}
 		});
 	});
 });

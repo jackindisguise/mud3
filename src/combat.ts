@@ -931,7 +931,7 @@ const deathColorRepeatingTransformer = repeatingColorStringTransformer(
 		COLOR.CRIMSON,
 		COLOR.MAROON,
 	],
-	3
+	4
 );
 
 /**

@@ -148,9 +148,10 @@ export function registerActiveCharacter(character: Character): boolean {
 	if (ACTIVE_REGISTRY.has(key)) return false;
 	ACTIVE_REGISTRY.set(key, { character, since: new Date() });
 	ACTIVE_ID_REGISTRY.set(character.credentials.characterId, character);
-	logger.debug(
-		`Registered active character: ${character.credentials.username} (ID: ${character.credentials.characterId})`
-	);
+	logger.debug("Registered active character", {
+		username: character.credentials.username,
+		characterId: character.credentials.characterId,
+	});
 	return true;
 }
 
@@ -166,7 +167,9 @@ export function unregisterActiveCharacter(arg: string | Character): boolean {
 	const removed = ACTIVE_REGISTRY.delete(key);
 	if (removed && entry) {
 		ACTIVE_ID_REGISTRY.delete(entry.character.credentials.characterId);
-		logger.debug(`Unregistered active character: ${username}`);
+		logger.debug("Unregistered active character", {
+			username,
+		});
 	}
 	return removed;
 }
@@ -237,11 +240,10 @@ export async function saveCharacter(character: Character) {
 		// Atomically rename temp file to final location
 		await rename(tempPath, filePath);
 
-		logger.debug(
-			`Saved character file: ${relative(ROOT_DIRECTORY, filePath)} for ${
-				character.credentials.username
-			}`
-		);
+		logger.debug("Saved character file", {
+			filePath: relative(ROOT_DIRECTORY, filePath),
+			username: character.credentials.username,
+		});
 	} catch (error) {
 		// Clean up temp file if it exists
 		try {
@@ -273,12 +275,10 @@ export async function checkCharacterPassword(
 	const filePath = getCharacterFilePath(username);
 
 	if (!(await characterExists(username))) {
-		logger.debug(
-			`Character file not found: ${relative(
-				ROOT_DIRECTORY,
-				filePath
-			)} (username=${username})`
-		);
+		logger.debug("Character file not found", {
+			filePath: relative(ROOT_DIRECTORY, filePath),
+			username,
+		});
 		return undefined;
 	}
 
@@ -289,7 +289,9 @@ export async function checkCharacterPassword(
 	// Note: We don't migrate here - migration happens in deserializeCharacter
 	const hashedPassword = hashPassword(password);
 	if (raw.credentials.passwordHash !== hashedPassword) {
-		logger.debug(`Password mismatch for user: ${username}`);
+		logger.debug("Password mismatch", {
+			username,
+		});
 		return undefined;
 	}
 
@@ -403,12 +405,10 @@ export async function loadCharacter(
 		return undefined;
 	}
 	if (!(await characterExists(username))) {
-		logger.debug(
-			`Character file not found: ${relative(
-				ROOT_DIRECTORY,
-				filePath
-			)} (username=${username})`
-		);
+		logger.debug("Character file not found", {
+			filePath: relative(ROOT_DIRECTORY, filePath),
+			username,
+		});
 		return undefined;
 	}
 
@@ -427,8 +427,8 @@ export default {
 	name: "character",
 	dependencies: [archetypePkg],
 	loader: async () => {
-		logger.debug(
-			`Character storage directory ready: ${relative(ROOT_DIRECTORY, CHAR_DIR)}`
-		);
+		logger.debug("Character storage directory ready", {
+			directory: relative(ROOT_DIRECTORY, CHAR_DIR),
+		});
 	},
 } as Package;

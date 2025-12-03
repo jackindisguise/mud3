@@ -168,9 +168,9 @@ function updateActivity(session: LoginSession): void {
 	const timeoutMs = Math.max(1, timeoutSeconds) * 1000;
 
 	session.inactivityTimer = setTimeout(async () => {
-		logger.debug(
-			`Inactivity timeout for ${session.character?.credentials.username}`
-		);
+		logger.debug("Inactivity timeout", {
+			username: session.character?.credentials.username,
+		});
 		session.character?.sendMessage(
 			"You have been disconnected due to inactivity.",
 			MESSAGE_GROUP.SYSTEM
@@ -558,7 +558,10 @@ function handleGameplayInput(session: LoginSession, input: string): void {
 		}
 	}
 
-	logger.debug(`${character.credentials.username} input: ${input}`);
+	logger.debug("Character input", {
+		username: character.credentials.username,
+		input,
+	});
 
 	// generate the context
 	const context: CommandContext = {
@@ -1070,7 +1073,9 @@ function nanny(session: LoginSession): void {
 		});
 	};
 
-	logger.debug(`calling askName() to start login process for ${client}`);
+	logger.debug("Starting login process", {
+		address: client.getAddress(),
+	});
 
 	// We check by username after they enter it, or we can check immediately
 	// For now, we'll check after they enter their name
@@ -1221,21 +1226,19 @@ async function stop(): Promise<void> {
 	// End all sessions and remove them from the set BEFORE closing the server
 	// This prevents handleDisconnection from trying to process them again
 	const sessions = Array.from(loginSessions);
-	logger.debug(`Found ${sessions.length} session/s to end`);
+	logger.debug("Found sessions to end", {
+		sessionCount: sessions.length,
+	});
 	loginSessions.clear(); // Clear immediately to prevent double-processing
 
 	for (const session of sessions) {
-		logger.debug(
-			`Ending session for ${
-				session.character?.credentials.username || "unauthenticated user"
-			}`
-		);
+		logger.debug("Ending session", {
+			username: session.character?.credentials.username || "unauthenticated user",
+		});
 		await endPlayerSession(session);
-		logger.debug(
-			`Session ended for ${
-				session.character?.credentials.username || "unauthenticated user"
-			}`
-		);
+		logger.debug("Session ended", {
+			username: session.character?.credentials.username || "unauthenticated user",
+		});
 	}
 
 	logger.debug("All sessions ended, saving boards");

@@ -206,9 +206,9 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 
 		// Register callback for when all telnet negotiations complete
 		manager.onAllNegotiationsComplete(() => {
-			logger.debug(
-				`StandardMudClient (${this.getAddress()}): all negotiations complete, emitting negotiationsComplete event`
-			);
+			logger.debug("All telnet negotiations complete", {
+				address: this.getAddress(),
+			});
 			this.emit("negotiationsComplete");
 		});
 
@@ -225,7 +225,9 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 		});
 
 		this.socket.on("close", () => {
-			logger.debug(`Client disconnected: ${this.getAddress()}`);
+			logger.debug("Client disconnected", {
+				address: this.getAddress(),
+			});
 			// Flush any pending messages before closing
 			this.emit("close");
 		});
@@ -239,7 +241,6 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 	private handleData(data: Buffer): void {
 		// Process telnet negotiations and remove them from the stream
 		const cleaned = this.negotiationManager.processData(data);
-		logger.debug(`Client data (${this.getAddress()}): ${Array.from(cleaned)}`);
 
 		// Convert to UTF-8 string and add to buffer
 		this.buffer += cleaned.toString("binary");
@@ -263,7 +264,10 @@ export class StandardMudClient extends EventEmitter implements MudClient {
 						);
 					}
 				} else {
-					logger.debug(`Client input (${this.getAddress()}): ${line}`);
+					logger.debug("Client input", {
+						address: this.getAddress(),
+						input: line,
+					});
 					this.emit("input", line);
 				}
 			}
@@ -520,18 +524,20 @@ export class MudServer extends EventEmitter {
 		const client = new StandardMudClient(socket);
 		this.clients.add(client);
 
-		logger.debug(
-			`MudServer (${client.getAddress()}): new socket connection, waiting for telnet negotiations`
-		);
+		logger.debug("New socket connection", {
+			address: client.getAddress(),
+			totalClients: this.clients.size,
+		});
 
 		// Wait for all telnet protocol negotiations to complete before emitting connection
 		// This ensures all protocols (especially MCCP2 compression) are set up (or rejected) before any writes occur
 		const emitConnection = () => {
 			// Only emit if we haven't already emitted (prevent double emission)
 			if (this.clients.has(client)) {
-				logger.debug(
-					`MudServer (${client.getAddress()}): emitting connection event`
-				);
+				logger.debug("Emitting connection event", {
+					address: client.getAddress(),
+					totalClients: this.clients.size,
+				});
 				logger.info(
 					`Client connected: ${client.getAddress()} (${
 						this.clients.size
@@ -539,9 +545,10 @@ export class MudServer extends EventEmitter {
 				);
 				this.emit("connection", client);
 			} else {
-				logger.debug(
-					`MudServer (${client.getAddress()}): skipping connection emission - client already removed`
-				);
+				logger.debug("Skipping connection emission", {
+					address: client.getAddress(),
+					reason: "client already removed",
+				});
 			}
 		};
 
@@ -549,37 +556,38 @@ export class MudServer extends EventEmitter {
 		let connectionEmitted = false;
 		const onNegotiationsComplete = () => {
 			if (!connectionEmitted) {
-				logger.debug(
-					`MudServer (${client.getAddress()}): negotiations complete callback triggered`
-				);
+				logger.debug("Negotiations complete callback triggered", {
+					address: client.getAddress(),
+				});
 				connectionEmitted = true;
 				emitConnection();
 			} else {
-				logger.debug(
-					`MudServer (${client.getAddress()}): negotiations complete callback triggered but connection already emitted`
-				);
+				logger.debug("Negotiations complete but connection already emitted", {
+					address: client.getAddress(),
+				});
 			}
 		};
 		client.once("negotiationsComplete", onNegotiationsComplete);
-		logger.debug(
-			`MudServer (${client.getAddress()}): registered negotiationsComplete event listener`
-		);
+		logger.debug("Registered negotiationsComplete event listener", {
+			address: client.getAddress(),
+		});
 
 		// Check if negotiations are already complete (synchronous check)
 		const hasPending = client.hasPendingNegotiations();
-		logger.debug(
-			`MudServer (${client.getAddress()}): checking pending negotiations - hasPending: ${hasPending}`
-		);
+		logger.debug("Checking pending negotiations", {
+			address: client.getAddress(),
+			hasPending,
+		});
 		if (!hasPending) {
 			// No negotiations pending, emit connection immediately
-			logger.debug(
-				`MudServer (${client.getAddress()}): no pending negotiations, emitting connection immediately`
-			);
+			logger.debug("No pending negotiations, emitting connection immediately", {
+				address: client.getAddress(),
+			});
 			onNegotiationsComplete();
 		} else {
-			logger.debug(
-				`MudServer (${client.getAddress()}): negotiations pending, waiting for completion`
-			);
+			logger.debug("Negotiations pending, waiting for completion", {
+				address: client.getAddress(),
+			});
 		}
 
 		// Timeout fallback: if negotiations don't complete within 2 seconds,
@@ -593,13 +601,13 @@ export class MudServer extends EventEmitter {
 				connectionEmitted = true;
 				emitConnection();
 			} else if (connectionEmitted) {
-				logger.debug(
-					`MudServer (${client.getAddress()}): timeout reached but connection already emitted`
-				);
+				logger.debug("Timeout reached but connection already emitted", {
+					address: client.getAddress(),
+				});
 			} else {
-				logger.debug(
-					`MudServer (${client.getAddress()}): timeout reached but client already removed`
-				);
+				logger.debug("Timeout reached but client already removed", {
+					address: client.getAddress(),
+				});
 			}
 		}, 3000);
 
@@ -645,24 +653,33 @@ export class MudServer extends EventEmitter {
 	 */
 	public async stop(): Promise<void> {
 		return new Promise((resolve, reject) => {
-			logger.debug("MudServer.stop() called");
+			logger.debug("MudServer.stop() called", {
+				isListening: this.isListening,
+				clientCount: this.clients.size,
+			});
 			if (!this.isListening) {
 				logger.debug("Server not listening, resolving immediately");
 				resolve();
 				return;
 			}
 
-			logger.debug(`Closing ${this.clients.size} client connections`);
+			logger.debug("Closing client connections", {
+				clientCount: this.clients.size,
+			});
 			// Close all client connections
 			for (const client of this.clients) {
-				logger.debug(`Closing ${client}`);
+				logger.debug("Closing client", {
+					address: client.getAddress(),
+				});
 				client.close();
 			}
 			logger.debug("All clients closed, calling server.close()");
 
 			this.server.close((err) => {
 				if (err) {
-					logger.debug(`Server.close() error: ${err.message}`);
+					logger.debug("Server.close() error", {
+						error: err.message,
+					});
 					reject(err);
 				} else {
 					logger.debug("Server.close() completed successfully");

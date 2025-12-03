@@ -65,31 +65,27 @@ async function loadEffectTemplates() {
 		);
 		try {
 			const files = await readdir(effectDir);
-			logger.debug(
-				`Found ${files.length} files in ${relative(ROOT_DIRECTORY, effectDir)}`
-			);
+			logger.debug("Found effect template files", {
+				fileCount: files.length,
+				directory: relative(ROOT_DIRECTORY, effectDir),
+			});
 
 			// Filter for JavaScript files
 			const jsFiles = files.filter(
 				(file) => file.endsWith(".js") && !file.startsWith("_")
 			);
-			logger.debug(
-				`Found ${jsFiles.length} JavaScript effect template files in ${relative(
-					ROOT_DIRECTORY,
-					effectDir
-				)}`
-			);
+			logger.debug("Found JavaScript effect template files", {
+				fileCount: jsFiles.length,
+				directory: relative(ROOT_DIRECTORY, effectDir),
+			});
 
 			// Load JavaScript effect templates
 			for (const file of jsFiles) {
 				try {
 					const filePath = join(effectDir, file);
-					logger.debug(
-						`Processing effect template file: ${relative(
-							ROOT_DIRECTORY,
-							filePath
-						)}`
-					);
+					logger.debug("Processing effect template file", {
+						filePath: relative(ROOT_DIRECTORY, filePath),
+					});
 					const fileUrl = pathToFileURL(filePath).href;
 					const effectModule = await import(fileUrl);
 
@@ -168,9 +164,10 @@ async function loadEffectTemplates() {
 
 					// Register the effect template
 					registerEffectTemplate(effectTemplate);
-					logger.debug(
-						`Registered effect template "${effectTemplateId}" (${effectTemplate.name})`
-					);
+					logger.debug("Registered effect template", {
+						id: effectTemplateId,
+						name: effectTemplate.name,
+					});
 				} catch (error) {
 					logger.error(
 						`Failed to load effect template from ${relative(

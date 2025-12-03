@@ -167,7 +167,10 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 
 	// Don't wander if in combat
 	if (wanderingMob.isInCombat()) {
-		logger.debug(`Wander: ${wanderingMob.display} skipping - in combat`);
+		logger.debug("Wander skipped - mob in combat", {
+			mob: wanderingMob.display,
+			mobId: wanderingMob.oid,
+		});
 		return false;
 	}
 
@@ -179,13 +182,18 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 	const currentRoom = wanderingMob.location as Room;
 	const dungeon = currentRoom.dungeon;
 	if (!dungeon) {
-		logger.debug(`Wander: ${wanderingMob.display} skipping - no dungeon`);
+		logger.debug("Wander skipped - no dungeon", {
+			mob: wanderingMob.display,
+			mobId: wanderingMob.oid,
+		});
 		return false;
 	}
 
-	logger.debug(
-		`Wander: ${wanderingMob.display} attempting to wander from room at ${currentRoom.x},${currentRoom.y},${currentRoom.z}`
-	);
+	logger.debug("Wander attempt", {
+		mob: wanderingMob.display,
+		mobId: wanderingMob.oid,
+		fromRoom: `${currentRoom.x},${currentRoom.y},${currentRoom.z}`,
+	});
 
 	const dimensions = dungeon.dimensions;
 	const totalRooms = dimensions.width * dimensions.height * dimensions.layers;
@@ -224,20 +232,25 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 	if (path && targetRoom) {
 		const stepsToTake = Math.min(5, path.directions.length);
 		const targetCoords = targetRoom.coordinates;
-		logger.debug(
-			`Wander: ${wanderingMob.display} found path to room at ${targetCoords.x},${targetCoords.y},${targetCoords.z} (${path.directions.length} steps), taking first ${stepsToTake} step(s)`
-		);
+		logger.debug("Wander path found", {
+			mob: wanderingMob.display,
+			mobId: wanderingMob.oid,
+			toRoom: `${targetCoords.x},${targetCoords.y},${targetCoords.z}`,
+			totalSteps: path.directions.length,
+			stepsToTake,
+		});
 
 		// Walk up to 5 steps
 		let moved = false;
 		for (let i = 0; i < stepsToTake; i++) {
 			const direction = path.directions[i];
 			if (!wanderingMob.step(direction)) {
-				logger.debug(
-					`Wander: ${wanderingMob.display} failed to step ${
-						i + 1
-					}/${stepsToTake}, stopping`
-				);
+				logger.debug("Wander step failed", {
+					mob: wanderingMob.display,
+					mobId: wanderingMob.oid,
+					step: i + 1,
+					totalSteps: stepsToTake,
+				});
 				moved = i > 0; // Return true if we took at least one step
 				break;
 			}
@@ -253,9 +266,11 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 	}
 
 	// If no path found, fall back to adjacent rooms
-	logger.debug(
-		`Wander: ${wanderingMob.display} no path found after ${attempts} attempts, falling back to adjacent rooms`
-	);
+	logger.debug("Wander no path found, falling back to adjacent rooms", {
+		mob: wanderingMob.display,
+		mobId: wanderingMob.oid,
+		attempts,
+	});
 	// Find valid exits
 	const validDirections: DIRECTION[] = [];
 	for (const dir of DIRECTIONS) {
@@ -268,18 +283,20 @@ export function processWanderBehavior(wanderingMob: Mob): boolean {
 	}
 
 	if (validDirections.length === 0) {
-		logger.debug(
-			`Wander: ${wanderingMob.display} no valid adjacent exits, cannot wander`
-		);
+		logger.debug("Wander failed - no valid adjacent exits", {
+			mob: wanderingMob.display,
+			mobId: wanderingMob.oid,
+		});
 		return false;
 	}
 
 	// Pick a random direction and move
 	const randomDir =
 		validDirections[Math.floor(Math.random() * validDirections.length)];
-	logger.debug(
-		`Wander: ${wanderingMob.display} moving to adjacent room (fallback)`
-	);
+	logger.debug("Wander moving to adjacent room (fallback)", {
+		mob: wanderingMob.display,
+		mobId: wanderingMob.oid,
+	});
 	const moved = wanderingMob.step(randomDir);
 
 	// Check for aggressive behavior in the final room

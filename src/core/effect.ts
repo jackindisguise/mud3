@@ -123,6 +123,10 @@ export interface ShieldEffectTemplate extends BaseEffectTemplate {
 	absorption: number;
 	/** Optional damage type filter - if specified, only absorbs this damage type */
 	damageType?: DAMAGE_TYPE;
+	/** Optional maximum amount of damage this shield can absorb from a single hit */
+	maxAbsorptionPerHit?: number;
+	/** Percentage of incoming damage this shield will try to absorb (default: 1.0 = 100%) */
+	absorptionRate?: number;
 }
 
 /**

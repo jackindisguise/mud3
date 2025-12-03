@@ -19,4 +19,8 @@ export const effectTemplate: ShieldEffectTemplate = {
 		user: "You activate your integrated armor!",
 		room: "{User} activates their integrated armor!",
 	},
+	onExpire: {
+		user: "Your integrated armor deactivates.",
+		room: "{User}'s integrated armor deactivates.",
+	}
 };

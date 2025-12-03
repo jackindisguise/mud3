@@ -19,6 +19,10 @@ export const effectTemplate: ShieldEffectTemplate = {
 		user: "You create a protective ward of earth around yourself!",
 		room: "{User} creates a protective ward of earth!",
 	},
+	onExpire: {
+		user: "Your protective ward of earth fades away.",
+		room: "{User}'s protective ward of earth fades.",
+	}
 };
 
 

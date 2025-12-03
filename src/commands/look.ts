@@ -181,9 +181,53 @@ function showObject(actor: Mob, obj: DungeonObject): void {
 	character.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
+/**
+ * Displays the contents of a container.
+ * Shows the container's description and lists all items inside it.
+ *
+ * @param actor The mob viewing the container
+ * @param container The container to look inside
+ */
+function showContainerContents(actor: Mob, container: DungeonObject): void {
+	const character = actor.character;
+	if (!character) return;
+
+	const lines: string[] = [];
+
+	// Display container name
+	if (container.display) {
+		lines.push(
+			`${color(`Looking inside ${container.display}...`, COLOR.CYAN)}`
+		);
+	}
+
+	// Show container description if it has one
+	if (container.description) {
+		lines.push(`> ${container.description}`);
+	}
+
+	// Show contents
+	const contents = container.contents;
+	if (contents.length === 0) {
+		lines.push("> It is empty.");
+	} else {
+		lines.push("");
+		lines.push(`${color("Contents:", COLOR.YELLOW)}`);
+		for (const item of contents) {
+			lines.push(`  ${item.display || item.keywords}`);
+		}
+	}
+
+	character.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
+}
+
 export default {
 	pattern: "look~",
-	aliases: ["look~ <target:object@all>", "look~ <direction:direction>"],
+	aliases: [
+		"look~ <target:object@all>",
+		"look~ <direction:direction>",
+		"look~ in <container:object@all>",
+	],
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor, room } = context;
 
@@ -197,6 +241,25 @@ export default {
 
 		const target = args.get("target") as DungeonObject | undefined;
 		const direction = args.get("direction") as DIRECTION | undefined;
+		const container = args.get("container") as DungeonObject | undefined;
+
+		// If container specified, show its contents
+		if (container) {
+			// Check if container is accessible (in room or in actor's inventory)
+			const containerLocation = container.location;
+			if (containerLocation !== room && containerLocation !== actor) {
+				actor.sendMessage(
+					`You don't have access to ${
+						container.display || container.keywords
+					}.`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
+
+			showContainerContents(actor, container);
+			return;
+		}
 
 		// If target object is specified, show that object
 		if (target) {

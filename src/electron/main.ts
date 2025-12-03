@@ -71,6 +71,7 @@ function createMainWindow(): BrowserWindow {
 			preload: path.join(__dirname, "preload.cjs"),
 			nodeIntegration: false,
 			contextIsolation: true,
+			spellcheck: false,
 		},
 		show: false,
 	});

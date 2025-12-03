@@ -1023,6 +1023,7 @@ export interface DungeonObjectOptions {
 	dungeon?: Dungeon;
 	baseWeight?: number;
 	templateId?: string;
+	value?: number;
 }
 
 /**
@@ -1074,6 +1075,7 @@ export interface SerializedDungeonObject {
 	contents?: SerializedDungeonObject[];
 	location?: string; // RoomRef value
 	baseWeight?: number;
+	value?: number;
 }
 
 /**
@@ -1775,6 +1777,12 @@ export class DungeonObject {
 	currentWeight: number = 0;
 
 	/**
+	 * Monetary value of this object.
+	 * Used for currency and items that have a gold value.
+	 */
+	value: number = 0;
+
+	/**
 	 * Array of objects directly contained by this object. Acts as a container
 	 * registry for inventory, room contents, or nested object hierarchies.
 	 * @private
@@ -1881,6 +1889,7 @@ export class DungeonObject {
 			this.currentWeight = options.baseWeight;
 		}
 		if (options.templateId) this.templateId = options.templateId;
+		if (options.value !== undefined) this.value = options.value;
 	}
 
 	toString() {
@@ -2265,6 +2274,7 @@ export class DungeonObject {
 			...(serializedContents.length > 0 && { contents: serializedContents }),
 			...(locationRef && { location: locationRef }),
 			...(this.baseWeight !== 0 && { baseWeight: this.baseWeight }),
+			...(this.value !== 0 && { value: this.value }),
 		};
 
 		if (options?.compress) {
@@ -3531,6 +3541,36 @@ export class Item extends Movable {
 	 */
 	override get location() {
 		return super.location;
+	}
+}
+
+/**
+ * Currency is a special type of Item that only exists at runtime.
+ * When picked up, its value is added to the mob's value property.
+ * Currency items are not persisted - they are created on demand and
+ * converted to mob value when picked up.
+ *
+ * @example
+ * ```typescript
+ * const gold = new Currency({ value: 100, keywords: "gold", display: "100 gold" });
+ * room.add(gold);
+ * // When mob picks it up, mob.value increases by 100 and the currency item is removed
+ * ```
+ */
+export class Currency extends Item {
+	constructor(options?: DungeonObjectOptions) {
+		super(options);
+		// Value is inherited from DungeonObject
+	}
+
+	/**
+	 * Currency items are not persisted - they only exist at runtime.
+	 * This override prevents serialization by throwing an error.
+	 */
+	override serialize(): never {
+		throw new Error(
+			"Currency items cannot be serialized - they only exist at runtime"
+		);
 	}
 }
 

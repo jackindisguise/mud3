@@ -41,16 +41,19 @@ export default {
 			(item) => !(item instanceof Equipment) || !equippedItems.includes(item)
 		);
 
-		const lines = [`${color("Gold:", COLOR.YELLOW)} ${actor.value}`];
+		const lines = ["You are carrying:"];
 
 		if (unequippedItems.length === 0) {
-			lines.push("", "You are carrying nothing.");
+			lines.push(" Nothing.");
 		} else {
 			// Format inventory list
 			const itemList = unequippedItems.map((item) => `${item.display}`);
-			lines.push("", "You are carrying:");
-			lines.push(...itemList);
+			lines.push(...itemList.map((item) => ` ${item}`));
 		}
+
+		lines.push(
+			`You're carrying ${color(`${actor.value} gold`, COLOR.YELLOW)}.`
+		);
 
 		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},

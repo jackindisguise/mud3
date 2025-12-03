@@ -1893,8 +1893,8 @@ export class CommandRegistry {
 				result.error !== "Input does not match command pattern"
 			) {
 				// Check if command has a meaningful error handler
-				if (this.hasErrorHandler(command)) {
-					command.onError!(context, result);
+				if (command.onError) {
+					command.onError(context, result);
 					return true;
 				}
 				// If onError is not implemented, continue searching other commands
@@ -2032,32 +2032,6 @@ export class CommandRegistry {
 			room:
 				actor.location instanceof Room ? (actor.location as Room) : undefined,
 		};
-	}
-
-	/**
-	 * Check if a command has a meaningful error handler.
-	 * For adapter commands, checks if they actually have an error handler configured.
-	 */
-	private hasErrorHandler(command: Command): boolean {
-		if (!command.onError) {
-			return false;
-		}
-		// Check if this is an adapter command and if it has an actual error handler configured
-		const commandType = command.constructor.name;
-		if (
-			command instanceof JavaScriptCommandAdapter ||
-			command instanceof AbilityCommand
-		) {
-			// Access private field via type assertion - this is a bit hacky but necessary
-			const adapter = command as any;
-			return !!adapter.errorFunction;
-		}
-		if (command instanceof YAMLCommandAdapter) {
-			const adapter = command as any;
-			return !!adapter.errorScript;
-		}
-		// For other command types, if onError exists, it's meaningful
-		return true;
 	}
 
 	/**

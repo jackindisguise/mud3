@@ -722,6 +722,53 @@ header h1 {
 	color: var(--base2);
 }
 
+.zoom-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-left: 1rem;
+	color: var(--base0);
+	font-size: 0.85rem;
+}
+
+.zoom-btn {
+	padding: 0.35rem 0.75rem;
+	background: var(--base02);
+	border: 1px solid var(--base01);
+	color: var(--base1);
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 1.2rem;
+	font-weight: bold;
+	line-height: 1;
+	min-width: 2rem;
+	transition: all 0.2s;
+}
+
+.zoom-btn:hover {
+	background: var(--base01);
+	border-color: var(--base00);
+}
+
+.zoom-btn:active {
+	background: var(--base00);
+}
+
+.zoom-level {
+	color: var(--base1);
+	font-weight: 500;
+	min-width: 3rem;
+	text-align: center;
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	transition: color 0.2s;
+}
+
+.zoom-level:hover {
+	color: var(--base2);
+}
+
 .toolbox-label {
 	color: var(--base0);
 	font-size: 0.85rem;

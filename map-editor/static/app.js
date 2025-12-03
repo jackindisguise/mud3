@@ -82,6 +82,9 @@ class MapEditor {
 		this.currentMousePosition = null; // {x, y, z} of cell mouse is over
 		this.projectVersion = null; // Project version from package.json
 		this.dungeonList = []; // List of available dungeon IDs
+		this.zoomLevel = 1.0; // Current zoom level (1.0 = 100%)
+		this.autoScrollInterval = null; // Interval for auto-scrolling
+		this.autoScrollSpeed = { x: 0, y: 0 }; // Current auto-scroll speed
 
 		this.init();
 	}
@@ -1672,6 +1675,8 @@ class MapEditor {
 		// Create wrapper for grid with rulers
 		const wrapper = document.createElement("div");
 		wrapper.className = "grid-wrapper";
+		wrapper.style.transform = `scale(${this.zoomLevel})`;
+		wrapper.style.transformOrigin = "top left";
 
 		// Create top ruler (column numbers)
 		const topRuler = document.createElement("div");
@@ -1891,6 +1896,12 @@ class MapEditor {
 
 		wrapper.appendChild(contentArea);
 		gridContainer.appendChild(wrapper);
+
+		// Update zoom display
+		this.updateZoomDisplay();
+
+		// Setup auto-scroll on mousemove for edge detection
+		this.setupAutoScroll();
 
 		// Restore selection visuals after rendering
 		this.selectedCells = previousSelection;
@@ -3087,7 +3098,8 @@ class MapEditor {
 			const make2WayBtn = linkItem.querySelector(".make-2way-btn");
 			if (make2WayBtn) {
 				make2WayBtn.onclick = async (e) => {
-					const idx = parseInt(e.target.dataset.index);
+					e.stopPropagation();
+					const idx = parseInt(make2WayBtn.dataset.index);
 					await this.makeExit2WayForOverride(idx, x, y, z);
 				};
 			}
@@ -3126,7 +3138,8 @@ class MapEditor {
 					if (make2WayBtn) {
 						make2WayBtn.dataset.index = i;
 						make2WayBtn.onclick = async (e) => {
-							const idx = parseInt(e.target.dataset.index);
+							e.stopPropagation();
+							const idx = parseInt(make2WayBtn.dataset.index);
 							await this.makeExit2WayForOverride(idx, x, y, z);
 						};
 					}
@@ -3160,7 +3173,8 @@ class MapEditor {
 			.querySelectorAll("#exit-override-room-links-container .make-2way-btn")
 			.forEach((btn) => {
 				btn.onclick = async (e) => {
-					const index = parseInt(e.target.dataset.index);
+					e.stopPropagation();
+					const index = parseInt(btn.dataset.index);
 					await this.makeExit2WayForOverride(index, x, y, z);
 				};
 			});
@@ -5424,6 +5438,139 @@ class MapEditor {
 		select.value = this.currentLayer;
 	}
 
+	zoomIn() {
+		this.zoomLevel = Math.min(this.zoomLevel + 0.1, 3.0); // Max 300%
+		this.updateZoom();
+	}
+
+	zoomOut() {
+		this.zoomLevel = Math.max(this.zoomLevel - 0.1, 0.1); // Min 10%
+		this.updateZoom();
+	}
+
+	resetZoom() {
+		this.zoomLevel = 1.0; // Reset to 100%
+		this.updateZoom();
+	}
+
+	updateZoom() {
+		// Update zoom display
+		this.updateZoomDisplay();
+
+		// Apply zoom to grid wrapper if it exists
+		const gridContainer = document.getElementById("map-grid");
+		if (gridContainer) {
+			const wrapper = gridContainer.querySelector(".grid-wrapper");
+			if (wrapper) {
+				wrapper.style.transform = `scale(${this.zoomLevel})`;
+				wrapper.style.transformOrigin = "top left";
+			}
+		}
+	}
+
+	updateZoomDisplay() {
+		const zoomDisplay = document.getElementById("zoom-level-display");
+		if (zoomDisplay) {
+			zoomDisplay.textContent = `${Math.round(this.zoomLevel * 100)}%`;
+		}
+	}
+
+	setupAutoScroll() {
+		const mapGrid = document.getElementById("map-grid");
+		if (!mapGrid) return;
+
+		// Remove existing listener if any
+		if (this.autoScrollMousemoveHandler) {
+			mapGrid.removeEventListener("mousemove", this.autoScrollMousemoveHandler);
+		}
+
+		// Create new handler
+		this.autoScrollMousemoveHandler = (e) => {
+			// Only auto-scroll when selecting or dragging
+			if (!this.isSelecting && !this.isDragging) {
+				this.stopAutoScroll();
+				return;
+			}
+
+			const rect = mapGrid.getBoundingClientRect();
+			const mouseX = e.clientX - rect.left;
+			const mouseY = e.clientY - rect.top;
+
+			// Edge detection zone (in pixels from edge)
+			const edgeZone = 50;
+			const scrollSpeed = 10; // pixels per frame
+
+			// Calculate distance from edges
+			const distanceFromLeft = mouseX;
+			const distanceFromRight = rect.width - mouseX;
+			const distanceFromTop = mouseY;
+			const distanceFromBottom = rect.height - mouseY;
+
+			// Determine scroll direction and speed
+			let scrollX = 0;
+			let scrollY = 0;
+
+			if (distanceFromLeft < edgeZone) {
+				// Near left edge - scroll left
+				const factor = 1 - (distanceFromLeft / edgeZone);
+				scrollX = -scrollSpeed * factor;
+			} else if (distanceFromRight < edgeZone) {
+				// Near right edge - scroll right
+				const factor = 1 - (distanceFromRight / edgeZone);
+				scrollX = scrollSpeed * factor;
+			}
+
+			if (distanceFromTop < edgeZone) {
+				// Near top edge - scroll up
+				const factor = 1 - (distanceFromTop / edgeZone);
+				scrollY = -scrollSpeed * factor;
+			} else if (distanceFromBottom < edgeZone) {
+				// Near bottom edge - scroll down
+				const factor = 1 - (distanceFromBottom / edgeZone);
+				scrollY = scrollSpeed * factor;
+			}
+
+			// Update scroll speed
+			this.autoScrollSpeed = { x: scrollX, y: scrollY };
+
+			// Start or update auto-scroll animation
+			if ((scrollX !== 0 || scrollY !== 0) && !this.autoScrollInterval) {
+				this.startAutoScroll();
+			} else if (scrollX === 0 && scrollY === 0) {
+				this.stopAutoScroll();
+			}
+		};
+
+		mapGrid.addEventListener("mousemove", this.autoScrollMousemoveHandler);
+	}
+
+	startAutoScroll() {
+		if (this.autoScrollInterval) return;
+
+		const mapGrid = document.getElementById("map-grid");
+		if (!mapGrid) return;
+
+		const scroll = () => {
+			if (this.autoScrollSpeed.x !== 0 || this.autoScrollSpeed.y !== 0) {
+				mapGrid.scrollLeft += this.autoScrollSpeed.x;
+				mapGrid.scrollTop += this.autoScrollSpeed.y;
+				this.autoScrollInterval = requestAnimationFrame(scroll);
+			} else {
+				this.stopAutoScroll();
+			}
+		};
+
+		this.autoScrollInterval = requestAnimationFrame(scroll);
+	}
+
+	stopAutoScroll() {
+		if (this.autoScrollInterval) {
+			cancelAnimationFrame(this.autoScrollInterval);
+			this.autoScrollInterval = null;
+		}
+		this.autoScrollSpeed = { x: 0, y: 0 };
+	}
+
 	async resizeDungeon() {
 		if (!this.yamlData) return;
 
@@ -6709,6 +6856,9 @@ class MapEditor {
 				this.isDragging = false;
 				this.processedCells.clear();
 			}
+
+			// Stop auto-scrolling when mouse is released
+			this.stopAutoScroll();
 		});
 
 		document.addEventListener("mouseleave", (e) => {
@@ -6717,6 +6867,8 @@ class MapEditor {
 				this.isDragging = false;
 				this.processedCells.clear();
 			}
+			// Stop auto-scrolling when mouse leaves window
+			this.stopAutoScroll();
 		});
 
 		document.addEventListener("selectstart", (e) => {
@@ -6917,6 +7069,45 @@ class MapEditor {
 			}
 		});
 
+		// Zoom controls
+		const zoomInBtn = document.getElementById("zoom-in-btn");
+		const zoomOutBtn = document.getElementById("zoom-out-btn");
+		const zoomLevelDisplay = document.getElementById("zoom-level-display");
+		if (zoomInBtn) {
+			zoomInBtn.addEventListener("click", () => {
+				this.zoomIn();
+			});
+		}
+		if (zoomOutBtn) {
+			zoomOutBtn.addEventListener("click", () => {
+				this.zoomOut();
+			});
+		}
+		if (zoomLevelDisplay) {
+			zoomLevelDisplay.addEventListener("click", () => {
+				this.resetZoom();
+			});
+			zoomLevelDisplay.style.cursor = "pointer";
+			zoomLevelDisplay.title = "Click to reset zoom to 100%";
+		}
+
+		// Mouse wheel zoom with CTRL/CMD modifier
+		const mapGrid = document.getElementById("map-grid");
+		if (mapGrid) {
+			mapGrid.addEventListener("wheel", (e) => {
+				// Check for CTRL (Windows/Linux) or CMD (Mac) modifier
+				if (e.ctrlKey || e.metaKey) {
+					e.preventDefault();
+					// Scroll up (negative deltaY) = zoom in, scroll down (positive deltaY) = zoom out
+					if (e.deltaY < 0) {
+						this.zoomIn();
+					} else if (e.deltaY > 0) {
+						this.zoomOut();
+					}
+				}
+			}, { passive: false });
+		}
+
 		// Keyboard shortcuts for layer navigation
 		document.addEventListener("keydown", (e) => {
 			// Only handle if not typing in an input field
@@ -6964,8 +7155,9 @@ class MapEditor {
 				this.renderMap(dungeon);
 				// Reload resets to show only current layer
 				this.loadResets(dungeon);
-			} else if (e.key === "Delete") {
+			} else if (e.key === "Delete" || e.key === "Backspace") {
 				// Delete selected rooms
+				// Handle both Delete (Windows/Forward Delete on macOS) and Backspace (Delete on macOS)
 				if (this.selectedCells.size > 0) {
 					e.preventDefault();
 					this.deleteSelectedRooms();
@@ -8855,18 +9047,18 @@ class MapEditor {
 		}
 		const displayName = rawName || sanitizedName;
 
-		if (width < 1 || width > 100) {
-			this.showToast("Invalid width", "Width must be between 1 and 100");
+		if (width < 1) {
+			this.showToast("Invalid width", "Width must be at least 1");
 			return;
 		}
 
-		if (height < 1 || height > 100) {
-			this.showToast("Invalid height", "Height must be between 1 and 100");
+		if (height < 1) {
+			this.showToast("Invalid height", "Height must be at least 1");
 			return;
 		}
 
-		if (layers < 1 || layers > 100) {
-			this.showToast("Invalid layers", "Layers must be between 1 and 100");
+		if (layers < 1) {
+			this.showToast("Invalid layers", "Layers must be at least 1");
 			return;
 		}
 

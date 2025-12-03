@@ -131,6 +131,23 @@
 								<label for="layer-select">Layer</label>
 								<select id="layer-select"></select>
 							</div>
+							<div class="zoom-controls">
+								<button
+									id="zoom-out-btn"
+									class="zoom-btn"
+									title="Zoom Out"
+								>
+									−
+								</button>
+								<span id="zoom-level-display" class="zoom-level">100%</span>
+								<button
+									id="zoom-in-btn"
+									class="zoom-btn"
+									title="Zoom In"
+								>
+									+
+								</button>
+							</div>
 							<div class="toolbox-label">Selection Tools</div>
 							<div class="toolbox-tools">
 								<button
@@ -391,7 +408,6 @@
 							type="number"
 							id="new-dungeon-width"
 							min="1"
-							max="100"
 							value="10"
 						/>
 					</div>
@@ -401,7 +417,6 @@
 							type="number"
 							id="new-dungeon-height"
 							min="1"
-							max="100"
 							value="10"
 						/>
 					</div>
@@ -411,7 +426,6 @@
 							type="number"
 							id="new-dungeon-layers"
 							min="1"
-							max="100"
 							value="1"
 						/>
 					</div>
@@ -750,21 +764,18 @@
 									type="number"
 									id="width-input"
 									min="1"
-									max="100"
 									placeholder="Width"
 								/>
 								<input
 									type="number"
 									id="height-input"
 									min="1"
-									max="100"
 									placeholder="Height"
 								/>
 								<input
 									type="number"
 									id="layers-input"
 									min="1"
-									max="100"
 									placeholder="Layers"
 								/>
 							</div>

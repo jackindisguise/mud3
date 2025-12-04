@@ -37,7 +37,6 @@ import {
 } from "./core/character.js";
 import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./core/dungeon.js";
 import { isNameBlocked } from "./registry/reserved-names.js";
-import { createMob } from "./package/dungeon.js";
 import { Race, Job } from "./core/archetype.js";
 import { showRoom } from "./utils/display.js";
 import { CONFIG } from "./registry/config.js";
@@ -52,14 +51,12 @@ import {
 	loadCharacterFromSerialized,
 	saveCharacter,
 	setCharacterPassword,
+	createCharacter,
 } from "./package/character.js";
 import { loadBoards, saveBoard } from "./package/board.js";
 import { getBoards } from "./registry/board.js";
 import { Board } from "./core/board.js";
-import {
-	saveGameState as saveGameStateFile,
-	getNextCharacterId,
-} from "./package/gamestate.js";
+import { saveGameState as saveGameStateFile } from "./package/gamestate.js";
 import { executeAllDungeonResets } from "./package/dungeon.js";
 import { color, COLOR } from "./core/color.js";
 import logger from "./logger.js";
@@ -1082,17 +1079,7 @@ function nanny(session: LoginSession): void {
 			} else {
 				// Create a new character
 				isNewCharacter = true;
-				const characterId = await getNextCharacterId();
-				const mob = createMob({
-					display: username,
-					keywords: username,
-					race: selectedRace,
-					job: selectedJob,
-				});
-				character = new Character({
-					credentials: { username, characterId },
-					mob,
-				});
+				character = await createCharacter(username, selectedRace, selectedJob);
 				setCharacterPassword(character, password);
 				saveCharacterFile(character);
 				// Remove name from in-creation set now that character is created

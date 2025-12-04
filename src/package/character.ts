@@ -63,14 +63,17 @@ import {
 	PlayerSettings,
 } from "../core/character.js";
 import { SerializedMob } from "../core/dungeon.js";
+import type { Race, Job } from "../core/archetype.js";
 import archetypePkg from "../package/archetype.js";
-import { deserializeMob } from "./dungeon.js";
+import { deserializeMob, createMob } from "./dungeon.js";
+import type { Mob } from "../core/dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { CONFIG } from "../registry/config.js";
 import { getCurrentDungeonVersion } from "../migrations/version.js";
 import { migrateCharacterData } from "../migrations/character/runner.js";
+import { getNextCharacterId } from "./gamestate.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -192,6 +195,64 @@ export function getActiveCharacters(): Character[] {
  */
 export function getCharacterById(characterId: number): Character | undefined {
 	return ACTIVE_ID_REGISTRY.get(characterId);
+}
+
+/**
+ * Creates a mob specifically for a character with proper room description.
+ * Sets the room description to "<name> is here." format.
+ *
+ * @param username The character's username (used for display, keywords, and room description)
+ * @param race Optional race for the mob (defaults to default race)
+ * @param job Optional job for the mob (defaults to default job)
+ * @returns A new Mob instance configured for a character
+ *
+ * @example
+ * ```typescript
+ * const mob = createCharacterMob("hero123", selectedRace, selectedJob);
+ * ```
+ */
+export function createCharacterMob(
+	username: string,
+	race?: Race,
+	job?: Job
+): Mob {
+	const mob = createMob({
+		display: username,
+		keywords: username,
+		race,
+		job,
+	});
+	// Set room description for character mobs
+	mob.roomDescription = `${username} is here.`;
+	return mob;
+}
+
+/**
+ * Creates a new character with a mob.
+ * This is a convenience function that creates both the character and its associated mob.
+ * Automatically assigns the next available character ID.
+ *
+ * @param username The character's username
+ * @param race Optional race for the mob (defaults to default race)
+ * @param job Optional job for the mob (defaults to default job)
+ * @returns A new Character instance with an associated mob
+ *
+ * @example
+ * ```typescript
+ * const character = await createCharacter("hero123", selectedRace, selectedJob);
+ * ```
+ */
+export async function createCharacter(
+	username: string,
+	race?: Race,
+	job?: Job
+): Promise<Character> {
+	const characterId = await getNextCharacterId();
+	const mob = createCharacterMob(username, race, job);
+	return new Character({
+		credentials: { username, characterId },
+		mob,
+	});
 }
 
 function sanitizeUsername(username: string): string {

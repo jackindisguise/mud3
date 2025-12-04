@@ -1116,9 +1116,7 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 
 		// Then auto-sacrifice (if enabled) - this will destroy the corpse even if it's now empty after looting
 		if (settings.autosacrifice) {
-			sacrificeContainer(corpse, killer, room, {
-				messagePrefix: "automatically ",
-			});
+			sacrificeContainer(corpse, killer, room);
 		}
 	}
 

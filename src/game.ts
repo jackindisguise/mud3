@@ -104,6 +104,7 @@ export interface LoginSession {
 	character?: Character;
 	lastActivity: Date;
 	inactivityTimer?: NodeJS.Timeout;
+	inactivityWarningTimer?: NodeJS.Timeout;
 	// in case the connection closes, we need access to the name being created somewhere on the session
 	creatingName?: string;
 }
@@ -154,19 +155,41 @@ let webClientServer: WebClientServer | undefined;
 /**
  * Update the session's last-activity time and reschedule inactivity timeout.
  * When the timeout elapses, the client is notified and disconnected.
+ * A warning is sent at half the timeout duration.
  */
 function updateActivity(session: LoginSession): void {
 	session.lastActivity = new Date();
 
-	// Clear existing inactivity timer if present
+	// Clear existing timers if present
 	if (session.inactivityTimer) {
 		clearTimeout(session.inactivityTimer);
 		session.inactivityTimer = undefined;
 	}
+	if (session.inactivityWarningTimer) {
+		clearTimeout(session.inactivityWarningTimer);
+		session.inactivityWarningTimer = undefined;
+	}
 
 	const timeoutSeconds = config.server.inactivity_timeout ?? 1800; // default 30min
 	const timeoutMs = Math.max(1, timeoutSeconds) * 1000;
+	const warningTimeoutMs = timeoutMs / 2;
+	const remainingMinutes = Math.ceil(
+		(timeoutMs - warningTimeoutMs) / (60 * 1000)
+	);
 
+	// Set up warning timer (at half the timeout)
+	session.inactivityWarningTimer = setTimeout(() => {
+		if (session.character) {
+			const minutesText =
+				remainingMinutes === 1 ? "1 minute" : `${remainingMinutes} minutes`;
+			session.character.sendMessage(
+				`You will be disconnected for inactivity after ${minutesText}.`,
+				MESSAGE_GROUP.SYSTEM
+			);
+		}
+	}, warningTimeoutMs);
+
+	// Set up disconnect timer (at full timeout)
 	session.inactivityTimer = setTimeout(async () => {
 		logger.debug("Inactivity timeout", {
 			username: session.character?.credentials.username,
@@ -413,10 +436,14 @@ async function checkUnreadMessages(
  * Persists the character and removes tracking.
  */
 async function endPlayerSession(session: LoginSession): Promise<void> {
-	// Find the session for this character and clear its inactivity timer
+	// Find the session for this character and clear its inactivity timers
 	if (session.inactivityTimer) {
 		clearTimeout(session.inactivityTimer);
 		session.inactivityTimer = undefined;
+	}
+	if (session.inactivityWarningTimer) {
+		clearTimeout(session.inactivityWarningTimer);
+		session.inactivityWarningTimer = undefined;
 	}
 
 	// Remove from loginSessions BEFORE closing client to prevent handleDisconnection
@@ -504,10 +531,14 @@ async function handleDisconnection(client: MudClient): Promise<void> {
 	// Clean up login session
 	const session = findSessionByClient(client);
 	if (!session) return;
-	// Clear inactivity timer if set
+	// Clear inactivity timers if set
 	if (session.inactivityTimer) {
 		clearTimeout(session.inactivityTimer);
 		session.inactivityTimer = undefined;
+	}
+	if (session.inactivityWarningTimer) {
+		clearTimeout(session.inactivityWarningTimer);
+		session.inactivityWarningTimer = undefined;
 	}
 
 	// end player session if they were playing
@@ -645,10 +676,10 @@ function startPlayerSession(
 					`Failed to restore location ${savedLocationRef} for character ${character.credentials.username}, falling back to starting location`
 				);
 				// Fall back to starting location
-				targetRoom = getRoomByRef("@tower{0,0,0}");
+				targetRoom = getLocation(LOCATION.START);
 				if (!targetRoom) {
 					logger.error(
-						`Failed to find fallback starting room @tower{0,0,0} for character ${character.credentials.username}`
+						`Failed to find fallback starting room ${LOCATION.START} for character ${character.credentials.username}`
 					);
 					character.sendMessage(
 						"Warning: Could not restore your location. Please contact an administrator.",
@@ -1233,11 +1264,13 @@ async function stop(): Promise<void> {
 
 	for (const session of sessions) {
 		logger.debug("Ending session", {
-			username: session.character?.credentials.username || "unauthenticated user",
+			username:
+				session.character?.credentials.username || "unauthenticated user",
 		});
 		await endPlayerSession(session);
 		logger.debug("Session ended", {
-			username: session.character?.credentials.username || "unauthenticated user",
+			username:
+				session.character?.credentials.username || "unauthenticated user",
 		});
 	}
 

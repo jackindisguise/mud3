@@ -633,13 +633,9 @@ dungeon:
       roomLinks: {south: '@worldmap{40,16,0}'}
     - coordinates: {x: 7, 'y': 6, z: 1}
       allowedExits: 527
-    - coordinates: {x: 6, 'y': 8, z: 1}
-      allowedExits: 271
     - coordinates: {x: 16, 'y': 8, z: 1}
       allowedExits: 527
     - coordinates: {x: 9, 'y': 14, z: 1}
       allowedExits: 527
     - coordinates: {x: 9, 'y': 19, z: 1}
       allowedExits: 527
-    - coordinates: {x: 11, 'y': 19, z: 1}
-      allowedExits: 271

@@ -21,6 +21,81 @@ const COLORS = [
 	{ id: 15, name: "White", hex: "#ffffff", tag: "W" },
 ];
 
+// Color name to COLOR enum mapping (matching game's COLOR_NAME_TO_COLOR)
+const COLOR_NAME_TO_ID = {
+	black: 0,
+	maroon: 1,
+	"dark green": 2,
+	olive: 3,
+	"dark blue": 4,
+	purple: 5,
+	teal: 6,
+	silver: 7,
+	grey: 8,
+	crimson: 9,
+	lime: 10,
+	yellow: 11,
+	"light blue": 12,
+	pink: 13,
+	cyan: 14,
+	white: 15,
+};
+
+// COLOR enum to color name mapping (matching game's COLOR_NAMES)
+const COLOR_ID_TO_NAME = {
+	0: "black",
+	1: "maroon",
+	2: "dark green",
+	3: "olive",
+	4: "dark blue",
+	5: "purple",
+	6: "teal",
+	7: "silver",
+	8: "grey",
+	9: "crimson",
+	10: "lime",
+	11: "yellow",
+	12: "light blue",
+	13: "pink",
+	14: "cyan",
+	15: "white",
+};
+
+// Helper: Convert mapColor from YAML (string or integer) to integer for UI display
+function mapColorToInteger(mapColor) {
+	if (mapColor === undefined || mapColor === null) {
+		return undefined;
+	}
+	if (typeof mapColor === "number") {
+		// Already an integer (COLOR enum)
+		return mapColor;
+	}
+	if (typeof mapColor === "string") {
+		// Color name string - convert to integer
+		const lowerName = mapColor.toLowerCase();
+		return COLOR_NAME_TO_ID[lowerName] !== undefined
+			? COLOR_NAME_TO_ID[lowerName]
+			: undefined;
+	}
+	return undefined;
+}
+
+// Helper: Convert mapColor from UI (integer) to string for YAML saving
+function mapColorToString(mapColor) {
+	if (mapColor === undefined || mapColor === null) {
+		return undefined;
+	}
+	if (typeof mapColor === "string") {
+		// Already a string
+		return mapColor;
+	}
+	if (typeof mapColor === "number") {
+		// COLOR enum integer - convert to string
+		return COLOR_ID_TO_NAME[mapColor];
+	}
+	return undefined;
+}
+
 const EDITOR_ACTIONS = Object.freeze({
 	CREATE_TEMPLATE: "CREATE_TEMPLATE",
 	EDIT_TEMPLATE_FIELD: "EDIT_TEMPLATE_FIELD",
@@ -655,7 +730,7 @@ class MapEditor {
 			);
 			if (template && template.type === "Mob") {
 				mapText = template.mapText !== undefined ? template.mapText : "!";
-				mapColor = template.mapColor !== undefined ? template.mapColor : 11; // Yellow
+				mapColor = mapColorToInteger(template.mapColor) ?? 11; // Yellow
 				return { mapText, mapColor };
 			}
 		}
@@ -667,7 +742,8 @@ class MapEditor {
 			);
 			if (template && template.type !== "Mob") {
 				if (template.mapText !== undefined) mapText = template.mapText;
-				if (template.mapColor !== undefined) mapColor = template.mapColor;
+				const templateMapColor = mapColorToInteger(template.mapColor);
+				if (templateMapColor !== undefined) mapColor = templateMapColor;
 				if (mapText !== null || mapColor !== null) {
 					return { mapText, mapColor };
 				}
@@ -684,7 +760,7 @@ class MapEditor {
 			const room = dungeon.rooms[roomIndex - 1];
 			if (room) {
 				mapText = room.mapText !== undefined ? room.mapText : ".";
-				mapColor = room.mapColor !== undefined ? room.mapColor : null;
+				mapColor = mapColorToInteger(room.mapColor) ?? null;
 			}
 		}
 
@@ -3420,7 +3496,10 @@ class MapEditor {
 		// Copy map color
 		const mapColorSelect = document.getElementById("template-map-color");
 		if (mapColorSelect && sourceRoom.mapColor !== undefined) {
-			mapColorSelect.value = sourceRoom.mapColor.toString();
+			const mapColorInt = mapColorToInteger(sourceRoom.mapColor);
+			if (mapColorInt !== undefined) {
+				mapColorSelect.value = mapColorInt.toString();
+			}
 		}
 
 		// Copy dense
@@ -3712,7 +3791,7 @@ class MapEditor {
 				</div>
 				<div class="form-group">
 					<label>Map Color</label>
-					${this.generateColorSelector("template-map-color", template.mapColor)}
+					${this.generateColorSelector("template-map-color", mapColorToInteger(template.mapColor))}
 				</div>
 				<div class="form-group">
 					<label>Dense</label>
@@ -3956,7 +4035,7 @@ class MapEditor {
 				</div>
 				<div class="form-group">
 					<label>Map Color</label>
-					${this.generateColorSelector("template-map-color", template.mapColor)}
+					${this.generateColorSelector("template-map-color", mapColorToInteger(template.mapColor))}
 				</div>
 			`;
 		}
@@ -4302,9 +4381,10 @@ class MapEditor {
 			const description = document.getElementById("template-description").value;
 			const mapText = document.getElementById("template-map-text").value;
 			const mapColorSelect = document.getElementById("template-map-color");
-			const mapColor = mapColorSelect.value
+			const mapColorInt = mapColorSelect.value
 				? parseInt(mapColorSelect.value)
 				: undefined;
+			const mapColor = mapColorToString(mapColorInt);
 			newParametersSummary.display = display;
 			newParametersSummary.description = description;
 
@@ -4404,7 +4484,7 @@ class MapEditor {
 					display,
 					description,
 					...(mapText && { mapText }),
-					...(mapColor !== undefined && { mapColor }),
+					...(mapColor !== undefined && { mapColor: mapColor }),
 				};
 				// Remove version if it exists - templates don't have version, dungeon does
 				if (updated.version !== undefined) {

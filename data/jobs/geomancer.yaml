@@ -4,11 +4,11 @@ archetype:
   description: An earthshaper who turns terrain, crystal, and magma into weapons.
   isStarter: true
   startingAttributes:
-    strength: 6
+    strength: 1
     agility: 3
     intelligence: 7
   attributeGrowthPerLevel:
-    strength: 2
+    strength: 1
     agility: 0
     intelligence: 2
   startingResourceCaps:
@@ -17,6 +17,9 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 11
     maxMana: 10
+  growthModifier:
+    base: 1.06
+    perLevel: 0.04
   skills:
     - id: stone-spike
       level: 1
@@ -24,6 +27,15 @@ archetype:
       level: 2
   passives:
     - seismic-attunement
-  growthModifier:
-    base: 1.06
-    perLevel: 0.04
+    - infernal-legacy
+    - shadow-flutter
+    - feline-agility
+    - inspire
+    - curious-whiskers
+    - construct-nature
+    - arcane-pulse
+    - grave-attunement
+    - lunar-regeneration
+    - keen-focus
+    - hidden-step
+    - ossuary-pact

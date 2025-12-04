@@ -9,9 +9,12 @@
  * put sword in bag
  * put potion in chest
  * put coin in backpack
+ * put all in bag
  * ```
  *
- * **Pattern:** `put~ <item:item@inventory> in <container:object@all>`
+ * **Patterns:**
+ * - `put all in <container>` - Put all items from inventory into container
+ * - `put~ <item:item@inventory> in <container:object@all>` - Put item in container
  * @module commands/put
  */
 
@@ -21,15 +24,134 @@ import { Item, DungeonObject, Equipment, Currency } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
 import { createGold } from "../utils/currency.js";
+import { capitalizeFirst } from "../utils/string.js";
+
+function putAllInContainer(
+	container: DungeonObject,
+	actor: any,
+	room: any
+): void {
+	// Check if actor is in a room
+	if (!room) {
+		actor.sendMessage(
+			"You are not in a room.",
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	// Check if container is specified
+	if (!container) {
+		actor.sendMessage(
+			"You don't see that container here or in your inventory.",
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	// Check if container is an Item and has isContainer flag
+	if (container instanceof Item && !container.isContainer) {
+		actor.sendMessage(
+			`${capitalizeFirst(container.display)} is not a container.`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	// Check if container is accessible (in room or in actor's inventory)
+	const containerLocation = container.location;
+	if (containerLocation !== room && containerLocation !== actor) {
+		actor.sendMessage(
+			`You don't have access to ${container.display}.`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+		return;
+	}
+
+	// Get all items from inventory (exclude equipped items and the container itself)
+	// Create a copy of the array since we'll be modifying actor.contents during iteration
+	const inventoryItems = [...actor.contents].filter(
+		(obj: any) =>
+			obj instanceof Item &&
+			!(obj instanceof Equipment && actor.getAllEquipped().includes(obj)) &&
+			obj !== container
+	) as Item[];
+
+	if (inventoryItems.length === 0) {
+		actor.sendMessage("You don't have anything to put in it.", MESSAGE_GROUP.COMMAND_RESPONSE);
+		return;
+	}
+
+	// Put all items in container
+	let successCount = 0;
+	const failedItems: string[] = [];
+
+	for (const invItem of inventoryItems) {
+		// Prevent putting container into itself
+		if (invItem === container) {
+			failedItems.push(invItem.display);
+			continue;
+		}
+
+		// Prevent putting container into something inside it (circular reference check)
+		let current: DungeonObject | undefined = container;
+		let circular = false;
+		while (current) {
+			if (current === invItem) {
+				circular = true;
+				break;
+			}
+			current = current.location;
+		}
+		if (circular) {
+			failedItems.push(invItem.display);
+			continue;
+		}
+
+		// Move item to container
+		container.add(invItem);
+		successCount++;
+	}
+
+	if (successCount > 0) {
+		act(
+			{
+				user: `You put ${successCount} item${successCount !== 1 ? "s" : ""} in ${container.display}.`,
+				room: `{User} puts ${successCount} item${successCount !== 1 ? "s" : ""} in ${container.display}.`,
+			},
+			{
+				user: actor,
+				room: room,
+			},
+			{ messageGroup: MESSAGE_GROUP.ACTION }
+		);
+	}
+
+	if (failedItems.length > 0) {
+		actor.sendMessage(
+			`Could not put: ${failedItems.join(", ")}`,
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
+	}
+}
 
 export default {
-	pattern: "put~ <item:item@inventory> in <container:object@all>",
-	aliases: ["put~ <amount:number> gold in <container:object@all>"],
+	pattern: "put~ all in <container:object@all>",
+	aliases: [
+		"put~ <amount:number> gold in <container:object@all>",
+		"put~ <item:item@inventory> in <container:object@all>",
+	],
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor, room } = context;
 		const item = args.get("item") as Item | undefined;
 		const amount = args.get("amount") as number | undefined;
 		const container = args.get("container") as DungeonObject | undefined;
+
+		// Handle "put all in container"
+		if (item === undefined && amount === undefined && container !== undefined) {
+			putAllInContainer(container, actor, room);
+			return;
+		}
 
 		// Check if actor is in a room
 		if (!room) {

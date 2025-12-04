@@ -22,6 +22,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { initiateCombat, addToCombatQueue } from "../combat.js";
+import { capitalizeFirst } from "../utils/string.js";
 
 export default {
 	pattern: "attack~ <target:mob>",
@@ -42,7 +43,7 @@ export default {
 		// Check if target is in the same room
 		if (target.location !== room) {
 			actor.sendMessage(
-				`${target.display} is not here.`,
+				`${capitalizeFirst(target.display)} is not here.`,
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

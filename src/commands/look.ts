@@ -32,6 +32,7 @@ import {
 	showContainerContents,
 } from "../utils/display.js";
 import logger from "../logger.js";
+import { capitalizeFirst } from "../utils/string.js";
 
 export default {
 	pattern: "look~",
@@ -60,8 +61,9 @@ export default {
 		if (container) {
 			// Check if it's actually a container
 			if (!(container instanceof Item) || !container.isContainer) {
+				const containerName = container.display || container.keywords;
 				actor.sendMessage(
-					`${container.display || container.keywords} is not a container.`,
+					`${capitalizeFirst(containerName)} is not a container.`,
 					MESSAGE_GROUP.COMMAND_RESPONSE
 				);
 				return;

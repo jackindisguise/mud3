@@ -14,6 +14,7 @@ import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob } from "../core/dungeon.js";
 import { act, ActMessageTemplates } from "../act.js";
+import { capitalizeFirst } from "../utils/string.js";
 
 /**
  * Options for creating a social command.
@@ -52,7 +53,7 @@ export function executeSocial(
 		// Check if target is in the same room
 		if (target.location !== room) {
 			actor.sendMessage(
-				`${target.display} is not here.`,
+				`${capitalizeFirst(target.display)} is not here.`,
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

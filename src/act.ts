@@ -33,6 +33,7 @@
 
 import { Mob, Room } from "./core/dungeon.js";
 import { MESSAGE_GROUP } from "./core/character.js";
+import { capitalizeFirst } from "./utils/string.js";
 
 /**
  * Message templates for an action from different perspectives.
@@ -141,13 +142,11 @@ function replacePlaceholders(
 ): string {
 	const user = context.user.display;
 	const target = context.target?.display ?? "";
-	const userCap = user.charAt(0).toUpperCase() + user.slice(1);
-	const targetCap = target
-		? target.charAt(0).toUpperCase() + target.slice(1)
-		: "";
+	const userCap = capitalizeFirst(user);
+	const targetCap = capitalizeFirst(target);
 
 	// Handle visibility - if user is invisible, show "Someone" instead
-	const visibleUser = visibility?.canSeeUser === false ? "Someone" : user;
+	const visibleUser = visibility?.canSeeUser === false ? "someone" : user;
 	const visibleUserCap = visibility?.canSeeUser === false ? "Someone" : userCap;
 	const visibleTarget = visibility?.canSeeTarget === false ? "someone" : target;
 	const visibleTargetCap =

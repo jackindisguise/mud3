@@ -65,6 +65,7 @@ import {
 import { SerializedMob } from "../core/dungeon.js";
 import type { Race, Job } from "../core/archetype.js";
 import archetypePkg from "../package/archetype.js";
+import configPkg from "../package/config.js";
 import { deserializeMob, createMob } from "./dungeon.js";
 import type { Mob } from "../core/dungeon.js";
 import YAML from "js-yaml";
@@ -488,7 +489,7 @@ export async function loadCharacter(
 // Optional package object for package-loader compatibility
 export default {
 	name: "character",
-	dependencies: [archetypePkg],
+	dependencies: [configPkg, archetypePkg],
 	loader: async () => {
 		logger.debug("Character storage directory ready", {
 			directory: relative(ROOT_DIRECTORY, CHAR_DIR),

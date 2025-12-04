@@ -510,3 +510,14 @@ export function repeatingColorStringTransformer(
 		return colored.join("");
 	};
 }
+
+export function wordColorStringTransformer(
+	colors: COLOR[]
+): (str: string) => string {
+	return (str: string) => {
+		return str
+			.split(" ")
+			.map((word, index) => color(word, colors[index % colors.length]))
+			.join(" ");
+	};
+}

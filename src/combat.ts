@@ -29,6 +29,7 @@ import {
 	repeatingColorStringTransformer,
 	SIZER,
 	stickyColor,
+	wordColorStringTransformer,
 } from "./core/color.js";
 import { LINEBREAK } from "./core/telnet.js";
 import logger from "./logger.js";
@@ -1015,20 +1016,25 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	}
 
 	// Send death messages
+	if (killer) {
+		deadMob.sendMessage(
+			"You have been slain by ${killer.display}!",
+			MESSAGE_GROUP.COMBAT
+		);
+	}
+
+	// action -- falling down, dead.
 	act(
 		{
-			user: "You have been slain by {target}!",
-			room: "{User} has been slain!",
+			user: "You hit the ground DEAD!",
+			room: "{User} hits the ground DEAD!",
 		},
 		{
 			user: deadMob,
-			target: killer,
 			room: room,
 		},
 		{
-			messageGroup: MESSAGE_GROUP.COMBAT,
-			excludeUser: true,
-			excludeTarget: true,
+			messageGroup: MESSAGE_GROUP.ACTION,
 		}
 	);
 
@@ -1038,65 +1044,20 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 			processThreatSwitching(killer);
 		} else {
 			if (killer.combatTarget === deadMob) killer.combatTarget = undefined;
-
-			// Create ASCII art for "SLAIN" (3 lines tall)
-			const slainArt = [
-				"@@@@@@   @@@        @@@@@@   @@@  @@@  @@@",
-				"@@@@@@@   @@@       @@@@@@@@  @@@  @@@@ @@@ ",
-				"!@@       @@!       @@!  @@@  @@!  @@!@!@@@ ",
-				"!@!       !@!       !@!  @!@  !@!  !@!!@!@! ",
-				"!!@@!!    @!!       @!@!@!@!  !!@  @!@ !!@! ",
-				" !!@!!!   !!!       !!!@!!!!  !!!  !@!  !!! ",
-				"     !:!  !!:       !!:  !!!  !!:  !!:  !!!  ",
-				"    !:!    :!:      :!:  !:!  :!:  :!:  !:!  ",
-				":::: ::    :: ::::  ::   :::   ::   ::   :: ",
-				":: : :    : :: : :   :   : :  :    ::    :  ",
-			];
-
-			// Build the message with "You have" on the left and mob name on the right of middle line
-			const leftText = "You have ";
-			const rightText = ` ${deadMob}!`;
-
-			// Create the message lines
-			const messageLines: string[] = [];
-			for (let i = 0; i < slainArt.length; i++) {
-				if (i === Math.ceil(slainArt.length / 2)) {
-					messageLines.push(leftText + slainArt[i] + rightText);
-				} else {
-					messageLines.push(
-						" ".repeat(leftText.length) +
-							slainArt[i] +
-							" ".repeat(rightText.length)
-					);
-				}
-			}
-
-			const box = string.box({
-				input: messageLines,
-				width: 73,
-				color: deathColorRepeatingTransformer,
-				innerColor: (str) => stickyColor(str, COLOR.CRIMSON),
-				sizer: SIZER,
-				style: {
-					vPadding: 1,
-					titleHAlign: string.ALIGN.CENTER,
-					titleBorder: {
-						left: ">",
-						right: "<",
-					},
-					vertical: "****",
-					horizontal: "*",
-					hAlign: string.ALIGN.CENTER,
-				},
-			});
-
-			killer.sendMessage(box.join("\n"), MESSAGE_GROUP.COMBAT);
+			const slainMessage = `You have slain ${color(
+				deadMob.display,
+				COLOR.YELLOW
+			)}!`;
+			killer.sendMessage(
+				stickyColor(slainMessage, COLOR.CRIMSON),
+				MESSAGE_GROUP.COMBAT
+			);
 			// Only players gain experience
 			const experienceGained = killer.awardKillExperience(deadMob.level);
 			if (experienceGained > 0) {
 				// Send experience message to the killer
 				killer.character.sendMessage(
-					`You gain ${experienceGained} experience!`,
+					`You gain ${color(String(experienceGained), COLOR.CYAN)} experience!`,
 					MESSAGE_GROUP.INFO
 				);
 			}

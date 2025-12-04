@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="
+				default-src 'self';
+				script-src 'self';
+				style-src 'self' 'unsafe-inline';
+				img-src 'self' data:;
+				font-src 'self' data:;
+				connect-src 'self';
+				media-src 'none';
+				object-src 'none';
+				base-uri 'self';
+				form-action 'self';
+				upgrade-insecure-requests;
+			"
+		/>
+		<title>Helpfile Editor</title>
+		<link rel="stylesheet" href="./static/dark.css" id="theme-stylesheet" />
+		<script src="./static/theme-init.js"></script>
+	</head>
+	<body>
+		<div id="app">
+			<header>
+				<div class="header-title">
+					<h1>Helpfile Editor</h1>
+				</div>
+				<div class="header-controls">
+					<button
+						id="theme-toggle-btn"
+						class="theme-toggle-btn"
+						title="Toggle light/dark mode"
+					>
+						🌙
+					</button>
+					<button id="help-btn" class="help-btn" title="Show help">?</button>
+				</div>
+			</header>
+
+			<div class="main-container">
+				<!-- Left Sidebar: Helpfile List -->
+				<aside class="sidebar left">
+					<div class="helpfile-list-container">
+						<div class="helpfile-list" id="helpfile-list"></div>
+					</div>
+					<button class="add-btn" id="add-helpfile-btn">+ Add Helpfile</button>
+				</aside>
+
+				<!-- Center: Editor -->
+				<main class="map-container">
+					<div class="map-area">
+						<div
+							id="editor-container"
+							style="padding: 2rem; overflow-y: auto; height: 100%"
+						>
+							<div
+								id="no-selection"
+								style="text-align: center; color: var(--base0); padding: 3rem"
+							>
+								<p>Select a helpfile from the sidebar to edit it.</p>
+							</div>
+							<div id="helpfile-editor" style="display: none">
+								<form id="helpfile-form" style="max-width: 800px">
+									<h2 id="editor-title">Edit Helpfile</h2>
+
+									<div class="form-group">
+										<label for="helpfile-keyword">Keyword:</label>
+										<input
+											type="text"
+											id="helpfile-keyword"
+											readonly
+											style="background: var(--base02); opacity: 0.7"
+										/>
+										<small
+											style="
+												color: var(--base0);
+												font-size: 0.85rem;
+												display: block;
+												margin-top: 0.25rem;
+											"
+										>
+											Primary keyword used to access this help file
+										</small>
+									</div>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Aliases</legend>
+										<div id="aliases-list"></div>
+										<button
+											type="button"
+											id="add-alias-btn"
+											style="
+												margin-top: 0.5rem;
+												padding: 0.5rem 1rem;
+												background: var(--base02);
+												border: 1px solid var(--base01);
+												color: var(--base1);
+												border-radius: 4px;
+												cursor: pointer;
+											"
+										>
+											+ Add Alias
+										</button>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Related</legend>
+										<div id="related-list"></div>
+										<button
+											type="button"
+											id="add-related-btn"
+											style="
+												margin-top: 0.5rem;
+												padding: 0.5rem 1rem;
+												background: var(--base02);
+												border: 1px solid var(--base01);
+												color: var(--base1);
+												border-radius: 4px;
+												cursor: pointer;
+											"
+										>
+											+ Add Related
+										</button>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Topics</legend>
+										<div id="topics-list"></div>
+										<button
+											type="button"
+											id="add-topic-btn"
+											style="
+												margin-top: 0.5rem;
+												padding: 0.5rem 1rem;
+												background: var(--base02);
+												border: 1px solid var(--base01);
+												color: var(--base1);
+												border-radius: 4px;
+												cursor: pointer;
+											"
+										>
+											+ Add Topic
+										</button>
+									</fieldset>
+
+									<div class="form-group">
+										<label for="helpfile-content">Content:</label>
+										<textarea
+											id="helpfile-content"
+											rows="15"
+											required
+											style="
+												width: 100%;
+												padding: 0.75rem;
+												background: var(--base02);
+												border: 1px solid var(--base01);
+												color: var(--base1);
+												border-radius: 4px;
+												font-family: monospace;
+												font-size: 0.9rem;
+												resize: vertical;
+											"
+										></textarea>
+										<small
+											style="
+												color: var(--base0);
+												font-size: 0.85rem;
+												display: block;
+												margin-top: 0.25rem;
+											"
+										>
+											Main body text of the help file displayed to players
+										</small>
+									</div>
+
+									<div class="modal-actions" style="margin-top: 2rem">
+										<button type="submit" id="save-btn">Save</button>
+										<button type="button" id="cancel-btn">Cancel</button>
+										<button
+											type="button"
+											id="delete-btn"
+											style="
+												background: var(--base02);
+												border-color: var(--red);
+												color: var(--red);
+											"
+										>
+											Delete
+										</button>
+									</div>
+								</form>
+							</div>
+						</div>
+						<!-- Toast Container -->
+						<div id="toast-container" class="toast-container"></div>
+					</div>
+				</main>
+			</div>
+
+			<!-- Modal for creating new helpfile -->
+			<div id="new-helpfile-modal" class="modal">
+				<div class="modal-content">
+					<span class="close" id="new-helpfile-close">&times;</span>
+					<h2>Create New Helpfile</h2>
+					<div class="form-group">
+						<label>Helpfile Keyword:</label>
+						<input
+							type="text"
+							id="new-helpfile-keyword"
+							placeholder="my-helpfile"
+							pattern="[a-z0-9_-]+"
+						/>
+						<small
+							style="
+								color: #aaa;
+								font-size: 0.85rem;
+								display: block;
+								margin-top: 0.25rem;
+							"
+						>
+							Lowercase letters, numbers, hyphens, and underscores only
+						</small>
+					</div>
+					<div class="modal-actions">
+						<button id="new-helpfile-create">Create</button>
+						<button id="new-helpfile-cancel">Cancel</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Help modal -->
+			<div id="help-modal" class="modal">
+				<div class="modal-content help-modal-content">
+					<span class="close" id="help-close">&times;</span>
+					<h2>Help & Tips</h2>
+					<div class="help-content">
+						<section class="help-section">
+							<h3>Editing Helpfiles</h3>
+							<ul>
+								<li>Select a helpfile from the sidebar to edit it</li>
+								<li>Edit the helpfile properties using the form fields</li>
+								<li>Click "Save" to save your changes</li>
+								<li>Click "Delete" to remove a helpfile</li>
+								<li>Use "Add Helpfile" to create new helpfiles</li>
+								<li>
+									Add aliases, related topics, and topics using the "+ Add"
+									buttons
+								</li>
+								<li>Remove items by clicking the "×" button</li>
+							</ul>
+						</section>
+					</div>
+					<div class="modal-actions">
+						<button id="help-close-btn">Close</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="./static/vendor/js-yaml.min.js"></script>
+		<script type="module" src="./static/app.js"></script>
+	</body>
+</html>
+

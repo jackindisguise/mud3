@@ -1,6 +1,6 @@
 # Electron
 
-This directory contains the Electron main process and preload scripts for the dungeon editor.
+This directory contains the Electron main process and preload scripts for the map editor and archetype editor.
 
 ## Purpose
 
@@ -9,12 +9,23 @@ Electron modules:
 - **Preload scripts** - Bridge between renderer and Node.js APIs
 - **IPC handlers** - Handle communication between frontend and backend
 
+## Editors
+
+### Map Editor
+- `main.ts` - Electron main process entry point for map editor
+- `preload.cts` - Preload script that exposes safe APIs to renderer for map editor
+
+### Archetype Editor
+- `archetype-main.ts` - Electron main process entry point for archetype editor
+- `archetype-preload.cts` - Preload script that exposes safe APIs to renderer for archetype editor
+
 ## Architecture Rules
 
 ### ✅ Allowed
 
 - Import Node.js modules (fs, path, etc.)
 - Import from `src/map-editor/` for map editor service
+- Import from `src/archetype-editor/` for archetype editor service
 - Expose safe APIs to renderer via preload scripts
 - Handle Electron lifecycle events
 
@@ -24,12 +35,7 @@ Electron modules:
 - **DO NOT** import game runtime modules unnecessarily
 - **DO NOT** perform blocking operations on main thread
 
-## Key Modules
-
-- `main.ts` - Electron main process entry point
-- `preload.cts` - Preload script that exposes safe APIs to renderer
-
 ## Security
 
-The preload script uses context isolation to prevent the renderer from accessing Node.js APIs directly. Only explicitly exposed functions are available to the frontend.
+The preload scripts use context isolation to prevent the renderer from accessing Node.js APIs directly. Only explicitly exposed functions are available to the frontend.
 

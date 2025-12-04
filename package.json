@@ -33,10 +33,10 @@
 		"rerun:ts": "npm run test:ts && npm run start",
 		"post-changelog": "node scripts/post-changelog-to-board.js",
 		"update-dungeon-version": "node scripts/increment-dungeon-version.js",
-		"mapeditor": "node mud3-dungeon-editor/dist/start-map-editor.js",
-		"update-mapeditor": "cd mud3-dungeon-editor && git pull origin && npm run build",
+		"start:archetype-editor": "node --import tsx/esm src/scripts/start-archetype-editor.ts",
 		"icon": "node scripts/generate-icon.cjs",
 		"electron:dev": "npm run build && npm run icon && electron dist/src/electron/main.js",
+		"electron:archetype:dev": "npm run build && npm run icon && electron dist/src/electron/archetype-main.js",
 		"electron:win:portable": "npm run build && npm run icon && electron-builder --win portable --publish never && node scripts/post-win-portable.js",
 		"electron:mac": "npm run build && npm run icon && electron-builder --mac dmg --publish never && node scripts/post-mac.js",
 		"electron:mac:dir": "npm run build && npm run icon && electron-builder --mac dir --publish never && node scripts/post-mac-dir.js"
@@ -70,6 +70,7 @@
 		"files": [
 			"dist/**/*",
 			"map-editor/**/*",
+			"archetype-editor/**/*",
 			"package.json"
 		],
 		"extraMetadata": {

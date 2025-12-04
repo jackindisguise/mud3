@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="
+				default-src 'self';
+				script-src 'self';
+				style-src 'self' 'unsafe-inline';
+				img-src 'self' data:;
+				font-src 'self' data:;
+				connect-src 'self';
+				media-src 'none';
+				object-src 'none';
+				base-uri 'self';
+				form-action 'self';
+				upgrade-insecure-requests;
+			"
+		/>
+		<title>Archetype Editor</title>
+		<link rel="stylesheet" href="./static/dark.css" id="theme-stylesheet" />
+		<script src="./static/theme-init.js"></script>
+	</head>
+	<body>
+		<div id="app">
+			<header>
+				<div class="header-title">
+					<h1>Archetype Editor</h1>
+				</div>
+				<div class="header-controls">
+					<button
+						id="theme-toggle-btn"
+						class="theme-toggle-btn"
+						title="Toggle light/dark mode"
+					>
+						🌙
+					</button>
+					<button id="help-btn" class="help-btn" title="Show help">?</button>
+				</div>
+			</header>
+
+			<div class="main-container">
+				<!-- Left Sidebar: Archetype List -->
+				<aside class="sidebar left">
+					<div class="tabs">
+						<button class="tab active" data-tab="races">Races</button>
+						<button class="tab" data-tab="jobs">Jobs</button>
+					</div>
+
+					<!-- Race List -->
+					<div class="tab-content active" id="races-tab">
+						<div class="template-list" id="race-list"></div>
+						<button class="add-btn" id="add-race-btn">+ Add Race</button>
+					</div>
+
+					<!-- Job List -->
+					<div class="tab-content" id="jobs-tab">
+						<div class="template-list" id="job-list"></div>
+						<button class="add-btn" id="add-job-btn">+ Add Job</button>
+					</div>
+				</aside>
+
+				<!-- Center: Editor -->
+				<main class="map-container">
+					<div class="map-area">
+						<div
+							id="editor-container"
+							style="padding: 2rem; overflow-y: auto; height: 100%"
+						>
+							<div
+								id="no-selection"
+								style="text-align: center; color: var(--base0); padding: 3rem"
+							>
+								<p>Select an archetype from the sidebar to edit it.</p>
+							</div>
+							<div id="archetype-editor" style="display: none">
+								<form id="archetype-form" style="max-width: 800px">
+									<h2 id="editor-title">Edit Archetype</h2>
+
+									<div class="form-group">
+										<label for="archetype-id">ID:</label>
+										<input
+											type="text"
+											id="archetype-id"
+											readonly
+											style="background: var(--base02); opacity: 0.7"
+										/>
+									</div>
+
+									<div class="form-group">
+										<label for="archetype-name">Name:</label>
+										<input type="text" id="archetype-name" required />
+									</div>
+
+									<div class="form-group">
+										<label for="archetype-description">Description:</label>
+										<textarea
+											id="archetype-description"
+											rows="3"
+											required
+										></textarea>
+									</div>
+
+									<div class="form-group">
+										<button
+											type="button"
+											id="archetype-is-starter-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+											title="Controls whether this archetype is available for new characters"
+										>
+											Starter
+										</button>
+									</div>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Starting Attributes</legend>
+										<div
+											style="
+												display: grid;
+												grid-template-columns: repeat(3, 1fr);
+												gap: 1rem;
+											"
+										>
+											<div class="form-group">
+												<label for="start-strength">Strength:</label>
+												<input
+													type="number"
+													id="start-strength"
+													min="0"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="start-agility">Agility:</label>
+												<input
+													type="number"
+													id="start-agility"
+													min="0"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="start-intelligence">Intelligence:</label>
+												<input
+													type="number"
+													id="start-intelligence"
+													min="0"
+													required
+												/>
+											</div>
+										</div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Attribute Growth Per Level</legend>
+										<div
+											style="
+												display: grid;
+												grid-template-columns: repeat(3, 1fr);
+												gap: 1rem;
+											"
+										>
+											<div class="form-group">
+												<label for="growth-strength">Strength:</label>
+												<input
+													type="number"
+													id="growth-strength"
+													min="0"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="growth-agility">Agility:</label>
+												<input
+													type="number"
+													id="growth-agility"
+													min="0"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="growth-intelligence">Intelligence:</label>
+												<input
+													type="number"
+													id="growth-intelligence"
+													min="0"
+													required
+												/>
+											</div>
+										</div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Starting Resource Caps</legend>
+										<div
+											style="
+												display: grid;
+												grid-template-columns: repeat(2, 1fr);
+												gap: 1rem;
+											"
+										>
+											<div class="form-group">
+												<label for="start-max-health">Max Health:</label>
+												<input
+													type="number"
+													id="start-max-health"
+													min="0"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="start-max-mana">Max Mana:</label>
+												<input
+													type="number"
+													id="start-max-mana"
+													min="0"
+													required
+												/>
+											</div>
+										</div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Resource Growth Per Level</legend>
+										<div
+											style="
+												display: grid;
+												grid-template-columns: repeat(2, 1fr);
+												gap: 1rem;
+											"
+										>
+											<div class="form-group">
+												<label for="growth-max-health">Max Health:</label>
+												<input
+													type="number"
+													id="growth-max-health"
+													min="0"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="growth-max-mana">Max Mana:</label>
+												<input
+													type="number"
+													id="growth-max-mana"
+													min="0"
+													required
+												/>
+											</div>
+										</div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Growth Modifier</legend>
+										<div
+											style="
+												display: grid;
+												grid-template-columns: repeat(2, 1fr);
+												gap: 1rem;
+											"
+										>
+											<div class="form-group">
+												<label for="growth-base">Base:</label>
+												<input
+													type="number"
+													id="growth-base"
+													step="0.01"
+													required
+												/>
+											</div>
+											<div class="form-group">
+												<label for="growth-per-level">Per Level:</label>
+												<input
+													type="number"
+													id="growth-per-level"
+													step="0.01"
+													required
+												/>
+											</div>
+										</div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Abilities</legend>
+										<div class="form-group" style="margin-bottom: 1rem">
+											<label for="ability-dropdown">Select Ability:</label>
+											<select
+												id="ability-dropdown"
+												style="
+													width: 100%;
+													padding: 0.5rem;
+													background: var(--base02);
+													border: 1px solid var(--base01);
+													color: var(--base1);
+													border-radius: 4px;
+												"
+											>
+												<option value="">-- Select an ability --</option>
+											</select>
+										</div>
+										<div
+											id="abilities-grid"
+											style="
+												display: grid;
+												grid-template-columns: repeat(
+													auto-fill,
+													minmax(200px, 1fr)
+												);
+												gap: 1rem;
+												margin-top: 1rem;
+											"
+										></div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Passives</legend>
+										<div class="form-group" style="margin-bottom: 1rem">
+											<label for="passive-dropdown">Select Passive:</label>
+											<select
+												id="passive-dropdown"
+												style="
+													width: 100%;
+													padding: 0.5rem;
+													background: var(--base02);
+													border: 1px solid var(--base01);
+													color: var(--base1);
+													border-radius: 4px;
+												"
+											>
+												<option value="">-- Select a passive --</option>
+											</select>
+										</div>
+										<div
+											id="passives-grid"
+											style="
+												display: grid;
+												grid-template-columns: repeat(
+													auto-fill,
+													minmax(200px, 1fr)
+												);
+												gap: 1rem;
+												margin-top: 1rem;
+											"
+										></div>
+									</fieldset>
+
+									<div class="modal-actions" style="margin-top: 2rem">
+										<button type="submit" id="save-btn">Save</button>
+										<button type="button" id="cancel-btn">Cancel</button>
+										<button
+											type="button"
+											id="delete-btn"
+											style="
+												background: var(--base02);
+												border-color: var(--red);
+												color: var(--red);
+											"
+										>
+											Delete
+										</button>
+									</div>
+								</form>
+							</div>
+						</div>
+						<!-- Toast Container -->
+						<div id="toast-container" class="toast-container"></div>
+					</div>
+				</main>
+			</div>
+
+			<!-- Modal for creating new archetype -->
+			<div id="new-archetype-modal" class="modal">
+				<div class="modal-content">
+					<span class="close" id="new-archetype-close">&times;</span>
+					<h2>Create New Archetype</h2>
+					<div class="form-group">
+						<label>Archetype ID:</label>
+						<input
+							type="text"
+							id="new-archetype-id"
+							placeholder="my-archetype"
+							pattern="[a-z0-9_-]+"
+						/>
+						<small
+							style="
+								color: #aaa;
+								font-size: 0.85rem;
+								display: block;
+								margin-top: 0.25rem;
+							"
+						>
+							Lowercase letters, numbers, hyphens, and underscores only
+						</small>
+					</div>
+					<div class="modal-actions">
+						<button id="new-archetype-create">Create</button>
+						<button id="new-archetype-cancel">Cancel</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Help modal -->
+			<div id="help-modal" class="modal">
+				<div class="modal-content help-modal-content">
+					<span class="close" id="help-close">&times;</span>
+					<h2>Help & Tips</h2>
+					<div class="help-content">
+						<section class="help-section">
+							<h3>Editing Archetypes</h3>
+							<ul>
+								<li>Select a race or job from the sidebar to edit it</li>
+								<li>Edit the archetype properties using the form fields</li>
+								<li>Click "Save" to save your changes</li>
+								<li>Click "Delete" to remove an archetype</li>
+								<li>Use "Add Race" or "Add Job" to create new archetypes</li>
+								<li>
+									Select abilities from the dropdown to add them to the
+									archetype
+								</li>
+								<li>Edit ability levels directly in the ability boxes</li>
+								<li>Use "+ Add Passive" to add passive abilities</li>
+							</ul>
+						</section>
+					</div>
+					<div class="modal-actions">
+						<button id="help-close-btn">Close</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="./static/vendor/js-yaml.min.js"></script>
+		<script type="module" src="./static/app.js"></script>
+	</body>
+</html>

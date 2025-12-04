@@ -2430,6 +2430,7 @@ export class DungeonObject {
 			this.mapText = template.mapText;
 		}
 		if (template.mapColor !== undefined) {
+			// Convert string color name to COLOR enum integer
 			this.mapColor =
 				COLOR_NAME_TO_COLOR[
 					template.mapColor as keyof typeof COLOR_NAME_TO_COLOR
@@ -3381,27 +3382,8 @@ export class Movable extends DungeonObject {
 			options.scripts?.afterOnExit?.(this, oldLocation);
 		}
 
-		// Execute afterOnExit script if provided
-		if (
-			shouldTriggerEvents &&
-			oldLocation instanceof Room &&
-			options.scripts?.afterOnExit
-		) {
-			options.scripts.afterOnExit(this, oldLocation);
-		}
-
 		// Perform the actual move
 		super.move(destination);
-
-		// Execute beforeOnEnter script if provided
-		if (
-			shouldTriggerEvents &&
-			this.location === destination &&
-			destination instanceof Room &&
-			options.scripts?.beforeOnEnter
-		) {
-			options.scripts.beforeOnEnter(this, destination);
-		}
 
 		// Call onEnter if events should be triggered
 		if (
@@ -3971,12 +3953,9 @@ export class Equipment extends Item {
 				? { secondaryAttributeBonuses: this._secondaryAttributeBonuses }
 				: {}),
 		};
-		const etc = (options?.compress
-			? (compressSerializedObject(
-					uncompressed,
-					base.templateId
-			  ))
-			: uncompressed);
+		const etc = options?.compress
+			? compressSerializedObject(uncompressed, base.templateId)
+			: uncompressed;
 		return etc;
 	}
 
@@ -3999,9 +3978,7 @@ export class Equipment extends Item {
 	 * equipment.applyTemplate(template);
 	 * ```
 	 */
-	override applyTemplate(
-		template: EquipmentTemplate
-	): void {
+	override applyTemplate(template: EquipmentTemplate): void {
 		// Call parent to apply base properties
 		super.applyTemplate(template);
 
@@ -4152,9 +4129,7 @@ export class Armor extends Equipment {
 	 *
 	 * @param template - Template object containing armor properties
 	 */
-	override applyTemplate(
-		template: ArmorTemplate
-	): void {
+	override applyTemplate(template: ArmorTemplate): void {
 		super.applyTemplate(template);
 		const armorTemplate = template;
 		if (armorTemplate.defense !== undefined) {
@@ -4338,9 +4313,7 @@ export class Weapon extends Equipment {
 	 *
 	 * @param template - Template object containing weapon properties
 	 */
-	override applyTemplate(
-		template: WeaponTemplate
-	): void {
+	override applyTemplate(template: WeaponTemplate): void {
 		super.applyTemplate(template);
 		const weaponTemplate = template;
 		if (weaponTemplate.attackPower !== undefined) {
@@ -6796,12 +6769,15 @@ export class Mob extends Movable {
 			// First, apply absorption rate to determine how much damage the shield will try to absorb
 			const absorptionRate = shieldTemplate.absorptionRate ?? 1.0;
 			const effectiveDamageToAbsorb = remainingDamage * absorptionRate;
-			
+
 			// Then, limit by remaining absorption capacity
 			let maxAbsorbable = remainingAbsorption;
 			// Then, limit by maxAbsorptionPerHit if specified
 			if (shieldTemplate.maxAbsorptionPerHit !== undefined) {
-				maxAbsorbable = Math.min(maxAbsorbable, shieldTemplate.maxAbsorptionPerHit);
+				maxAbsorbable = Math.min(
+					maxAbsorbable,
+					shieldTemplate.maxAbsorptionPerHit
+				);
 			}
 			// Finally, limit by effective damage to absorb
 			const absorbed = Math.min(effectiveDamageToAbsorb, maxAbsorbable);

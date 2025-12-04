@@ -1,5 +1,54 @@
 # Changelog
 
+## [1.24.0](https://github.com/jackindisguise/mud3/compare/v1.23.0...v1.24.0) (2025-12-04)
+
+
+### Features
+
+* **abilities:** added lifesteal to bloodbound lunge ([02e1223](https://github.com/jackindisguise/mud3/commit/02e1223b3b2fab8b60d4fba61349a8dfe118e931))
+* **combat:** added debug messages for combat events ([5ddc41c](https://github.com/jackindisguise/mud3/commit/5ddc41c542dd03a7fc8dcd343fffbb23c0f23033))
+* **combat:** mobs now drop corpses containing inventory and equipment on death ([7e1bd04](https://github.com/jackindisguise/mud3/commit/7e1bd045d94b360740331c79414acffe98758566))
+* **command:** added quoted string literal support in patterns ([3e74c3e](https://github.com/jackindisguise/mud3/commit/3e74c3e3eb053825da1a646b3b138d546b4985c0))
+* **commands:** add container validation to get and put commands ([d60c284](https://github.com/jackindisguise/mud3/commit/d60c28467c96af523624681e1f3934e83841ca0d))
+* **commands:** add sacrifice command to destroy items for gold ([aa80ab4](https://github.com/jackindisguise/mud3/commit/aa80ab46fab9ce1a183962a724818d4228cbbafe))
+* **commands:** added "look in &lt;container&gt;" pattern to examine container contents ([8f46716](https://github.com/jackindisguise/mud3/commit/8f467164c927edad991b5bbeceb34830e737ece2))
+* **commands:** added drop all command and refactored drop logic ([5149e86](https://github.com/jackindisguise/mud3/commit/5149e86c0e82e3d743293ad709c0185cab21a490))
+* **commands:** added scan command using minimap visibility system ([b5b5cde](https://github.com/jackindisguise/mud3/commit/b5b5cde961401921fba060985d7d3800eff39626))
+* **commands:** added value (gold) display to score command ([fc37d61](https://github.com/jackindisguise/mud3/commit/fc37d61ec2fec37e9e3c2a5a643528253ca2341b))
+* **commands:** created give command for giving items and gold to mobs ([744e548](https://github.com/jackindisguise/mud3/commit/744e5482092a10d0d56f58f4ca266c71e15b517a))
+* **commands:** created put command for placing items and gold in containers ([35f1eb8](https://github.com/jackindisguise/mud3/commit/35f1eb8ed409afb143c7d3b186d90861bdbac6ca))
+* **commands:** filter equipped items from [@inventory](https://github.com/inventory) source ([7e19d9e](https://github.com/jackindisguise/mud3/commit/7e19d9e6cf26d73ec794b54df148d81ff620a311))
+* **commands:** fixed drop gold pattern ([87566bf](https://github.com/jackindisguise/mud3/commit/87566bf711937958725a33ba83da6e8f37abb8f2))
+* **commands:** implemented currency pickup and drop functionality ([78be245](https://github.com/jackindisguise/mud3/commit/78be245ad4f45c7f8c7f53fabf26f9ba8defd01e))
+* **commands:** improve effects command display and sorting ([a27f503](https://github.com/jackindisguise/mud3/commit/a27f503134d6462a939199f57b156fd134118524))
+* **commands:** improve inventory and worth command display ([7e82d4d](https://github.com/jackindisguise/mud3/commit/7e82d4d47fc9e27f79b3409f8342e4c7e6e97729))
+* **commands:** improve look in container command validation ([d773d25](https://github.com/jackindisguise/mud3/commit/d773d25c26a406da7daa6256bd354ff1bc0a0905))
+* **config:** added autoloot and autosacrifice configuration options ([5b95234](https://github.com/jackindisguise/mud3/commit/5b95234cd40c5f7234769cfd2718404bdb9b8da5))
+* **core:** added calculateTotalBaseExperience method to Mob ([02c62d4](https://github.com/jackindisguise/mud3/commit/02c62d401a21381f87e32e8979aacca2e9117016))
+* **core:** added value property to DungeonObject and created Currency class ([c1cb30a](https://github.com/jackindisguise/mud3/commit/c1cb30afe6bfad35514f1ff88ce47b65e8d7c292))
+* **effects:** add shield effect enhancements ([9c4a78d](https://github.com/jackindisguise/mud3/commit/9c4a78dd9a192a203d293a6a543cb67fa033f25b))
+* **effects:** added all archetype core effects ([30a51a7](https://github.com/jackindisguise/mud3/commit/30a51a719bf00b76399e77eed0ca239c240eae74))
+* **game:** added two-part inactivity timer with warning ([dc9de4a](https://github.com/jackindisguise/mud3/commit/dc9de4af31532412ce8bdc629caa44df4ee5a91a))
+* **map-editor:** add auto-scroll when dragging near grid edges ([09fc164](https://github.com/jackindisguise/mud3/commit/09fc16472c1d9bf36dd6efcd11948ca3750997db))
+* **map-editor:** add container toggle and value fields to template editor ([ef41d05](https://github.com/jackindisguise/mud3/commit/ef41d05cebc1cfb5f9ceb62ddf2395e71b7e5765))
+* **utils:** add number formatting utility ([8062dc8](https://github.com/jackindisguise/mud3/commit/8062dc81e589417bdb2e40013e2eaabfe06217a3))
+* **utils:** added capitalizeFirst utility function and unit tests ([b94d748](https://github.com/jackindisguise/mud3/commit/b94d748a5300e793bb85b5b3a32dc590291973e8))
+* **warrior:** added second-attack and third-attack abilities ([866dadb](https://github.com/jackindisguise/mud3/commit/866dadb576c301437def3db1ff592de9ff7377c2))
+* **whisper:** improved error handling for target parsing ([12f80b6](https://github.com/jackindisguise/mud3/commit/12f80b6840432129c7a0dc70c93bdbd51c3d1456))
+
+
+### Bug Fixes
+
+* **combat:** added damage variation to oneMagicHit function ([368dfff](https://github.com/jackindisguise/mud3/commit/368dfffcddee53ae5d693404b34f2db326d2320b))
+* **core:** apply value field from templates to objects ([8c32767](https://github.com/jackindisguise/mud3/commit/8c32767abe766d1271795af73be4810b51b83d8a))
+* **dungeon:** removed duplicate script hook calls in move method ([65fc1ae](https://github.com/jackindisguise/mud3/commit/65fc1ae5e685f3a1ad857f66b9482974783d43fd))
+* **electron:** disable spellcheck to suppress NSSpellServer warnings ([ebb79d6](https://github.com/jackindisguise/mud3/commit/ebb79d6f04734c39a4d21e4971d91304c302448e))
+* **map-editor:** updated mapColor saving to follow serialization rules ([0f1c951](https://github.com/jackindisguise/mud3/commit/0f1c95130d3edadabe59606934c255026254341e))
+* **minimap:** improved mapColor handling and display priority ([50fba28](https://github.com/jackindisguise/mud3/commit/50fba28433011369a9e3da5b498633a54ab70b59))
+* **package:** handle integer mapColor in template hydration ([f35c58c](https://github.com/jackindisguise/mud3/commit/f35c58c52079a84c460ea153560a36656d77f0a3))
+* **package:** hydrate isContainer field when deserializing items ([f6797d6](https://github.com/jackindisguise/mud3/commit/f6797d6a2ddf59b2273728c3b99ae49e9aa7c580))
+* **package:** include isContainer and value in item template hydration ([2fe332f](https://github.com/jackindisguise/mud3/commit/2fe332f37840df0f29ad3968cd50f2ca61908f81))
+
 ## [1.23.0](https://github.com/jackindisguise/mud3/compare/v1.22.0...v1.23.0) (2025-12-02)
 
 

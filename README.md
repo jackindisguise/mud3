@@ -7,16 +7,16 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 ### World & Dungeon System
 
 - **3D Grid-Based World**: Rooms organized in width × height × layers with full coordinate support
-- **Movement System**: Cardinal directions (N/S/E/W), diagonals (NE/NW/SE/SW), and vertical movement (UP/DOWN)
-- **Room System**: Rooms with configurable exits (bitmask-based), density (passable/impassable), and custom descriptions
-- **Room Links**: Create tunnels and connections between rooms, even across different dungeons
-- **Exit Overrides**: Override exit configurations for specific room cells, allowing custom room links and exit permissions
+- **Movement System**: Cardinal directions (N/S/E/W), independent diagonal directions (NE/NW/SE/SW), and vertical movement (UP/DOWN)
+- **Room System**: Rooms with configurable exits (bitmask-based with independent diagonal flags), density (passable/impassable), and custom descriptions
+- **Room Links**: Create tunnels and connections between rooms, even across different dungeons with automatic reciprocal link creation
+- **Exit Overrides**: Override exit configurations for specific room cells, allowing custom room links (including UP/DOWN) and exit permissions per cell
 - **Cross-Dungeon Links**: Room links can connect rooms across different dungeons with automatic reciprocal link creation
 - **Template System**: Define reusable room and object templates for efficient dungeon creation
 - **Serialization**: Full save/load support with template-aware compression for efficient storage
 - **Data Migration System**: Automatic version-based migration system for dungeons, characters, rooms, mobs, items, equipment, armor, and weapons
 - **Reset System**: Automatically respawn mobs and items based on templates and room references
-- **Minimap**: Visual minimap display showing surrounding rooms with vision blocking and directional indicators
+- **Minimap**: Visual minimap display showing surrounding rooms with vision blocking and directional indicators (UP/DOWN shown as ^/V arrows)
 - **Pathfinding**: A* pathfinding algorithm for finding optimal paths between rooms, with cross-dungeon pathfinding support
 
 ### Character & Combat System
@@ -30,13 +30,14 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Reciprocal Combat**: Automatic combat engagement when damage is dealt between mobs in the same room
 - **Threat System**: Aggro management for NPCs with threat tables
 - **Resources**: Health, Mana, and Exhaustion with automatic recovery
+- **Effects System**: Damage over time, heal over time, passive effects, and dynamic modifiers with individual timers and expiration tracking
 
 ### Ability System
 
 - **Learnable Abilities**: Players can learn and use special abilities (e.g., Whirlwind, Pure Power)
 - **Proficiency System**: Abilities improve with use through configurable proficiency curves
 - **Proficiency Tracking**: Four breakpoint system (25%, 50%, 75%, 100%) with linear interpolation
-- **Ability Commands**: `learn <ability>` to learn new abilities, `abilities` to view all learned abilities with proficiency
+- **Ability Commands**: `learn <ability>` to learn new abilities, `abilities` to view all learned abilities with proficiency, `effects` to view active effects
 - **Proficiency Notifications**: Automatic notifications when ability proficiency increases
 
 ### Commands & Interaction
@@ -48,11 +49,12 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 
 ### Communication
 
-- **Channels**: Configurable communication channels (OOC, Gossip, Say, Newbie, Trade) with customizable message patterns
+- **Channels**: Configurable communication channels (OOC, Gossip, Say, Newbie, Trade, Gocial) with customizable message patterns
 - **Message Boards**: Persistent message boards with targeting (@mentions), read tracking, and interactive editing
 - **Busy Mode**: Message queuing system that allows players to queue certain message groups (channels, combat, info) to be read later, similar to an answering machine
 - **Combat Busy Mode**: Automatically activates during combat to queue non-critical messages, reducing combat screen clutter
 - **Color Support**: ANSI color codes throughout the interface with web client HTML conversion
+- **Calendar System**: Time tracking and event system for game world events
 
 ### Objects & Items
 
@@ -63,9 +65,9 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 
 ### Client Support
 
-- **Telnet Server**: Traditional telnet protocol support for classic MUD clients
-- **Web Client**: WebSocket-based web client for playing in a browser with HTML color rendering
-- **Auto-Focus**: Web client automatically focuses command input on interaction for improved UX
+- **Telnet Server**: Traditional telnet protocol support with comprehensive option negotiation and MCCP2 compression
+- **Web Client**: WebSocket-based web client for playing in a browser with HTML color rendering (sequential span generation for flat HTML structure)
+- **Auto-Focus**: Web client automatically focuses command input on interaction and window focus for improved UX
 
 ### Persistence
 

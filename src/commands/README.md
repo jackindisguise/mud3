@@ -43,10 +43,10 @@ The `CommandObject` includes:
 - **Combat** - `attack.ts`, `flee.ts`, `block.ts`, `unblock.ts`
 - **Social** - `say.ts`, `whisper.ts`, `ooc.ts`, `gocial.ts`, `reply.ts`
 - **Inventory** - `get.ts`, `drop.ts`, `inventory.ts`, `equipment.ts`
-- **Character** - `score.ts`, `look.ts`, `abilities.ts`, `learn.ts`, `levelup.ts`
+- **Character** - `score.ts`, `look.ts`, `abilities.ts`, `learn.ts`, `levelup.ts`, `effects.ts`
 - **Boards** - `board.ts`, `boards.ts`, `changes.ts`
 - **Communication** - `busy.ts` - Busy mode and message queuing management
-- **System** - `save.ts`, `quit.ts`, `help.ts`, `commands.ts`, `config.ts`
+- **System** - `save.ts`, `quit.ts`, `help.ts`, `commands.ts`, `config.ts`, `calendar.ts`
 
 ## Examples
 

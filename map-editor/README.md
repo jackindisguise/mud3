@@ -5,11 +5,13 @@ This directory contains the frontend application for the Electron-based dungeon 
 ## Purpose
 
 The map editor frontend provides:
-- **Visual dungeon editing** - Grid-based room layout editor
+- **Visual dungeon editing** - Grid-based room layout editor with multi-layer support
 - **Template management** - Create and edit room, mob, and object templates
 - **Reset configuration** - Set up dungeon resets for spawning mobs and items
-- **Room link editing** - Create tunnels and connections between rooms
+- **Room link editing** - Create tunnels and connections between rooms (including cross-dungeon links)
+- **Exit overrides** - Custom exit configurations and room links for specific room cells
 - **Attribute calculators** - Calculate mob attributes from race/job combinations
+- **Theme support** - Dark and light themes with persistence
 
 ## Structure
 
@@ -19,7 +21,7 @@ The map editor frontend provides:
   - `dark.css` - Dark theme stylesheet
   - `light.css` - Light theme stylesheet
   - `grid.css` - Grid layout styles
-  - `theme-init.js` - Theme initialization
+  - `theme-init.js` - Theme initialization (CSP-compliant)
   - `vendor/` - Third-party libraries (js-yaml)
 
 ## Architecture

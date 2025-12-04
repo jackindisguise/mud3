@@ -56,7 +56,10 @@ import { readFile } from "fs/promises";
 - `command.ts` - Command system framework
 - `archetype.ts` - Race and Job type definitions
 - `ability.ts` - Ability type definitions
+- `effect.ts` - Effect system types (DoT, HoT, passive effects)
 - `equipment.ts` - Equipment slot definitions
 - `board.ts` - Message board types
 - `channel.ts` - Communication channel types
+- `calendar.ts` - Calendar and time tracking types
+- `telnet.ts` - Telnet protocol definitions
 

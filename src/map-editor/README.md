@@ -45,9 +45,10 @@ The map editor service provides endpoints for:
 
 - **Cross-Dungeon Editing**: Create room links between different dungeons with automatic reciprocal link creation
 - **Make 2-Way Button**: One-click button (⇄) to create bidirectional room links
-- **Exit Overrides**: Edit custom exit configurations for specific room cells
-- **Template Management**: Create and edit room and object templates
+- **Exit Overrides**: Edit custom exit configurations and room links (including UP/DOWN directions) for specific room cells
+- **Template Management**: Create and edit room, mob, and object templates with weapon type support
 - **Data Migration**: Automatically migrates dungeon data to current `dungeonVersion` when loading
+- **Version Support**: All dungeon operations use current `dungeonVersion` from package.json
 
 ## Usage
 

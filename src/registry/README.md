@@ -60,5 +60,6 @@ export function getItem(id: string): ItemType | undefined {
 - `help.ts` - Help system registry
 - `board.ts` - Message board registry
 - `locations.ts` - System location references
+- `calendar.ts` - Calendar registry and time tracking
 - `reserved-names.ts` - Blocked name patterns
 

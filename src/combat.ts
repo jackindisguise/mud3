@@ -20,6 +20,8 @@ import {
 	Prop,
 	Item,
 	Equipment,
+	Currency,
+	DungeonObject,
 } from "./core/dungeon.js";
 import { MESSAGE_GROUP } from "./core/character.js";
 import {
@@ -38,6 +40,8 @@ import { act, damageMessage } from "./act.js";
 import { showRoom } from "./utils/display.js";
 import { createItem, createProp } from "./package/dungeon.js";
 import { createGold } from "./utils/currency.js";
+import { getAllFromContainer } from "./utils/get.js";
+import { sacrificeContainer } from "./utils/sacrifice.js";
 import {
 	DEFAULT_HIT_TYPE,
 	getDamageMultiplier,
@@ -1018,7 +1022,7 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 	// Send death messages
 	if (killer) {
 		deadMob.sendMessage(
-			"You have been slain by ${killer.display}!",
+			`You have been slain by ${killer.display}!`,
 			MESSAGE_GROUP.COMBAT
 		);
 	}
@@ -1099,6 +1103,24 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 
 	// Drop corpse in room (always drop it, even if empty)
 	room.add(corpse);
+
+	// Handle autoloot and autosacrifice if killer is a player character
+	if (killer && killer.character) {
+		const settings = killer.character.settings;
+
+		// Auto-loot first (if enabled)
+		if (settings.autoloot) {
+			// Auto-loot all items from the corpse using the centralized get logic
+			getAllFromContainer(corpse, killer, room);
+		}
+
+		// Then auto-sacrifice (if enabled) - this will destroy the corpse even if it's now empty after looting
+		if (settings.autosacrifice) {
+			sacrificeContainer(corpse, killer, room, {
+				messagePrefix: "automatically ",
+			});
+		}
+	}
 
 	// delete NPCs
 	if (!deadMob.character) {

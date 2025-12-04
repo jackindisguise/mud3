@@ -107,12 +107,7 @@ const prefixSpaces = (prefix: number = 0): string => " ".repeat(prefix);
 
 const createToggleUsage = (command: string, prefix: number = 0): string[] => {
 	const _prefix = prefixSpaces(prefix);
-	return [
-		`${_prefix}${color(
-			"Usage:",
-			COLOR.GREY
-		)} config ${command} on | config ${command} off`,
-	];
+	return [`${_prefix}${color("Usage:", COLOR.GREY)} config ${command} on|off`];
 };
 
 const getColorUsage: UsageHelper = (prefix = 0) => {
@@ -183,6 +178,12 @@ const getBriefUsage: UsageHelper = (prefix = 0) =>
 const getColorEnabledUsage: UsageHelper = (prefix = 0) =>
 	createToggleUsage("colorEnabled", prefix);
 
+const getAutolootUsage: UsageHelper = (prefix = 0) =>
+	createToggleUsage("autoloot", prefix);
+
+const getAutosacrificeUsage: UsageHelper = (prefix = 0) =>
+	createToggleUsage("autosacrifice", prefix);
+
 function showSettingsOverview(actor: Actor, character: PlayerCharacter): void {
 	const lines: string[] = [];
 	lines.push(color("Current Settings:", COLOR.YELLOW));
@@ -249,6 +250,24 @@ function showSettingsOverview(actor: Actor, character: PlayerCharacter): void {
 		)}`
 	);
 	lines.push(...promptPlaceholders);
+	lines.push("");
+
+	lines.push(
+		`  ${color("Auto-loot", COLOR.TEAL).padEnd(20)} ${formatBoolean(
+			character.settings.autoloot,
+			false
+		)}`
+	);
+	lines.push(...getAutolootUsage(4));
+	lines.push("");
+
+	lines.push(
+		`  ${color("Auto-sacrifice", COLOR.TEAL).padEnd(20)} ${formatBoolean(
+			character.settings.autosacrifice,
+			false
+		)}`
+	);
+	lines.push(...getAutosacrificeUsage(4));
 	lines.push("");
 
 	lines.push(
@@ -437,6 +456,34 @@ function setColorEnabled(
 	);
 }
 
+function setAutoloot(
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+): void {
+	character.updateSettings({ autoloot: isOn });
+	actor.sendMessage(
+		`Auto-loot ${isOn ? "enabled" : "disabled"}. You will ${
+			isOn ? "automatically" : "no longer automatically"
+		} loot mob corpses when you kill them.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
+function setAutosacrifice(
+	actor: Actor,
+	character: PlayerCharacter,
+	isOn: boolean
+): void {
+	character.updateSettings({ autosacrifice: isOn });
+	actor.sendMessage(
+		`Auto-sacrifice ${isOn ? "enabled" : "disabled"}. You will ${
+			isOn ? "automatically" : "no longer automatically"
+		} sacrifice mob corpses when you kill them.`,
+		MESSAGE_GROUP.COMMAND_RESPONSE
+	);
+}
+
 const BOOLEAN_SETTING_HANDLERS: Record<string, BooleanSettingHandler> = {
 	autolook: setAutoLook,
 	"auto-look": setAutoLook,
@@ -447,6 +494,10 @@ const BOOLEAN_SETTING_HANDLERS: Record<string, BooleanSettingHandler> = {
 	colorenabled: setColorEnabled,
 	"color-enabled": setColorEnabled,
 	colors: setColorEnabled,
+	autoloot: setAutoloot,
+	"auto-loot": setAutoloot,
+	autosacrifice: setAutosacrifice,
+	"auto-sacrifice": setAutosacrifice,
 };
 
 const BOOLEAN_USAGE_HELPERS: Record<string, UsageHelper> = {
@@ -459,6 +510,10 @@ const BOOLEAN_USAGE_HELPERS: Record<string, UsageHelper> = {
 	colorenabled: getColorEnabledUsage,
 	"color-enabled": getColorEnabledUsage,
 	colors: getColorEnabledUsage,
+	autoloot: getAutolootUsage,
+	"auto-loot": getAutolootUsage,
+	autosacrifice: getAutosacrificeUsage,
+	"auto-sacrifice": getAutosacrificeUsage,
 };
 
 export default {
@@ -526,7 +581,7 @@ export default {
 
 		// Unknown setting
 		actor.sendMessage(
-			`Unknown setting "${setting}". Available settings: color, autolook, verbose, brief, colorEnabled, prompt, echomode`,
+			`Unknown setting "${setting}". Available settings: color, autolook, verbose, brief, colorEnabled, prompt, echomode, autoloot, autosacrifice`,
 			MESSAGE_GROUP.COMMAND_RESPONSE
 		);
 	},

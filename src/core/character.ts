@@ -124,6 +124,10 @@ export interface PlayerSettings {
 	busyForwardedGroups?: Set<MESSAGE_GROUP>;
 	/** Message groups to forward to answering machine in combat busy mode */
 	combatBusyForwardedGroups?: Set<MESSAGE_GROUP>;
+	/** Whether to automatically loot mob corpses when killing them */
+	autoloot?: boolean;
+	/** Whether to automatically sacrifice mob corpses when killing them */
+	autosacrifice?: boolean;
 }
 
 /**
@@ -168,6 +172,8 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	combatBusyModeEnabled: true,
 	busyForwardedGroups: new Set([MESSAGE_GROUP.CHANNELS]),
 	combatBusyForwardedGroups: new Set([MESSAGE_GROUP.CHANNELS]),
+	autoloot: false,
+	autosacrifice: false,
 } as const;
 
 /**
@@ -360,6 +366,10 @@ export interface SerializedPlayerSettings {
 	busyForwardedGroups?: MESSAGE_GROUP[];
 	/** Message groups to forward to answering machine in combat busy mode (serialized as array) */
 	combatBusyForwardedGroups?: MESSAGE_GROUP[];
+	/** Whether to automatically loot mob corpses when killing them */
+	autoloot?: boolean;
+	/** Whether to automatically sacrifice mob corpses when killing them */
+	autosacrifice?: boolean;
 }
 
 export interface SerializedCharacter {

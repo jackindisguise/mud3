@@ -366,6 +366,8 @@ export async function deserializeCharacter(
 			migratedData.settings.defaultColor !== undefined
 				? COLOR_NAME_TO_COLOR[migratedData.settings.defaultColor]
 				: undefined,
+		autoloot: migratedData.settings.autoloot,
+		autosacrifice: migratedData.settings.autosacrifice,
 	};
 
 	const character = new Character({

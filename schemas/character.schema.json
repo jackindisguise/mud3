@@ -145,6 +145,14 @@
 							"PROMPT"
 						]
 					}
+				},
+				"autoloot": {
+					"type": "boolean",
+					"description": "If true, automatically loot all items from mob corpses when killing them."
+				},
+				"autosacrifice": {
+					"type": "boolean",
+					"description": "If true, automatically sacrifice mob corpses when killing them (destroying the corpse and giving 25% of its value as gold)."
 				}
 			},
 			"additionalProperties": false

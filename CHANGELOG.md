@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.25.0](https://github.com/jackindisguise/mud3/compare/v1.24.0...v1.25.0) (2025-12-04)
+
+
+### Features
+
+* **archetype-editor:** added archetype editor with Electron app ([fd10c43](https://github.com/jackindisguise/mud3/commit/fd10c43ecf98e8cd0af0cc63d99bff6ac2c4bffe))
+* **character-editor:** add character editor implementation ([f5ba881](https://github.com/jackindisguise/mud3/commit/f5ba881327657987b74d09869913702217a7311a))
+* **character:** add room description to character mobs ([bf22857](https://github.com/jackindisguise/mud3/commit/bf228578d5d0ec5bc801b306404ac2d2e7ec74eb))
+* **dungeon:** export compressSerializedObject for use in character editor ([37c4c6a](https://github.com/jackindisguise/mud3/commit/37c4c6afaf2d6687cefc0aa5af4adc933581e2cf))
+* **helpfile-editor:** add helpfile editor implementation ([02f6493](https://github.com/jackindisguise/mud3/commit/02f649324d6c6751ebdb1359cc5c70022a216c04))
+* **jobs:** updated geomancer job with additional passives ([978b256](https://github.com/jackindisguise/mud3/commit/978b25673807c3c101c3c7ad426e08ae0338777a))
+
+
+### Bug Fixes
+
+* **combat:** remove messagePrefix from autosacrifice call ([eda7e75](https://github.com/jackindisguise/mud3/commit/eda7e754d758ef90e4ac29f4e690cb46f3d9719c))
+
 ## [1.24.0](https://github.com/jackindisguise/mud3/compare/v1.23.0...v1.24.0) (2025-12-04)
 
 

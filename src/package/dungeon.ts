@@ -90,6 +90,7 @@ import {
 	SerializedWeapon,
 	EQUIPMENT_SLOT,
 	normalizeSerializedData,
+	compressSerializedObject,
 	type EquipmentTemplate,
 	type ArmorTemplate,
 	type WeaponTemplate,

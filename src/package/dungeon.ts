@@ -109,7 +109,7 @@ import { migrateItemData } from "../migrations/item/runner.js";
 import { migrateEquipmentData } from "../migrations/equipment/runner.js";
 import { migrateArmorData } from "../migrations/armor/runner.js";
 import { migrateWeaponData } from "../migrations/weapon/runner.js";
-import { COLOR_NAME_TO_COLOR } from "../core/color.js";
+import { COLOR_NAME_TO_COLOR, COLOR_NAMES, COLOR } from "../core/color.js";
 import assert from "assert";
 import {
 	DIRECTION,
@@ -1906,7 +1906,12 @@ function hydrateTemplateData(
 		description: data.description,
 		roomDescription: data.roomDescription,
 		mapText: data.mapText,
-		mapColor: data.mapColor, // Keep as string (color name)
+		mapColor:
+			data.mapColor !== undefined
+				? typeof data.mapColor === "number"
+					? COLOR_NAMES[data.mapColor as COLOR] // Convert integer to string
+					: data.mapColor // Already a string
+				: undefined,
 		baseWeight: data.baseWeight,
 		value: data.value,
 	});

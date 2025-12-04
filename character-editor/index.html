@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="
+				default-src 'self';
+				script-src 'self';
+				style-src 'self' 'unsafe-inline';
+				img-src 'self' data:;
+				font-src 'self' data:;
+				connect-src 'self';
+				media-src 'none';
+				object-src 'none';
+				base-uri 'self';
+				form-action 'self';
+				upgrade-insecure-requests;
+			"
+		/>
+		<title>Character Editor</title>
+		<link rel="stylesheet" href="./static/dark.css" id="theme-stylesheet" />
+		<script src="./static/theme-init.js"></script>
+	</head>
+	<body>
+		<div id="app">
+			<header>
+				<div class="header-title">
+					<h1>Character Editor</h1>
+				</div>
+				<div class="header-controls">
+					<button
+						id="theme-toggle-btn"
+						class="theme-toggle-btn"
+						title="Toggle light/dark mode"
+					>
+						🌙
+					</button>
+					<button id="help-btn" class="help-btn" title="Show help">?</button>
+				</div>
+			</header>
+
+			<div class="main-container">
+				<!-- Left Sidebar: Character List -->
+				<aside class="sidebar left">
+					<div class="character-list-container">
+						<div class="character-list" id="character-list"></div>
+					</div>
+					<button class="add-btn" id="add-character-btn">+ Add Character</button>
+				</aside>
+
+				<!-- Center: Editor -->
+				<main class="map-container">
+					<div class="map-area">
+						<div
+							id="editor-container"
+							style="padding: 2rem; overflow-y: auto; height: 100%"
+						>
+							<div
+								id="no-selection"
+								style="text-align: center; color: var(--base0); padding: 3rem"
+							>
+								<p>Select a character from the sidebar to edit it.</p>
+							</div>
+							<div id="character-editor" style="display: none">
+								<form id="character-form" style="max-width: 1000px">
+									<h2 id="editor-title">Edit Character</h2>
+
+									<!-- Credentials Section -->
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Credentials</legend>
+										<div class="form-group">
+											<label for="character-username">Username:</label>
+											<input
+												type="text"
+												id="character-username"
+												readonly
+												style="background: var(--base02); opacity: 0.7"
+											/>
+										</div>
+										<div class="form-group">
+											<label for="character-characterId">Character ID:</label>
+											<input type="number" id="character-characterId" />
+										</div>
+										<div class="form-group">
+											<label for="character-passwordHash">Password Hash:</label>
+											<input type="text" id="character-passwordHash" />
+										</div>
+										<div class="form-group">
+											<label for="character-createdAt">Created At:</label>
+											<input type="datetime-local" id="character-createdAt" />
+										</div>
+										<div class="form-group">
+											<label for="character-lastLogin">Last Login:</label>
+											<input type="datetime-local" id="character-lastLogin" />
+										</div>
+									<div
+										class="form-group"
+										style="display: flex; gap: 0.5rem; flex-wrap: wrap"
+									>
+										<button
+											type="button"
+											id="character-isActive-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Is Active
+										</button>
+										<button
+											type="button"
+											id="character-isBanned-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Is Banned
+										</button>
+										<button
+											type="button"
+											id="character-isAdmin-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Is Admin
+										</button>
+									</div>
+									</fieldset>
+
+									<!-- Settings Section -->
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Settings</legend>
+									<div
+										class="form-group"
+										style="display: flex; gap: 0.5rem; flex-wrap: wrap"
+									>
+										<button
+											type="button"
+											id="character-receiveOOC-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Receive OOC
+										</button>
+										<button
+											type="button"
+											id="character-verboseMode-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Verbose Mode
+										</button>
+										<button
+											type="button"
+											id="character-colorEnabled-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Color Enabled
+										</button>
+										<button
+											type="button"
+											id="character-autoLook-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Auto Look
+										</button>
+										<button
+											type="button"
+											id="character-briefMode-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Brief Mode
+										</button>
+										<button
+											type="button"
+											id="character-busyModeEnabled-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Busy Mode Enabled
+										</button>
+										<button
+											type="button"
+											id="character-combatBusyModeEnabled-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Combat Busy Mode Enabled
+										</button>
+										<button
+											type="button"
+											id="character-autoloot-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Autoloot
+										</button>
+										<button
+											type="button"
+											id="character-autosacrifice-btn"
+											class="toggle-btn toggle-btn-disabled"
+											data-enabled="false"
+										>
+											Autosacrifice
+										</button>
+									</div>
+									<div class="form-group">
+										<label for="character-prompt">Prompt:</label>
+										<input type="text" id="character-prompt" />
+									</div>
+									<div class="form-group">
+										<label for="character-echoMode">Echo Mode:</label>
+										<select id="character-echoMode">
+											<option value="client">client</option>
+											<option value="server">server</option>
+										</select>
+									</div>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Channels</legend>
+										<div
+											style="display: flex; gap: 0.5rem; flex-wrap: wrap"
+											id="channels-container"
+										></div>
+									</fieldset>
+
+										<fieldset
+											style="
+												border: 1px solid var(--base01);
+												padding: 1rem;
+												margin: 1rem 0;
+												border-radius: 4px;
+											"
+										>
+											<legend>Blocked Users</legend>
+											<div id="blockedUsers-list"></div>
+											<button
+												type="button"
+												id="add-blockedUser-btn"
+												style="
+													margin-top: 0.5rem;
+													padding: 0.5rem 1rem;
+													background: var(--base02);
+													border: 1px solid var(--base01);
+													color: var(--base1);
+													border-radius: 4px;
+													cursor: pointer;
+												"
+											>
+												+ Add Blocked User
+											</button>
+										</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Busy Forwarded Groups</legend>
+										<div
+											style="display: flex; gap: 0.5rem; flex-wrap: wrap"
+											id="busyForwardedGroups-container"
+										></div>
+									</fieldset>
+
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Combat Busy Forwarded Groups</legend>
+										<div
+											style="display: flex; gap: 0.5rem; flex-wrap: wrap"
+											id="combatBusyForwardedGroups-container"
+										></div>
+									</fieldset>
+									</fieldset>
+
+									<!-- Stats Section -->
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Stats</legend>
+										<div class="form-group">
+											<label for="character-playtime">Playtime (seconds):</label>
+											<input type="number" id="character-playtime" min="0" />
+										</div>
+										<div class="form-group">
+											<label for="character-deaths">Deaths:</label>
+											<input type="number" id="character-deaths" min="0" />
+										</div>
+										<div class="form-group">
+											<label for="character-kills">Kills:</label>
+											<input type="number" id="character-kills" min="0" />
+										</div>
+									</fieldset>
+
+									<!-- Mob Section -->
+									<fieldset
+										style="
+											border: 1px solid var(--base01);
+											padding: 1rem;
+											margin: 1rem 0;
+											border-radius: 4px;
+										"
+									>
+										<legend>Mob (In-Game Entity)</legend>
+										<div class="form-group">
+											<label for="character-oid">Object ID:</label>
+											<input type="number" id="character-oid" />
+										</div>
+										<div class="form-group">
+											<label for="character-keywords">Keywords:</label>
+											<input type="text" id="character-keywords" />
+										</div>
+										<div class="form-group">
+											<label for="character-display">Display Name:</label>
+											<input type="text" id="character-display" />
+										</div>
+										<div class="form-group">
+											<label for="character-location">Location:</label>
+											<input type="text" id="character-location" placeholder="@dungeon{x,y,z}" />
+										</div>
+										<div class="form-group">
+											<label for="character-level">Level:</label>
+											<input type="number" id="character-level" min="1" />
+										</div>
+										<div class="form-group">
+											<label for="character-experience">Experience:</label>
+											<input type="number" id="character-experience" min="0" />
+										</div>
+									<div class="form-group">
+										<label for="character-race">Race:</label>
+										<select id="character-race">
+											<option value="">-- Select a race --</option>
+										</select>
+									</div>
+									<div class="form-group">
+										<label for="character-job">Job:</label>
+										<select id="character-job">
+											<option value="">-- Select a job --</option>
+										</select>
+									</div>
+										<div class="form-group">
+											<label for="character-health">Health:</label>
+											<input type="number" id="character-health" />
+										</div>
+										<div class="form-group">
+											<label for="character-mana">Mana:</label>
+											<input type="number" id="character-mana" />
+										</div>
+
+										<fieldset
+											style="
+												border: 1px solid var(--base01);
+												padding: 1rem;
+												margin: 1rem 0;
+												border-radius: 4px;
+											"
+										>
+											<legend>Learned Abilities</legend>
+											<div id="learnedAbilities-list"></div>
+											<button
+												type="button"
+												id="add-ability-btn"
+												style="
+													margin-top: 0.5rem;
+													padding: 0.5rem 1rem;
+													background: var(--base02);
+													border: 1px solid var(--base01);
+													color: var(--base1);
+													border-radius: 4px;
+													cursor: pointer;
+												"
+											>
+												+ Add Ability
+											</button>
+										</fieldset>
+
+										<fieldset
+											style="
+												border: 1px solid var(--base01);
+												padding: 1rem;
+												margin: 1rem 0;
+												border-radius: 4px;
+											"
+										>
+											<legend>Contents (Inventory Items)</legend>
+											<div id="contents-list"></div>
+											<button
+												type="button"
+												id="add-content-btn"
+												style="
+													margin-top: 0.5rem;
+													padding: 0.5rem 1rem;
+													background: var(--base02);
+													border: 1px solid var(--base01);
+													color: var(--base1);
+													border-radius: 4px;
+													cursor: pointer;
+												"
+											>
+												+ Add Item
+											</button>
+										</fieldset>
+									</fieldset>
+
+									<div class="modal-actions" style="margin-top: 2rem">
+										<button type="submit" id="save-btn">Save</button>
+										<button type="button" id="cancel-btn">Cancel</button>
+										<button
+											type="button"
+											id="delete-btn"
+											style="
+												background: var(--base02);
+												border-color: var(--red);
+												color: var(--red);
+											"
+										>
+											Delete
+										</button>
+									</div>
+								</form>
+							</div>
+						</div>
+						<!-- Toast Container -->
+						<div id="toast-container" class="toast-container"></div>
+					</div>
+				</main>
+			</div>
+
+			<!-- Modal for creating new character -->
+			<div id="new-character-modal" class="modal">
+				<div class="modal-content">
+					<span class="close" id="new-character-close">&times;</span>
+					<h2>Create New Character</h2>
+					<div class="form-group">
+						<label>Character Username:</label>
+						<input
+							type="text"
+							id="new-character-username"
+							placeholder="mycharacter"
+							pattern="[a-z0-9_-]+"
+						/>
+						<small
+							style="
+								color: #aaa;
+								font-size: 0.85rem;
+								display: block;
+								margin-top: 0.25rem;
+							"
+						>
+							Lowercase letters, numbers, hyphens, and underscores only
+						</small>
+					</div>
+					<div class="modal-actions">
+						<button id="new-character-create">Create</button>
+						<button id="new-character-cancel">Cancel</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Help modal -->
+			<div id="help-modal" class="modal">
+				<div class="modal-content help-modal-content">
+					<span class="close" id="help-close">&times;</span>
+					<h2>Help & Tips</h2>
+					<div class="help-content">
+						<section class="help-section">
+							<h3>Editing Characters</h3>
+							<ul>
+								<li>Select a character from the sidebar to edit it</li>
+								<li>Edit the character properties using the form fields</li>
+								<li>Click "Save" to save your changes</li>
+								<li>Click "Delete" to remove a character</li>
+								<li>Use "Add Character" to create new characters</li>
+								<li>
+									Add items to arrays (channels, blocked users, etc.) using the "+ Add" buttons
+								</li>
+								<li>Remove items by clicking the "×" button</li>
+							</ul>
+						</section>
+					</div>
+					<div class="modal-actions">
+						<button id="help-close-btn">Close</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="./static/vendor/js-yaml.min.js"></script>
+		<script type="module" src="./static/app.js"></script>
+	</body>
+</html>

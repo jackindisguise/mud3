@@ -34,9 +34,13 @@
 		"post-changelog": "node scripts/post-changelog-to-board.js",
 		"update-dungeon-version": "node scripts/increment-dungeon-version.js",
 		"start:archetype-editor": "node --import tsx/esm src/scripts/start-archetype-editor.ts",
+		"start:helpfile-editor": "node --import tsx/esm src/scripts/start-helpfile-editor.ts",
+		"start:character-editor": "node --import tsx/esm src/scripts/start-character-editor.ts",
 		"icon": "node scripts/generate-icon.cjs",
 		"electron:dev": "npm run build && npm run icon && electron dist/src/electron/main.js",
 		"electron:archetype:dev": "npm run build && npm run icon && electron dist/src/electron/archetype-main.js",
+		"electron:helpfile:dev": "npm run build && npm run icon && electron dist/src/electron/helpfile-main.js",
+		"electron:character:dev": "npm run build && npm run icon && electron dist/src/electron/character-main.js",
 		"electron:win:portable": "npm run build && npm run icon && electron-builder --win portable --publish never && node scripts/post-win-portable.js",
 		"electron:mac": "npm run build && npm run icon && electron-builder --mac dmg --publish never && node scripts/post-mac.js",
 		"electron:mac:dir": "npm run build && npm run icon && electron-builder --mac dir --publish never && node scripts/post-mac-dir.js"
@@ -71,6 +75,8 @@
 			"dist/**/*",
 			"map-editor/**/*",
 			"archetype-editor/**/*",
+			"helpfile-editor/**/*",
+			"character-editor/**/*",
 			"package.json"
 		],
 		"extraMetadata": {

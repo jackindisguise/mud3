@@ -433,7 +433,13 @@ export default {
 					const right = modifiers[i + 1];
 					if (right) {
 						lines.push(
-							`  ${string.pad(left, columnWidth, string.ALIGN.LEFT, " ", SIZER)}|${right}`
+							`  ${string.pad(
+								left,
+								columnWidth,
+								string.ALIGN.LEFT,
+								" ",
+								SIZER
+							)} ${right}`
 						);
 					} else {
 						lines.push(`  ${left}`);

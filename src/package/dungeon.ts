@@ -718,9 +718,6 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					const coordinates = { x, y, z };
 
 					// Create room from template using the formal template system
-					logger.debug(
-						`[${id}] Creating room at (${x},${y},${z}) from template index ${templateIndex}`
-					);
 					const room = createRoomFromTemplate(roomTemplate, coordinates);
 					totalRoomsCreated++;
 

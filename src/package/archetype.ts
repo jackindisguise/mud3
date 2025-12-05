@@ -272,11 +272,28 @@ async function loadDirectory(
 		const parsed = parseArchetypeFile(raw, filePath, type);
 		if (!parsed) continue;
 
-		logger.debug(`Loaded ${parsed.definition.name} archetype`);
 		if (type === "race") {
-			registerRace(parsed.definition);
+			const registered = registerRace(parsed.definition);
+			logger.debug(
+				`Loaded and registered race: ${registered.id} (${registered.name})`,
+				{
+					id: registered.id,
+					name: registered.name,
+					filePath: relative(ROOT_DIRECTORY, filePath),
+					type: "race",
+				}
+			);
 		} else {
-			registerJob(parsed.definition);
+			const registered = registerJob(parsed.definition);
+			logger.debug(
+				`Loaded and registered job: ${registered.id} (${registered.name})`,
+				{
+					id: registered.id,
+					name: registered.name,
+					filePath: relative(ROOT_DIRECTORY, filePath),
+					type: "job",
+				}
+			);
 		}
 		count++;
 	}

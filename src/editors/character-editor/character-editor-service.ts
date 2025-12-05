@@ -10,19 +10,19 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import { join, extname, dirname } from "path";
 import YAML from "js-yaml";
-import logger from "../logger.js";
-import { getSafeRootDirectory } from "../utils/path.js";
-import { getAllRaces, getAllJobs } from "../registry/archetype.js";
+import logger from "../../logger.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
+import { getAllRaces, getAllJobs } from "../../registry/archetype.js";
 import {
 	getDungeonById,
 	getRegisteredDungeonIds,
-} from "../registry/dungeon.js";
+} from "../../registry/dungeon.js";
 import {
 	WEAPON_TYPES,
 	compressSerializedObject,
 	type SerializedDungeonObject,
 	type AnySerializedDungeonObject,
-} from "../core/dungeon.js";
+} from "../../core/dungeon.js";
 
 export interface CharacterListResponse {
 	characters: string[];

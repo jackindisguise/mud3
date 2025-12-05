@@ -10,16 +10,20 @@ import { createServer, IncomingMessage, ServerResponse } from "http";
 import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "../logger.js";
+import logger from "../../logger.js";
 import {
 	createCharacterEditorService,
 	CharacterEditorService,
 } from "./character-editor-service.js";
-import { getSafeRootDirectory } from "../utils/path.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
 
 const PORT = 3003; // Different port from archetype editor (3001), map editor (3000), and helpfile editor (3002)
 const ROOT_DIRECTORY = getSafeRootDirectory();
-const CHARACTER_EDITOR_DIR = join(ROOT_DIRECTORY, "character-editor");
+const CHARACTER_EDITOR_DIR = join(
+	ROOT_DIRECTORY,
+	"editors",
+	"character-editor"
+);
 
 // Verify character editor directory exists at startup (async check)
 access(CHARACTER_EDITOR_DIR, FS_CONSTANTS.F_OK)

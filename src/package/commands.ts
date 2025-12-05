@@ -61,6 +61,7 @@ export interface CommandObject {
 	pattern: string;
 	aliases?: string[];
 	priority?: PRIORITY;
+	adminOnly?: boolean;
 	cooldown?:
 		| number
 		| ((context: CommandContext, args: Map<string, any>) => number | undefined);
@@ -94,6 +95,7 @@ export class JavaScriptCommandAdapter extends Command {
 			pattern: commandObj.pattern,
 			aliases: commandObj.aliases,
 			priority: commandObj.priority,
+			adminOnly: commandObj.adminOnly,
 		});
 		this.executeFunction = commandObj.execute;
 		this.errorFunction = commandObj.onError;

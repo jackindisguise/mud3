@@ -215,6 +215,7 @@ export interface CommandOptions {
 	pattern: string;
 	aliases?: string[];
 	priority?: PRIORITY;
+	adminOnly?: boolean;
 }
 
 /**
@@ -455,6 +456,13 @@ export abstract class Command {
 	readonly priority: PRIORITY = PRIORITY.NORMAL;
 
 	/**
+	 * Whether this command is admin-only.
+	 * If true, the command will not be parsed for non-admin characters.
+	 * Defaults to false.
+	 */
+	readonly adminOnly: boolean = false;
+
+	/**
 	 * Cached pattern information for efficient parsing.
 	 * Built once during construction to avoid rebuilding regex patterns on every parse.
 	 * @private
@@ -501,6 +509,7 @@ export abstract class Command {
 			if (options.pattern) this.pattern = options.pattern;
 			if (options.aliases) this.aliases = options.aliases;
 			if (options.priority !== undefined) this.priority = options.priority;
+			if (options.adminOnly !== undefined) this.adminOnly = options.adminOnly;
 		}
 		this.buildPatternCache();
 	}
@@ -1220,7 +1229,9 @@ export abstract class Command {
 			let inventoryItems = context.actor.contents;
 			if (context.actor instanceof Mob) {
 				const equippedItems = context.actor.getAllEquipped() as DungeonObject[];
-				inventoryItems = inventoryItems.filter((item) => !equippedItems.includes(item));
+				inventoryItems = inventoryItems.filter(
+					(item) => !equippedItems.includes(item)
+				);
 			}
 			searchLocations.push(...inventoryItems);
 		}
@@ -1869,6 +1880,14 @@ export class CommandRegistry {
 
 		// Commands are already sorted by priority and pattern length
 		for (const command of this.commands) {
+			// Skip admin-only commands for non-admin characters
+			if (command.adminOnly) {
+				const character = context.actor.character;
+				if (!character || !character.isAdmin()) {
+					continue;
+				}
+			}
+
 			// Skip ability commands if the actor doesn't know the ability
 			if (command instanceof AbilityCommand) {
 				if (!context.actor.knowsAbilityById(command.abilityId)) {

@@ -1384,6 +1384,17 @@ export function forEachCharacter(
  * await stopGame();
  * ```
  */
+// Store the stop function globally so it can be accessed from commands
+let globalStopFunction: (() => Promise<void>) | null = null;
+
+/**
+ * Get the stop function for graceful shutdown.
+ * Returns null if the game hasn't been started yet.
+ */
+export function getStopGameFunction(): (() => Promise<void>) | null {
+	return globalStopFunction;
+}
+
 export async function startGame(): Promise<() => Promise<void>> {
 	// Initialize server
 	server = new MudServer();
@@ -1396,5 +1407,6 @@ export async function startGame(): Promise<() => Promise<void>> {
 	});
 
 	await start();
+	globalStopFunction = stop;
 	return stop;
 }

@@ -17,11 +17,82 @@
  */
 
 import { CommandContext, ParseResult } from "../core/command.js";
-import { MESSAGE_GROUP } from "../core/character.js";
+import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
+import { runInNewContext } from "vm";
+import { inspect } from "util";
+import logger from "../logger.js";
+import {
+	broadcast,
+	forEachCharacter,
+	announce,
+	forEachSession,
+	getGameStats,
+} from "../game.js";
+import { createFromTemplateWithOid } from "../package/dungeon.js";
+import { resolveTemplateById, DungeonObject } from "../core/dungeon.js";
+
+// allows each user to have their own persistant.
+const persistance = new Map<Character, Record<string, any>>();
+function getPersistance(character: Character): Record<string, any> {
+	let data = persistance.get(character);
+	if (!data) {
+		data = {
+			user: character,
+			mob: character.mob,
+			room: character.mob!.location,
+			game: {
+				forEachCharacter,
+				broadcast,
+				announce,
+				forEachSession,
+				getGameStats,
+			},
+			createFromTemplate: (templateId: string): DungeonObject | null => {
+				const template = resolveTemplateById(templateId);
+				if (!template) {
+					return null;
+				}
+				const object = createFromTemplateWithOid(template);
+				character.mob?.add(object);
+				return object;
+			},
+
+			// printing messages directly to user
+			print: (...args: any[]) =>
+				character.sendMessage(
+					`${args.join(" ")}`,
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				),
+			// Provide console for debugging
+			console: {
+				log: (...args: any[]) => logger.debug(`[Exec] ${args.join(" ")}`),
+				error: (...args: any[]) => logger.error(`[Exec] ${args.join(" ")}`),
+				warn: (...args: any[]) => logger.warn(`[Exec] ${args.join(" ")}`),
+				info: (...args: any[]) => logger.info(`[Exec] ${args.join(" ")}`),
+			},
+			// Provide util.inspect for better object inspection than JSON.stringify
+			inspect: (
+				obj: any,
+				options?: { depth?: number; colors?: boolean; compact?: boolean }
+			) => {
+				return inspect(obj, {
+					depth: options?.depth ?? 1,
+					colors: options?.colors ?? false,
+					compact: options?.compact ?? false,
+					showHidden: false,
+					breakLength: 80,
+				});
+			},
+		};
+		persistance.set(character, data);
+	}
+	return data;
+}
 
 export default {
 	pattern: "exec <code:text>",
+	adminOnly: true,
 	/**
 	 * Execute the JavaScript code.
 	 */
@@ -33,7 +104,7 @@ export default {
 		const { actor } = context;
 		const character = actor.character;
 
-		// Security check: only admins can use this command
+		// Double-check admin status (shouldn't be needed due to adminOnly flag, but safety check)
 		if (!character || !character.isAdmin()) {
 			actor.sendMessage(
 				"You do not have permission to use this command.",
@@ -46,21 +117,36 @@ export default {
 		let actualCode = code;
 
 		// If code starts with =, treat it as an expression to return
-		if (code.startsWith("=")) {
-			actualCode = `return ${code.slice(1)}`;
+		if (code.startsWith(":")) {
+			actualCode = `print(${code.slice(1)})`;
 		}
 
 		try {
-			// Create an async function from the code string and execute it
+			// Create a sandboxed context for executing code
 			// The context object is available within the executed code
-			const AsyncFunction = async function () {}
-				.constructor as FunctionConstructor;
-			const func = AsyncFunction("context", actualCode);
-			const result = await func(context);
+			const sandbox = getPersistance(character);
+
+			// Wrap code in an async function if it contains await
+			const wrappedCode = actualCode.includes("await")
+				? `(async () => { ${actualCode} })()`
+				: actualCode;
+
+			// Execute code in the sandboxed context
+			const result = runInNewContext(wrappedCode, sandbox, {
+				timeout: 5000, // 5 second timeout
+			});
+
+			// Handle promise result if code was async
+			const finalResult = result instanceof Promise ? await result : result;
 
 			// Prepare the result message
-			if (result !== undefined) {
-				message = `Result: ${JSON.stringify(result, null, 2)}`;
+			if (finalResult !== undefined) {
+				message = `Result: ${inspect(finalResult, {
+					depth: 1,
+					colors: false,
+					compact: false,
+					showHidden: false,
+				})}`;
 			} else {
 				message = "Code executed successfully (no return value).";
 			}

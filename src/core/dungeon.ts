@@ -7738,7 +7738,7 @@ function getCompressionBaseline(
 /**
  * Produces a compressed serialized object by removing keys equal to baseline.
  * Always preserves 'type', 'oid' (if present), and includes 'templateId' when provided.
- * 
+ *
  * @param uncompressed The full serialized object to compress
  * @param templateId Optional template ID to use as baseline for compression
  * @returns Compressed serialized object with only fields that differ from baseline
@@ -7778,7 +7778,9 @@ export function compressSerializedObject<T extends SerializedDungeonObject>(
  * If no dungeon prefix is provided, attempts to find a matching template
  * in any registered dungeon (first match wins).
  */
-function resolveTemplateById(id: string): DungeonObjectTemplate | undefined {
+export function resolveTemplateById(
+	id: string
+): DungeonObjectTemplate | undefined {
 	// Parse @dungeon:id form
 	const m = id.match(/^@([^:]+):(.+)$/);
 	if (m) {

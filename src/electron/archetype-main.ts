@@ -167,16 +167,9 @@ function registerHandlers() {
 	);
 
 	// Abilities
-	ipcMain.handle("archetype-editor:get-abilities", () => {
-		const abilities = service.getAbilities();
-		return { abilities };
-	});
-
-	// Passives
-	ipcMain.handle("archetype-editor:get-passives", () => {
-		const passives = service.getPassives();
-		return { passives };
-	});
+	ipcMain.handle("archetype-editor:get-abilities", () =>
+		service.getAbilities()
+	);
 }
 
 app.whenReady().then(async () => {
@@ -193,7 +186,7 @@ app.whenReady().then(async () => {
 
 		// Import and create service after packages are loaded
 		const { createArchetypeEditorService } = await import(
-			"../archetype-editor/archetype-editor-service.js"
+			"../editors/archetype-editor/archetype-editor-service.js"
 		);
 		service = createArchetypeEditorService({
 			racesDir: path.join(dataRootPath, "data", "races"),

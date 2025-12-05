@@ -17,6 +17,15 @@ const api = {
 		jobId: string;
 		level: number;
 	}) => ipcRenderer.invoke("map-editor:calculate-attributes", payload),
+	logAction: (payload: {
+		dungeonId: string | null;
+		action: string;
+		actionTarget?: string | null;
+		newParameters?: unknown;
+		oldParameters?: unknown;
+		metadata?: unknown;
+		timestamp: number;
+	}) => ipcRenderer.invoke("map-editor:log-action", payload),
 };
 
 contextBridge.exposeInMainWorld("mapEditorAPI", api);

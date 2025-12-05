@@ -188,7 +188,7 @@ app.whenReady().then(async () => {
 
 		// Import and create service
 		const { createCharacterEditorService } = await import(
-			"../character-editor/character-editor-service.js"
+			"../editors/character-editor/character-editor-service.js"
 		);
 		service = createCharacterEditorService({
 			characterDir: path.join(dataRootPath, "data", "characters"),

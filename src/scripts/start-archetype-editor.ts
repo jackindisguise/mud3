@@ -5,34 +5,13 @@
  * The server will be available at http://localhost:3001
  */
 
-import { createArchetypeEditorServer } from "../archetype-editor/archetype-editor-server.js";
+import { createArchetypeEditorServer } from "../editors/archetype-editor/archetype-editor-server.js";
 import logger from "../logger.js";
-import { loadPackage } from "package-loader";
+
+const server = createArchetypeEditorServer();
 
 async function start() {
 	try {
-		// Load packages first (archetype, ability, effect) before creating server
-		const archetype = await import("../package/archetype.js");
-		const ability = await import("../package/ability.js");
-		const effect = await import("../package/effect.js");
-
-		await logger.block("archetype", async () => {
-			await loadPackage(archetype.default);
-		});
-		await logger.block("ability", async () => {
-			await loadPackage(ability.default);
-		});
-		await logger.block("effect", async () => {
-			await loadPackage(effect.default);
-		});
-
-		// Load dungeon after the above packages
-		const dungeon = await import("../package/dungeon.js");
-		await logger.block("dungeon", async () => {
-			await loadPackage(dungeon.default);
-		});
-
-		const server = createArchetypeEditorServer();
 		await server.start();
 		logger.info("Archetype editor server is running. Press Ctrl+C to stop.");
 

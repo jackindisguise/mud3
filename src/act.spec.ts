@@ -487,7 +487,7 @@ suite("act.ts", () => {
 			assert.strictEqual(userMessages.length, 1);
 			assert.strictEqual(
 				userMessages[0],
-				"You hit TestTarget for 25 damage. [57%]"
+				"You hit TestTarget for 25 damage. [60%]"
 			);
 		});
 
@@ -516,7 +516,7 @@ suite("act.ts", () => {
 			assert.strictEqual(targetMessages.length, 1);
 			assert.strictEqual(
 				targetMessages[0],
-				"Alice hits you for 25 damage. [57%]"
+				"Alice hits you for 25 damage. [60%]"
 			);
 		});
 

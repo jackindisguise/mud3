@@ -15,22 +15,22 @@ await logger.block("packages", async () => {
 
 await logger.block("pathfinding", async () => {
 	await logger.block("graph-building", async () => {
-		logger.info("Pre-building dungeon graph.");
 		const graph = buildDungeonGraph();
-		logger.info(`Dungeon graph built: ${graph.size} dungeons.`);
-		for (let [dungeonId, edges] of graph.entries()) {
-			logger.info(`Dungeon ${dungeonId} has ${edges.length} edges.`);
-			for (let edge of edges) {
-				logger.info(
-					`Edge to dungeon ${edge.toDungeonId} via ${edge.via.length} rooms.`
-				);
-			}
-		}
+		const graphData = Array.from(graph.entries()).map(([dungeonId, edges]) => ({
+			dungeonId,
+			edgeCount: edges.length,
+			edges: edges.map((edge) => ({
+				toDungeonId: edge.toDungeonId,
+				roomCount: edge.via.length,
+			})),
+		}));
+		logger.info(`Dungeon graph built: ${graph.size} dungeons`, {
+			dungeonCount: graph.size,
+			dungeons: graphData,
+		});
 	});
 
 	await logger.block("path-cache", async () => {
-		logger.info("Pre-caching paths between dungeon gateway edges...");
-
 		// Identify gateway rooms per dungeon (rooms that step into a different dungeon)
 		const gatewaysByDungeon = new Map<string, Array<any>>();
 		for (const d of DUNGEON_REGISTRY.values()) {
@@ -56,18 +56,35 @@ await logger.block("pathfinding", async () => {
 		}
 
 		// For each pair of dungeons, pre-cache between their gateway rooms
+		const cachedPaths: Array<{
+			from: string;
+			to: string;
+			steps: number;
+		}> = [];
 		for (const [fromId, fromGateways] of gatewaysByDungeon.entries()) {
 			for (const [toId, toGateways] of gatewaysByDungeon.entries()) {
 				if (fromId === toId) continue;
 				for (const fromRoom of fromGateways) {
 					for (const toRoom of toGateways) {
-						findDirectionsBetweenRooms(fromRoom, toRoom, { maxNodes: 5000 });
+						const result = findDirectionsBetweenRooms(fromRoom, toRoom, {
+							maxNodes: 5000,
+						});
+						if (result) {
+							cachedPaths.push({
+								from: fromRoom.getRoomRef() || "",
+								to: toRoom.getRoomRef() || "",
+								steps: result.length,
+							});
+						}
 					}
 				}
 			}
 		}
 
-		logger.info("Finished pre-caching dungeon gateway paths.");
+		logger.info(`Pre-cached ${cachedPaths.length} dungeon gateway paths`, {
+			pathCount: cachedPaths.length,
+			paths: cachedPaths,
+		});
 	});
 });
 

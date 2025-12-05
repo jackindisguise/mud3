@@ -411,6 +411,23 @@ class MapEditor {
 		return response.json();
 	}
 
+	async logAction(payload) {
+		if (this.api?.logAction) {
+			return this.api.logAction(payload);
+		}
+		const response = await fetch("/api/log-action", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(payload),
+		});
+		if (!response.ok) {
+			// Don't throw - logging failures shouldn't break the editor
+			console.warn("Failed to log action:", response.statusText);
+			return { success: false };
+		}
+		return response.json();
+	}
+
 	async createDungeonData(id, yaml) {
 		if (this.api?.createDungeon) {
 			return this.api.createDungeon({ id, yaml });
@@ -3791,7 +3808,10 @@ class MapEditor {
 				</div>
 				<div class="form-group">
 					<label>Map Color</label>
-					${this.generateColorSelector("template-map-color", mapColorToInteger(template.mapColor))}
+					${this.generateColorSelector(
+						"template-map-color",
+						mapColorToInteger(template.mapColor)
+					)}
 				</div>
 				<div class="form-group">
 					<label>Dense</label>
@@ -4019,7 +4039,9 @@ class MapEditor {
 						</div>
 					</div>
 				</div>
-				<div id="object-value-field" style="display: ${isObjectType ? "block" : "none"};">
+				<div id="object-value-field" style="display: ${
+					isObjectType ? "block" : "none"
+				};">
 					<div class="form-group">
 						<label>Value</label>
 						<input type="number" id="template-value" value="${
@@ -4035,7 +4057,10 @@ class MapEditor {
 				</div>
 				<div class="form-group">
 					<label>Map Color</label>
-					${this.generateColorSelector("template-map-color", mapColorToInteger(template.mapColor))}
+					${this.generateColorSelector(
+						"template-map-color",
+						mapColorToInteger(template.mapColor)
+					)}
 				</div>
 			`;
 		}
@@ -4248,11 +4273,20 @@ class MapEditor {
 						newType === "Equipment" ? "block" : "none";
 				}
 				if (itemFields) {
-					const isItemType = newType === "Item" || newType === "Equipment" || newType === "Weapon" || newType === "Armor";
+					const isItemType =
+						newType === "Item" ||
+						newType === "Equipment" ||
+						newType === "Weapon" ||
+						newType === "Armor";
 					itemFields.style.display = isItemType ? "block" : "none";
 				}
 				if (objectValueField) {
-					const isObjectType = newType === "Item" || newType === "Equipment" || newType === "Weapon" || newType === "Armor" || newType === "Prop";
+					const isObjectType =
+						newType === "Item" ||
+						newType === "Equipment" ||
+						newType === "Weapon" ||
+						newType === "Armor" ||
+						newType === "Prop";
 					objectValueField.style.display = isObjectType ? "block" : "none";
 				}
 				// Recalculate if switching to Mob
@@ -4655,7 +4689,9 @@ class MapEditor {
 				templateType === "Armor" ||
 				templateType === "Equipment"
 			) {
-				const containerBtn = document.getElementById("template-is-container-btn");
+				const containerBtn = document.getElementById(
+					"template-is-container-btn"
+				);
 				if (containerBtn) {
 					const isContainer = containerBtn.classList.contains("enabled");
 					if (isContainer) {
@@ -4851,7 +4887,11 @@ class MapEditor {
 				dungeon.templates[existing] = updated;
 			} else {
 				// For new templates, remove behaviors if empty to avoid including empty object in YAML
-				if (templateType === "Mob" && newTemplate.behaviors && Object.keys(newTemplate.behaviors).length === 0) {
+				if (
+					templateType === "Mob" &&
+					newTemplate.behaviors &&
+					Object.keys(newTemplate.behaviors).length === 0
+				) {
 					delete newTemplate.behaviors;
 				}
 				dungeon.templates.push(newTemplate);
@@ -5592,21 +5632,21 @@ class MapEditor {
 
 			if (distanceFromLeft < edgeZone) {
 				// Near left edge - scroll left
-				const factor = 1 - (distanceFromLeft / edgeZone);
+				const factor = 1 - distanceFromLeft / edgeZone;
 				scrollX = -scrollSpeed * factor;
 			} else if (distanceFromRight < edgeZone) {
 				// Near right edge - scroll right
-				const factor = 1 - (distanceFromRight / edgeZone);
+				const factor = 1 - distanceFromRight / edgeZone;
 				scrollX = scrollSpeed * factor;
 			}
 
 			if (distanceFromTop < edgeZone) {
 				// Near top edge - scroll up
-				const factor = 1 - (distanceFromTop / edgeZone);
+				const factor = 1 - distanceFromTop / edgeZone;
 				scrollY = -scrollSpeed * factor;
 			} else if (distanceFromBottom < edgeZone) {
 				// Near bottom edge - scroll down
-				const factor = 1 - (distanceFromBottom / edgeZone);
+				const factor = 1 - distanceFromBottom / edgeZone;
 				scrollY = scrollSpeed * factor;
 			}
 
@@ -7174,18 +7214,22 @@ class MapEditor {
 		// Mouse wheel zoom with CTRL/CMD modifier
 		const mapGrid = document.getElementById("map-grid");
 		if (mapGrid) {
-			mapGrid.addEventListener("wheel", (e) => {
-				// Check for CTRL (Windows/Linux) or CMD (Mac) modifier
-				if (e.ctrlKey || e.metaKey) {
-					e.preventDefault();
-					// Scroll up (negative deltaY) = zoom in, scroll down (positive deltaY) = zoom out
-					if (e.deltaY < 0) {
-						this.zoomIn();
-					} else if (e.deltaY > 0) {
-						this.zoomOut();
+			mapGrid.addEventListener(
+				"wheel",
+				(e) => {
+					// Check for CTRL (Windows/Linux) or CMD (Mac) modifier
+					if (e.ctrlKey || e.metaKey) {
+						e.preventDefault();
+						// Scroll up (negative deltaY) = zoom in, scroll down (positive deltaY) = zoom out
+						if (e.deltaY < 0) {
+							this.zoomIn();
+						} else if (e.deltaY > 0) {
+							this.zoomOut();
+						}
 					}
-				}
-			}, { passive: false });
+				},
+				{ passive: false }
+			);
 		}
 
 		// Keyboard shortcuts for layer navigation
@@ -8580,6 +8624,20 @@ class MapEditor {
 		if (!options.skipAutosave) {
 			this.saveToLocalStorage();
 		}
+
+		// Log action to persistent log file
+		this.logAction({
+			dungeonId: this.currentDungeonId,
+			action: changeDetails.action,
+			actionTarget: changeDetails.actionTarget || null,
+			newParameters: changeDetails.newParameters || null,
+			oldParameters: changeDetails.oldParameters || null,
+			metadata: changeDetails.metadata || null,
+			timestamp: now,
+		}).catch((error) => {
+			// Silently fail - logging shouldn't break the editor
+			console.warn("Failed to log action:", error);
+		});
 	}
 
 	renderChangeHistory() {

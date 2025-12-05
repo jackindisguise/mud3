@@ -27,6 +27,8 @@
 		"doc": "npx typedoc",
 		"deploy": "npm run clean && npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
+		"prestart:keep-alive": "npm run build",
+		"start:keep-alive": "node scripts/keep-alive.js",
 		"prestart:rebuild": "npm run build",
 		"start:rebuild": "node dist/index",
 		"rerun": "npm run test && npm run start",

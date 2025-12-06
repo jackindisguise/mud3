@@ -53,7 +53,7 @@ import { readFile } from "fs/promises";
 
 - `dungeon.ts` - Dungeon, Room, Mob, Item classes and world model
 - `character.ts` - Character class and message grouping (includes busy mode support)
-- `command.ts` - Command system framework
+- `command.ts` - Command system framework with admin-only command support
 - `archetype.ts` - Race and Job type definitions
 - `ability.ts` - Ability type definitions
 - `effect.ts` - Effect system types (DoT, HoT, passive effects)

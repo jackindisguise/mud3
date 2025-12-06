@@ -20,6 +20,7 @@ Scripts in this directory are run independently and perform various tasks:
 - `post-mac-dir.js` - Post macOS distribution artifacts
 - `post-win-portable.js` - Post Windows portable distribution
 - `setup-debug-logging.js` - Configure debug logging
+- `keep-alive.js` - Monitor game server and automatically restart on crash
 
 ## Usage
 
@@ -36,6 +37,20 @@ Or directly with Node.js:
 ```bash
 node scripts/test.js
 node scripts/test-ts.js
+```
+
+## Keep-Alive Script
+
+The `keep-alive.js` script monitors the game server process and automatically restarts it if it crashes or exits unexpectedly. It provides:
+
+- **Automatic restart** - Restarts the server after crashes or unexpected exits
+- **Rate limiting** - Prevents restart loops (max 5 restarts per minute)
+- **Graceful shutdown** - Handles SIGINT/SIGTERM signals properly
+- **Intentional shutdown detection** - Does not restart when server exits with code 2 (intentional shutdown via shutdown command)
+
+Run with:
+```bash
+npm run start:keep-alive
 ```
 
 ## Notes

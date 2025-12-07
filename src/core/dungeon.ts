@@ -3478,7 +3478,6 @@ export class Movable extends DungeonObject {
 
 		// Call onExit
 		if (sourceRoom) {
-			options.scripts?.beforeOnExit?.(this, sourceRoom, dir);
 			sourceRoom.onExit(this, dir);
 			options.scripts?.afterOnExit?.(this, sourceRoom, dir);
 		}

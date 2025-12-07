@@ -40,7 +40,8 @@ import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import logger from "../logger.js";
-import { CommandRegistry, AbilityCommand } from "../core/command.js";
+import { AbilityCommand } from "../core/command.js";
+import { registerCommand } from "../registry/command.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { access, constants } from "fs/promises";
 import { Ability, generateProficiencyTable } from "../core/ability.js";
@@ -184,7 +185,7 @@ async function loadAbilities() {
 					const commandObj = abilityModule.command;
 					if (commandObj && commandObj.pattern && commandObj.execute) {
 						const command = new AbilityCommand(abilityId, commandObj);
-						CommandRegistry.default.register(command);
+						registerCommand(command);
 						totalCommandsRegistered++;
 
 						const metadata: Record<string, unknown> = {

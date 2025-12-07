@@ -21,7 +21,7 @@
  * if (player.canStep(DIRECTION.UP)) player.step(DIRECTION.UP);
  * ```
  */
-export const enum DIRECTION {
+export enum DIRECTION {
 	NORTH = 1 << 0,
 	SOUTH = 1 << 1,
 	EAST = 1 << 2,

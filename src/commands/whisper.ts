@@ -88,6 +88,14 @@ export default {
 		// Send the whisper to the target
 		target.sendChat(character, message, CHANNEL.WHISPER);
 
+		// If target is an NPC mob, emit whisper event
+		if (target.mob) {
+			const targetEmitter = target.mob.aiEvents;
+			if (targetEmitter) {
+				targetEmitter.emit("whisper", actor, message);
+			}
+		}
+
 		// Send confirmation to sender
 		character.sendChat(
 			character,

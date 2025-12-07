@@ -30,28 +30,40 @@ export default {
 		const { actor, room } = context;
 		const character = actor.character;
 
-		if (!character) {
-			actor.sendMessage(
-				"Only players can use the say channel.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
+		// For characters, check channel subscription
+		if (character) {
+			if (!character.isInChannel(CHANNEL.SAY)) {
+				actor.sendMessage(
+					"You are not subscribed to the SAY channel.",
+					MESSAGE_GROUP.COMMAND_RESPONSE
+				);
+				return;
+			}
 		}
 
-		// Check if the character is in the SAY channel
-		if (!character.isInChannel(CHANNEL.SAY)) {
-			actor.sendMessage(
-				"You are not subscribed to the SAY channel.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		// Send to all mobs in the same room that are subscribed to SAY
+		// Send to all mobs in the same room
 		for (const mob of [actor, ...(room?.contents || [])]) {
 			if (!(mob instanceof Mob)) continue;
-			if (!mob.character) continue;
-			mob.character.sendChat(character, message, CHANNEL.SAY);
+			if (mob.character) {
+				// Send chat message to character mobs
+				if (character) {
+					mob.character.sendChat(character, message, CHANNEL.SAY);
+				}
+			} else {
+				// For NPCs, emit say event for AI to handle
+				const npcEmitter = mob.aiEvents;
+				if (npcEmitter) {
+					npcEmitter.emit("say", actor, message);
+				}
+			}
+		}
+
+		// Emit say event for the speaking mob (if NPC)
+		if (!character) {
+			const actorEmitter = actor.aiEvents;
+			if (actorEmitter) {
+				actorEmitter.emit("say", actor, message);
+			}
 		}
 	},
 

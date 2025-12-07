@@ -96,6 +96,34 @@ function mapColorToString(mapColor) {
 	return undefined;
 }
 
+// DIRECTION enum values matching the game's DIRECTION enum
+const DIRECTION = {
+	NORTH: 1 << 0,
+	SOUTH: 1 << 1,
+	EAST: 1 << 2,
+	WEST: 1 << 3,
+	NORTHEAST: 1 << 4,
+	NORTHWEST: 1 << 5,
+	SOUTHEAST: 1 << 6,
+	SOUTHWEST: 1 << 7,
+	UP: 1 << 8,
+	DOWN: 1 << 9,
+};
+
+// Text to DIRECTION mapping (matching game's TEXT2DIR)
+const TEXT2DIR = {
+	north: DIRECTION.NORTH,
+	south: DIRECTION.SOUTH,
+	east: DIRECTION.EAST,
+	west: DIRECTION.WEST,
+	northeast: DIRECTION.NORTHEAST,
+	northwest: DIRECTION.NORTHWEST,
+	southeast: DIRECTION.SOUTHEAST,
+	southwest: DIRECTION.SOUTHWEST,
+	up: DIRECTION.UP,
+	down: DIRECTION.DOWN,
+};
+
 const EDITOR_ACTIONS = Object.freeze({
 	CREATE_TEMPLATE: "CREATE_TEMPLATE",
 	EDIT_TEMPLATE_FIELD: "EDIT_TEMPLATE_FIELD",
@@ -1652,14 +1680,9 @@ class MapEditor {
 	// Helper function to check if a room has an exit in a direction
 	hasExit(room, direction) {
 		if (!room || !room.allowedExits) return false;
-		const DIRECTION = {
-			NORTH: 1 << 0,
-			SOUTH: 1 << 1,
-			EAST: 1 << 2,
-			WEST: 1 << 3,
-		};
 		// Room's allowedExits already includes any exit overrides applied at load time
-		return (room.allowedExits & DIRECTION[direction]) !== 0;
+		const dirFlag = TEXT2DIR[direction.toLowerCase()];
+		return dirFlag ? (room.allowedExits & dirFlag) !== 0 : false;
 	}
 
 	// Helper function to get exit indicators for a cell
@@ -2873,32 +2896,6 @@ class MapEditor {
 			dungeon.exitOverrides = [];
 		}
 
-		const DIRECTION = {
-			NORTH: 1 << 0,
-			SOUTH: 1 << 1,
-			EAST: 1 << 2,
-			WEST: 1 << 3,
-			NORTHEAST: 1 << 4,
-			NORTHWEST: 1 << 5,
-			SOUTHEAST: 1 << 6,
-			SOUTHWEST: 1 << 7,
-			UP: 1 << 8,
-			DOWN: 1 << 9,
-		};
-
-		const TEXT2DIR = {
-			north: DIRECTION.NORTH,
-			south: DIRECTION.SOUTH,
-			east: DIRECTION.EAST,
-			west: DIRECTION.WEST,
-			northeast: DIRECTION.NORTHEAST,
-			northwest: DIRECTION.NORTHWEST,
-			southeast: DIRECTION.SOUTHEAST,
-			southwest: DIRECTION.SOUTHWEST,
-			up: DIRECTION.UP,
-			down: DIRECTION.DOWN,
-		};
-
 		const modal = document.getElementById("template-modal");
 		const title = document.getElementById("modal-title");
 		const body = document.getElementById("modal-body");
@@ -3534,18 +3531,6 @@ class MapEditor {
 		}
 
 		// Copy allowedExits
-		const DIRECTION = {
-			NORTH: 1 << 0,
-			SOUTH: 1 << 1,
-			EAST: 1 << 2,
-			WEST: 1 << 3,
-			NORTHEAST: 1 << 4,
-			NORTHWEST: 1 << 5,
-			SOUTHEAST: 1 << 6,
-			SOUTHWEST: 1 << 7,
-			UP: 1 << 8,
-			DOWN: 1 << 9,
-		};
 		const DEFAULT_ALLOWED_EXITS =
 			DIRECTION.NORTH |
 			DIRECTION.SOUTH |
@@ -3564,20 +3549,6 @@ class MapEditor {
 		if (modal) {
 			modal.dataset.allowedExits = allowedExits;
 		}
-
-		// Update exit buttons
-		const TEXT2DIR = {
-			north: DIRECTION.NORTH,
-			south: DIRECTION.SOUTH,
-			east: DIRECTION.EAST,
-			west: DIRECTION.WEST,
-			northeast: DIRECTION.NORTHEAST,
-			northwest: DIRECTION.NORTHWEST,
-			southeast: DIRECTION.SOUTHEAST,
-			southwest: DIRECTION.SOUTHWEST,
-			up: DIRECTION.UP,
-			down: DIRECTION.DOWN,
-		};
 
 		document.querySelectorAll(".exit-btn").forEach((btn) => {
 			const direction = btn.dataset.direction;
@@ -3682,20 +3653,6 @@ class MapEditor {
 		const isMob = type !== "room" && template.type === "Mob";
 
 		if (type === "room") {
-			// DIRECTION bitmap values
-			const DIRECTION = {
-				NORTH: 1 << 0, // 1
-				SOUTH: 1 << 1, // 2
-				EAST: 1 << 2, // 4
-				WEST: 1 << 3, // 8
-				NORTHEAST: 1 << 4, // 16
-				NORTHWEST: 1 << 5, // 32
-				SOUTHEAST: 1 << 6, // 64
-				SOUTHWEST: 1 << 7, // 128
-				UP: 1 << 8, // 256
-				DOWN: 1 << 9, // 512
-			};
-
 			// Default allowedExits: NSEW + diagonals (not UP/DOWN)
 			const DEFAULT_ALLOWED_EXITS =
 				DIRECTION.NORTH |
@@ -3706,20 +3663,6 @@ class MapEditor {
 				DIRECTION.NORTHWEST |
 				DIRECTION.SOUTHEAST |
 				DIRECTION.SOUTHWEST;
-
-			// Text to DIRECTION mapping
-			const TEXT2DIR = {
-				north: DIRECTION.NORTH,
-				south: DIRECTION.SOUTH,
-				east: DIRECTION.EAST,
-				west: DIRECTION.WEST,
-				northeast: DIRECTION.NORTHEAST,
-				northwest: DIRECTION.NORTHWEST,
-				southeast: DIRECTION.SOUTHEAST,
-				southwest: DIRECTION.SOUTHWEST,
-				up: DIRECTION.UP,
-				down: DIRECTION.DOWN,
-			};
 
 			// Get allowedExits bitmap (mandatory field, default to NSEW)
 			const allowedExits =
@@ -3988,6 +3931,17 @@ class MapEditor {
 						template.value || ""
 					}" placeholder="0" min="0" step="1">
 				</div>
+				<div class="form-group">
+					<label>AI Script</label>
+					<div style="display: flex; flex-direction: column; gap: 5px;">
+						<textarea id="template-ai-script" style="width: 100%; min-height: 200px; font-family: 'Courier New', monospace; background: #1a1a1a; color: #ffffff; border: 1px solid #444; padding: 8px; resize: vertical;" placeholder="// AI script code (JavaScript)&#10;// Example:&#10;// on(&quot;entrance&quot;, (mob) =&gt; {&#10;//   this.say(&quot;Hello!&quot;);&#10;// });">${
+							template.aiScript || ""
+						}</textarea>
+						<div style="font-size: 0.85em; color: #888;">
+							Enter JavaScript code for mob AI behavior. See documentation for available events and API functions.
+						</div>
+					</div>
+				</div>
 				</div>
 				<div id="weapon-fields" style="display: ${isWeapon ? "block" : "none"};">
 					<div class="form-group">
@@ -4070,18 +4024,6 @@ class MapEditor {
 
 		// Initialize allowedExits data attribute for room templates
 		if (type === "room") {
-			const DIRECTION = {
-				NORTH: 1 << 0,
-				SOUTH: 1 << 1,
-				EAST: 1 << 2,
-				WEST: 1 << 3,
-				NORTHEAST: 1 << 4,
-				NORTHWEST: 1 << 5,
-				SOUTHEAST: 1 << 6,
-				SOUTHWEST: 1 << 7,
-				UP: 1 << 8,
-				DOWN: 1 << 9,
-			};
 			const DEFAULT_ALLOWED_EXITS =
 				DIRECTION.NORTH |
 				DIRECTION.SOUTH |
@@ -4101,33 +4043,6 @@ class MapEditor {
 
 		// Set up room link handlers if this is a room template
 		if (type === "room") {
-			// DIRECTION bitmap values (same as above, needed in this scope)
-			const DIRECTION = {
-				NORTH: 1 << 0,
-				SOUTH: 1 << 1,
-				EAST: 1 << 2,
-				WEST: 1 << 3,
-				NORTHEAST: 1 << 4,
-				NORTHWEST: 1 << 5,
-				SOUTHEAST: 1 << 6,
-				SOUTHWEST: 1 << 7,
-				UP: 1 << 8,
-				DOWN: 1 << 9,
-			};
-
-			const TEXT2DIR = {
-				north: DIRECTION.NORTH,
-				south: DIRECTION.SOUTH,
-				east: DIRECTION.EAST,
-				west: DIRECTION.WEST,
-				northeast: DIRECTION.NORTHEAST,
-				northwest: DIRECTION.NORTHWEST,
-				southeast: DIRECTION.SOUTHEAST,
-				southwest: DIRECTION.SOUTHWEST,
-				up: DIRECTION.UP,
-				down: DIRECTION.DOWN,
-			};
-
 			// Exit button handlers - store current allowedExits bitmap (mandatory field)
 			let currentAllowedExits =
 				template.allowedExits !== undefined && template.allowedExits !== null
@@ -4388,6 +4303,25 @@ class MapEditor {
 				modal.classList.remove("active");
 			};
 		}
+
+		// Add tab key handler for AI script textarea
+		const aiScriptTextarea = document.getElementById("template-ai-script");
+		if (aiScriptTextarea) {
+			aiScriptTextarea.addEventListener("keydown", (e) => {
+				if (e.key === "Tab") {
+					e.preventDefault();
+					// Insert tab character at cursor position
+					const start = aiScriptTextarea.selectionStart;
+					const end = aiScriptTextarea.selectionEnd;
+					const value = aiScriptTextarea.value;
+					aiScriptTextarea.value =
+						value.substring(0, start) + "\t" + value.substring(end);
+					// Move cursor after inserted tab
+					aiScriptTextarea.selectionStart = aiScriptTextarea.selectionEnd =
+						start + 1;
+				}
+			});
+		}
 	}
 
 	saveTemplate(type, id, oldTemplate) {
@@ -4431,30 +4365,6 @@ class MapEditor {
 			let allowedExits = modal.dataset.allowedExits;
 			if (allowedExits === undefined) {
 				// If not set, calculate from button states
-				const DIRECTION = {
-					NORTH: 1 << 0,
-					SOUTH: 1 << 1,
-					EAST: 1 << 2,
-					WEST: 1 << 3,
-					NORTHEAST: 1 << 4,
-					NORTHWEST: 1 << 5,
-					SOUTHEAST: 1 << 6,
-					SOUTHWEST: 1 << 7,
-					UP: 1 << 8,
-					DOWN: 1 << 9,
-				};
-				const TEXT2DIR = {
-					north: DIRECTION.NORTH,
-					south: DIRECTION.SOUTH,
-					east: DIRECTION.EAST,
-					west: DIRECTION.WEST,
-					northeast: DIRECTION.NORTHEAST,
-					northwest: DIRECTION.NORTHWEST,
-					southeast: DIRECTION.SOUTHEAST,
-					southwest: DIRECTION.SOUTHWEST,
-					up: DIRECTION.UP,
-					down: DIRECTION.DOWN,
-				};
 				const DEFAULT_ALLOWED_EXITS =
 					DIRECTION.NORTH |
 					DIRECTION.SOUTH |
@@ -4646,6 +4556,18 @@ class MapEditor {
 				});
 				// Always set behaviors, even if empty, so disabled behaviors are properly cleared
 				newTemplate.behaviors = behaviors;
+
+				// Collect AI script
+				const aiScriptInput = document.getElementById("template-ai-script");
+				if (aiScriptInput) {
+					const aiScript = aiScriptInput.value.trim();
+					if (aiScript) {
+						newTemplate.aiScript = aiScript;
+					} else {
+						// Remove aiScript field if empty
+						delete newTemplate.aiScript;
+					}
+				}
 			}
 
 			// Add weapon-specific fields
@@ -5830,20 +5752,6 @@ class MapEditor {
 
 		// Store the previous state for the change entry
 		const previousState = this.cloneDungeonState(dungeon);
-
-		// Direction bitmask constants
-		const DIRECTION = {
-			NORTH: 1 << 0,
-			SOUTH: 1 << 1,
-			EAST: 1 << 2,
-			WEST: 1 << 3,
-			NORTHEAST: 1 << 4,
-			NORTHWEST: 1 << 5,
-			SOUTHEAST: 1 << 6,
-			SOUTHWEST: 1 << 7,
-			UP: 1 << 8,
-			DOWN: 1 << 9,
-		};
 
 		let linksCreated = 0;
 

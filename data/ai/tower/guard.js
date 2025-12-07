@@ -1,6 +1,6 @@
 function trespasserCycle(mob) {
 	const worldMemory = world.getMemory(mob);
-	if(worldMemory.trespasser) {
+	if (worldMemory.trespasser) {
 		eliminateTrespasser(mob);
 		return;
 	}
@@ -29,7 +29,6 @@ function trespasserCycle(mob) {
 			)}. You are trespassing.`
 		);
 	} else if (memory.seen == 3) {
-		markTrespasser(mob);
 		eliminateTrespasser(mob);
 	}
 
@@ -39,10 +38,7 @@ function trespasserCycle(mob) {
 function eliminateTrespasser(mob) {
 	markTrespasser(mob);
 	self.say(
-		`ELIMINATING TRESPASSER: ${color(
-			capitalize(mob.display),
-			COLOR.CRIMSON
-		)}.`
+		`ELIMINATING TRESPASSER: ${color(capitalize(mob.display), COLOR.CRIMSON)}.`
 	);
 	self.oneHit({
 		target: mob,
@@ -58,18 +54,18 @@ function markTrespasser(mob) {
 	worldMemory.trespasser = true;
 }
 
-on("sight", (mob) => {
-	if(self.combatTarget) return;
-	trespasserCycle(mob);
-});
-
-on("attacked", (mob)=>{
-	if(isTrespasser(mob)) return;
-	self.say("HOSTILE TRESPASSER DETECTED. ELIMINATING.");
-	eliminateTrespasser(mob);
-});
-
 function isTrespasser(mob) {
 	const worldMemory = world.getMemory(mob);
 	return worldMemory.trespasser;
 }
+
+on("sight", (mob) => {
+	if (self.combatTarget) return;
+	trespasserCycle(mob);
+});
+
+on("attacked", (mob) => {
+	if (isTrespasser(mob)) return;
+	self.say("HOSTILE TRESPASSER DETECTED. ELIMINATING.");
+	eliminateTrespasser(mob);
+});

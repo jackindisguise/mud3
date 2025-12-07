@@ -73,7 +73,7 @@ function createMainWindow(): BrowserWindow {
 		height: 900,
 		autoHideMenuBar: true,
 		webPreferences: {
-			preload: path.join(__dirname, "preload.cjs"),
+			preload: path.join(__dirname, "map-preload.cjs"),
 			nodeIntegration: false,
 			contextIsolation: true,
 			spellcheck: false,

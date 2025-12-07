@@ -539,15 +539,16 @@ dungeon:
   templates:
     - id: tower-guardian
       type: Mob
-      keywords: guardian creature monster
+      keywords: tower guard guardian creature monster
       display: a tower guard
       description: A mysterious guardian creature that patrols the tower rooms.
       roomDescription: A mysterious guardian creature stands here, watching the room with an otherworldly gaze.
-      race: dunpeal
-      job: gravesinger
-      level: 20
-      behaviors: {aggressive: true, wander: true}
+      race: warforged
+      job: warrior
+      level: 1
+      behaviors: {wander: true}
       value: 10
+      aiScript: file:ai/tower/guard.js
     - id: tower-sword
       type: Weapon
       keywords: guardian force maul golden radiant

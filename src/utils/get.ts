@@ -94,6 +94,13 @@ export function getItemFromRoom(
 		},
 		{ messageGroup: MESSAGE_GROUP.ACTION }
 	);
+
+	// Emit item-pickup event for NPC AI
+	const actorEmitter = actor.aiEvents;
+	if (actorEmitter) {
+		actorEmitter.emit("item-pickup", item);
+	}
+
 	return true;
 }
 

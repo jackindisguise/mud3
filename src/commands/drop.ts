@@ -40,6 +40,12 @@ function dropItem(item: Item, actor: Mob, room: Room): void {
 			room: room,
 		}
 	);
+
+	// Emit item-dropped event for NPC AI
+	const actorEmitter = actor.aiEvents;
+	if (actorEmitter) {
+		actorEmitter.emit("item-dropped", item);
+	}
 }
 
 function dropAll(actor: any, room: any): void {

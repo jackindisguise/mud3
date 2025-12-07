@@ -12,7 +12,7 @@
  * - `onError?(context, result)` - optional error handler
  *
  * Files beginning with `_` are ignored. `.js` and `.yaml` files are loaded.
- * The loader logs progress and registers commands into `CommandRegistry.default`.
+ * The loader logs progress and registers commands using `registerCommand()`.
  *
  * @example
  * // data/commands/say.js
@@ -30,6 +30,8 @@ import {
 	CommandContext,
 	ParseResult,
 	PRIORITY,
+	registerCommand,
+	getCommands,
 } from "../core/command.js";
 import { Package } from "package-loader";
 import { readdir, readFile, stat } from "fs/promises";
@@ -277,7 +279,7 @@ async function loadCommands() {
 
 					if (commandObj && commandObj.pattern && commandObj.execute) {
 						const command = new JavaScriptCommandAdapter(commandObj);
-						CommandRegistry.default.register(command);
+						registerCommand(command);
 						logger.debug(
 							`Loaded command "${commandObj.pattern}" from ${relative(
 								ROOT_DIRECTORY,
@@ -319,7 +321,7 @@ async function loadCommands() {
 
 					if (yamlDef && yamlDef.pattern && yamlDef.execute) {
 						const command = new YAMLCommandAdapter(yamlDef);
-						CommandRegistry.default.register(command);
+						registerCommand(command);
 						logger.info(
 							`Loaded YAML command "${yamlDef.pattern}" from ${relative(
 								ROOT_DIRECTORY,
@@ -360,7 +362,7 @@ async function loadCommands() {
 
 	logger.debug(
 		`Command loading complete. Total commands registered: ${
-			CommandRegistry.default.getCommands().length
+			getCommands().length
 		}`
 	);
 }
@@ -405,7 +407,7 @@ async function generateSocialCommands(): Promise<void> {
 		};
 
 		const command = new JavaScriptCommandAdapter(commandObj);
-		CommandRegistry.default.register(command);
+		registerCommand(command);
 		logger.debug(`Generated social command: ${pattern}`);
 	}
 

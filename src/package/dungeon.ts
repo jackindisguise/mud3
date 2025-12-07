@@ -420,6 +420,19 @@ function createFromTemplate(
 	// Apply template properties
 	obj.applyTemplate(template);
 
+	// Initialize AI for NPC mobs (mobs without character)
+	// Skip AI initialization for temporary template instances (OID -1) used for baseSerialized
+	if (obj instanceof Mob && !obj.character && providedOid >= 0) {
+		// Dynamic import to avoid circular dependency
+		import("../mob-ai.js")
+			.then(async (module) => {
+				await module.initializeMobAI(obj);
+			})
+			.catch((error) => {
+				logger.error(`Failed to initialize AI for mob ${obj.oid}: ${error}`);
+			});
+	}
+
 	return obj;
 }
 
@@ -813,6 +826,52 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					);
 
 					dungeon.addTemplate(hydrated);
+
+					// Cache AI script if this is a Mob template with an AI script
+					if (hydrated.type === "Mob") {
+						const mobTemplate = hydrated as MobTemplate;
+						const aiScript = mobTemplate.aiScript;
+						if (aiScript) {
+							// Dynamic import to avoid circular dependency
+							import("../mob-ai.js")
+								.then(async (module) => {
+									let scriptToCache: string | undefined;
+									if (aiScript.startsWith("file:")) {
+										// Load from file
+										const { readFile } = await import("fs/promises");
+										const { join } = await import("path");
+										const { getSafeRootDirectory } = await import(
+											"../utils/path.js"
+										);
+										const filePath = aiScript.slice(5);
+										const fullPath = join(
+											getSafeRootDirectory(),
+											"data",
+											filePath
+										);
+										try {
+											scriptToCache = await readFile(fullPath, "utf-8");
+										} catch (error) {
+											logger.error(
+												`Failed to load AI script file for template ${globalizedId}: ${error}`
+											);
+										}
+									} else {
+										// Inline script
+										scriptToCache = aiScript;
+									}
+									if (scriptToCache) {
+										module.cacheAIScript(globalizedId, scriptToCache);
+									}
+								})
+								.catch((error) => {
+									logger.error(
+										`Failed to cache AI script for template ${globalizedId}: ${error}`
+									);
+								});
+						}
+					}
+
 					logger.debug(
 						`[${id}] Template "${rawTemplate.id}" loaded successfully`
 					);
@@ -1771,7 +1830,9 @@ function hydrateSerializedItemData(data: SerializedDungeonObject): ItemOptions {
 	const itemData = data as SerializedItem;
 	return {
 		...base,
-		...(itemData.isContainer !== undefined && { isContainer: itemData.isContainer }),
+		...(itemData.isContainer !== undefined && {
+			isContainer: itemData.isContainer,
+		}),
 	};
 }
 
@@ -1986,6 +2047,7 @@ function hydrateMobTemplateData(
 		mana: data.mana,
 		exhaustion: data.exhaustion,
 		behaviors,
+		aiScript: (data as any).aiScript, // AI script from template (if present)
 	}) as MobTemplate;
 }
 

@@ -62,6 +62,7 @@
  * @module core/dungeon
  */
 
+import { EventEmitter } from "events";
 import { string } from "mud-ext";
 import { color, COLOR, COLOR_NAMES, COLOR_NAME_TO_COLOR } from "./color.js";
 import logger from "../logger.js";
@@ -1395,6 +1396,8 @@ export interface MobTemplate extends DungeonObjectTemplate {
 	mana?: number;
 	exhaustion?: number;
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
+	/** Optional AI script for mob behavior. Can be inline code or file path (prefix with "file:") */
+	aiScript?: string;
 }
 
 /**
@@ -2852,37 +2855,26 @@ export class Room extends DungeonObject {
 		// Process aggressive behavior: aggressive mobs attack character mobs that enter
 		if (movable instanceof Mob) {
 			const enterer = movable as Mob;
+
+			// Emit entrance event for all existing mobs in room (they see someone enter)
 			for (const obj of this.contents) {
-				if (!(obj instanceof Mob)) continue;
-				if (obj === enterer) continue;
-				const inhabitant = obj;
-
-				// Process aggressive behavior: player entering room with aggressive mob in it
-				// This should happen first to ensure aggro mobs attack even if threat table exists
-				if (inhabitant.hasBehavior(BEHAVIOR.AGGRESSIVE) && enterer.character) {
-					if (!inhabitant.combatTarget) {
-						initiateCombat(inhabitant, enterer);
+				if (obj instanceof Mob && obj !== enterer) {
+					const emitter = obj.aiEvents;
+					if (emitter) {
+						emitter.emit("entrance", enterer);
+						emitter.emit("sight", enterer);
 					}
-					inhabitant.addToThreatTable(enterer);
 				}
+			}
 
-				// Check threat table: if entering mob is in this mob's threat table, process threat switching
-				// This handles cases where the mob has the enterer on threat table (e.g., after fleeing)
-				if (inhabitant.threatTable && inhabitant.threatTable.get(enterer)) {
-					processThreatSwitching(inhabitant);
-				}
-
-				// Also check if the entering mob is aggressive - it should generate threat for character mobs in the room
-				if (enterer.hasBehavior(BEHAVIOR.AGGRESSIVE) && inhabitant.character) {
-					if (!enterer.combatTarget) {
-						initiateCombat(enterer, inhabitant);
+			// Emit entrance event for the entering mob (they see existing mobs)
+			const entererEmitter = enterer.aiEvents;
+			if (entererEmitter) {
+				// Emit entrance for each existing mob in the room
+				for (const obj of this.contents) {
+					if (obj instanceof Mob && obj !== enterer) {
+						entererEmitter.emit("sight", obj);
 					}
-					enterer.addToThreatTable(inhabitant);
-				}
-
-				// Check threat table for entering aggro mob: if inhabitant is in enterer's threat table, process threat switching
-				if (enterer.threatTable && enterer.threatTable.get(inhabitant)) {
-					processThreatSwitching(enterer);
 				}
 			}
 		}
@@ -2911,7 +2903,30 @@ export class Room extends DungeonObject {
 	 * }
 	 * ```
 	 */
-	onExit(movable: Movable, direction?: DIRECTION) {}
+	onExit(movable: Movable, direction?: DIRECTION) {
+		// Emit exit event for all mobs in room (they see someone leave)
+		if (movable instanceof Mob) {
+			const exiter = movable as Mob;
+			for (const obj of this.contents) {
+				if (obj instanceof Mob && obj !== exiter) {
+					const emitter = obj.aiEvents;
+					if (emitter) {
+						emitter.emit("exit", exiter);
+					}
+				}
+			}
+
+			// Emit exit event for the exiting mob (they see existing mobs they're leaving behind)
+			const exiterEmitter = exiter.aiEvents;
+			if (exiterEmitter) {
+				for (const obj of this.contents) {
+					if (obj instanceof Mob && obj !== exiter) {
+						exiterEmitter.emit("exit", obj);
+					}
+				}
+			}
+		}
+	}
 
 	/**
 	 * Generates a room reference string for this room in the format `@dungeon-id{x,y,z}`.
@@ -4532,6 +4547,8 @@ export class Mob extends Movable {
 	private _threatTable?: Map<Mob, ThreatEntry>;
 	private _threatExpirationTimer?: number;
 	private _behaviors: Map<BEHAVIOR, boolean>;
+	/** EventEmitter for AI events (only for NPCs) */
+	private _aiEventEmitter?: EventEmitter;
 	/** Map of Ability objects to number of uses */
 	/** @internal - Public for package deserializers */
 	public _learnedAbilities: Map<Ability, number>;
@@ -4614,6 +4631,11 @@ export class Mob extends Movable {
 		// Initialize combat properties
 		// Only NPCs (mobs without a character) have threat tables
 		// Threat table will be initialized when character is set/cleared
+
+		// Initialize EventEmitter for AI events (only for NPCs)
+		if (!this._character) {
+			this._aiEventEmitter = new EventEmitter();
+		}
 	}
 	/**
 	 * Gets the Character that controls this mob (if any).
@@ -4632,6 +4654,29 @@ export class Mob extends Movable {
 	 */
 	public get character(): Character | undefined {
 		return this._character;
+	}
+
+	/**
+	 * Gets the EventEmitter for AI events (only available for NPCs).
+	 * Returns undefined for player-controlled mobs.
+	 *
+	 * @returns The EventEmitter instance or undefined if not initialized
+	 */
+	public get aiEvents(): EventEmitter | undefined {
+		return this._aiEventEmitter;
+	}
+
+	/**
+	 * Initialize the AI EventEmitter if it doesn't exist.
+	 * This should only be called for NPCs (mobs without a character).
+	 *
+	 * @returns The EventEmitter instance (newly created or existing)
+	 */
+	public initializeAIEvents(): EventEmitter {
+		if (!this._aiEventEmitter) {
+			this._aiEventEmitter = new EventEmitter();
+		}
+		return this._aiEventEmitter;
 	}
 
 	/**
@@ -7405,6 +7450,14 @@ export class Mob extends Movable {
 		this._combatTarget = undefined;
 		if (this._threatTable) {
 			this._threatTable.clear();
+		}
+
+		// Clean up AI system (if initialized)
+		if (this._aiEventEmitter) {
+			// Dynamic import to avoid circular dependency
+			import("../mob-ai.js").then((module) => {
+				module.cleanupMobAI(this);
+			});
 		}
 
 		// Note: Wandering mob removal is handled by the package layer

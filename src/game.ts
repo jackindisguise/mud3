@@ -29,7 +29,8 @@
  */
 
 import { MudServer, MudClient } from "./core/io.js";
-import { CommandContext, CommandRegistry } from "./core/command.js";
+import { CommandContext } from "./core/command.js";
+import { executeCommand } from "./registry/command.js";
 import {
 	Character,
 	SerializedCharacter,
@@ -72,6 +73,7 @@ import {
 	REGENERATION_INTERVAL_MS,
 } from "./regeneration.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
+import { EventEmitter } from "events";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -79,6 +81,7 @@ export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 4 * 1000; // 4 seconds
 export const DEFAULT_WANDER_INTERVAL_MS = 30 * 1000; // 30 seconds
 export const DEFAULT_BOARD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+export const DEFAULT_GAME_TICK_INTERVAL_MS = 60 * 1000; // 1 minute
 
 /**
  * Player authentication states during the login process.
@@ -142,6 +145,12 @@ let wanderTimer: number | undefined;
 
 /** Regeneration interval timer */
 let regenerationTimer: number | undefined;
+
+/** Game-wide tick event emitter (fires once per IRL minute) */
+export const gameTickEmitter = new EventEmitter();
+
+/** Game tick interval timer */
+let gameTickTimer: number | undefined;
 
 /** Next connection ID */
 let nextConnectionId = 1;
@@ -599,7 +608,7 @@ function handleGameplayInput(session: LoginSession, input: string): void {
 				? character.mob!.location
 				: undefined,
 	};
-	const executed = CommandRegistry.default.execute(input, context);
+	const executed = executeCommand(input, context);
 	if (!executed) {
 		character.sendMessage("Do what?", MESSAGE_GROUP.COMMAND_RESPONSE);
 	}
@@ -1181,6 +1190,17 @@ async function start(): Promise<void> {
 	regenerationTimer = setAbsoluteInterval(() => {
 		processRegeneration();
 	}, REGENERATION_INTERVAL_MS);
+
+	// Set up game-wide tick events (fires every 60 seconds)
+	gameTickTimer = setAbsoluteInterval(() => {
+		gameTickEmitter.emit("tick");
+	}, DEFAULT_GAME_TICK_INTERVAL_MS);
+
+	// Connect AI system to game tick events
+	const { processAITick } = await import("./mob-ai.js");
+	gameTickEmitter.on("tick", () => {
+		processAITick();
+	});
 }
 
 /**
@@ -1236,6 +1256,13 @@ async function stop(): Promise<void> {
 		clearCustomInterval(regenerationTimer);
 		regenerationTimer = undefined;
 		logger.debug("Regeneration timer cleared");
+	}
+
+	// Clear game tick timer
+	if (gameTickTimer !== undefined) {
+		clearCustomInterval(gameTickTimer);
+		gameTickTimer = undefined;
+		logger.debug("Game tick timer cleared");
 	}
 
 	// Save game state before shutdown

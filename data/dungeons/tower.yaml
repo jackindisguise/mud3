@@ -574,10 +574,11 @@ dungeon:
       description: A zombie that needs to be killed.
       roomDescription: There is a shambling zombie here, ready to eat.
       keywords: zombie shambling undead
-      race: nobility
-      job: warrior
+      race: human
+      job: geomancer
       level: 1
       value: 999
+      behaviors: {aggressive: true}
     - id: haversack
       type: Item
       display: a haversack
@@ -704,6 +705,11 @@ dungeon:
       roomRef: '@tower{11,19,0}'
       minCount: 1
       maxCount: 1
+    - templateId: zombie
+      roomRef: '@tower{11,17,0}'
+      minCount: 20
+      maxCount: 100
+      equipped: ['@tower:tower-sword', '@tower:tower-helmet']
   exitOverrides:
     - coordinates: {x: 7, 'y': 6, z: 0}
       allowedExits: 511

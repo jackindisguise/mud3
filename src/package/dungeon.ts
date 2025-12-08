@@ -36,7 +36,7 @@ import {
 	getDefaultRace,
 	getDefaultJob,
 } from "../registry/archetype.js";
-import type { Race, Job } from "../core/archetype.js";
+import { initializeMobAI } from "../mob-ai.js";
 import { getAbilityById } from "../registry/ability.js";
 import { getEffectTemplateById } from "../registry/effect.js";
 import { Ability, getProficiencyAtUses } from "../core/ability.js";
@@ -300,18 +300,27 @@ export function checkMobArchetypeAbilities(mob: Mob): Ability[] {
  * Factory function to create a Mob with an auto-generated OID.
  */
 export function createMob(options?: MobOptions): Mob {
+	const oid = options?.oid ?? getNextObjectId();
 	const race = options?.race ?? getDefaultRace();
 	const job = options?.job ?? getDefaultJob();
 	const mob = new Mob({
 		...options,
 		race,
 		job,
-		oid: options?.oid ?? getNextObjectId(),
+		oid,
 	});
 
 	// Apply archetype passives and abilities (requires registry access)
 	applyMobArchetypePassives(mob);
 	checkMobArchetypeAbilities(mob);
+
+	// Initialize AI for NPC mobs (mobs without character)
+	// Skip AI initialization for temporary template instances (OID -1) used for baseSerialized
+	if (!mob.character && oid >= 0) {
+		initializeMobAI(mob).catch((error) => {
+			logger.error(`Failed to initialize AI for mob ${mob.oid}: ${error}`);
+		});
+	}
 
 	return mob;
 }
@@ -530,19 +539,6 @@ function createFromTemplate(
 
 	// Apply template properties (handles any remaining template fields)
 	obj.applyTemplate(template);
-
-	// Initialize AI for NPC mobs (mobs without character)
-	// Skip AI initialization for temporary template instances (OID -1) used for baseSerialized
-	if (obj instanceof Mob && !obj.character && providedOid >= 0) {
-		// Dynamic import to avoid circular dependency
-		import("../mob-ai.js")
-			.then(async (module) => {
-				await module.initializeMobAI(obj);
-			})
-			.catch((error) => {
-				logger.error(`Failed to initialize AI for mob ${obj.oid}: ${error}`);
-			});
-	}
 
 	return obj;
 }

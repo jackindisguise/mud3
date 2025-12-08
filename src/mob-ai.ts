@@ -9,13 +9,7 @@
 
 import { EventEmitter } from "events";
 import { runInNewContext } from "vm";
-import {
-	Mob,
-	BEHAVIOR,
-	Room,
-	resolveTemplateById,
-	MobTemplate,
-} from "./core/dungeon.js";
+import { Mob, BEHAVIOR, Room, MobTemplate } from "./core/dungeon.js";
 import { DIRECTION, DIRECTIONS } from "./direction.js";
 import { initiateCombat, oneHit, OneHitOptions } from "./combat.js";
 import logger from "./logger.js";
@@ -25,6 +19,7 @@ import { getSafeRootDirectory } from "./utils/path.js";
 import { join } from "path";
 import { readFile } from "fs/promises";
 import { getAbilityById } from "./registry/ability.js";
+import { resolveTemplateById } from "./registry/dungeon.js";
 import { AbilityCommand, CommandContext } from "./core/command.js";
 import { getCommands } from "./registry/command.js";
 import { Ability } from "./core/ability.js";
@@ -74,13 +69,6 @@ function getPersistence(mob: Mob): Record<string, any> {
 		mobPersistence.set(oid, data);
 	}
 	return data;
-}
-
-/**
- * Get persistence data for a target mob.
- */
-function getData(targetMob: Mob): Record<string, any> {
-	return getPersistence(targetMob);
 }
 
 /**
@@ -308,8 +296,8 @@ function createAISandbox(mob: Mob): Record<string, any> {
 		},
 		oneHit: (options: Omit<OneHitOptions, "attacker">) => {
 			const _options: OneHitOptions = {
-				attacker: mob,
 				...options,
+				attacker: mob,
 			};
 			oneHit({ ..._options });
 		},

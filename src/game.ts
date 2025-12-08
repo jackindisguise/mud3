@@ -36,7 +36,9 @@ import {
 	SerializedCharacter,
 	MESSAGE_GROUP,
 } from "./core/character.js";
-import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./core/dungeon.js";
+import { Room } from "./core/dungeon.js";
+import { DUNGEON_REGISTRY } from "./registry/dungeon.js";
+import { getRoomByRef } from "./registry/dungeon.js";
 import { isNameBlocked } from "./registry/reserved-names.js";
 import { Race, Job } from "./core/archetype.js";
 import { showRoom } from "./utils/display.js";
@@ -66,7 +68,6 @@ import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
 import { LINEBREAK } from "./core/telnet.js";
 import { searchHelpfiles } from "./registry/help.js";
 import { processCombatRound } from "./combat.js";
-import { processWanderBehaviors } from "./behavior.js";
 import { WebClientServer } from "./web-client.js";
 import {
 	processRegeneration,
@@ -79,7 +80,6 @@ import { EventEmitter } from "events";
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 4 * 1000; // 4 seconds
-export const DEFAULT_WANDER_INTERVAL_MS = 30 * 1000; // 30 seconds
 export const DEFAULT_BOARD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 export const DEFAULT_GAME_TICK_INTERVAL_MS = 60 * 1000; // 1 minute
 
@@ -139,9 +139,6 @@ let dungeonResetTimer: number | undefined;
 
 /** Combat round interval timer */
 let combatTimer: number | undefined;
-
-/** Wander behavior interval timer */
-let wanderTimer: number | undefined;
 
 /** Regeneration interval timer */
 let regenerationTimer: number | undefined;
@@ -1178,14 +1175,6 @@ async function start(): Promise<void> {
 		processCombatRound();
 	}, DEFAULT_COMBAT_ROUND_INTERVAL_MS);
 
-	// Run initial wander cycle after dungeons are loaded
-	processWanderBehaviors();
-
-	// Set up wander behavior timer (every 30 seconds)
-	wanderTimer = setAbsoluteInterval(() => {
-		processWanderBehaviors();
-	}, DEFAULT_WANDER_INTERVAL_MS);
-
 	// Set up regeneration timer (every 30 seconds)
 	regenerationTimer = setAbsoluteInterval(() => {
 		processRegeneration();
@@ -1242,13 +1231,6 @@ async function stop(): Promise<void> {
 		clearCustomInterval(combatTimer);
 		combatTimer = undefined;
 		logger.debug("Combat timer cleared");
-	}
-
-	// Clear wander timer
-	if (wanderTimer !== undefined) {
-		clearCustomInterval(wanderTimer);
-		wanderTimer = undefined;
-		logger.debug("Wander timer cleared");
 	}
 
 	// Clear regeneration timer

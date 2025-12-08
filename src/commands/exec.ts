@@ -30,7 +30,8 @@ import {
 	getGameStats,
 } from "../game.js";
 import { createFromTemplateWithOid } from "../package/dungeon.js";
-import { resolveTemplateById, DungeonObject } from "../core/dungeon.js";
+import { DungeonObject } from "../core/dungeon.js";
+import { resolveTemplateById } from "../registry/dungeon.js";
 
 // allows each user to have their own persistant.
 const persistance = new Map<Character, Record<string, any>>();

@@ -75,6 +75,7 @@ import { CONFIG } from "../registry/config.js";
 import { getCurrentDungeonVersion } from "../migrations/version.js";
 import { migrateCharacterData } from "../migrations/character/runner.js";
 import { getNextCharacterId } from "./gamestate.js";
+import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -220,8 +221,8 @@ export function createCharacterMob(
 	const mob = createMob({
 		display: username,
 		keywords: username,
-		race,
-		job,
+		race: race ?? getDefaultRace(),
+		job: job ?? getDefaultJob(),
 	});
 	// Set room description for character mobs
 	mob.roomDescription = `${username} is here.`;

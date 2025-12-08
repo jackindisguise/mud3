@@ -384,36 +384,10 @@ function executeAIScript(mob: Mob, script: string): void {
 }
 
 /**
- * Update behavior scripts for a mob that already has AI initialized.
- * Re-executes default behavior scripts based on current behavior flags.
- */
-export function updateMobBehaviorScripts(mob: Mob): void {
-	// Only update for NPCs (mobs without character)
-	if (mob.character) {
-		return;
-	}
-
-	// Check if AI is already initialized
-	if (!mob.aiEvents && !mobEventEmitters.has(mob)) {
-		// AI not initialized yet, initialize it fully
-		initializeMobAI(mob).catch((error) => {
-			logger.error(`Failed to initialize AI for mob ${mob.oid}: ${error}`);
-		});
-		return;
-	}
-
-	// AI is initialized, just update behavior scripts
-	const defaultScript = generateDefaultBehaviorScripts(mob);
-	if (defaultScript) {
-		executeAIScript(mob, defaultScript);
-	}
-}
-
-/**
  * Initialize AI system for a mob.
  * Sets up EventEmitter and executes AI scripts (default behaviors + custom).
  */
-export async function initializeMobAI(mob: Mob): Promise<void> {
+export function initializeMobAI(mob: Mob) {
 	// Only initialize for NPCs (mobs without character)
 	if (mob.character) {
 		return;
@@ -426,6 +400,7 @@ export async function initializeMobAI(mob: Mob): Promise<void> {
 
 		// Get custom AI script from template if present and execute it first
 		const templateId = mob.templateId;
+		let scriptLoaded = false;
 		if (templateId) {
 			// Try to get script from cache first
 			let customScript = mobAIScripts.get(templateId);
@@ -436,32 +411,14 @@ export async function initializeMobAI(mob: Mob): Promise<void> {
 				if (template && template.type === "Mob") {
 					const mobTemplate = template as MobTemplate;
 					if (mobTemplate.aiScript) {
-						// Check if it's a file reference
-						if (mobTemplate.aiScript.startsWith("file:")) {
-							// Load from file
-							const filePath = mobTemplate.aiScript.slice(5); // Remove "file:" prefix
-							const fullPath = join(getSafeRootDirectory(), "data", filePath);
-							try {
-								customScript = await readFile(fullPath, "utf-8");
-								// Cache it
-								mobAIScripts.set(templateId, customScript);
-							} catch (error) {
-								logger.error(
-									`Failed to load AI script file for mob ${mob.oid} (template: ${templateId}): ${error}`
-								);
-							}
-						} else {
-							// Inline script
-							customScript = mobTemplate.aiScript;
-							// Cache it
-							mobAIScripts.set(templateId, customScript);
-						}
+						customScript = mobTemplate.aiScript;
 					}
 				}
 			}
 
 			if (customScript) {
 				executeAIScript(mob, customScript);
+				scriptLoaded = true;
 			}
 		}
 
@@ -469,12 +426,16 @@ export async function initializeMobAI(mob: Mob): Promise<void> {
 		const defaultScript = generateDefaultBehaviorScripts(mob);
 		if (defaultScript) {
 			executeAIScript(mob, defaultScript);
+			scriptLoaded = true;
 		}
 
 		// Add mob to registry
-		aiMobRegistry.add(mob);
-
-		logger.debug(`Initialized AI for mob ${mob.oid} (${mob.display})`);
+		if (scriptLoaded) {
+			logger.info(`Initialized AI for mob ${mob.oid} (${mob.display})`);
+			aiMobRegistry.add(mob);
+		} else {
+			logger.info(`No AI script found for mob ${mob.oid} (${mob.display})`);
+		}
 	} catch (error) {
 		logger.error(`Failed to initialize AI for mob ${mob.oid}: ${error}`);
 	}

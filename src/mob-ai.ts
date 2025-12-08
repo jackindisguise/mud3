@@ -384,6 +384,32 @@ function executeAIScript(mob: Mob, script: string): void {
 }
 
 /**
+ * Update behavior scripts for a mob that already has AI initialized.
+ * Re-executes default behavior scripts based on current behavior flags.
+ */
+export function updateMobBehaviorScripts(mob: Mob): void {
+	// Only update for NPCs (mobs without character)
+	if (mob.character) {
+		return;
+	}
+
+	// Check if AI is already initialized
+	if (!mob.aiEvents && !mobEventEmitters.has(mob)) {
+		// AI not initialized yet, initialize it fully
+		initializeMobAI(mob).catch((error) => {
+			logger.error(`Failed to initialize AI for mob ${mob.oid}: ${error}`);
+		});
+		return;
+	}
+
+	// AI is initialized, just update behavior scripts
+	const defaultScript = generateDefaultBehaviorScripts(mob);
+	if (defaultScript) {
+		executeAIScript(mob, defaultScript);
+	}
+}
+
+/**
  * Initialize AI system for a mob.
  * Sets up EventEmitter and executes AI scripts (default behaviors + custom).
  */

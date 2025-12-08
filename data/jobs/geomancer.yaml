@@ -20,7 +20,7 @@ archetype:
   growthModifier:
     base: 1.06
     perLevel: 0.04
-  skills:
+  abilities:
     - id: stone-spike
       level: 1
     - id: earthen-ward

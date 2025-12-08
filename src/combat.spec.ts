@@ -28,7 +28,7 @@ const testJob = freezeArchetype({
 	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 	startingResourceCaps: { maxHealth: 100000, maxMana: 0 },
 	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-	skills: [],
+	abilities: [],
 	passives: [],
 	growthModifier: { base: 1.0 },
 });
@@ -40,7 +40,7 @@ const testRace = freezeArchetype({
 	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 	startingResourceCaps: { maxHealth: 100000, maxMana: 50 },
 	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-	skills: [],
+	abilities: [],
 	passives: [],
 	growthModifier: { base: 1.0 },
 });
@@ -216,7 +216,7 @@ suite("combat.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 				damageRelationships: {
@@ -265,7 +265,7 @@ suite("combat.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 				damageRelationships: {
@@ -313,7 +313,7 @@ suite("combat.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 				damageRelationships: {
@@ -363,7 +363,7 @@ suite("combat.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 				damageRelationships: {
@@ -377,7 +377,7 @@ suite("combat.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 0, maxMana: 0 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 				damageRelationships: {

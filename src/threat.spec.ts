@@ -13,7 +13,7 @@ const testRace: Race = {
 	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 	startingResourceCaps: { maxHealth: 100000, maxMana: 50 },
 	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-	skills: [],
+	abilities: [],
 	passives: [],
 	growthModifier: { base: 1.0 },
 };
@@ -25,7 +25,7 @@ const testJob: Job = {
 	attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 	startingResourceCaps: { maxHealth: 100000, maxMana: 50 },
 	resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-	skills: [],
+	abilities: [],
 	passives: [],
 	growthModifier: { base: 1.0 },
 };

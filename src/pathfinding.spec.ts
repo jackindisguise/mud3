@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { suite, test } from "node:test";
 
-import { Dungeon, Room, RoomLink, getDungeonById } from "./core/dungeon.js";
+import { Dungeon, Room, RoomLink } from "./core/dungeon.js";
 import {
 	findDirectionsBetweenRooms,
 	findDirectionsViaRefs,
@@ -12,6 +12,7 @@ import {
 import { registerDungeonInstance } from "./package/dungeon.js";
 import { dir2text } from "./direction.js";
 import { DIRECTION, DIRECTIONS } from "./direction.js";
+import { createTunnel, DUNGEON_REGISTRY } from "./registry/dungeon.js";
 
 suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 	test("should find a path from dungeon A to E via linear links", () => {
@@ -46,7 +47,7 @@ suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 		for (let i = 0; i < rooms.length - 1; i++) {
 			const from = rooms[i];
 			const to = rooms[i + 1];
-			RoomLink.createTunnel(
+			createTunnel(
 				from,
 				DIRECTIONS[
 					Math.floor(Math.random() * size * size * size) % DIRECTIONS.length
@@ -57,7 +58,7 @@ suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 		}
 
 		for (const id of ids) {
-			assert(getDungeonById(id), `dungeon ${id} should be registered`);
+			assert(DUNGEON_REGISTRY.get(id), `dungeon ${id} should be registered`);
 		}
 
 		const start = dungeons[0].contents[0] as Room;
@@ -93,11 +94,11 @@ suite("pathfinding - via refs returns flat direction list", () => {
 
 		const A_220 = A.getRoom({ x: 2, y: 2, z: 0 }) as Room;
 		const B_020 = B.getRoom({ x: 0, y: 2, z: 0 }) as Room;
-		RoomLink.createTunnel(A_220, DIRECTION.EAST, B_020, true);
+		createTunnel(A_220, DIRECTION.EAST, B_020, true);
 
 		const B_200 = B.getRoom({ x: 2, y: 0, z: 0 }) as Room;
 		const C_000 = C.getRoom({ x: 0, y: 0, z: 0 }) as Room;
-		RoomLink.createTunnel(B_200, DIRECTION.EAST, C_000, true);
+		createTunnel(B_200, DIRECTION.EAST, C_000, true);
 
 		const startRef = "@A-map{0,0,0}";
 		const goalRef = "@C-map{2,2,0}";

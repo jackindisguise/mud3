@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 12
     maxMana: 4
-  skills:
+  abilities:
     - id: power-strike
       level: 1
     - id: shield-bash

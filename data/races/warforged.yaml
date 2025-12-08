@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 12
     maxMana: 6
-  skills:
+  abilities:
     - id: integrated-armor
       level: 1
   passives:

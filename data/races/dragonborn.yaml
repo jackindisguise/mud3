@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 11
     maxMana: 7
-  skills:
+  abilities:
     - id: breath-weapon
       level: 1
   passives:

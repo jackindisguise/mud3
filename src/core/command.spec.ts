@@ -21,8 +21,17 @@ import {
 	executeCommand,
 	getCommands,
 } from "../registry/command.js";
+import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
 
 let nextTestCharacterId = 1;
+function createTestMob(display: string, keywords: string): Mob {
+	return createMob({
+		display,
+		keywords,
+		race: getDefaultRace(),
+		job: getDefaultJob(),
+	});
+}
 const attachCharacterToMob = (mob: Mob, username = "tester") =>
 	new Character({
 		credentials: {
@@ -54,7 +63,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -128,7 +137,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			room?.add(actor);
 			room?.add(sword);
@@ -145,7 +154,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			actor.add(sword);
 			const context: CommandContext = { actor };
@@ -165,7 +174,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			const coin = new DungeonObject({ keywords: "gold coin" });
 			const bag = new DungeonObject({ keywords: "leather bag" });
 
@@ -191,8 +200,8 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
-			const target = createMob({ keywords: "bob" });
+			const actor = createTestMob("Player", "player");
+			const target = createTestMob("Bob", "bob");
 			room?.add(actor);
 			room?.add(target);
 			const context: CommandContext = { actor, room };
@@ -230,7 +239,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 			const result = command.parse("get sword", context);
@@ -963,7 +972,7 @@ suite("command.ts", () => {
 				},
 			});
 
-			const actor = createMob({ display: "Player" });
+			const actor = createTestMob("Player", "player");
 			const context: CommandContext = { actor };
 
 			const result = command.parse("ooc Hello everyone!", context);
@@ -989,7 +998,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob();
+			const actor = createTestMob("Player", "player");
 			const sword = new DungeonObject({ keywords: "steel sword" });
 
 			room?.add(actor);
@@ -1119,7 +1128,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1139,7 +1148,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1159,7 +1168,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1175,7 +1184,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = createMob();
+			const actor = createTestMob("Player", "player");
 			const context: CommandContext = { actor };
 
 			const result = command.parse("go sideways", context);
@@ -1189,7 +1198,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = createMob();
+			const actor = createTestMob("Player", "player");
 			const context: CommandContext = { actor };
 
 			const result = command.parse("look", context);
@@ -1222,7 +1231,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = {

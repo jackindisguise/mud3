@@ -23,7 +23,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 2, agility: 1, intelligence: 1 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 10, maxMana: 5 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 			};
@@ -50,7 +50,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 			};
@@ -71,7 +71,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 			};
@@ -88,7 +88,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [
+				abilities: [
 					{ id: "skill1", level: 1 },
 					{ id: "skill2", level: 5 },
 				],
@@ -98,13 +98,13 @@ suite("archetype.ts", () => {
 
 			const frozen = freezeArchetype(def);
 
-			assert.strictEqual(frozen.skills.length, 2);
-			assert.strictEqual(frozen.skills[0].id, "skill1");
-			assert.strictEqual(frozen.skills[0].level, 1);
+			assert.strictEqual(frozen.abilities.length, 2);
+			assert.strictEqual(frozen.abilities[0].id, "skill1");
+			assert.strictEqual(frozen.abilities[0].level, 1);
 
 			// Should be frozen
 			assert.throws(() => {
-				(frozen.skills as any).push({ id: "skill3", level: 10 });
+				(frozen.abilities as any).push({ id: "skill3", level: 10 });
 			});
 		});
 
@@ -116,7 +116,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: ["passive1", "passive2"],
 				growthModifier: { base: 1.0 },
 			};
@@ -140,7 +140,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: ["  passive1  ", "passive2"],
 				growthModifier: { base: 1.0 },
 			};
@@ -163,7 +163,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 				damageRelationships,
@@ -194,7 +194,7 @@ suite("archetype.ts", () => {
 				attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 				startingResourceCaps: { maxHealth: 100, maxMana: 50 },
 				resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-				skills: [],
+				abilities: [],
 				passives: [],
 				growthModifier: { base: 1.0 },
 			};

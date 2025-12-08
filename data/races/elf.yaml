@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 8
     maxMana: 12
-  skills:
+  abilities:
     - id: essence-bolt
       level: 1
   passives:

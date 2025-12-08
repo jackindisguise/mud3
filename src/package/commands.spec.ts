@@ -6,11 +6,19 @@ import { join } from "path";
 import { existsSync } from "fs";
 import commandsPackage, { JavaScriptCommandAdapter } from "./commands.js";
 import { CommandRegistry, CommandContext } from "../core/command.js";
-import { Dungeon } from "../core/dungeon.js";
+import { Dungeon, Mob } from "../core/dungeon.js";
 import { createMob } from "./dungeon.js";
+import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
 
 const COMMANDS_DIR = join(process.cwd(), "data", "commands");
-
+function createTestMob(display: string, keywords: string): Mob {
+	return createMob({
+		display,
+		keywords,
+		race: getDefaultRace(),
+		job: getDefaultJob(),
+	});
+}
 suite("package/commands.ts", () => {
 	let initialCommandCount: number;
 
@@ -85,7 +93,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 			const args = new Map();
@@ -117,7 +125,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 
@@ -144,7 +152,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 
@@ -185,7 +193,7 @@ suite("package/commands.ts", () => {
 				dimensions: { width: 1, height: 1, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 

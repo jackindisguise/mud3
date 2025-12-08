@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 14
     maxMana: 3
-  skills:
+  abilities:
     - id: stone-giant-grip
       level: 1
   passives:

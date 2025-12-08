@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 7
     maxMana: 10
-  skills:
+  abilities:
     - id: clockwork-bolt
       level: 1
   passives:

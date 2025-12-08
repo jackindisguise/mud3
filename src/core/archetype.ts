@@ -2,7 +2,7 @@
  * Core archetype module.
  *
  * Provides interfaces and functions for managing race and job archetypes.
- * Archetypes define starting attributes, growth curves, skills, and passives.
+ * Archetypes define starting attributes, growth curves, abilities, and passives.
  *
  * @module core/archetype
  */
@@ -14,7 +14,7 @@ export interface GrowthModifierCurve {
 	perLevel?: number;
 }
 
-export interface ArchetypeSkillDefinition {
+export interface ArchetypeAbilityDefinition {
 	id: string;
 	level: number;
 }
@@ -28,7 +28,7 @@ export interface BaseArchetypeDefinition {
 	readonly attributeGrowthPerLevel: PrimaryAttributeSet;
 	readonly startingResourceCaps: ResourceCapacities;
 	readonly resourceGrowthPerLevel: ResourceCapacities;
-	readonly skills: ReadonlyArray<ArchetypeSkillDefinition>;
+	readonly abilities: ReadonlyArray<ArchetypeAbilityDefinition>;
 	readonly passives: ReadonlyArray<string>;
 	readonly growthModifier: GrowthModifierCurve;
 	readonly damageRelationships?: DamageTypeRelationships;
@@ -53,12 +53,12 @@ function freezeGrowth(curve: GrowthModifierCurve): GrowthModifierCurve {
 	});
 }
 
-function freezeSkills(skills: ReadonlyArray<ArchetypeSkillDefinition>) {
+function freezeAbilities(abilities: ReadonlyArray<ArchetypeAbilityDefinition>) {
 	return Object.freeze(
-		skills.map((skill) =>
+		abilities.map((ability) =>
 			Object.freeze({
-				id: skill.id,
-				level: skill.level,
+				id: ability.id,
+				level: ability.level,
 			})
 		)
 	);
@@ -89,7 +89,7 @@ export function freezeArchetype(
 		attributeGrowthPerLevel: freezeAttributes(def.attributeGrowthPerLevel),
 		startingResourceCaps: freezeResources(def.startingResourceCaps),
 		resourceGrowthPerLevel: freezeResources(def.resourceGrowthPerLevel),
-		skills: freezeSkills(def.skills),
+		abilities: freezeAbilities(def.abilities),
 		passives: freezePassives(def.passives),
 		growthModifier: freezeGrowth(def.growthModifier),
 		damageRelationships: freezeDamageRelationships(def.damageRelationships),

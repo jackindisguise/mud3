@@ -19,7 +19,7 @@ import { getSafeRootDirectory } from "../utils/path.js";
 import {
 	BaseArchetypeDefinition,
 	GrowthModifierCurve,
-	ArchetypeSkillDefinition,
+	ArchetypeAbilityDefinition,
 } from "../core/archetype.js";
 import { PrimaryAttributeSet, ResourceCapacities } from "../core/attribute.js";
 import {
@@ -66,7 +66,7 @@ type RawArchetypeFile = {
 		>;
 		startingResourceCaps?: Partial<Record<keyof ResourceCapacities, unknown>>;
 		resourceGrowthPerLevel?: Partial<Record<keyof ResourceCapacities, unknown>>;
-		skills?: Array<unknown>;
+		abilities?: Array<unknown>;
 		passives?: Array<unknown>;
 		growthModifier?: Partial<Record<keyof GrowthModifierCurve, unknown>>;
 		damageRelationships?: Record<keyof DAMAGE_TYPE, unknown>;
@@ -116,9 +116,9 @@ function normalizeGrowthModifier(
 	};
 }
 
-function normalizeSkills(raw?: Array<unknown>): ArchetypeSkillDefinition[] {
+function normalizeAbilities(raw?: Array<unknown>): ArchetypeAbilityDefinition[] {
 	if (!raw || raw.length === 0) return [];
-	const result: ArchetypeSkillDefinition[] = [];
+	const result: ArchetypeAbilityDefinition[] = [];
 	for (const entry of raw) {
 		if (typeof entry === "string") {
 			const trimmed = entry.trim();
@@ -231,7 +231,7 @@ function parseArchetypeFile(
 			resourceGrowthPerLevel: normalizeResourceCaps(
 				(archetype.resourceGrowthPerLevel ?? {}) as Partial<ResourceCapacities>
 			),
-			skills: normalizeSkills(archetype.skills),
+			abilities: normalizeAbilities(archetype.abilities),
 			passives: normalizePassives(archetype.passives),
 			growthModifier: normalizeGrowthModifier(
 				(archetype.growthModifier ?? {}) as Partial<GrowthModifierCurve>

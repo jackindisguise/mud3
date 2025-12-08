@@ -2130,59 +2130,6 @@ export class DungeonObject {
 	}
 
 	/**
-	 * Applies a template to this object, setting only the fields specified in the template.
-	 * Fields not in the template remain unchanged.
-	 *
-	 * @param template - The template to apply
-	 *
-	 * @example
-	 * ```typescript
-	 * const obj = new Item();
-	 * const template: DungeonObjectTemplate = {
-	 *   id: "sword",
-	 *   type: "Item",
-	 *   display: "Iron Sword",
-	 *   description: "A sword.",
-	 *   baseWeight: 3.5
-	 * };
-	 * obj.applyTemplate(template);
-	 * // obj now has display="Iron Sword", description="A sword.", and baseWeight=3.5
-	 * // but keywords remains "dungeon object" (default)
-	 * ```
-	 */
-	applyTemplate(template: DungeonObjectTemplate): void {
-		if (template.keywords !== undefined) {
-			this.keywords = template.keywords;
-		}
-		if (template.display !== undefined) {
-			this.display = template.display;
-		}
-		if (template.description !== undefined) {
-			this.description = template.description;
-		}
-		if (template.roomDescription !== undefined) {
-			this.roomDescription = template.roomDescription;
-		}
-		if (template.mapText !== undefined) {
-			this.mapText = template.mapText;
-		}
-		if (template.mapColor !== undefined) {
-			// Convert string color name to COLOR enum integer
-			this.mapColor =
-				COLOR_NAME_TO_COLOR[
-					template.mapColor as keyof typeof COLOR_NAME_TO_COLOR
-				];
-		}
-		if (template.baseWeight !== undefined) {
-			this.baseWeight = template.baseWeight;
-			this.currentWeight = template.baseWeight;
-		}
-		if (template.value !== undefined) {
-			this.value = template.value;
-		}
-	}
-
-	/**
 	 * Completely destroy this object, removing all references and clearing all relationships.
 	 * This method:
 	 * - Removes the object from its location/container
@@ -2403,34 +2350,6 @@ export class Room extends DungeonObject {
 				DIRECTION.SOUTHWEST;
 		// Default dense to false
 		this.dense = options.dense ?? false;
-	}
-
-	/**
-	 * Applies a room template to this room, setting only the fields specified in the template.
-	 * Fields not in the template remain unchanged.
-	 *
-	 * @param template - The room template to apply
-	 *
-	 * @example
-	 * ```typescript
-	 * const room = new Room({ coordinates: { x: 0, y: 0, z: 0 } });
-	 * const template: RoomTemplate = {
-	 *   id: "room",
-	 *   type: "Room",
-	 *   display: "Chamber",
-	 *   allowedExits: DIRECTION.NORTH | DIRECTION.UP
-	 * };
-	 * room.applyTemplate(template);
-	 * ```
-	 */
-	applyTemplate(template: RoomTemplate): void {
-		super.applyTemplate(template);
-		// allowedExits is mandatory in RoomTemplate
-		this.allowedExits = template.allowedExits;
-		// dense is optional, only set if present in template
-		if (template.dense !== undefined) {
-			this.dense = template.dense;
-		}
 	}
 
 	/**
@@ -3249,20 +3168,6 @@ export class Item extends Movable {
 		};
 		return result;
 	}
-
-	/**
-	 * Override applyTemplate to handle Item-specific properties.
-	 * Applies the isContainer value from the template if present.
-	 *
-	 * @param template - Template object containing item properties
-	 */
-	override applyTemplate(template: ItemTemplate): void {
-		super.applyTemplate(template);
-		const itemTemplate = template;
-		if (itemTemplate.isContainer !== undefined) {
-			this.isContainer = itemTemplate.isContainer;
-		}
-	}
 }
 
 /**
@@ -3646,46 +3551,6 @@ export class Equipment extends Item {
 			: uncompressed;
 		return etc;
 	}
-
-	/**
-	 * Override applyTemplate to handle Equipment-specific properties.
-	 * Applies slot, attributeBonuses, resourceBonuses, and secondaryAttributeBonuses
-	 * from the template.
-	 *
-	 * @param template - Template object containing equipment properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const equipment = new Equipment();
-	 * const template: EquipmentTemplate = {
-	 *   id: "ring-rare",
-	 *   type: "Equipment",
-	 *   slot: EQUIPMENT_SLOT.FINGER,
-	 *   attributeBonuses: { strength: 10 }
-	 * };
-	 * equipment.applyTemplate(template);
-	 * ```
-	 */
-	override applyTemplate(template: EquipmentTemplate): void {
-		// Call parent to apply base properties
-		super.applyTemplate(template);
-
-		// Handle Equipment-specific properties
-		const equipmentTemplate = template as EquipmentTemplate;
-		if (equipmentTemplate.slot !== undefined) {
-			this._slot = equipmentTemplate.slot;
-		}
-		if (equipmentTemplate.attributeBonuses !== undefined) {
-			this._attributeBonuses = equipmentTemplate.attributeBonuses;
-		}
-		if (equipmentTemplate.resourceBonuses !== undefined) {
-			this._resourceBonuses = equipmentTemplate.resourceBonuses;
-		}
-		if (equipmentTemplate.secondaryAttributeBonuses !== undefined) {
-			this._secondaryAttributeBonuses =
-				equipmentTemplate.secondaryAttributeBonuses;
-		}
-	}
 }
 
 /**
@@ -3787,42 +3652,6 @@ export class Armor extends Equipment {
 					(base as SerializedDungeonObject).templateId
 			  ) as SerializedArmor)
 			: uncompressed;
-	}
-
-	/**
-	 * Deserialize a SerializedArmor into an Armor instance.
-	 * Restores the armor's defense value and all other equipment properties.
-	 *
-	 * @param data - Serialized armor data
-	 * @returns New Armor instance with restored properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const serialized: SerializedArmor = {
-	 *   type: "Armor",
-	 *   slot: EQUIPMENT_SLOT.HEAD,
-	 *   defense: 5,
-	 *   keywords: "helmet",
-	 *   display: "Helmet"
-	 * };
-	 *
-	 * const armor = Armor.deserialize(serialized);
-	 * console.log(armor.defense); // 5
-	 * ```
-	 */
-
-	/**
-	 * Override applyTemplate to handle Armor-specific properties.
-	 * Applies the defense value from the template if present.
-	 *
-	 * @param template - Template object containing armor properties
-	 */
-	override applyTemplate(template: ArmorTemplate): void {
-		super.applyTemplate(template);
-		const armorTemplate = template;
-		if (armorTemplate.defense !== undefined) {
-			this._defense = armorTemplate.defense;
-		}
 	}
 }
 
@@ -3971,61 +3800,6 @@ export class Weapon extends Equipment {
 			  ) as SerializedWeapon)
 			: uncompressed;
 	}
-
-	/**
-	 * Deserialize a SerializedWeapon into a Weapon instance.
-	 * Restores the weapon's attackPower value and all other equipment properties.
-	 *
-	 * @param data - Serialized weapon data
-	 * @returns New Weapon instance with restored properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const serialized: SerializedWeapon = {
-	 *   type: "Weapon",
-	 *   slot: EQUIPMENT_SLOT.MAIN_HAND,
-	 *   attackPower: 15,
-	 *   defense: 0,
-	 *   keywords: "sword",
-	 *   display: "Sword"
-	 * };
-	 *
-	 * const weapon = Weapon.deserialize(serialized);
-	 * console.log(weapon.attackPower); // 15
-	 * ```
-	 */
-
-	/**
-	 * Override applyTemplate to handle Weapon-specific properties.
-	 * Applies the attackPower, hitType, and type values from the template if present.
-	 *
-	 * @param template - Template object containing weapon properties
-	 */
-	override applyTemplate(template: WeaponTemplate): void {
-		super.applyTemplate(template);
-		const weaponTemplate = template;
-		if (weaponTemplate.attackPower !== undefined) {
-			this._attackPower = weaponTemplate.attackPower;
-		}
-		if (weaponTemplate.hitType !== undefined) {
-			if (typeof weaponTemplate.hitType === "string") {
-				// Look up in common hit types
-				const common = COMMON_HIT_TYPES.get(
-					weaponTemplate.hitType.toLowerCase()
-				);
-				if (!common)
-					throw new Error(
-						`Common hit type ${weaponTemplate.hitType} not found`
-					);
-				this._hitType = common;
-			} else {
-				this._hitType = weaponTemplate.hitType;
-			}
-		}
-		if (weaponTemplate.weaponType !== undefined) {
-			this._type = weaponTemplate.weaponType;
-		}
-	}
 }
 
 /**
@@ -4110,6 +3884,8 @@ export interface MobOptions extends DungeonObjectOptions {
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
 	/** Learned abilities map (Ability object -> number of uses) */
 	learnedAbilities?: Map<Ability, number>;
+	/** AI script for this mob */
+	aiScript?: string;
 }
 
 const MAX_EXHAUSTION = 100;
@@ -4222,6 +3998,8 @@ export class Mob extends Movable {
 	private _behaviors: Map<BEHAVIOR, boolean>;
 	/** EventEmitter for AI events (only for NPCs) */
 	private _aiEventEmitter?: EventEmitter;
+	/** AI script for this mob */
+	private _aiScript?: string;
 	/** Map of Ability objects to number of uses */
 	/** @internal - Public for package deserializers */
 	public _learnedAbilities: Map<Ability, number>;
@@ -4308,6 +4086,9 @@ export class Mob extends Movable {
 		// Initialize EventEmitter for AI events (only for NPCs)
 		if (!this._character) {
 			this._aiEventEmitter = new EventEmitter();
+		}
+		if (options?.aiScript) {
+			this._aiScript = options.aiScript;
 		}
 	}
 	/**
@@ -4989,79 +4770,6 @@ export class Mob extends Movable {
 			return false;
 		}
 		return this.removeAbility(ability);
-	}
-
-	/**
-	 * Override applyTemplate to handle Mob-specific properties.
-	 * Applies race, job, level, experience, bonuses, resources, and behaviors
-	 * from the template.
-	 *
-	 * @param template - Template object containing mob properties
-	 *
-	 * @example
-	 * ```typescript
-	 * import { BEHAVIOR } from "./dungeon.js";
-	 *
-	 * const mob = new Mob();
-	 * const template: MobTemplate = {
-	 *   id: "goblin-warrior",
-	 *   type: "Mob",
-	 *   race: "goblin",
-	 *   job: "warrior",
-	 *   level: 5,
-	 *   behaviors: {
-	 *     [BEHAVIOR.AGGRESSIVE]: true,
-	 *     [BEHAVIOR.WANDER]: true
-	 *   }
-	 * };
-	 * mob.applyTemplate(template);
-	 * ```
-	 */
-	override applyTemplate(template: DungeonObjectTemplate | MobTemplate): void {
-		// Call parent to apply base properties
-		super.applyTemplate(template);
-
-		// Handle Mob-specific properties
-		const mobTemplate = template as MobTemplate;
-
-		// Apply properties that might trigger attribute recalculation
-		if (mobTemplate.level !== undefined) {
-			this.level = mobTemplate.level;
-		}
-		if (mobTemplate.experience !== undefined) {
-			this.experience = mobTemplate.experience;
-		}
-		if (mobTemplate.attributeBonuses !== undefined) {
-			this.setAttributeBonuses(mobTemplate.attributeBonuses);
-		}
-		if (mobTemplate.resourceBonuses !== undefined) {
-			this.setResourceBonuses(mobTemplate.resourceBonuses);
-		}
-
-		// Apply health/mana if explicitly set in template (after potential recalculation)
-		if (mobTemplate.health !== undefined) {
-			this.health = mobTemplate.health;
-		} else {
-			this.health = this.maxHealth;
-		}
-		if (mobTemplate.mana !== undefined) {
-			this.mana = mobTemplate.mana;
-		} else {
-			this.mana = this.maxMana;
-		}
-		if (mobTemplate.exhaustion !== undefined) {
-			this.exhaustion = mobTemplate.exhaustion;
-		}
-
-		if (mobTemplate.behaviors !== undefined) {
-			// Apply behavior flags from template
-			for (const [key, value] of Object.entries(mobTemplate.behaviors)) {
-				// Validate that the key is a valid BEHAVIOR enum value
-				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR)) {
-					this.setBehavior(key as BEHAVIOR, !!value);
-				}
-			}
-		}
 	}
 
 	/** @internal - Public for package deserializers */

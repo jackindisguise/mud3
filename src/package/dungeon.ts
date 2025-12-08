@@ -36,7 +36,7 @@ import {
 	getDefaultRace,
 	getDefaultJob,
 } from "../registry/archetype.js";
-import { initializeMobAI } from "../mob-ai.js";
+import { initializeMobAI, cacheAIScript } from "../mob-ai.js";
 import { getAbilityById } from "../registry/ability.js";
 import { getEffectTemplateById } from "../registry/effect.js";
 import { Ability, getProficiencyAtUses } from "../core/ability.js";
@@ -207,7 +207,7 @@ export function createDungeonInstance(options: DungeonOptions): Dungeon {
  * Factory function to create a DungeonObject with an auto-generated OID.
  */
 export function createDungeonObject(
-	options?: Omit<DungeonObjectOptions, "oid"> & { oid?: number }
+	options?: DungeonObjectOptions
 ): DungeonObject {
 	return new DungeonObject({
 		...options,
@@ -314,12 +314,15 @@ export function createMob(options?: MobOptions): Mob {
 	applyMobArchetypePassives(mob);
 	checkMobArchetypeAbilities(mob);
 
+	logger.info(`Creating mob ${mob.oid} (${mob.display})`);
 	// Initialize AI for NPC mobs (mobs without character)
 	// Skip AI initialization for temporary template instances (OID -1) used for baseSerialized
 	if (!mob.character && oid >= 0) {
-		initializeMobAI(mob).catch((error) => {
+		try {
+			initializeMobAI(mob);
+		} catch (error) {
 			logger.error(`Failed to initialize AI for mob ${mob.oid}: ${error}`);
-		});
+		}
 	}
 
 	return mob;
@@ -393,6 +396,27 @@ export function createWeapon(options?: WeaponOptions): Weapon {
 	});
 }
 
+function dungeonObjectTemplateToOptions(
+	template: DungeonObjectTemplate,
+	oid: number
+): DungeonObjectOptions {
+	return {
+		templateId: template.id,
+		oid,
+		keywords: template.keywords,
+		display: template.display,
+		description: template.description,
+		roomDescription: template.roomDescription,
+		mapText: template.mapText,
+		mapColor: template.mapColor
+			? COLOR_NAME_TO_COLOR[
+					template.mapColor as keyof typeof COLOR_NAME_TO_COLOR
+			  ]
+			: undefined,
+		baseWeight: template.baseWeight,
+	};
+}
+
 /**
  * Convert a MobTemplate to MobOptions for use with createMob.
  */
@@ -405,10 +429,32 @@ function mobTemplateToOptions(template: MobTemplate, oid: number): MobOptions {
 		? getJobById(template.job) ?? getDefaultJob()
 		: getDefaultJob();
 	return {
+		...dungeonObjectTemplateToOptions(template, oid),
 		templateId: template.id,
 		oid,
+		behaviors: template.behaviors,
+		aiScript: template.aiScript,
+		level: template.level,
+		experience: template.experience,
+		attributeBonuses: template.attributeBonuses,
+		resourceBonuses: template.resourceBonuses,
+		health: template.health,
+		mana: template.mana,
+		exhaustion: template.exhaustion,
 		race,
 		job,
+	};
+}
+
+function itemTemplateToOptions(
+	template: ItemTemplate,
+	oid: number
+): ItemOptions {
+	return {
+		...dungeonObjectTemplateToOptions(template, oid),
+		templateId: template.id,
+		oid,
+		isContainer: template.isContainer,
 	};
 }
 
@@ -420,6 +466,7 @@ function equipmentTemplateToOptions(
 	oid: number
 ): EquipmentOptions {
 	return {
+		...itemTemplateToOptions(template, oid),
 		templateId: template.id,
 		oid,
 		slot: template.slot ?? EQUIPMENT_SLOT.HEAD,
@@ -437,13 +484,10 @@ function armorTemplateToOptions(
 	oid: number
 ): ArmorOptions {
 	return {
+		...equipmentTemplateToOptions(template, oid),
 		templateId: template.id,
 		oid,
-		slot: template.slot ?? EQUIPMENT_SLOT.HEAD,
 		defense: template.defense ?? 0,
-		attributeBonuses: template.attributeBonuses,
-		resourceBonuses: template.resourceBonuses,
-		secondaryAttributeBonuses: template.secondaryAttributeBonuses,
 	};
 }
 
@@ -455,15 +499,12 @@ function weaponTemplateToOptions(
 	oid: number
 ): WeaponOptions {
 	return {
+		...equipmentTemplateToOptions(template, oid),
 		templateId: template.id,
 		oid,
-		slot: template.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
 		attackPower: template.attackPower ?? 0,
 		hitType: template.hitType,
 		type: template.weaponType ?? "shortsword",
-		attributeBonuses: template.attributeBonuses,
-		resourceBonuses: template.resourceBonuses,
-		secondaryAttributeBonuses: template.secondaryAttributeBonuses,
 	};
 }
 
@@ -492,6 +533,7 @@ function createFromTemplate(
 			const mobTemplate = template as MobTemplate;
 			const options = mobTemplateToOptions(mobTemplate, providedOid);
 			obj = createMob(options);
+			logger.info(`Created mob ${obj.oid} (${obj.display})`);
 			break;
 		}
 		case "Equipment": {
@@ -537,9 +579,6 @@ function createFromTemplate(
 			break;
 	}
 
-	// Apply template properties (handles any remaining template fields)
-	obj.applyTemplate(template);
-
 	return obj;
 }
 
@@ -561,12 +600,21 @@ export function createRoomFromTemplate(
 	template: RoomTemplate,
 	coordinates: Coordinates
 ): Room {
+	const options = roomTemplateToOptions(template, coordinates);
 	const room = new Room({
-		coordinates,
-		templateId: template.id,
+		...options,
 	});
-	room.applyTemplate(template);
 	return room;
+}
+
+function roomTemplateToOptions(
+	template: RoomTemplate,
+	coordinates: Coordinates
+): RoomOptions {
+	return {
+		...dungeonObjectTemplateToOptions(template, -1),
+		coordinates,
+	};
 }
 
 /**
@@ -650,9 +698,7 @@ function globalizeTemplateId(
  */
 export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 	const filePath = getDungeonFilePath(id);
-
 	const hasFile = await fileExists(filePath);
-
 	if (!hasFile) {
 		return undefined;
 	}
@@ -939,43 +985,24 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 						const mobTemplate = hydrated as MobTemplate;
 						const aiScript = mobTemplate.aiScript;
 						if (aiScript) {
-							// Dynamic import to avoid circular dependency
-							import("../mob-ai.js")
-								.then(async (module) => {
-									let scriptToCache: string | undefined;
-									if (aiScript.startsWith("file:")) {
-										// Load from file
-										const { readFile } = await import("fs/promises");
-										const { join } = await import("path");
-										const { getSafeRootDirectory } = await import(
-											"../utils/path.js"
-										);
-										const filePath = aiScript.slice(5);
-										const fullPath = join(
-											getSafeRootDirectory(),
-											"data",
-											filePath
-										);
-										try {
-											scriptToCache = await readFile(fullPath, "utf-8");
-										} catch (error) {
-											logger.error(
-												`Failed to load AI script file for template ${globalizedId}: ${error}`
-											);
-										}
-									} else {
-										// Inline script
-										scriptToCache = aiScript;
-									}
-									if (scriptToCache) {
-										module.cacheAIScript(globalizedId, scriptToCache);
-									}
-								})
-								.catch((error) => {
+							let scriptToCache: string | undefined;
+							if (aiScript.startsWith("file:")) {
+								const filePath = aiScript.slice(5);
+								const fullPath = join(getSafeRootDirectory(), "data", filePath);
+								try {
+									scriptToCache = await readFile(fullPath, "utf-8");
+								} catch (error) {
 									logger.error(
-										`Failed to cache AI script for template ${globalizedId}: ${error}`
+										`Failed to load AI script file for template ${globalizedId}: ${error}`
 									);
-								});
+								}
+							} else {
+								// Inline script
+								scriptToCache = aiScript;
+							}
+							if (scriptToCache) {
+								cacheAIScript(globalizedId, scriptToCache);
+							}
 						}
 					}
 
@@ -2380,12 +2407,7 @@ function generateTemplateBaseSerialized(
 ): SerializedDungeonObject {
 	if (template.type === "Room") {
 		const roomTemplate = template as RoomTemplate;
-		const room = new Room({
-			coordinates: { x: 0, y: 0, z: 0 },
-			templateId: template.id,
-			oid: -1, // Baseline serialization uses -1
-		});
-		room.applyTemplate(roomTemplate);
+		const room = createRoomFromTemplate(roomTemplate, { x: 0, y: 0, z: 0 });
 		return room.serialize();
 	} else {
 		const obj = createFromTemplate(template, -1);

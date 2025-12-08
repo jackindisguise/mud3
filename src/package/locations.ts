@@ -18,7 +18,7 @@
  * @module package/locations
  */
 import { Package } from "package-loader";
-import { getRoomByRef } from "../core/dungeon.js";
+import { getRoomByRef } from "../registry/dungeon.js";
 import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";

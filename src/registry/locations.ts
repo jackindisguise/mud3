@@ -7,7 +7,8 @@
  * @module registry/locations
  */
 
-import { getRoomByRef, Room } from "../core/dungeon.js";
+import { getRoomByRef } from "../registry/dungeon.js";
+import { Room } from "../core/dungeon.js";
 import { DeepReadonly } from "../utils/types.js";
 
 export { READONLY_LOCATIONS as LOCATIONS };

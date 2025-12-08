@@ -43,7 +43,14 @@ import { Ability, getProficiencyAtUses } from "../core/ability.js";
 import {
 	registerDungeon,
 	hasDungeon,
-	addWanderingMob,
+	createTunnel,
+	getRoomByRef,
+	resolveTemplateById,
+	getAllDungeons,
+	getDungeonById,
+	createReset,
+	countResetExisting,
+	addResetSpawned,
 } from "../registry/dungeon.js";
 import { join, relative } from "path";
 import { mkdir, readFile, access, readdir } from "fs/promises";
@@ -60,8 +67,6 @@ import {
 	ItemTemplate,
 	Reset,
 	RoomLink,
-	getRoomByRef,
-	getDungeonById,
 	DungeonObject,
 	DungeonObjectOptions,
 	Mob,
@@ -97,7 +102,6 @@ import {
 	type ItemType,
 	type equipmentType,
 	DungeonOptions,
-	DUNGEON_REGISTRY,
 } from "../core/dungeon.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
@@ -203,11 +207,11 @@ export function createDungeonInstance(options: DungeonOptions): Dungeon {
  * Factory function to create a DungeonObject with an auto-generated OID.
  */
 export function createDungeonObject(
-	options?: Omit<DungeonObjectOptions, "oid">
+	options?: Omit<DungeonObjectOptions, "oid"> & { oid?: number }
 ): DungeonObject {
 	return new DungeonObject({
 		...options,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
@@ -236,27 +240,78 @@ export function registerDungeonInstance(dungeon: Dungeon): void {
 }
 
 /**
+ * Apply archetype passive effects to a mob.
+ * This helper has access to the effect template registry.
+ */
+export function applyMobArchetypePassives(mob: Mob): void {
+	mob.removeArchetypePassives();
+
+	// Apply race passives
+	for (const passiveId of mob.race.passives) {
+		const template = getEffectTemplateById(passiveId);
+		if (template) {
+			mob.applyArchetypePassive(template);
+		} else {
+			logger.warn(
+				`Race "${mob.race.id}" references passive effect "${passiveId}" which was not found in effect template registry`
+			);
+		}
+	}
+
+	// Apply job passives
+	for (const passiveId of mob.job.passives) {
+		const template = getEffectTemplateById(passiveId);
+		if (template) {
+			mob.applyArchetypePassive(template);
+		} else {
+			logger.warn(
+				`Job "${mob.job.id}" references passive effect "${passiveId}" which was not found in effect template registry`
+			);
+		}
+	}
+}
+
+/**
+ * Check and teach archetype abilities to a mob based on current level.
+ * This helper has access to the ability registry.
+ * Returns an array of newly learned abilities.
+ */
+export function checkMobArchetypeAbilities(mob: Mob): Ability[] {
+	const unlearned = mob.getUnlearnedArchetypeAbilities();
+	const newlyLearned: Ability[] = [];
+
+	for (const abilityDef of unlearned) {
+		const ability = getAbilityById(abilityDef.id);
+		if (!ability) {
+			logger.warn(
+				`Archetype references ability "${abilityDef.id}" which was not found in ability registry`
+			);
+			continue;
+		}
+
+		mob.learnArchetypeAbility(ability);
+		newlyLearned.push(ability);
+	}
+
+	return newlyLearned;
+}
+
+/**
  * Factory function to create a Mob with an auto-generated OID.
  */
-export function createMob(
-	options?: Omit<MobOptions, "oid" | "race" | "job"> & {
-		race?: Race;
-		job?: Job;
-	}
-): Mob {
+export function createMob(options?: MobOptions): Mob {
 	const race = options?.race ?? getDefaultRace();
 	const job = options?.job ?? getDefaultJob();
 	const mob = new Mob({
 		...options,
 		race,
 		job,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 
-	// Register in wandering mobs cache if wander behavior is enabled
-	if (mob.hasBehavior(BEHAVIOR.WANDER) && !mob.character) {
-		addWanderingMob(mob);
-	}
+	// Apply archetype passives and abilities (requires registry access)
+	applyMobArchetypePassives(mob);
+	checkMobArchetypeAbilities(mob);
 
 	return mob;
 }
@@ -265,68 +320,147 @@ export function createMob(
  * Factory function to create a Room.
  * Note: Rooms do not use OIDs as they are identified by coordinates.
  */
-export function createRoom(options: Omit<RoomOptions, "oid">): Room {
-	return new Room({
+export function createRoom(options: RoomOptions): Room {
+	return new Room(options);
+}
+
+/**
+ * Factory function to create a Movable with an auto-generated OID.
+ */
+export function createMovable(options?: MovableOptions): Movable {
+	return new Movable({
 		...options,
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
 /**
  * Factory function to create an Item with an auto-generated OID.
  */
-export function createItem(options?: Omit<DungeonObjectOptions, "oid">): Item {
+export function createItem(options?: DungeonObjectOptions): Item {
 	return new Item({
 		...options,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
 /**
  * Factory function to create a Prop with an auto-generated OID.
  */
-export function createProp(options?: Omit<DungeonObjectOptions, "oid">): Prop {
+export function createProp(options?: DungeonObjectOptions): Prop {
 	return new Prop({
 		...options,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
 /**
  * Factory function to create Equipment with an auto-generated OID.
  */
-export function createEquipment(
-	options?: Omit<EquipmentOptions, "oid">
-): Equipment {
+export function createEquipment(options?: EquipmentOptions): Equipment {
 	return new Equipment({
 		...options,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
 /**
  * Factory function to create Armor with an auto-generated OID.
  */
-export function createArmor(options?: Omit<ArmorOptions, "oid">): Armor {
+export function createArmor(options?: ArmorOptions): Armor {
 	return new Armor({
 		...options,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
 /**
  * Factory function to create Weapon with an auto-generated OID.
  */
-export function createWeapon(options?: Omit<WeaponOptions, "oid">): Weapon {
+export function createWeapon(options?: WeaponOptions): Weapon {
 	return new Weapon({
 		...options,
-		oid: getNextObjectId(),
+		oid: options?.oid ?? getNextObjectId(),
 	});
 }
 
 /**
+ * Convert a MobTemplate to MobOptions for use with createMob.
+ */
+function mobTemplateToOptions(template: MobTemplate, oid: number): MobOptions {
+	// Resolve race/job string IDs to Race/Job objects
+	const race = template.race
+		? getRaceById(template.race) ?? getDefaultRace()
+		: getDefaultRace();
+	const job = template.job
+		? getJobById(template.job) ?? getDefaultJob()
+		: getDefaultJob();
+	return {
+		templateId: template.id,
+		oid,
+		race,
+		job,
+	};
+}
+
+/**
+ * Convert an EquipmentTemplate to EquipmentOptions for use with createEquipment.
+ */
+function equipmentTemplateToOptions(
+	template: EquipmentTemplate,
+	oid: number
+): EquipmentOptions {
+	return {
+		templateId: template.id,
+		oid,
+		slot: template.slot ?? EQUIPMENT_SLOT.HEAD,
+		attributeBonuses: template.attributeBonuses,
+		resourceBonuses: template.resourceBonuses,
+		secondaryAttributeBonuses: template.secondaryAttributeBonuses,
+	};
+}
+
+/**
+ * Convert an ArmorTemplate to ArmorOptions for use with createArmor.
+ */
+function armorTemplateToOptions(
+	template: ArmorTemplate,
+	oid: number
+): ArmorOptions {
+	return {
+		templateId: template.id,
+		oid,
+		slot: template.slot ?? EQUIPMENT_SLOT.HEAD,
+		defense: template.defense ?? 0,
+		attributeBonuses: template.attributeBonuses,
+		resourceBonuses: template.resourceBonuses,
+		secondaryAttributeBonuses: template.secondaryAttributeBonuses,
+	};
+}
+
+/**
+ * Convert a WeaponTemplate to WeaponOptions for use with createWeapon.
+ */
+function weaponTemplateToOptions(
+	template: WeaponTemplate,
+	oid: number
+): WeaponOptions {
+	return {
+		templateId: template.id,
+		oid,
+		slot: template.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
+		attackPower: template.attackPower ?? 0,
+		hitType: template.hitType,
+		type: template.weaponType ?? "shortsword",
+		attributeBonuses: template.attributeBonuses,
+		resourceBonuses: template.resourceBonuses,
+		secondaryAttributeBonuses: template.secondaryAttributeBonuses,
+	};
+}
+
+/**
  * Creates a new DungeonObject instance from a template.
- * This is the package-layer implementation that handles OID assignment and
- * resolves runtime dependencies (like race/job for Mobs).
+ * This routes to the appropriate createEtc() function to avoid duplication.
  *
  * @param template - The template to create an object from
  * @param oid - Optional OID to assign. If not provided, a new OID will be generated.
@@ -336,10 +470,10 @@ function createFromTemplate(
 	template: DungeonObjectTemplate,
 	oid?: number
 ): DungeonObject {
-	let obj: DungeonObject;
 	const providedOid = oid ?? getNextObjectId();
+	let obj: DungeonObject;
 
-	// Create the appropriate object type
+	// Route to the appropriate createEtc() function
 	switch (template.type) {
 		case "Room":
 			throw new Error(
@@ -347,77 +481,54 @@ function createFromTemplate(
 			);
 		case "Mob": {
 			const mobTemplate = template as MobTemplate;
-			// Resolve race/job string IDs to Race/Job objects
-			const race = mobTemplate.race
-				? getRaceById(mobTemplate.race) ?? getDefaultRace()
-				: getDefaultRace();
-			const job = mobTemplate.job
-				? getJobById(mobTemplate.job) ?? getDefaultJob()
-				: getDefaultJob();
-			obj = new Mob({
-				templateId: template.id,
-				oid: providedOid,
-				race,
-				job,
-			});
+			const options = mobTemplateToOptions(mobTemplate, providedOid);
+			obj = createMob(options);
 			break;
 		}
 		case "Equipment": {
 			const equipmentTemplate = template as EquipmentTemplate;
-			obj = new Equipment({
-				templateId: template.id,
-				oid: providedOid,
-				slot: equipmentTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
-				attributeBonuses: equipmentTemplate.attributeBonuses,
-				resourceBonuses: equipmentTemplate.resourceBonuses,
-				secondaryAttributeBonuses: equipmentTemplate.secondaryAttributeBonuses,
-			});
+			const options = equipmentTemplateToOptions(
+				equipmentTemplate,
+				providedOid
+			);
+			obj = createEquipment(options);
 			break;
 		}
 		case "Armor": {
 			const armorTemplate = template as ArmorTemplate;
-			obj = new Armor({
-				templateId: template.id,
-				oid: providedOid,
-				slot: armorTemplate.slot ?? EQUIPMENT_SLOT.HEAD,
-				defense: armorTemplate.defense ?? 0,
-				attributeBonuses: armorTemplate.attributeBonuses,
-				resourceBonuses: armorTemplate.resourceBonuses,
-				secondaryAttributeBonuses: armorTemplate.secondaryAttributeBonuses,
-			});
+			const options = armorTemplateToOptions(armorTemplate, providedOid);
+			obj = createArmor(options);
 			break;
 		}
 		case "Weapon": {
 			const weaponTemplate = template as WeaponTemplate;
-			obj = new Weapon({
-				templateId: template.id,
-				oid: providedOid,
-				slot: weaponTemplate.slot ?? EQUIPMENT_SLOT.MAIN_HAND,
-				attackPower: weaponTemplate.attackPower ?? 0,
-				hitType: weaponTemplate.hitType,
-				type: weaponTemplate.weaponType ?? "shortsword",
-				attributeBonuses: weaponTemplate.attributeBonuses,
-				resourceBonuses: weaponTemplate.resourceBonuses,
-				secondaryAttributeBonuses: weaponTemplate.secondaryAttributeBonuses,
-			});
+			const options = weaponTemplateToOptions(weaponTemplate, providedOid);
+			obj = createWeapon(options);
 			break;
 		}
-		case "Movable":
-			obj = new Movable({ templateId: template.id, oid: providedOid });
+		case "Movable": {
+			const options = { templateId: template.id, oid: providedOid };
+			obj = createMovable(options);
 			break;
-		case "Item":
-			obj = new Item({ templateId: template.id, oid: providedOid });
+		}
+		case "Item": {
+			const options = { templateId: template.id, oid: providedOid };
+			obj = createItem(options);
 			break;
-		case "Prop":
-			obj = new Prop({ templateId: template.id, oid: providedOid });
+		}
+		case "Prop": {
+			const options = { templateId: template.id, oid: providedOid };
+			obj = createProp(options);
 			break;
+		}
 		case "DungeonObject":
 		default:
-			obj = new DungeonObject({ templateId: template.id, oid: providedOid });
+			const options = { templateId: template.id, oid: providedOid };
+			obj = createDungeonObject(options);
 			break;
 	}
 
-	// Apply template properties
+	// Apply template properties (handles any remaining template fields)
 	obj.applyTemplate(template);
 
 	// Initialize AI for NPC mobs (mobs without character)
@@ -901,7 +1012,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 					continue;
 				}
 
-				const reset = new Reset({
+				const reset = createReset({
 					templateId: globalizeTemplateId(resetData.templateId, dungeon.id!),
 					roomRef: resetData.roomRef,
 					minCount: resetData.minCount ?? 1,
@@ -1195,7 +1306,7 @@ function processPendingRoomLinks(): void {
 		// Check if this link or its reverse has already been processed
 		if (processedLinks.has(linkKey) || processedLinks.has(reverseLinkKey)) {
 			// This is a duplicate or reverse of an already processed link
-			// RoomLink.createTunnel already creates two-way links, so we skip the duplicate
+			// createTunnel already creates two-way links, so we skip the duplicate
 			logger.debug(
 				`Skipping duplicate room link: ${pending.roomRef} ${pending.direction} -> ${pending.targetRoomRef}`
 			);
@@ -1230,7 +1341,7 @@ function processPendingRoomLinks(): void {
 		}
 
 		// Create the link
-		RoomLink.createTunnel(fromRoom, direction, toRoom, oneWay);
+		createTunnel(fromRoom, direction, toRoom, oneWay);
 		createdCount++;
 
 		// Mark both this link and its reverse as processed to avoid duplicates
@@ -1274,15 +1385,156 @@ export async function loadDungeons(): Promise<Dungeon[]> {
 }
 
 /**
+ * Execute a reset with pre-resolved room and template.
+ * This is the package-layer implementation that handles reset execution logic.
+ *
+ * @param reset The reset to execute
+ * @param targetRoom The room to spawn objects in
+ * @param template The template to create objects from
+ * @returns Array of newly spawned objects
+ */
+function executeResetWithResolved(
+	reset: Reset,
+	targetRoom: Room,
+	template: DungeonObjectTemplate
+): DungeonObject[] {
+	// Count existing spawned objects (anywhere in the game world)
+	const existingCount = countResetExisting(reset);
+
+	// If we're at or above max, don't spawn
+	if (existingCount >= reset.maxCount) {
+		return [];
+	}
+
+	// Calculate how many to spawn
+	// We need at least minCount, but can spawn up to maxCount
+	const needed = Math.max(
+		reset.minCount - existingCount, // Need to reach minimum
+		0
+	);
+	const canSpawn = reset.maxCount - existingCount; // Can spawn up to max
+
+	// Spawn the needed objects (up to maxCount)
+	const spawned: DungeonObject[] = [];
+	const toSpawn = Math.min(needed, canSpawn);
+	for (let i = 0; i < toSpawn; i++) {
+		const obj = createFromTemplate(template);
+		// Track which reset spawned this object BEFORE adding to room
+		// This ensures spawnedByReset is set before location changes
+		targetRoom.add(obj);
+		spawned.push(obj);
+		addResetSpawned(reset, obj);
+
+		// If this is a Mob, handle equipped and inventory items
+		if (obj instanceof Mob) {
+			// Spawn and equip equipment templates
+			if (reset.equipped) {
+				for (const equipmentTemplateId of reset.equipped) {
+					const equipmentTemplate = resolveTemplateById(equipmentTemplateId);
+					if (!equipmentTemplate) {
+						logger.warn(
+							`Reset for template "${reset.templateId}" failed: equipment template "${equipmentTemplateId}" not found`
+						);
+						continue;
+					}
+
+					// Verify template is Equipment, Armor, or Weapon
+					if (
+						equipmentTemplate.type !== "Equipment" &&
+						equipmentTemplate.type !== "Armor" &&
+						equipmentTemplate.type !== "Weapon"
+					) {
+						logger.warn(
+							`Reset for template "${reset.templateId}" failed: equipment template "${equipmentTemplateId}" is not an Equipment, Armor, or Weapon type (got "${equipmentTemplate.type}")`
+						);
+						continue;
+					}
+
+					const equipment = createFromTemplate(equipmentTemplate) as Equipment;
+					obj.equip(equipment);
+				}
+			}
+
+			// Spawn and add inventory item templates
+			if (reset.inventory) {
+				for (const itemTemplateId of reset.inventory) {
+					const itemTemplate = resolveTemplateById(itemTemplateId);
+					if (!itemTemplate) {
+						logger.warn(
+							`Reset for template "${reset.templateId}" failed: inventory template "${itemTemplateId}" not found`
+						);
+						continue;
+					}
+
+					const item = createFromTemplate(itemTemplate);
+					obj.add(item);
+				}
+			}
+		}
+	}
+
+	return spawned;
+}
+
+/**
+ * Execute a single reset with template and room resolution.
+ * This helper has access to the registry for resolving templates and rooms.
+ *
+ * @param reset The reset to execute
+ * @param dungeon The dungeon containing the reset
+ * @returns Array of newly spawned objects
+ */
+function executeReset(reset: Reset, dungeon: Dungeon): DungeonObject[] {
+	// Resolve template
+	const template = resolveTemplateById(reset.templateId);
+	if (!template) {
+		logger.warn(
+			`Reset for template "${reset.templateId}" in dungeon "${dungeon.id}" failed: template not found`
+		);
+		return [];
+	}
+
+	// Resolve target room
+	const targetRoom = getRoomByRef(reset.roomRef);
+	if (!targetRoom) {
+		logger.warn(
+			`Reset for template "${reset.templateId}" in dungeon "${dungeon.id}" failed: room "${reset.roomRef}" not found`
+		);
+		return [];
+	}
+
+	// Execute reset with resolved dependencies
+	return executeResetWithResolved(reset, targetRoom, template);
+}
+
+/**
+ * Execute all resets for a dungeon.
+ * This helper has access to the registry for resolving templates and rooms.
+ *
+ * @param dungeon The dungeon whose resets to execute
+ * @returns Total number of objects spawned
+ */
+function executeDungeonResets(dungeon: Dungeon): number {
+	let totalSpawned = 0;
+
+	for (const reset of dungeon.resets) {
+		const spawned = executeReset(reset, dungeon);
+		totalSpawned += spawned.length;
+	}
+
+	return totalSpawned;
+}
+
+/**
  * Execute resets on all registered dungeons.
  */
 export function executeAllDungeonResets(): void {
 	let totalSpawned = 0;
 	let dungeonCount = 0;
 
-	for (const dungeon of DUNGEON_REGISTRY.values()) {
-		// Execute resets with OID assignment using factory function
-		const spawned = dungeon.executeResets(createFromTemplateWithOid);
+	for (const dungeon of getAllDungeons()) {
+		// Execute resets - createFromTemplate auto-generates OIDs when not provided
+		const spawned = executeDungeonResets(dungeon);
 		totalSpawned += spawned;
 		dungeonCount++;
 	}
@@ -2310,8 +2562,12 @@ export async function deserializeMob(
 	const mobOptions = hydrateSerializedMobData(normalized);
 	logger.debug(`Mob options`, mobOptions);
 
-	const mob = new Mob(mobOptions);
+	const mob = createMob(mobOptions);
 	logger.debug(`Mob instance created successfully`);
+
+	// Apply archetype passives and abilities (requires registry access)
+	applyMobArchetypePassives(mob);
+	checkMobArchetypeAbilities(mob);
 
 	// Restore learned abilities if provided
 	if (learnedAbilitiesData) {
@@ -2383,7 +2639,7 @@ export async function deserializeMob(
 
 	// Re-apply archetype passive effects (race and job passives)
 	// These are not serialized and must be re-applied on deserialization
-	mob.applyArchetypePassives();
+	applyMobArchetypePassives(mob);
 
 	// Restore effects (excluding archetype passives which are re-applied above)
 	if (normalized.effects && Array.isArray(normalized.effects)) {
@@ -2399,7 +2655,7 @@ export async function deserializeMob(
 
 			// Find caster by OID (search through all dungeons)
 			let caster: Mob | undefined;
-			for (const dungeon of DUNGEON_REGISTRY.values()) {
+			for (const dungeon of getAllDungeons()) {
 				// Search through all objects in the dungeon
 				for (const obj of dungeon.contents) {
 					if (obj.oid === serializedEffect.casterOid && obj instanceof Mob) {
@@ -2449,11 +2705,6 @@ export async function deserializeMob(
 
 			mob.addEffect(template, caster, overrides);
 		}
-	}
-
-	// Register in wandering mobs cache if wander behavior is enabled
-	if (mob.hasBehavior(BEHAVIOR.WANDER) && !mob.character) {
-		addWanderingMob(mob);
 	}
 
 	return mob;

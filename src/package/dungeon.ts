@@ -533,7 +533,6 @@ function createFromTemplate(
 			const mobTemplate = template as MobTemplate;
 			const options = mobTemplateToOptions(mobTemplate, providedOid);
 			obj = createMob(options);
-			logger.info(`Created mob ${obj.oid} (${obj.display})`);
 			break;
 		}
 		case "Equipment": {
@@ -613,6 +612,7 @@ function roomTemplateToOptions(
 ): RoomOptions {
 	return {
 		...dungeonObjectTemplateToOptions(template, -1),
+		dense: template.dense,
 		coordinates,
 	};
 }

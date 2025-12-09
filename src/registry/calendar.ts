@@ -10,7 +10,7 @@
 import { EventEmitter } from "events";
 import { DeepReadonly } from "../utils/types.js";
 import { getElapsedTime } from "./gamestate.js";
-import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
+import { setRelativeInterval, clearCustomInterval } from "accurate-intervals";
 
 // Calendar event emitter
 export const calendarEvents = new EventEmitter();
@@ -19,7 +19,7 @@ export const calendarEvents = new EventEmitter();
 let CALENDAR: Calendar | null = null;
 let DERIVED: CalendarDerived | null = null;
 
-// Interval IDs for calendar events (from setAbsoluteInterval)
+// Interval IDs for calendar events (from setRelativeInterval)
 let minuteInterval: number | undefined;
 let hourInterval: number | undefined;
 let dayInterval: number | undefined;
@@ -347,7 +347,6 @@ function setupCalendarEvents(): void {
 	// Clear existing intervals
 	clearCalendarEvents();
 
-	const now = Date.now();
 	const elapsed = getElapsedTime();
 
 	// Calculate next event times
@@ -387,14 +386,14 @@ function setupCalendarEvents(): void {
 	const timeSinceLastNight = dayElapsed % nightHour;
 	const nextNight = nightHour - timeSinceLastNight;
 
-	// Set up intervals with initial delay using setSafeTimeout, then recurring with setAbsoluteInterval
+	// Set up intervals with initial delay using setSafeTimeout, then recurring with setRelativeInterval
 	// Clear previous timeouts
 	minuteTimeouts.forEach((id) => clearTimeout(id));
 	minuteTimeouts = [];
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("minute");
-			minuteInterval = setAbsoluteInterval(() => {
+			minuteInterval = setRelativeInterval(() => {
 				calendarEvents.emit("minute");
 			}, millisecondsPerMinute);
 		},
@@ -407,7 +406,7 @@ function setupCalendarEvents(): void {
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("hour");
-			hourInterval = setAbsoluteInterval(() => {
+			hourInterval = setRelativeInterval(() => {
 				calendarEvents.emit("hour");
 			}, millisecondsPerHour);
 		},
@@ -420,7 +419,7 @@ function setupCalendarEvents(): void {
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("day");
-			dayInterval = setAbsoluteInterval(() => {
+			dayInterval = setRelativeInterval(() => {
 				calendarEvents.emit("day");
 			}, millisecondsPerDay);
 		},
@@ -433,7 +432,7 @@ function setupCalendarEvents(): void {
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("week");
-			weekInterval = setAbsoluteInterval(() => {
+			weekInterval = setRelativeInterval(() => {
 				calendarEvents.emit("week");
 			}, millisecondsPerWeek);
 		},
@@ -481,7 +480,7 @@ function setupCalendarEvents(): void {
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("year");
-			yearInterval = setAbsoluteInterval(() => {
+			yearInterval = setRelativeInterval(() => {
 				calendarEvents.emit("year");
 			}, millisecondsPerYear);
 		},
@@ -495,7 +494,7 @@ function setupCalendarEvents(): void {
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("morning");
-			morningInterval = setAbsoluteInterval(() => {
+			morningInterval = setRelativeInterval(() => {
 				calendarEvents.emit("morning");
 			}, millisecondsPerDay);
 		},
@@ -510,7 +509,7 @@ function setupCalendarEvents(): void {
 	setSafeTimeout(
 		() => {
 			calendarEvents.emit("night");
-			nightInterval = setAbsoluteInterval(() => {
+			nightInterval = setRelativeInterval(() => {
 				calendarEvents.emit("night");
 			}, nightHour);
 		},

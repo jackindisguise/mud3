@@ -32,6 +32,7 @@ import {
 
 export default {
 	pattern: "calendar~",
+	aliases: ["time~"],
 	execute(context: CommandContext): void {
 		const { actor } = context;
 

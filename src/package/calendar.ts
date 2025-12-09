@@ -22,10 +22,8 @@ import { readFile } from "fs/promises";
 import YAML from "js-yaml";
 import logger from "../logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
-import {
-	Calendar,
-	setCalendar,
-} from "../registry/calendar.js";
+import { Calendar, setCalendar } from "../registry/calendar.js";
+import gamestatePkg from "./gamestate.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -38,7 +36,7 @@ export async function loadCalendar(): Promise<void> {
 	try {
 		const content = await readFile(CALENDAR_PATH, "utf-8");
 		const parsed = YAML.load(content) as Partial<Calendar> | undefined;
-		
+
 		if (!parsed) {
 			throw new Error("Calendar file is empty or invalid");
 		}
@@ -65,22 +63,15 @@ export async function loadCalendar(): Promise<void> {
 			typeof parsed.secondsPerMinute !== "number" ||
 			parsed.secondsPerMinute < 1
 		) {
-			throw new Error(
-				"Calendar must have a valid 'secondsPerMinute' >= 1"
-			);
+			throw new Error("Calendar must have a valid 'secondsPerMinute' >= 1");
 		}
 		if (
 			typeof parsed.minutesPerHour !== "number" ||
 			parsed.minutesPerHour < 1
 		) {
-			throw new Error(
-				"Calendar must have a valid 'minutesPerHour' >= 1"
-			);
+			throw new Error("Calendar must have a valid 'minutesPerHour' >= 1");
 		}
-		if (
-			typeof parsed.hoursPerDay !== "number" ||
-			parsed.hoursPerDay < 1
-		) {
+		if (typeof parsed.hoursPerDay !== "number" || parsed.hoursPerDay < 1) {
 			throw new Error("Calendar must have a valid 'hoursPerDay' >= 1");
 		}
 
@@ -88,9 +79,7 @@ export async function loadCalendar(): Promise<void> {
 		for (let i = 0; i < parsed.days.length; i++) {
 			const day = parsed.days[i];
 			if (!day || typeof day.name !== "string") {
-				throw new Error(
-					`Day at index ${i} must have a 'name' string field`
-				);
+				throw new Error(`Day at index ${i} must have a 'name' string field`);
 			}
 		}
 
@@ -98,14 +87,9 @@ export async function loadCalendar(): Promise<void> {
 		for (let i = 0; i < parsed.months.length; i++) {
 			const month = parsed.months[i];
 			if (!month || typeof month.name !== "string") {
-				throw new Error(
-					`Month at index ${i} must have a 'name' string field`
-				);
+				throw new Error(`Month at index ${i} must have a 'name' string field`);
 			}
-			if (
-				typeof month.days !== "number" ||
-				month.days < 1
-			) {
+			if (typeof month.days !== "number" || month.days < 1) {
 				throw new Error(
 					`Month at index ${i} must have a 'days' number field >= 1`
 				);
@@ -136,9 +120,8 @@ export async function loadCalendar(): Promise<void> {
 
 export default {
 	name: "calendar",
-	dependencies: [],
+	dependencies: [gamestatePkg],
 	loader: async () => {
 		await loadCalendar();
 	},
 } as Package;
-

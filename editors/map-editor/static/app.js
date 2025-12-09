@@ -4003,6 +4003,16 @@ class MapEditor {
 						}" placeholder="0" min="0" step="1">
 					</div>
 				</div>
+				<div id="object-weight-field" style="display: ${
+					isObjectType ? "block" : "none"
+				};">
+					<div class="form-group">
+						<label>Weight</label>
+						<input type="number" id="template-weight" value="${
+							template.baseWeight || ""
+						}" placeholder="0" min="0" step="0.1">
+					</div>
+				</div>
 				<div class="form-group">
 					<label>Map Text (1 letter)</label>
 					<input type="text" id="template-map-text" value="${
@@ -4638,6 +4648,18 @@ class MapEditor {
 							newTemplate.value = valueNum;
 						}
 						// If valueNum is 0 or negative, don't include value field (defaults to 0)
+					}
+				}
+
+				// Add weight for Item, Equipment, Weapon, Armor, and Prop
+				const weight = document.getElementById("template-weight")?.value;
+				if (weight !== undefined && weight !== "") {
+					const weightNum = parseFloat(weight);
+					if (!isNaN(weightNum)) {
+						if (weightNum > 0) {
+							newTemplate.baseWeight = weightNum;
+						}
+						// If weightNum is 0 or negative, don't include baseWeight field (defaults to 0)
 					}
 				}
 			}

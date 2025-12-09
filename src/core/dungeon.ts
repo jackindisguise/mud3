@@ -63,6 +63,7 @@
  * @module core/dungeon
  */
 
+import { isDeepStrictEqual } from "node:util";
 import { EventEmitter } from "events";
 import { string } from "mud-ext";
 import { color, COLOR, COLOR_NAMES, COLOR_NAME_TO_COLOR } from "./color.js";
@@ -143,6 +144,7 @@ import {
 	isWestward,
 } from "../direction.js";
 import { checkMobArchetypeAbilities } from "../package/dungeon.js";
+import { resolveTemplateById } from "../registry/dungeon.js";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
@@ -7004,13 +7006,6 @@ const baseSerializedTypes: Partial<
 };
 
 /**
- * Global cache of templateId -> baseline serialization snapshots.
- * Populated when objects are created from templates outside of a dungeon registry.
- */
-const SAFE_TEMPLATE_BASE_CACHE: Map<string, SerializedDungeonObject> =
-	new Map();
-
-/**
  * Returns the baseline serialization for a given type and optional templateId.
  * Prefers the template baseline when available; falls back to type baseline.
  */
@@ -7030,8 +7025,8 @@ function getCompressionBaseline(
 			base = baseSerializedTypes[type];
 		}
 	} else if (templateId) {
-		const cached = SAFE_TEMPLATE_BASE_CACHE.get(templateId);
-		if (cached) base = cached;
+		const cached = resolveTemplateById(templateId);
+		if (cached) base = cached as SerializedDungeonObject;
 	}
 	return (base ?? baseSerializedTypes[type]) as SerializedDungeonObject;
 }
@@ -7064,22 +7059,22 @@ export function compressSerializedObject<T extends SerializedDungeonObject>(
 	>) {
 		if (key === "type") continue;
 		if (key === "templateId") continue;
-		if (key === "oid") continue; // Already handled above
-		if (key === "version") continue; // Always preserve version, skip compression
+		if (key === "oid") continue;
+		if (key === "version") continue;
 		const baseValue = (base as any)?.[key];
+		// if the value is an object and the base value is an object and the values are deep equal -- compress
+		if (
+			typeof value === "object" &&
+			typeof baseValue === "object" &&
+			isDeepStrictEqual(value, baseValue)
+		)
+			continue;
 		if (value !== baseValue) {
 			(compressed as any)[key] = value;
 		}
 	}
 	return compressed as T;
 }
-
-/**
- * Resolve a template id into a DungeonObjectTemplate.
- * Supports fully-qualified ids of the form "@<dungeonId>:<id>".
- * If no dungeon prefix is provided, attempts to find a matching template
- * in any registered dungeon (first match wins).
- */
 
 /**
  * Creates a normalized, uncompressed serialized object by overlaying the provided
@@ -7109,7 +7104,8 @@ export function normalizeSerializedData<T extends AnySerializedDungeonObject>(
 		}
 	} else if (hasTemplate) {
 		// Fallback to global cache when template not provided
-		const cached = SAFE_TEMPLATE_BASE_CACHE.get(data.templateId!);
+
+		const cached = resolveTemplateById(data.templateId!);
 		if (cached) base = { ...cached } as Record<string, unknown>;
 	}
 

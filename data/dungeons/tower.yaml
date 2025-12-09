@@ -560,7 +560,8 @@ dungeon:
       attributeBonuses: {strength: 20, agility: 20, intelligence: 20}
       roomDescription: The Guardian Force is lying here, humming with violence.
       weaponType: maul
-      value: 999
+      value: 1025
+      baseWeight: 35
     - id: tower-helmet
       type: Armor
       keywords: helmet head armor
@@ -568,6 +569,8 @@ dungeon:
       description: A sturdy steel helmet that provides protection for the head.
       slot: head
       defense: 3
+      value: 12
+      baseWeight: 5
     - id: zombie
       type: Mob
       display: a zombie
@@ -586,6 +589,8 @@ dungeon:
       roomDescription: A haversack is lying on the floor.
       keywords: haversack sack
       isContainer: true
+      value: 1
+      baseWeight: 2
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{10,3,0}'

@@ -75,6 +75,7 @@ import {
 } from "./regeneration.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
+import { calendarEvents, getCurrentTime } from "./registry/calendar.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -1190,6 +1191,27 @@ async function start(): Promise<void> {
 	gameTickEmitter.on("tick", () => {
 		processAITick();
 	});
+
+	// Listen for day/night changes and inform players
+	calendarEvents.on("morning", () => {
+		const result = Object.entries(getCurrentTime()!)
+			.map(([key, value]) => `${key}=${value}`)
+			.join(", ");
+		broadcast(
+			color(`The sun rises, bringing a new day. <${result}>`, COLOR.YELLOW),
+			MESSAGE_GROUP.SYSTEM
+		);
+	});
+
+	calendarEvents.on("night", () => {
+		const result = Object.entries(getCurrentTime()!)
+			.map(([key, value]) => `${key}=${value}`)
+			.join(", ");
+		broadcast(
+			color(`The sun sets, and darkness falls. <${result}>`, COLOR.TEAL),
+			MESSAGE_GROUP.SYSTEM
+		);
+	});
 }
 
 /**
@@ -1307,7 +1329,7 @@ export function getGameStats(): {
  * Broadcast a message to all active playing characters.
  *
  * @param text The message to send
- * @param group The message group to use (defaults to INFO)
+ * @param group The message group to use
  *
  * @example
  * ```ts

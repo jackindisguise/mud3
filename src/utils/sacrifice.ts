@@ -33,10 +33,7 @@ export function sacrificeItem(
 
 	// Check if actor is in a room
 	if (!room) {
-		actor.sendMessage(
-			"You are not in a room.",
-			MESSAGE_GROUP.COMMAND_RESPONSE
-		);
+		actor.sendMessage("You are not in a room.", MESSAGE_GROUP.COMMAND_RESPONSE);
 		return false;
 	}
 
@@ -77,9 +74,19 @@ export function sacrificeItem(
 		return false;
 	}
 
-	// Calculate gold reward (25% of item value)
-	const itemValue = item.value || 0;
-	const goldReward = Math.floor(itemValue * 0.25);
+	// Calculate total value (including container contents if it's a container)
+	let totalValue = item.value;
+
+	// If this is a container, add the value of all items inside
+	if (item.isContainer && item.contents.length > 0) {
+		const itemsInContainer = item.contents.filter(
+			(obj) => obj instanceof Item
+		) as Item[];
+		totalValue += itemsInContainer.reduce((acc, item) => acc + item.value, 0);
+	}
+
+	// Calculate gold reward (25% of total value)
+	const goldReward = Math.floor(totalValue * 0.25);
 
 	// Save display name before destroying
 	const itemDisplay = item.display;
@@ -89,7 +96,7 @@ export function sacrificeItem(
 
 	// Give gold to actor
 	if (goldReward > 0) {
-		actor.value = (actor.value || 0) + goldReward;
+		actor.value += goldReward;
 		act(
 			{
 				user: `You ${messagePrefix}sacrifice ${itemDisplay} and gain ${color(
@@ -150,10 +157,7 @@ export function sacrificeContainer(
 	}
 
 	if (!room) {
-		actor.sendMessage(
-			"You are not in a room.",
-			MESSAGE_GROUP.COMMAND_RESPONSE
-		);
+		actor.sendMessage("You are not in a room.", MESSAGE_GROUP.COMMAND_RESPONSE);
 		return false;
 	}
 
@@ -182,11 +186,7 @@ export function sacrificeContainer(
 		(obj) => obj instanceof Item
 	) as Item[];
 	for (const item of itemsInContainer) {
-		if (item instanceof Currency) {
-			totalValue += item.value;
-		} else {
-			totalValue += item.value || 0;
-		}
+		totalValue += item.value;
 	}
 
 	// Calculate gold reward (25% of total value)

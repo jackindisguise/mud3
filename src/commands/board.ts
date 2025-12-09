@@ -269,7 +269,7 @@ function displayBoard(
 		width: 76,
 		sizer: SIZER,
 		style: {
-			hPadding: 2,
+			hPadding: 1,
 			vPadding: 1,
 		},
 	});

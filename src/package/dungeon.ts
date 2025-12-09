@@ -191,7 +191,9 @@ type MovableOptions = DungeonObjectOptions;
  * Type alias for Item options (currently same as DungeonObjectOptions).
  * Defined for type safety and future extensibility.
  */
-type ItemOptions = MovableOptions;
+type ItemOptions = MovableOptions & {
+	isContainer?: boolean;
+};
 
 /**
  * Factory function to create a DungeonObject with an auto-generated OID.
@@ -349,7 +351,8 @@ export function createMovable(options?: MovableOptions): Movable {
 /**
  * Factory function to create an Item with an auto-generated OID.
  */
-export function createItem(options?: DungeonObjectOptions): Item {
+export function createItem(options?: ItemOptions): Item {
+	logger.info(`Creating item ${options?.oid} (${options?.display})`);
 	return new Item({
 		...options,
 		oid: options?.oid ?? getNextObjectId(),
@@ -414,6 +417,7 @@ function dungeonObjectTemplateToOptions(
 			  ]
 			: undefined,
 		baseWeight: template.baseWeight,
+		value: template.value,
 	};
 }
 
@@ -557,23 +561,24 @@ function createFromTemplate(
 			break;
 		}
 		case "Movable": {
-			const options = { templateId: template.id, oid: providedOid };
+			const options = dungeonObjectTemplateToOptions(template, providedOid);
 			obj = createMovable(options);
 			break;
 		}
 		case "Item": {
-			const options = { templateId: template.id, oid: providedOid };
+			const itemTemplate = template as ItemTemplate;
+			const options = itemTemplateToOptions(itemTemplate, providedOid);
 			obj = createItem(options);
 			break;
 		}
 		case "Prop": {
-			const options = { templateId: template.id, oid: providedOid };
+			const options = dungeonObjectTemplateToOptions(template, providedOid);
 			obj = createProp(options);
 			break;
 		}
 		case "DungeonObject":
 		default:
-			const options = { templateId: template.id, oid: providedOid };
+			const options = dungeonObjectTemplateToOptions(template, providedOid);
 			obj = createDungeonObject(options);
 			break;
 	}

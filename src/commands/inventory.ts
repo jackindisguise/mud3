@@ -2,16 +2,21 @@
  * Inventory command for viewing items in your inventory.
  *
  * Shows all items currently in your inventory (excluding equipped items).
+ * Optional arguments:
+ * - `weight` - Shows weight next to each item and sorts by weight
+ * - `value` - Shows value next to each item and sorts by value
  *
  * @example
  * ```
  * inventory
  * inv
- * i
+ * inv weight
+ * inv value
  * ```
  *
  * **Patterns:**
- * - `inventory` - Show inventory
+ * - `inventory~` - Show inventory
+ * - `inventory~ <mode:word?>` - Show inventory with optional mode (weight/value)
  * @module commands/inventory
  */
 
@@ -25,10 +30,11 @@ import { color, COLOR } from "../core/color.js";
 import { formatNumber } from "../utils/number.js";
 
 export default {
-	pattern: "inventory~",
+	pattern: "inventory~ <mode:word?>",
 	priority: PRIORITY.HIGH,
-	execute(context: CommandContext): void {
+	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor } = context;
+		const mode = (args.get("mode") as string | undefined)?.toLowerCase();
 
 		// Get all items in inventory
 		const inventory = actor.contents.filter(
@@ -39,9 +45,16 @@ export default {
 		const equippedItems = actor.getAllEquipped();
 
 		// Filter out equipped items
-		const unequippedItems = inventory.filter(
+		let unequippedItems = inventory.filter(
 			(item) => !(item instanceof Equipment) || !equippedItems.includes(item)
 		);
+
+		// Sort items based on mode
+		if (mode === "weight") {
+			unequippedItems.sort((a, b) => b.currentWeight - a.currentWeight);
+		} else if (mode === "value") {
+			unequippedItems.sort((a, b) => b.value - a.value);
+		}
 
 		const lines = ["You are carrying:"];
 
@@ -49,11 +62,41 @@ export default {
 			lines.push(" Nothing.");
 		} else {
 			// Format inventory list
-			const itemList = unequippedItems.map((item) => ` ${item.display}`);
+			const itemList = unequippedItems.map((item) => {
+				let line = ` ${item.display}`;
+				if (mode === "weight") {
+					line += ` ${color(
+						`(${formatNumber(item.currentWeight)}lbs)`,
+						COLOR.CYAN
+					)}`;
+				} else if (mode === "value") {
+					if (item.value > 0) {
+						line += ` ${color(
+							`(${formatNumber(item.value)} gold)`,
+							COLOR.YELLOW
+						)}`;
+					} else {
+						line += ` ${color(`(worthless)`, COLOR.GREY)}`;
+					}
+				}
+				return line;
+			});
 			lines.push(...itemList);
 			if (actor.value > 0)
-				lines.push(` ${color(`${formatNumber(actor.value)} gold`, COLOR.YELLOW)}`);
+				lines.push(
+					` ${color(`${formatNumber(actor.value)} gold`, COLOR.YELLOW)}`
+				);
 		}
+
+		// Add current weight at the bottom
+		const totalWeight = unequippedItems.reduce(
+			(sum, item) => sum + item.currentWeight,
+			0
+		);
+		lines.push("");
+		lines.push(
+			`Total weight: ${color(`${formatNumber(totalWeight)}lbs`, COLOR.CYAN)}`
+		);
 
 		actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},

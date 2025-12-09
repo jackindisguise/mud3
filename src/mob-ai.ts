@@ -431,7 +431,7 @@ export function initializeMobAI(mob: Mob) {
 
 		// Add mob to registry
 		if (scriptLoaded) {
-			logger.info(`Initialized AI for mob ${mob.oid} (${mob.display})`);
+			//logger.info(`Initialized AI for mob ${mob.oid} (${mob.display})`);
 			aiMobRegistry.add(mob);
 		} else {
 			logger.info(`No AI script found for mob ${mob.oid} (${mob.display})`);

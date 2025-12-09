@@ -377,14 +377,22 @@ function setupCalendarEvents(): void {
 		monthRemaining -= monthDuration;
 	}
 
-	// Calculate morning (hour 0) and night (hoursPerDay/2)
-	const nextMorning = millisecondsPerDay - (elapsed % millisecondsPerDay);
-	const nightHour = (CALENDAR.hoursPerDay / 2) * millisecondsPerHour;
+	// Calculate morning (25% of day) and night (75% of day)
 	const dayElapsed = elapsed % millisecondsPerDay;
-	// Night fires at hoursPerDay/2 and hoursPerDay (which is hour 0 of next day)
-	// So it fires every hoursPerDay/2 hours
-	const timeSinceLastNight = dayElapsed % nightHour;
-	const nextNight = nightHour - timeSinceLastNight;
+	const morningTime = 0.25 * millisecondsPerDay;
+	const nightTime = 0.75 * millisecondsPerDay;
+	
+	// Calculate next morning: if we're before 25%, next is at 25%; otherwise next day's 25%
+	const nextMorning =
+		dayElapsed < morningTime
+			? morningTime - dayElapsed
+			: millisecondsPerDay - dayElapsed + morningTime;
+	
+	// Calculate next night: if we're before 75%, next is at 75%; otherwise next day's 75%
+	const nextNight =
+		dayElapsed < nightTime
+			? nightTime - dayElapsed
+			: millisecondsPerDay - dayElapsed + nightTime;
 
 	// Set up intervals with initial delay using setSafeTimeout, then recurring with setRelativeInterval
 	// Clear previous timeouts
@@ -488,7 +496,7 @@ function setupCalendarEvents(): void {
 		yearTimeouts
 	);
 
-	// Morning event (hour 0)
+	// Morning event (25% of day) - fires once per day at 25% mark
 	morningTimeouts.forEach((id) => clearTimeout(id));
 	morningTimeouts = [];
 	setSafeTimeout(
@@ -502,8 +510,7 @@ function setupCalendarEvents(): void {
 		morningTimeouts
 	);
 
-	// Night event (hoursPerDay/2) - fires every hoursPerDay/2 hours
-	// This means it fires at hoursPerDay/2 and hoursPerDay (hour 0 of next day)
+	// Night event (75% of day) - fires once per day at 75% mark
 	nightTimeouts.forEach((id) => clearTimeout(id));
 	nightTimeouts = [];
 	setSafeTimeout(
@@ -511,7 +518,7 @@ function setupCalendarEvents(): void {
 			calendarEvents.emit("night");
 			nightInterval = setRelativeInterval(() => {
 				calendarEvents.emit("night");
-			}, nightHour);
+			}, millisecondsPerDay);
 		},
 		nextNight,
 		nightTimeouts

@@ -2158,6 +2158,22 @@ function hydrateSerializedWeaponData(data: SerializedWeapon): WeaponOptions {
 }
 
 /**
+ * Filters and converts serialized behaviors to valid BEHAVIOR enum keys.
+ * Removes any invalid behavior keys and ensures values are boolean.
+ */
+function filterBehaviors(
+	behaviors: Record<string, boolean> | undefined
+): Partial<Record<BEHAVIOR, boolean>> | undefined {
+	return behaviors
+		? Object.fromEntries(
+				Object.entries(behaviors)
+					.filter(([key]) => Object.values(BEHAVIOR).includes(key as BEHAVIOR))
+					.map(([key, value]) => [key as BEHAVIOR, !!value])
+		  )
+		: undefined;
+}
+
+/**
  * Hydrates a SerializedMob into MobOptions.
  * Handles conversion of Mob-specific fields (behaviors, etc.) and resolves race/job from IDs.
  * This function requires runtime data (race/job registries) so it lives in the package layer.
@@ -2166,17 +2182,8 @@ function hydrateSerializedWeaponData(data: SerializedWeapon): WeaponOptions {
 function hydrateSerializedMobData(data: SerializedMob): MobOptions {
 	const base = hydrateSerializedMovableData(data);
 
-	// Convert serialized behaviors (strings) back to enum keys
-	const behaviors: Partial<Record<BEHAVIOR, boolean>> | undefined =
-		data.behaviors
-			? Object.fromEntries(
-					Object.entries(data.behaviors)
-						.filter(([key]) =>
-							Object.values(BEHAVIOR).includes(key as BEHAVIOR)
-						)
-						.map(([key, value]) => [key as BEHAVIOR, !!value])
-			  )
-			: undefined;
+	// filter out invalid behaviors
+	const behaviors = filterBehaviors(data.behaviors);
 
 	// Resolve race and job from string IDs to actual objects
 	const race = getRaceById(data.race);
@@ -2205,8 +2212,6 @@ function hydrateSerializedMobData(data: SerializedMob): MobOptions {
 		mana: data.mana,
 		exhaustion: data.exhaustion,
 		behaviors,
-		// learnedAbilities will be handled separately during deserialization
-		// (not passed through options since it needs Ability objects, not IDs)
 	};
 
 	/**
@@ -2297,17 +2302,8 @@ function hydrateMobTemplateData(
 ): MobTemplate {
 	const base = hydrateTemplateData(data, templateId);
 
-	// Convert behaviors from serialized format (Record<string, boolean>) to template format
-	const behaviors: Partial<Record<BEHAVIOR, boolean>> | undefined =
-		data.behaviors
-			? Object.fromEntries(
-					Object.entries(data.behaviors)
-						.filter(([key]) =>
-							Object.values(BEHAVIOR).includes(key as BEHAVIOR)
-						)
-						.map(([key, value]) => [key as BEHAVIOR, !!value])
-			  )
-			: undefined;
+	// filter out invalid behaviors
+	const behaviors = filterBehaviors(data.behaviors);
 
 	return pruneUndefined({
 		...base,

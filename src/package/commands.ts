@@ -5,18 +5,18 @@
  * - `data/commands` (runtime-extensible JS/YAML commands)
  * - `dist/src/commands` (compiled built-in commands)
  *
- * Each command file should export a default plain object with:
+ * Each command file should export a named `command` constant with:
  * - `pattern: string` - the command pattern
  * - `aliases?: string[]` - optional aliases
  * - `execute(context, args)` - handler function
  * - `onError?(context, result)` - optional error handler
  *
  * Files beginning with `_` are ignored. `.js` and `.yaml` files are loaded.
- * The loader logs progress and registers commands into `CommandRegistry.default`.
+ * The loader logs progress and registers commands using `registerCommand()`.
  *
  * @example
  * // data/commands/say.js
- * export default {
+ * export const command = {
  *   pattern: 'say <...text:any>';
  *   aliases: ['"'],
  *   execute(ctx, args) { ctx.client.sendLine(args.get('text')); }
@@ -30,6 +30,8 @@ import {
 	CommandContext,
 	ParseResult,
 	PRIORITY,
+	registerCommand,
+	getCommands,
 } from "../core/command.js";
 import { Package } from "package-loader";
 import { readdir, readFile, stat } from "fs/promises";
@@ -61,6 +63,7 @@ export interface CommandObject {
 	pattern: string;
 	aliases?: string[];
 	priority?: PRIORITY;
+	adminOnly?: boolean;
 	cooldown?:
 		| number
 		| ((context: CommandContext, args: Map<string, any>) => number | undefined);
@@ -94,6 +97,7 @@ export class JavaScriptCommandAdapter extends Command {
 			pattern: commandObj.pattern,
 			aliases: commandObj.aliases,
 			priority: commandObj.priority,
+			adminOnly: commandObj.adminOnly,
 		});
 		this.executeFunction = commandObj.execute;
 		this.errorFunction = commandObj.onError;
@@ -271,11 +275,21 @@ async function loadCommands() {
 						`Importing command from ${relative(ROOT_DIRECTORY, filePath)}`
 					);*/
 					const commandModule = await import(fileUrl);
-					const commandObj = commandModule.default;
+					const commandObj = commandModule.command;
 
-					if (commandObj && commandObj.pattern && commandObj.execute) {
+					if (!commandObj) {
+						logger.warn(
+							`Command file ${relative(
+								ROOT_DIRECTORY,
+								filePath
+							)} must export a named 'command' constant`
+						);
+						continue;
+					}
+
+					if (commandObj.pattern && commandObj.execute) {
 						const command = new JavaScriptCommandAdapter(commandObj);
-						CommandRegistry.default.register(command);
+						registerCommand(command);
 						logger.debug(
 							`Loaded command "${commandObj.pattern}" from ${relative(
 								ROOT_DIRECTORY,
@@ -290,7 +304,7 @@ async function loadCommands() {
 							`Invalid command structure in ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)}`
+							)}: missing pattern or execute function`
 						);
 					}
 				} catch (error) {
@@ -317,7 +331,7 @@ async function loadCommands() {
 
 					if (yamlDef && yamlDef.pattern && yamlDef.execute) {
 						const command = new YAMLCommandAdapter(yamlDef);
-						CommandRegistry.default.register(command);
+						registerCommand(command);
 						logger.info(
 							`Loaded YAML command "${yamlDef.pattern}" from ${relative(
 								ROOT_DIRECTORY,
@@ -358,7 +372,7 @@ async function loadCommands() {
 
 	logger.debug(
 		`Command loading complete. Total commands registered: ${
-			CommandRegistry.default.getCommands().length
+			getCommands().length
 		}`
 	);
 }
@@ -403,7 +417,7 @@ async function generateSocialCommands(): Promise<void> {
 		};
 
 		const command = new JavaScriptCommandAdapter(commandObj);
-		CommandRegistry.default.register(command);
+		registerCommand(command);
 		logger.debug(`Generated social command: ${pattern}`);
 	}
 

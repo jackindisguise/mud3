@@ -9,7 +9,7 @@ import archetype from "../package/archetype.js";
 import {
 	createMapEditorService,
 	MapEditorService,
-} from "../map-editor/map-editor-service.js";
+} from "../editors/map-editor/map-editor-service.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -57,9 +57,14 @@ async function ensurePackagesLoaded() {
 
 function getMapEditorIndexPath(): string {
 	if (app.isPackaged) {
-		return path.join(app.getAppPath(), "map-editor", "index.html");
+		return path.join(app.getAppPath(), "editors", "map-editor", "index.html");
 	}
-	return path.join(getSafeRootDirectory(), "map-editor", "index.html");
+	return path.join(
+		getSafeRootDirectory(),
+		"editors",
+		"map-editor",
+		"index.html"
+	);
 }
 
 function createMainWindow(): BrowserWindow {
@@ -68,7 +73,7 @@ function createMainWindow(): BrowserWindow {
 		height: 900,
 		autoHideMenuBar: true,
 		webPreferences: {
-			preload: path.join(__dirname, "preload.cjs"),
+			preload: path.join(__dirname, "map-preload.cjs"),
 			nodeIntegration: false,
 			contextIsolation: true,
 			spellcheck: false,
@@ -142,6 +147,21 @@ function registerHandlers() {
 		"map-editor:calculate-attributes",
 		(_event, payload: { raceId: string; jobId: string; level: number }) =>
 			service.calculateAttributes(payload)
+	);
+	ipcMain.handle(
+		"map-editor:log-action",
+		(
+			_event,
+			payload: {
+				dungeonId: string | null;
+				action: string;
+				actionTarget?: string | null;
+				newParameters?: unknown;
+				oldParameters?: unknown;
+				metadata?: unknown;
+				timestamp: number;
+			}
+		) => service.logAction(payload)
 	);
 }
 

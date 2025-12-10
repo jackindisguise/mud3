@@ -44,8 +44,11 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 
 - **Flexible Command System**: Pattern-based command parsing with priority levels (HIGH, NORMAL, LOW)
 - **Command Aliases**: Multiple patterns per command for natural language processing
+- **Admin-Only Commands**: Commands can be restricted to admin users using the `adminOnly` flag
 - **Error Handling**: Built-in error responses and user-friendly feedback
 - **Comprehensive Command Set**: Movement, combat, inventory, equipment, social, and administrative commands
+- **Exec Command**: Admin-only JavaScript execution in sandboxed context with per-character persistence
+- **Shutdown Command**: Admin-only graceful server shutdown command
 
 ### Communication
 
@@ -137,6 +140,16 @@ npm run build
 npm start
 ```
 
+### Running with Keep-Alive
+
+Run the server with automatic restart on crash:
+
+```bash
+npm run start:keep-alive
+```
+
+The keep-alive script monitors the game server and automatically restarts it if it crashes or exits unexpectedly. It respects intentional shutdowns (via the shutdown command) and implements rate limiting to prevent restart loops.
+
 ### Development
 
 ```bash
@@ -163,6 +176,9 @@ npm run rerun
 
 # Run TypeScript directly (development)
 npm run start:ts
+
+# Run with keep-alive (auto-restart on crash)
+npm run start:keep-alive
 
 # Launch the Electron-based dungeon editor
 npm run electron:dev

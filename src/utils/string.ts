@@ -74,3 +74,51 @@ export function capitalizeFirst(text: string): string {
 	// String only contains color codes, return as-is
 	return text;
 }
+
+/**
+ * Capitalizes every letter while preserving color codes.
+ *
+ * This function converts all letters to uppercase while skipping over color code
+ * sequences. Color codes and their formatting are left intact.
+ *
+ * @param text - The text to capitalize (may contain color codes)
+ * @returns The text with all letters capitalized, color codes preserved
+ *
+ * @example
+ * ```typescript
+ * capitalize("hello world") // "HELLO WORLD"
+ * capitalize("{Ra red sword{x") // "{RA RED SWORD{x"
+ * capitalize("{{not a code}") // "{{NOT A CODE}" (literal { preserved)
+ * capitalize("") // ""
+ * ```
+ */
+export function capitalize(text: string): string {
+	if (!text) return text;
+
+	let result = "";
+	let i = 0;
+
+	while (i < text.length) {
+		if (text[i] === COLOR_ESCAPE) {
+			// Check for escaped {{ (literal {)
+			if (i + 1 < text.length && text[i + 1] === COLOR_ESCAPE) {
+				result += text[i] + text[i + 1];
+				i += 2;
+				continue;
+			}
+			// Copy color code {letter
+			result += text[i];
+			if (i + 1 < text.length) {
+				result += text[i + 1];
+			}
+			i += 2;
+			continue;
+		}
+
+		// Capitalize all letters
+		result += text[i].toUpperCase();
+		i++;
+	}
+
+	return result;
+}

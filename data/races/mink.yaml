@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 9
     maxMana: 10
-  skills:
+  abilities:
     - id: electro-claw
       level: 1
   passives:

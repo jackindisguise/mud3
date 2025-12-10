@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 6
     maxMana: 14
-  skills:
+  abilities:
     - id: mournful-wail
       level: 1
     - id: ossuary-pact

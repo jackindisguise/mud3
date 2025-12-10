@@ -31,12 +31,22 @@ import {
 	SerializedEquipment,
 	SerializedArmor,
 	SerializedWeapon,
+	MobOptions,
 } from "../core/dungeon.js";
 import archetypePkg from "./archetype.js";
 import abilitiesPkg from "./ability.js";
 import { getAllAbilities } from "../registry/ability.js";
 import { createMob } from "./dungeon.js";
 import { DIRECTION } from "../direction.js";
+import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
+
+function createTestMob(options: Partial<MobOptions>): Mob {
+	return createMob({
+		...options,
+		race: getDefaultRace(),
+		job: getDefaultJob(),
+	});
+}
 
 describe("package/dungeon.ts deserializers", () => {
 	before(async () => {
@@ -513,7 +523,7 @@ describe("package/dungeon.ts deserializers", () => {
 		});
 
 		it("round-trips a Mob", async () => {
-			const original = createMob({
+			const original = createTestMob({
 				keywords: "test mob",
 				display: "Test Mob",
 				level: 10,
@@ -602,7 +612,7 @@ describe("package/dungeon.ts deserializers", () => {
 			const abilityUses = 150;
 
 			// Create a Mob and add the ability
-			const original = createMob({
+			const original = createTestMob({
 				keywords: "test warrior",
 				display: "Test Warrior",
 				level: 5,
@@ -654,7 +664,7 @@ describe("package/dungeon.ts deserializers", () => {
 			const uses2 = 250;
 
 			// Create a Mob and add multiple abilities
-			const original = createMob({
+			const original = createTestMob({
 				keywords: "test mage",
 				display: "Test Mage",
 				level: 10,

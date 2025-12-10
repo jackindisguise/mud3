@@ -13,10 +13,25 @@ import archetypePkg from "../package/archetype.js";
 import { Dungeon, DungeonObject, Room } from "../core/dungeon.js";
 import { Mob } from "../core/dungeon.js";
 import { Character } from "../core/character.js";
-import cancelCommand from "../commands/cancel.js";
-import queueCommand from "../commands/queue.js";
+import { command as cancelCommand } from "../commands/cancel.js";
+import { command as queueCommand } from "../commands/queue.js";
+import {
+	registerCommand,
+	unregisterCommand,
+	executeCommand,
+	getCommands,
+} from "../registry/command.js";
+import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
 
 let nextTestCharacterId = 1;
+function createTestMob(display: string, keywords: string): Mob {
+	return createMob({
+		display,
+		keywords,
+		race: getDefaultRace(),
+		job: getDefaultJob(),
+	});
+}
 const attachCharacterToMob = (mob: Mob, username = "tester") =>
 	new Character({
 		credentials: {
@@ -48,7 +63,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -122,7 +137,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			room?.add(actor);
 			room?.add(sword);
@@ -139,7 +154,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			const sword = new DungeonObject({ keywords: "steel sword" });
 			actor.add(sword);
 			const context: CommandContext = { actor };
@@ -159,7 +174,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			const coin = new DungeonObject({ keywords: "gold coin" });
 			const bag = new DungeonObject({ keywords: "leather bag" });
 
@@ -185,8 +200,8 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
-			const target = createMob({ keywords: "bob" });
+			const actor = createTestMob("Player", "player");
+			const target = createTestMob("Bob", "bob");
 			room?.add(actor);
 			room?.add(target);
 			const context: CommandContext = { actor, room };
@@ -224,7 +239,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 			const context: CommandContext = { actor, room };
 			const result = command.parse("get sword", context);
@@ -747,15 +762,15 @@ suite("command.ts", () => {
 			}
 
 			const command = new ActionCommand();
-			registry.register(command);
+			registerCommand(command);
 
 			const actor = createMob();
 			const character = attachCharacterToMob(actor, "worker");
 			assert.ok(character === actor.character);
 			const context: CommandContext = { actor };
 
-			const first = registry.execute("work", context);
-			const second = registry.execute("work", context);
+			const first = executeCommand("work", context);
+			const second = executeCommand("work", context);
 
 			assert.strictEqual(first, true);
 			assert.strictEqual(second, true);
@@ -766,7 +781,7 @@ suite("command.ts", () => {
 
 			// Allow the final cooldown timer to finish before ending the test
 			await new Promise((resolve) => setTimeout(resolve, 40));
-			registry.unregister(command);
+			unregisterCommand(command);
 		});
 
 		test("queued action commands rebuild context from the actor", async () => {
@@ -786,7 +801,7 @@ suite("command.ts", () => {
 			}
 
 			const command = new TrackingCommand();
-			registry.register(command);
+			registerCommand(command);
 
 			const dungeon = Dungeon.generateEmptyDungeon({
 				dimensions: { width: 2, height: 1, layers: 1 },
@@ -801,9 +816,9 @@ suite("command.ts", () => {
 			const contextA: CommandContext = { actor, room: roomA };
 			const contextB: CommandContext = { actor, room: roomB };
 
-			assert.strictEqual(registry.execute("gather", contextA), true);
+			assert.strictEqual(executeCommand("gather", contextA), true);
 			roomB.add(actor);
-			assert.strictEqual(registry.execute("gather", contextB), true);
+			assert.strictEqual(executeCommand("gather", contextB), true);
 
 			await new Promise((resolve) => setTimeout(resolve, 70));
 
@@ -812,7 +827,7 @@ suite("command.ts", () => {
 			assert.strictEqual(seenRooms[1], roomB);
 
 			await new Promise((resolve) => setTimeout(resolve, 40));
-			registry.unregister(command);
+			unregisterCommand(command);
 		});
 
 		test("cancel removes the next queued action", () => {
@@ -831,26 +846,26 @@ suite("command.ts", () => {
 
 			const work = new WorkCommand();
 			const cancelAdapter = new JavaScriptCommandAdapter(cancelCommand);
-			registry.register(work);
-			registry.register(cancelAdapter);
+			registerCommand(work);
+			registerCommand(cancelAdapter);
 
 			const actor = createMob();
 			const character = attachCharacterToMob(actor, "canceler");
 			assert.ok(character === actor.character);
 			const context: CommandContext = { actor };
 
-			assert.strictEqual(registry.execute("work", context), true);
-			assert.strictEqual(registry.execute("work", context), true);
+			assert.strictEqual(executeCommand("work", context), true);
+			assert.strictEqual(executeCommand("work", context), true);
 
 			const state = character.actionState;
 			assert.ok(state);
 			assert.strictEqual(state.queue.length, 1);
 
-			assert.strictEqual(registry.execute("cancel", context), true);
+			assert.strictEqual(executeCommand("cancel", context), true);
 			assert.strictEqual(state.queue.length, 0);
 
-			registry.unregister(work);
-			registry.unregister(cancelAdapter);
+			unregisterCommand(work);
+			unregisterCommand(cancelAdapter);
 		});
 
 		test("cancel all removes every queued action", () => {
@@ -869,27 +884,27 @@ suite("command.ts", () => {
 
 			const work = new WorkCommand();
 			const cancelAdapter = new JavaScriptCommandAdapter(cancelCommand);
-			registry.register(work);
-			registry.register(cancelAdapter);
+			registerCommand(work);
+			registerCommand(cancelAdapter);
 
 			const actor = createMob();
 			const character = attachCharacterToMob(actor, "canceler-all");
 			assert.ok(character === actor.character);
 			const context: CommandContext = { actor };
 
-			assert.strictEqual(registry.execute("work", context), true);
-			assert.strictEqual(registry.execute("work", context), true);
-			assert.strictEqual(registry.execute("work", context), true);
+			assert.strictEqual(executeCommand("work", context), true);
+			assert.strictEqual(executeCommand("work", context), true);
+			assert.strictEqual(executeCommand("work", context), true);
 
 			const state = character.actionState;
 			assert.ok(state);
 			assert.strictEqual(state.queue.length, 2);
 
-			assert.strictEqual(registry.execute("cancel all", context), true);
+			assert.strictEqual(executeCommand("cancel all", context), true);
 			assert.strictEqual(state.queue.length, 0);
 
-			registry.unregister(work);
-			registry.unregister(cancelAdapter);
+			unregisterCommand(work);
+			unregisterCommand(cancelAdapter);
 		});
 
 		test("queue command lists queued raw inputs", () => {
@@ -908,8 +923,8 @@ suite("command.ts", () => {
 
 			const task = new TaskCommand();
 			const queueAdapter = new JavaScriptCommandAdapter(queueCommand);
-			registry.register(task);
-			registry.register(queueAdapter);
+			registerCommand(task);
+			registerCommand(queueAdapter);
 
 			const actor = createMob();
 			const character = attachCharacterToMob(actor, "queue-test");
@@ -922,12 +937,12 @@ suite("command.ts", () => {
 
 			const context: CommandContext = { actor };
 
-			assert.strictEqual(registry.execute("task mining", context), true);
-			assert.strictEqual(registry.execute("task smithing", context), true);
+			assert.strictEqual(executeCommand("task mining", context), true);
+			assert.strictEqual(executeCommand("task smithing", context), true);
 
 			// Drop previous "Action queued" message
 			captured.length = 0;
-			assert.strictEqual(registry.execute("queue", context), true);
+			assert.strictEqual(executeCommand("queue", context), true);
 
 			assert.ok(
 				captured.some((line) => line.includes("Queued actions (1):")),
@@ -939,8 +954,8 @@ suite("command.ts", () => {
 			);
 
 			actor.sendMessage = originalSendMessage;
-			registry.unregister(task);
-			registry.unregister(queueAdapter);
+			unregisterCommand(task);
+			unregisterCommand(queueAdapter);
 		});
 	});
 
@@ -957,7 +972,7 @@ suite("command.ts", () => {
 				},
 			});
 
-			const actor = createMob({ display: "Player" });
+			const actor = createTestMob("Player", "player");
 			const context: CommandContext = { actor };
 
 			const result = command.parse("ooc Hello everyone!", context);
@@ -983,7 +998,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob();
+			const actor = createTestMob("Player", "player");
 			const sword = new DungeonObject({ keywords: "steel sword" });
 
 			room?.add(actor);
@@ -1113,7 +1128,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1133,7 +1148,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1153,7 +1168,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = { actor, room };
@@ -1169,7 +1184,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = createMob();
+			const actor = createTestMob("Player", "player");
 			const context: CommandContext = { actor };
 
 			const result = command.parse("go sideways", context);
@@ -1183,7 +1198,7 @@ suite("command.ts", () => {
 				execute() {},
 			});
 
-			const actor = createMob();
+			const actor = createTestMob("Player", "player");
 			const context: CommandContext = { actor };
 
 			const result = command.parse("look", context);
@@ -1216,7 +1231,7 @@ suite("command.ts", () => {
 				dimensions: { width: 5, height: 5, layers: 1 },
 			});
 			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-			const actor = createMob({ keywords: "player" });
+			const actor = createTestMob("Player", "player");
 			room?.add(actor);
 
 			const context: CommandContext = {

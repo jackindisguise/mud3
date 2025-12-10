@@ -30,8 +30,9 @@ import {
 	toOrdinal,
 } from "../registry/calendar.js";
 
-export default {
+export const command = {
 	pattern: "calendar~",
+	aliases: ["time~"],
 	execute(context: CommandContext): void {
 		const { actor } = context;
 

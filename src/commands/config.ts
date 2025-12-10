@@ -516,7 +516,7 @@ const BOOLEAN_USAGE_HELPERS: Record<string, UsageHelper> = {
 	"auto-sacrifice": getAutosacrificeUsage,
 };
 
-export default {
+export const command = {
 	pattern: "config~ <setting:word?> <value:text?>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const setting = args.get("setting") as string | undefined;

@@ -16,9 +16,9 @@
 
 import { CommandContext } from "../core/command.js";
 import { CommandObject } from "../package/commands.js";
-import boardCommand from "./board.js";
+import { command as boardCommand } from "./board.js";
 
-export default {
+export const command = {
 	pattern: "trade~ <action:word?> <id:word?>",
 	async execute(context: CommandContext, args: Map<string, any>) {
 		// Create new args map with boardname pre-filled

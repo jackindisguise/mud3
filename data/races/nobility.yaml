@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 13
     maxMana: 12
-  skills:
+  abilities:
     - id: sanguine-dominate
       level: 1
   passives:

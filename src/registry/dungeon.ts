@@ -8,7 +8,19 @@
  * @module registry/dungeon
  */
 
-import { Dungeon, Room, RoomLink, Mob } from "../core/dungeon.js";
+import {
+	Dungeon,
+	Room,
+	RoomLink,
+	Mob,
+	roomLinkReferencesDungeon,
+	DungeonObjectTemplate,
+	Reset,
+	DungeonObject,
+	ResetOptions,
+} from "../core/dungeon.js";
+import { DIRECTION, dir2reverse, dir2text } from "../direction.js";
+import logger from "../logger.js";
 
 export { READONLY_DUNGEON_REGISTRY as DUNGEON_REGISTRY };
 export { READONLY_WANDERING_MOBS as WANDERING_MOBS };
@@ -191,10 +203,39 @@ export function addRoomLink(link: RoomLink): void {
 }
 
 /**
- * Remove a room link from the registry.
+ * Remove a room link from both connected rooms and the registry.
+ *
+ * This function detaches the link from any room that currently has it. The
+ * operation is idempotent and safe to call multiple times: `removeLink`
+ * on the rooms will simply ignore links that are not present.
+ *
+ * After calling this function there are no references to this link left in
+ * the connected rooms' _links arrays, but the RoomLink object itself is
+ * not modified further - callers may keep or discard the instance as they
+ * wish.
+ *
  * @param link The room link to remove
  */
 export function removeRoomLink(link: RoomLink): void {
+	const fromRef =
+		link.from.room.getRoomRef() ||
+		`${link.from.room.x},${link.from.room.y},${link.from.room.z}`;
+	const toRef =
+		link.to.room.getRoomRef() ||
+		`${link.to.room.x},${link.to.room.y},${link.to.room.z}`;
+	const dirText = dir2text(link.from.direction);
+	logger.debug("Removing room link", {
+		type: link.oneWay ? "one-way" : "bidirectional",
+		from: fromRef,
+		direction: dirText,
+		to: toRef,
+	});
+
+	// Remove from connected rooms
+	link.from.room.removeLink(link);
+	link.to.room.removeLink(link);
+
+	// Remove from the global registry if present
 	const index = SAFE_ROOM_LINKS.indexOf(link);
 	if (index !== -1) {
 		SAFE_ROOM_LINKS.splice(index, 1);
@@ -223,4 +264,270 @@ export function clearDungeons(): void {
  */
 export function clearWanderingMobs(): void {
 	SAFE_WANDERING_MOBS.clear();
+}
+
+/**
+ * Remove all room links that reference rooms in the specified dungeon.
+ *
+ * @param dungeon The dungeon whose room links should be removed
+ */
+export function removeDungeonRoomLinks(dungeon: Dungeon): void {
+	// Remove any room links that reference this dungeon's rooms
+	// Make a copy to avoid modifying array during iteration
+	const linksToRemove: RoomLink[] = [];
+	for (const link of SAFE_ROOM_LINKS) {
+		// Check if either end of the link is in this dungeon
+		if (roomLinkReferencesDungeon(link, dungeon)) {
+			linksToRemove.push(link);
+		}
+	}
+	for (const link of linksToRemove) {
+		removeRoomLink(link);
+	}
+}
+
+/**
+ * Safely destroy a room, removing all room links that reference it.
+ *
+ * This helper function should be used instead of calling room.destroy()
+ * directly when you need to ensure room links are properly cleaned up.
+ * It removes all links referencing the room from both the room's own
+ * links array and the global ROOM_LINKS registry, then calls the
+ * room's parent destroy method.
+ *
+ * @param room The room to destroy
+ * @param destroyContents If true (default), recursively destroys all contained objects
+ */
+export function destroyRoom(room: Room, destroyContents: boolean = true): void {
+	// Remove all RoomLinks that reference this room
+	// Use the room's own links array if available, otherwise search all links
+	if ((room as any)._links) {
+		// Make a copy to avoid modifying array during iteration
+		const linksToRemove = [...(room as any)._links];
+		for (const link of linksToRemove) {
+			removeRoomLink(link);
+		}
+	} else {
+		// If _links is undefined, search all ROOM_LINKS for links referencing this room
+		const linksToRemove: RoomLink[] = [];
+		for (const link of SAFE_ROOM_LINKS) {
+			if (link.from.room === room || link.to.room === room) {
+				linksToRemove.push(link);
+			}
+		}
+		for (const link of linksToRemove) {
+			removeRoomLink(link);
+		}
+	}
+
+	// Remove from dungeon grid if in a dungeon
+	const dungeon = room.dungeon;
+	if (dungeon) {
+		const { x, y, z } = room.coordinates;
+		// Check bounds before accessing grid
+		if (
+			z >= 0 &&
+			z < dungeon.dimensions.layers &&
+			y >= 0 &&
+			y < dungeon.dimensions.height &&
+			x >= 0 &&
+			x < dungeon.dimensions.width
+		) {
+			const gridRoom = dungeon.getRoom({ x, y, z });
+			if (gridRoom === room) {
+				// Access private _rooms array to set to undefined
+				(dungeon as any)._rooms[z][y][x] = undefined;
+			}
+		}
+	}
+
+	// Clear links array
+	(room as any)._links = undefined;
+
+	// Call parent DungeonObject.destroy() method
+	// Access the parent class's destroy method through the prototype chain
+	const DungeonObjectPrototype = Object.getPrototypeOf(
+		Object.getPrototypeOf(room)
+	);
+	if (DungeonObjectPrototype && DungeonObjectPrototype.destroy) {
+		DungeonObjectPrototype.destroy.call(room, destroyContents);
+	}
+}
+
+/**
+ * Resolve a template id into a DungeonObjectTemplate.
+ * Supports fully-qualified ids of the form "@<dungeonId>:<id>".
+ * If no dungeon prefix is provided, attempts to find a matching template
+ * in any registered dungeon (first match wins).
+ *
+ * @param id The template ID to resolve (may include @dungeon:id format)
+ * @returns The template if found, undefined otherwise
+ */
+export function resolveTemplateById(
+	id: string
+): DungeonObjectTemplate | undefined {
+	// Parse @dungeon:id form
+	const m = id.match(/^@([^:]+):(.+)$/);
+	if (m) {
+		const dungeonId = m[1];
+		const templateId = m[2];
+		const dungeon = getDungeonById(dungeonId);
+		if (!dungeon) return undefined;
+		// Templates are stored with globalized IDs, so use the full id
+		return dungeon.templates.get(id);
+	}
+
+	// Fallback: scan all registered dungeons for a matching template id
+	for (const dungeon of SAFE_DUNGEON_REGISTRY.values()) {
+		const t = dungeon.templates.get(id);
+		if (t) return t;
+	}
+	return undefined;
+}
+
+/**
+ * Create and register a RoomLink between two rooms.
+ *
+ * This factory is the recommended way to create links because it performs
+ * the necessary registration with the provided Room instances and infers
+ * the reverse direction automatically. It never mutates the rooms in a way
+ * that breaks invariants: the link is added to the `fromRoom` and, unless
+ * `oneWay` is true, also to the `toRoom`.
+ *
+ * @param fromRoom The room which will act as the source endpoint
+ * @param direction The direction (on `fromRoom`) that will lead to `toRoom`
+ * @param toRoom The room which will act as the destination endpoint
+ * @param oneWay When true only `fromRoom` will register the link; traversal back from `toRoom` will not use this link
+ * @returns The created RoomLink instance (already registered on the appropriate rooms)
+ *
+ * @example
+ * ```typescript
+ * // Two-way link: moving NORTH from roomA goes to roomB, and moving SOUTH from roomB returns to roomA
+ * const link = createTunnel(roomA, DIRECTION.NORTH, roomB);
+ *
+ * // One-way link: moving EAST from roomA goes to roomB, but moving WEST from roomB does not return to roomA
+ * const oneWay = createTunnel(roomA, DIRECTION.EAST, roomB, true);
+ * ```
+ */
+export function createTunnel(
+	fromRoom: Room,
+	direction: DIRECTION,
+	toRoom: Room,
+	oneWay: boolean = false
+): RoomLink {
+	// Infer the reverse direction automatically
+	const reverse = dir2reverse(direction);
+
+	const link: RoomLink = {
+		from: { room: fromRoom, direction },
+		to: { room: toRoom, direction: reverse },
+		oneWay,
+	};
+
+	// Register with the "from" room always
+	fromRoom.addLink(link);
+	// Register with the "to" room only for two-way links
+	if (!link.oneWay) toRoom.addLink(link);
+	// Register in the global link registry for persistence/inspection
+	addRoomLink(link);
+
+	const fromRef =
+		fromRoom.getRoomRef() || `${fromRoom.x},${fromRoom.y},${fromRoom.z}`;
+	const toRef = toRoom.getRoomRef() || `${toRoom.x},${toRoom.y},${toRoom.z}`;
+	const dirText = dir2text(direction);
+	logger.debug("Created room link", {
+		type: oneWay ? "one-way" : "bidirectional",
+		from: fromRef,
+		direction: dirText,
+		to: toRef,
+	});
+
+	return link;
+}
+
+/**
+ * Registry of spawned objects for each reset.
+ * Maps Reset objects to arrays of spawned DungeonObjects.
+ */
+const SAFE_RESET_SPAWNED: WeakMap<Reset, DungeonObject[]> = new WeakMap();
+
+/**
+ * Create a new Reset instance from options.
+ * Use this instead of instantiating Reset directly.
+ *
+ * @param options Reset configuration options
+ * @returns A new Reset instance
+ */
+export function createReset(options: ResetOptions): Reset {
+	return {
+		templateId: options.templateId,
+		roomRef: options.roomRef,
+		minCount: options.minCount ?? 1,
+		maxCount: options.maxCount ?? 1,
+		equipped: options.equipped,
+		inventory: options.inventory,
+	};
+}
+
+/**
+ * Get all spawned objects for a reset.
+ *
+ * @param reset The reset to get spawned objects for
+ * @returns Array of spawned objects (readonly copy)
+ */
+export function getResetSpawned(reset: Reset): readonly DungeonObject[] {
+	const spawned = SAFE_RESET_SPAWNED.get(reset);
+	return spawned ? [...spawned] : [];
+}
+
+/**
+ * Add a spawned object to a reset's tracking.
+ * Also sets the object's spawnedByReset property.
+ *
+ * @param reset The reset to add the object to
+ * @param obj The object to add
+ */
+export function addResetSpawned(reset: Reset, obj: DungeonObject): void {
+	let spawned = SAFE_RESET_SPAWNED.get(reset);
+	if (!spawned) {
+		spawned = [];
+		SAFE_RESET_SPAWNED.set(reset, spawned);
+	}
+
+	if (spawned.includes(obj)) return;
+	spawned.push(obj);
+	if (obj.spawnedByReset !== reset) {
+		obj.spawnedByReset = reset;
+	}
+}
+
+/**
+ * Remove a spawned object from a reset's tracking.
+ * Also unsets the object's spawnedByReset property if it points to this reset.
+ *
+ * @param reset The reset to remove the object from
+ * @param obj The object to remove
+ */
+export function removeResetSpawned(reset: Reset, obj: DungeonObject): void {
+	const spawned = SAFE_RESET_SPAWNED.get(reset);
+	if (!spawned) return;
+
+	const index = spawned.indexOf(obj);
+	if (index === -1) return;
+	spawned.splice(index, 1);
+
+	if (obj.spawnedByReset === reset) {
+		obj.spawnedByReset = undefined;
+	}
+}
+
+/**
+ * Count how many spawned objects still exist for a reset.
+ *
+ * @param reset The reset to count objects for
+ * @returns The number of valid spawned objects
+ */
+export function countResetExisting(reset: Reset): number {
+	const spawned = SAFE_RESET_SPAWNED.get(reset);
+	return spawned ? spawned.length : 0;
 }

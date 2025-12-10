@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 8
     maxMana: 11
-  skills:
+  abilities:
     - id: hellish-rebuke
       level: 1
   passives:

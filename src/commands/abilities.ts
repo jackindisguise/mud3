@@ -54,7 +54,7 @@ function formatProficiency(proficiency: number): string {
 	return `${proficiency.toString()}%`;
 }
 
-export default {
+export const command = {
 	pattern: "abilities~",
 	execute(context: CommandContext): void {
 		const { actor } = context;

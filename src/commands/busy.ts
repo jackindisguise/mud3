@@ -54,7 +54,7 @@ function getValidForwardableGroupNames(): string[] {
 	return VALID_FORWARDABLE_GROUPS.map((group) => MESSAGE_GROUP_NAMES[group]);
 }
 
-export default {
+export const command = {
 	pattern: "busy~ <action:word?> <mode:word?> <group:word?>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const action = args.get("action") as string | undefined;

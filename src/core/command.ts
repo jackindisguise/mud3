@@ -51,10 +51,6 @@ import { Character } from "./character.js";
 import { MESSAGE_GROUP } from "./character.js";
 import { forEachCharacter } from "../game.js";
 import logger from "../logger.js";
-import {
-	JavaScriptCommandAdapter,
-	YAMLCommandAdapter,
-} from "../package/commands.js";
 
 /**
  * Context provided to command execution.
@@ -215,6 +211,7 @@ export interface CommandOptions {
 	pattern: string;
 	aliases?: string[];
 	priority?: PRIORITY;
+	adminOnly?: boolean;
 }
 
 /**
@@ -455,6 +452,13 @@ export abstract class Command {
 	readonly priority: PRIORITY = PRIORITY.NORMAL;
 
 	/**
+	 * Whether this command is admin-only.
+	 * If true, the command will not be parsed for non-admin characters.
+	 * Defaults to false.
+	 */
+	readonly adminOnly: boolean = false;
+
+	/**
 	 * Cached pattern information for efficient parsing.
 	 * Built once during construction to avoid rebuilding regex patterns on every parse.
 	 * @private
@@ -501,6 +505,7 @@ export abstract class Command {
 			if (options.pattern) this.pattern = options.pattern;
 			if (options.aliases) this.aliases = options.aliases;
 			if (options.priority !== undefined) this.priority = options.priority;
+			if (options.adminOnly !== undefined) this.adminOnly = options.adminOnly;
 		}
 		this.buildPatternCache();
 	}
@@ -1220,7 +1225,9 @@ export abstract class Command {
 			let inventoryItems = context.actor.contents;
 			if (context.actor instanceof Mob) {
 				const equippedItems = context.actor.getAllEquipped() as DungeonObject[];
-				inventoryItems = inventoryItems.filter((item) => !equippedItems.includes(item));
+				inventoryItems = inventoryItems.filter(
+					(item) => !equippedItems.includes(item)
+				);
 			}
 			searchLocations.push(...inventoryItems);
 		}
@@ -1539,20 +1546,9 @@ export abstract class Command {
 	}
 }
 
-export interface ActionQueueEntry {
-	input: string;
-	command: Command;
-	args: Map<string, any>;
-	cooldownMs: number;
-	enqueuedAt: number;
-}
-
-export interface ActionState {
-	queue: ActionQueueEntry[];
-	cooldownTimer?: NodeJS.Timeout;
-	cooldownExpiresAt?: number;
-	isProcessing: boolean;
-}
+// ActionQueueEntry and ActionState moved to src/registry/command.ts
+// Re-exported here for backward compatibility
+export type { ActionQueueEntry, ActionState } from "../registry/command.js";
 
 /**
  * Registry and executor for commands.
@@ -1719,366 +1715,31 @@ export class AbilityCommand extends Command {
 	}
 }
 
-export class CommandRegistry {
-	/**
-	 * Default global command registry instance.
-	 * Use this for general commands that are always available.
-	 */
-	static readonly default = new CommandRegistry();
+// Command registry functions moved to src/registry/command.ts
+// Re-exported here for backward compatibility
+export {
+	registerCommand as registerCommand,
+	unregisterCommand as unregisterCommand,
+	executeCommand as executeCommand,
+	getCommands as getCommands,
+} from "../registry/command.js";
 
-	private commands: Command[] = [];
+// Legacy compatibility - maintain CommandRegistry.default for now
+// TODO: Remove this once all code is migrated to use functions directly
+import {
+	registerCommand,
+	unregisterCommand,
+	executeCommand,
+	getCommands,
+} from "../registry/command.js";
 
-	/**
-	 * Register a command in this registry.
-	 *
-	 * Adds a command instance to the command registry. Once registered,
-	 * the command will be considered when execute() is called with user input.
-	 *
-	 * Commands are automatically sorted by pattern length (longest first) to ensure
-	 * more specific commands are tried before more general ones. This means you can
-	 * register commands in any order without worrying about matching priority.
-	 *
-	 * For example, if you register:
-	 * - "get <item:object@room>" (26 chars)
-	 * - "get <item:object@inventory> from <container:object@room>" (58 chars)
-	 *
-	 * They will automatically be ordered with the longer, more specific pattern first,
-	 * regardless of registration order.
-	 *
-	 * The same command instance can only be registered once. If you need
-	 * multiple instances of a command (e.g., for different contexts), create
-	 * separate instances.
-	 *
-	 * @param command - The Command instance to register
-	 *
-	 * @example
-	 * ```typescript
-	 * CommandRegistry.default.register(new SayCommand());
-	 * CommandRegistry.default.register(new GetFromContainerCommand()); // Longer pattern
-	 * CommandRegistry.default.register(new GetCommand()); // Shorter pattern
-	 * // GetFromContainerCommand will be tried first automatically
-	 * ```
-	 */
-	register(command: Command) {
-		this.commands.push(command);
-		// Sort by priority first (higher priority first), then by pattern length (longest first)
-		this.commands.sort((a, b) => {
-			if (a.priority !== b.priority) {
-				return b.priority - a.priority; // Higher priority first
-			}
-			return b.pattern.length - a.pattern.length; // Longer pattern first
-		});
-	}
-
-	/**
-	 * Unregister a command from this registry.
-	 *
-	 * Removes a previously registered command instance from the registry.
-	 * After unregistering, the command will no longer be considered for
-	 * execution when execute() is called.
-	 *
-	 * If the command is not currently registered, this method does nothing.
-	 * Uses reference equality to find the command, so you must pass the
-	 * exact same instance that was registered.
-	 *
-	 * The remaining commands will stay in their sorted order (by pattern length).
-	 *
-	 * This is useful for:
-	 * - Temporarily disabling commands
-	 * - Context-sensitive command availability (e.g., combat vs non-combat)
-	 * - Dynamic command loading/unloading
-	 * - Plugin systems that add/remove commands
-	 *
-	 * @param command - The Command instance to unregister (must be same instance)
-	 *
-	 * @example
-	 * ```typescript
-	 * const sayCommand = new SayCommand();
-	 * CommandRegistry.default.register(sayCommand);
-	 * // ... later
-	 * CommandRegistry.default.unregister(sayCommand); // Removes the command
-	 * ```
-	 */
-	unregister(command: Command): void {
-		const index = this.commands.indexOf(command);
-		if (index !== -1) {
-			this.commands.splice(index, 1);
-		}
-	}
-
-	/**
-	 * Execute a command string for the given context.
-	 *
-	 * This is the main entry point for command execution. It attempts to parse
-	 * the input against all registered commands in order, and executes the first
-	 * command that successfully matches.
-	 *
-	 * The execution process:
-	 * 1. Trim whitespace from input
-	 * 2. Return false immediately if input is empty
-	 * 3. Try each registered command's parse() method in order (longest patterns first)
-	 * 4. On successful parse, call that command's execute() method
-	 * 5. On failed parse, call the command's onError() method if implemented
-	 * 6. Return true if a command was matched (even if parsing failed), false if none matched
-	 *
-	 * The return value indicates whether a command pattern was matched, not whether
-	 * the command fully succeeded. Commands handle their own success/failure messaging,
-	 * and parsing errors are handled by the command's onError() method if implemented.
-	 *
-	 * When a command pattern matches but parsing fails (e.g., missing required argument),
-	 * the command's onError() method is called to let the command provide custom error
-	 * messages and usage information. If onError() is not implemented, no error message
-	 * is displayed (you should implement onError() to guide users).
-	 *
-	 * Empty input is handled gracefully and returns false without trying
-	 * any commands, allowing you to distinguish between "no input" and
-	 * "invalid command".
-	 *
-	 * @param input - The user's input string (will be trimmed)
-	 * @param context - The execution context with actor and room
-	 * @returns {boolean} True if a command pattern was matched, false if no command matched
-	 *
-	 * @example
-	 * ```typescript
-	 * const executed = CommandRegistry.default.execute("say hello world", context);
-	 * if (executed) {
-	 *   // Command was found (executed successfully or onError was called)
-	 * } else {
-	 *   // No command matched
-	 *   console.log("Huh? Type 'help' for a list of commands.");
-	 * }
-	 * ```
-	 *
-	 * @example
-	 * Handle empty input:
-	 * ```typescript
-	 * const input = userInput.trim();
-	 * if (!input) {
-	 *   // Don't bother calling execute for empty input
-	 *   return;
-	 * }
-	 *
-	 * const executed = CommandRegistry.default.execute(input, context);
-	 * // ...
-	 * ```
-	 */
-
-	execute(input: string, context: CommandContext): boolean {
-		input = input.trim();
-		if (!input) return false;
-
-		// Commands are already sorted by priority and pattern length
-		for (const command of this.commands) {
-			// Skip ability commands if the actor doesn't know the ability
-			if (command instanceof AbilityCommand) {
-				if (!context.actor.knowsAbilityById(command.abilityId)) {
-					continue;
-				}
-			}
-			const result = command.parse(input, context);
-			if (result.success) {
-				const cooldownMs =
-					command.getActionCooldownMs(context, result.args) ?? 0;
-				if (cooldownMs > 0) {
-					this.handleActionCommand(
-						input,
-						command,
-						context,
-						result.args,
-						cooldownMs
-					);
-				} else {
-					command.execute(context, result.args);
-				}
-				return true;
-			}
-			// If pattern matched but parsing failed, call onError if implemented
-			if (
-				result.error &&
-				result.error !== "Input does not match pattern" &&
-				result.error !== "Input does not match command pattern"
-			) {
-				// Check if command has a meaningful error handler
-				if (command.onError) {
-					command.onError(context, result);
-					return true;
-				}
-				// If onError is not implemented, continue searching other commands
-				continue;
-			}
-		}
-
-		return false;
-	}
-
-	private handleActionCommand(
-		input: string,
-		command: Command,
-		context: CommandContext,
-		args: Map<string, any>,
-		cooldownMs: number
-	): void {
-		const actor = context.actor;
-		const character = actor.character;
-
-		if (!character) {
-			command.execute(context, args);
-			return;
-		}
-
-		const state = this.getActionState(character);
-		const wasQueued =
-			state.queue.length > 0 || state.isProcessing || !!state.cooldownTimer;
-
-		const entry: ActionQueueEntry = {
-			input,
-			command,
-			args: new Map(args),
-			cooldownMs,
-			enqueuedAt: Date.now(),
-		};
-
-		state.queue.push(entry);
-		this.tryProcessActionQueue(actor, character, state, context);
-
-		if (wasQueued) {
-			this.notifyQueued(actor, state);
-		}
-	}
-
-	private getActionState(character: Character): ActionState {
-		if (!character.actionState) {
-			character.actionState = {
-				queue: [],
-				isProcessing: false,
-			};
-		}
-		return character.actionState;
-	}
-
-	private tryProcessActionQueue(
-		actor: Mob,
-		character: Character,
-		state: ActionState,
-		contextOverride?: CommandContext
-	): void {
-		if (state.isProcessing || state.cooldownTimer) {
-			return;
-		}
-
-		const nextEntry = state.queue.shift();
-		if (!nextEntry) {
-			return;
-		}
-
-		state.isProcessing = true;
-		const executionContext =
-			contextOverride ?? this.buildContextFromActor(actor);
-
-		try {
-			nextEntry.command.execute(executionContext, nextEntry.args);
-		} catch (error) {
-			logger.error(
-				`Failed to execute action command "${nextEntry.command.pattern}" for ${actor.display}: ${error}`
-			);
-		} finally {
-			state.isProcessing = false;
-		}
-
-		this.beginCooldown(actor, character, state, nextEntry.cooldownMs);
-
-		if (!contextOverride) {
-			character.showPrompt();
-		}
-	}
-
-	private beginCooldown(
-		actor: Mob,
-		character: Character,
-		state: ActionState,
-		cooldownMs: number
-	): void {
-		if (state.cooldownTimer) {
-			clearTimeout(state.cooldownTimer);
-			state.cooldownTimer = undefined;
-		}
-
-		if (cooldownMs <= 0) {
-			this.tryProcessActionQueue(actor, character, state);
-			return;
-		}
-
-		state.cooldownExpiresAt = Date.now() + cooldownMs;
-		state.cooldownTimer = setTimeout(() => {
-			state.cooldownTimer = undefined;
-			state.cooldownExpiresAt = undefined;
-			this.tryProcessActionQueue(actor, character, state);
-		}, cooldownMs);
-	}
-
-	private notifyQueued(actor: Mob, state: ActionState): void {
-		const position = state.queue.length;
-		if (position <= 0) return;
-
-		const remainingMs =
-			state.cooldownExpiresAt !== undefined
-				? Math.max(0, state.cooldownExpiresAt - Date.now())
-				: undefined;
-		const timeFragment =
-			remainingMs && remainingMs > 0
-				? ` (~${Math.ceil(remainingMs / 1000)}s)`
-				: "";
-
-		actor.sendMessage(`Action queued...`, MESSAGE_GROUP.COMMAND_RESPONSE);
-	}
-
-	private buildContextFromActor(actor: Mob): CommandContext {
-		return {
-			actor,
-			room:
-				actor.location instanceof Room ? (actor.location as Room) : undefined,
-		};
-	}
-
-	/**
-	 * Get all registered commands.
-	 *
-	 * Returns a shallow copy of the internal commands array. The returned
-	 * array can be modified without affecting the registry, but the Command
-	 * instances themselves are the same references.
-	 *
-	 * This is useful for:
-	 * - Debugging and introspection
-	 * - Building dynamic help systems
-	 * - Displaying available commands to users
-	 * - Testing and validation
-	 *
-	 * The commands are returned in their sorted order (longest patterns first),
-	 * which is also the order they'll be tried during execution.
-	 *
-	 * @returns {Command[]} A copy of the commands array
-	 *
-	 * @example
-	 * ```typescript
-	 * // Display all available commands
-	 * const commands = CommandRegistry.default.getCommands();
-	 * console.log("Available commands:");
-	 * for (const command of commands) {
-	 *   console.log(`  ${command.pattern}`);
-	 *   if (command.aliases) {
-	 *     console.log(`    Aliases: ${command.aliases.join(", ")}`);
-	 *   }
-	 * }
-	 * ```
-	 *
-	 * @example
-	 * Check if a specific command is registered:
-	 * ```typescript
-	 * const hasSayCommand = CommandRegistry.default.getCommands()
-	 *   .some(cmd => cmd instanceof SayCommand);
-	 * ```
-	 */
-	getCommands(): Command[] {
-		return [...this.commands];
-	}
+class CommandRegistry {
+	static readonly default = {
+		register: registerCommand,
+		unregister: unregisterCommand,
+		execute: executeCommand,
+		getCommands: getCommands,
+	};
 }
+
+export { CommandRegistry };

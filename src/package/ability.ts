@@ -40,7 +40,8 @@ import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import logger from "../logger.js";
-import { CommandRegistry, AbilityCommand } from "../core/command.js";
+import { AbilityCommand } from "../core/command.js";
+import { registerCommand } from "../registry/command.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { access, constants } from "fs/promises";
 import { Ability, generateProficiencyTable } from "../core/ability.js";
@@ -92,9 +93,6 @@ async function loadAbilities() {
 			for (const file of jsFiles) {
 				try {
 					const filePath = join(abilityDir, file);
-					logger.debug(
-						`Processing ability file: ${relative(ROOT_DIRECTORY, filePath)}`
-					);
 					const fileUrl = pathToFileURL(filePath).href;
 					const abilityModule = await import(fileUrl);
 
@@ -104,7 +102,7 @@ async function loadAbilities() {
 							`Ability file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing ABILITY_ID export`
+							)} must export a named 'ABILITY_ID' constant`
 						);
 						continue;
 					}
@@ -137,7 +135,7 @@ async function loadAbilities() {
 							`Ability file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing ability export`
+							)} must export a named 'ability' constant`
 						);
 						continue;
 					}
@@ -182,43 +180,50 @@ async function loadAbilities() {
 
 					// Register the ability
 					registerAbility(ability);
-					logger.debug(
-						`Loaded ability "${abilityId}" (${ability.name}) from ${relative(
-							ROOT_DIRECTORY,
-							filePath
-						)}`
-					);
 
 					// Load command if provided (named export)
 					const commandObj = abilityModule.command;
 					if (commandObj && commandObj.pattern && commandObj.execute) {
-						logger.debug(
-							`Found command export for ability "${abilityId}" with pattern "${commandObj.pattern}"`
-						);
 						const command = new AbilityCommand(abilityId, commandObj);
-						CommandRegistry.default.register(command);
+						registerCommand(command);
 						totalCommandsRegistered++;
-						logger.debug(
-							`Registered ability command "${commandObj.pattern}" for ability "${abilityId}"`
-						);
+
+						const metadata: Record<string, unknown> = {
+							abilityId,
+							abilityName: ability.name,
+							filePath: relative(ROOT_DIRECTORY, filePath),
+							commandPattern: commandObj.pattern,
+						};
+
 						if (commandObj.aliases) {
-							logger.debug(`  Aliases: ${commandObj.aliases.join(", ")}`);
+							metadata.aliases = commandObj.aliases;
 						}
 						if (commandObj.priority !== undefined) {
-							logger.debug(`  Priority: ${commandObj.priority}`);
+							metadata.priority = commandObj.priority;
 						}
 						if (commandObj.cooldown !== undefined) {
-							logger.debug(
-								`  Cooldown: ${
-									typeof commandObj.cooldown === "number"
-										? `${commandObj.cooldown}ms`
-										: "dynamic"
-								}`
-							);
+							metadata.cooldown =
+								typeof commandObj.cooldown === "number"
+									? `${commandObj.cooldown}ms`
+									: "dynamic";
 						}
+
+						logger.debug(
+							`Loaded ability "${abilityId}" (${ability.name}) with command "${commandObj.pattern}"`,
+							metadata
+						);
 					} else {
 						logger.debug(
-							`Ability "${abilityId}" has no command export (ability-only, no command)`
+							`Loaded ability "${abilityId}" (${ability.name}) from ${relative(
+								ROOT_DIRECTORY,
+								filePath
+							)}`,
+							{
+								abilityId,
+								abilityName: ability.name,
+								filePath: relative(ROOT_DIRECTORY, filePath),
+								hasCommand: false,
+							}
 						);
 					}
 				} catch (error) {

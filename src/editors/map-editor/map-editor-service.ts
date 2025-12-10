@@ -1,5 +1,6 @@
 import {
 	access,
+	appendFile,
 	mkdir,
 	readFile,
 	rename,
@@ -12,23 +13,23 @@ import YAML from "js-yaml";
 import {
 	getAllDungeonIds,
 	SerializedDungeonFormat,
-} from "../package/dungeon.js";
+} from "../../package/dungeon.js";
 import {
 	getAllJobs,
 	getAllRaces,
 	getJobById,
 	getRaceById,
-} from "../registry/archetype.js";
-import { Mob, WEAPON_TYPES } from "../core/dungeon.js";
-import { createMob } from "../package/dungeon.js";
+} from "../../registry/archetype.js";
+import { Mob, WEAPON_TYPES } from "../../core/dungeon.js";
+import { createMob } from "../../package/dungeon.js";
 import {
 	COMMON_HIT_TYPES,
 	MAGICAL_DAMAGE_TYPE,
 	PHYSICAL_DAMAGE_TYPE,
-} from "../core/damage-types.js";
-import logger from "../logger.js";
-import { getSafeRootDirectory } from "../utils/path.js";
-import { migrateDungeonData } from "../migrations/dungeon/runner.js";
+} from "../../core/damage-types.js";
+import logger from "../../logger.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
+import { migrateDungeonData } from "../../migrations/dungeon/runner.js";
 
 export interface DungeonListResponse {
 	dungeons: string[];
@@ -89,14 +90,28 @@ export interface CalculateAttributesResponse {
 
 export interface MapEditorServiceConfig {
 	dungeonDir?: string;
+	logDir?: string;
+}
+
+export interface LogActionPayload {
+	dungeonId: string | null;
+	action: string;
+	actionTarget?: string | null;
+	newParameters?: unknown;
+	oldParameters?: unknown;
+	metadata?: unknown;
+	timestamp: number;
 }
 
 export class MapEditorService {
 	private readonly dungeonDir: string;
+	private readonly logDir: string;
 
 	constructor(config: MapEditorServiceConfig = {}) {
 		this.dungeonDir =
 			config.dungeonDir ?? join(getSafeRootDirectory(), "data", "dungeons");
+		this.logDir =
+			config.logDir ?? join(getSafeRootDirectory(), "logs", "map-editor");
 	}
 
 	public async listDungeons(): Promise<DungeonListResponse> {
@@ -247,6 +262,50 @@ export class MapEditorService {
 		} catch (error) {
 			logger.warn(`Failed to read package.json version: ${error}`);
 			return { version: "unknown" };
+		}
+	}
+
+	public async logAction(
+		payload: LogActionPayload
+	): Promise<{ success: true }> {
+		try {
+			// Create log directory if it doesn't exist
+			await mkdir(this.logDir, { recursive: true });
+
+			// Generate log filename based on date (YYYY-MM-DD) in local timezone
+			const date = new Date(payload.timestamp);
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, "0");
+			const day = String(date.getDate()).padStart(2, "0");
+			const dateStr = `${year}-${month}-${day}`;
+			const logFilePath = join(this.logDir, `actions-${dateStr}.log`);
+
+			// Format timestamp in local timezone (YYYY-MM-DDTHH:mm:ss.sss)
+			const hours = String(date.getHours()).padStart(2, "0");
+			const minutes = String(date.getMinutes()).padStart(2, "0");
+			const seconds = String(date.getSeconds()).padStart(2, "0");
+			const milliseconds = String(date.getMilliseconds()).padStart(3, "0");
+			const localTimestamp = `${dateStr}T${hours}:${minutes}:${seconds}.${milliseconds}`;
+
+			// Format log entry as JSON
+			const logEntry = {
+				timestamp: localTimestamp,
+				dungeonId: payload.dungeonId,
+				action: payload.action,
+				actionTarget: payload.actionTarget,
+				newParameters: payload.newParameters,
+				oldParameters: payload.oldParameters,
+				metadata: payload.metadata,
+			};
+
+			// Append to log file
+			await appendFile(logFilePath, JSON.stringify(logEntry) + "\n", "utf-8");
+
+			return { success: true };
+		} catch (error) {
+			logger.error(`Failed to log map editor action: ${error}`);
+			// Don't throw - logging failures shouldn't break the editor
+			return { success: true };
 		}
 	}
 

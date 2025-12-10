@@ -85,7 +85,7 @@ export function showBoardsList(char: Character): void {
 	}
 }
 
-export default {
+export const command = {
 	pattern: "boards~",
 	execute(context: CommandContext): void {
 		const { actor } = context;

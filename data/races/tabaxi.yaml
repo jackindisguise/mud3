@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 9
     maxMana: 7
-  skills:
+  abilities:
     - id: feline-agility
       level: 1
   passives:

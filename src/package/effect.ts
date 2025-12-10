@@ -83,9 +83,6 @@ async function loadEffectTemplates() {
 			for (const file of jsFiles) {
 				try {
 					const filePath = join(effectDir, file);
-					logger.debug("Processing effect template file", {
-						filePath: relative(ROOT_DIRECTORY, filePath),
-					});
 					const fileUrl = pathToFileURL(filePath).href;
 					const effectModule = await import(fileUrl);
 
@@ -95,7 +92,7 @@ async function loadEffectTemplates() {
 							`Effect template file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing EFFECT_TEMPLATE_ID export`
+							)} must export a named 'EFFECT_TEMPLATE_ID' constant`
 						);
 						continue;
 					}
@@ -128,7 +125,7 @@ async function loadEffectTemplates() {
 							`Effect template file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing effectTemplate export`
+							)} must export a named 'effectTemplate' constant`
 						);
 						continue;
 					}
@@ -164,10 +161,14 @@ async function loadEffectTemplates() {
 
 					// Register the effect template
 					registerEffectTemplate(effectTemplate);
-					logger.debug("Registered effect template", {
-						id: effectTemplateId,
-						name: effectTemplate.name,
-					});
+					logger.debug(
+						`Registered effect template "${effectTemplateId}" (${effectTemplate.name})`,
+						{
+							id: effectTemplateId,
+							name: effectTemplate.name,
+							filePath: relative(ROOT_DIRECTORY, filePath),
+						}
+					);
 				} catch (error) {
 					logger.error(
 						`Failed to load effect template from ${relative(
@@ -198,4 +199,3 @@ export default {
 		await loadEffectTemplates();
 	},
 } as Package;
-

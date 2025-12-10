@@ -19,7 +19,7 @@ import { CommandObject } from "../package/commands.js";
 
 const EXPERIENCE_THRESHOLD = 100;
 
-export default {
+export const command = {
 	pattern: "levelup~",
 	aliases: [],
 	execute(context: CommandContext): void {

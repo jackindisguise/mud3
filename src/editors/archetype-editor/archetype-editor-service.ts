@@ -10,10 +10,10 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import { join, extname, dirname } from "path";
 import YAML from "js-yaml";
-import logger from "../logger.js";
-import { getSafeRootDirectory } from "../utils/path.js";
-import { getAllAbilities } from "../registry/ability.js";
-import { getAllEffectTemplates } from "../registry/effect.js";
+import logger from "../../logger.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
+import { getAllAbilities } from "../../registry/ability.js";
+import { getAllEffectTemplates } from "../../registry/effect.js";
 
 export interface ArchetypeListResponse {
 	archetypes: string[];

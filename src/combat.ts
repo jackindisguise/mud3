@@ -89,6 +89,8 @@ export interface OneHitOptions {
 	guaranteedHit?: boolean;
 	/** Optional ability name to use in damage messages instead of the hit verb */
 	abilityName?: string;
+	/** Optional hit type to use for the attack */
+	hitTypeOverride?: HitType;
 	/** Optional flat bonus to add to attack power before damage calculation */
 	attackPowerBonus?: number;
 	/** Optional multiplier to apply to attack power before damage calculation */
@@ -164,6 +166,7 @@ export function oneHit(options: OneHitOptions): number {
 		abilityName,
 		attackPowerBonus = 0,
 		attackPowerMultiplier = 1,
+		hitTypeOverride,
 	} = options;
 
 	// Get the room where combat is occurring
@@ -231,7 +234,11 @@ export function oneHit(options: OneHitOptions): number {
 
 	// Attack hits - proceed with damage calculation
 	// Get hit type from weapon or use default
-	const hitType = weapon ? weapon.hitType : DEFAULT_HIT_TYPE;
+	const hitType = hitTypeOverride
+		? hitTypeOverride
+		: weapon
+		? weapon.hitType
+		: DEFAULT_HIT_TYPE;
 
 	// Calculate base damage
 	// Base attack power comes from strength (without weapon bonuses)
@@ -363,6 +370,12 @@ export function oneHit(options: OneHitOptions): number {
 	// Deal the damage (this handles threat generation, death, and combat initiation)
 	// Pass damage type for shield filtering
 	target.damage(attacker, finalDamage, hitType.damageType);
+
+	// Emit got-hit event on target (NPC AI can respond to taking damage)
+	const targetEmitter = target.aiEvents;
+	if (targetEmitter && finalDamage > 0) {
+		targetEmitter.emit("got-hit", attacker);
+	}
 
 	logger.debug("Combat hit", {
 		attacker: attacker.display,
@@ -1002,6 +1015,21 @@ export function handleDeath(deadMob: Mob, killer?: Mob): void {
 		return; // Can't handle death if not in a room
 	}
 
+	// Emit death events before removing from combat
+	// Emit target-death for killer (if they have AI)
+	if (killer) {
+		const killerEmitter = killer.aiEvents;
+		if (killerEmitter) {
+			killerEmitter.emit("target-death", deadMob);
+		}
+	}
+
+	// Emit death event for the dying mob
+	const deadMobEmitter = deadMob.aiEvents;
+	if (deadMobEmitter) {
+		deadMobEmitter.emit("death", killer);
+	}
+
 	// Remove from combat
 	deadMob.combatTarget = undefined;
 
@@ -1182,6 +1210,12 @@ function processMobCombatRound(mob: Mob): void {
 		}
 	}
 
+	// Emit combat-round event before combat actions
+	const mobEmitter = mob.aiEvents;
+	if (mobEmitter && mob.combatTarget) {
+		mobEmitter.emit("combat-round", mob.combatTarget);
+	}
+
 	// Perform the hit (oneHit handles accuracy checks, damage calculation, messages, and damage dealing)
 	const mainHand = mob.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
 	const weapon = mainHand instanceof Weapon ? mainHand : undefined;
@@ -1213,6 +1247,11 @@ function processMobCombatRound(mob: Mob): void {
 		oneHit({ attacker: mob, target: mob.combatTarget, weapon });
 		if (weaponOff)
 			oneHit({ attacker: mob, target: mob.combatTarget, weapon: weaponOff });
+	}
+
+	// Emit after-combat-round event after all combat actions
+	if (mobEmitter && mob.combatTarget) {
+		mobEmitter.emit("after-combat-round", mob.combatTarget);
 	}
 }
 
@@ -1274,6 +1313,13 @@ export function initiateCombat(
 		attacker.location instanceof Room ? attacker.location : undefined;
 
 	attacker.combatTarget = defender;
+
+	// Emit attacked event on defender (NPC AI can respond to being attacked)
+	const defenderEmitter = defender.aiEvents;
+	if (defenderEmitter) {
+		defenderEmitter.emit("attacked", attacker);
+	}
+
 	// not a reactionary initiation (backfoot)
 	if (!reaction) {
 		// defender	is an NPC? defender needs to consider us a threat

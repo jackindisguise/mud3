@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 7
     maxMana: 13
-  skills:
+  abilities:
     - id: tempest-lance
       level: 1
     - id: windstep-chorus

@@ -35,7 +35,7 @@ import {
 	getAllFromContainer,
 } from "../utils/get.js";
 
-export default {
+export const command = {
 	pattern: "get~ all from <container:object>",
 	aliases: [
 		"get~ all",

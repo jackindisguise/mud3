@@ -1,7 +1,7 @@
 import { CommandContext, CommandRegistry, Command } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 
-export default {
+export const command = {
 	pattern: "commands~",
 	execute(context: CommandContext, args: Map<string, any>) {
 		const commandLabelsSet = new Set<string>();

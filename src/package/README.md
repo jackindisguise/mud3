@@ -64,6 +64,6 @@ All package modules that load data automatically apply migrations before deseria
 - `locations.ts` - System location loading
 - `calendar.ts` - Calendar and time tracking loading
 - `reserved-names.ts` - Reserved names cache building
-- `commands.ts` - Command loading from YAML files
+- `commands.ts` - Command loading from YAML files with admin-only support
 - `lockfile.ts` - Package loading lock management
 

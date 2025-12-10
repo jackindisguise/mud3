@@ -12,6 +12,7 @@ import { Mob, Room, Dungeon } from "./core/dungeon.js";
 import { Character, MESSAGE_GROUP } from "./core/character.js";
 import { freezeArchetype } from "./core/archetype.js";
 import { createMob } from "./package/dungeon.js";
+import { getDefaultJob, getDefaultRace } from "./registry/archetype.js";
 
 suite("act.ts", () => {
 	before(async () => {
@@ -28,6 +29,14 @@ suite("act.ts", () => {
 	let observerCharacter: Character;
 
 	// Helper to create a test character with message tracking
+	function createTestMob(display: string, keywords: string): Mob {
+		return createMob({
+			display,
+			keywords,
+			race: getDefaultRace(),
+			job: getDefaultJob(),
+		});
+	}
 	function createTestCharacter(
 		mob: Mob,
 		characterId: number
@@ -80,28 +89,19 @@ suite("act.ts", () => {
 		dungeon.addRoom(room);
 
 		// Create user mob with character
-		user = createMob({
-			display: "Alice",
-			keywords: "alice",
-		});
+		user = createTestMob("Alice", "alice");
 		user.location = room;
 		userCharacter = createTestCharacter(user, 1);
 		user.character = userCharacter;
 
 		// Create target mob with character
-		target = createMob({
-			display: "Bob",
-			keywords: "bob",
-		});
+		target = createTestMob("Bob", "bob");
 		target.location = room;
 		targetCharacter = createTestCharacter(target, 2);
 		target.character = targetCharacter;
 
 		// Create observer mob with character
-		observer = createMob({
-			display: "Charlie",
-			keywords: "charlie",
-		});
+		observer = createTestMob("Charlie", "charlie");
 		observer.location = room;
 		observerCharacter = createTestCharacter(observer, 3);
 		observer.character = observerCharacter;
@@ -343,10 +343,7 @@ suite("act.ts", () => {
 		});
 
 		test("should not send message to mobs without characters", () => {
-			const npc = createMob({
-				display: "NPC",
-				keywords: "npc",
-			});
+			const npc = createTestMob("NPC", "npc");
 			npc.location = room;
 
 			const templates: ActMessageTemplates = {
@@ -369,10 +366,7 @@ suite("act.ts", () => {
 		});
 
 		test("should not send user message if user has no character", () => {
-			const npcUser = createMob({
-				display: "NPC User",
-				keywords: "npc user",
-			});
+			const npcUser = createTestMob("NPC User", "npc user");
 			npcUser.location = room;
 			npcUser.character = undefined;
 
@@ -455,11 +449,8 @@ suite("act.ts", () => {
 			currentHealth: number
 		): Mob {
 			// Set attributes to 0 to avoid vitality bonus affecting maxHealth
-			const testMob = createMob({
-				display,
-				keywords: display.toLowerCase(),
-				level: 1,
-			});
+			const testMob = createTestMob(display, display.toLowerCase());
+			testMob.level = 1;
 			testMob.location = room;
 			testMob.health = currentHealth;
 			return testMob;
@@ -487,7 +478,7 @@ suite("act.ts", () => {
 			assert.strictEqual(userMessages.length, 1);
 			assert.strictEqual(
 				userMessages[0],
-				"You hit TestTarget for 25 damage. [57%]"
+				"You hit TestTarget for 25 damage. [60%]"
 			);
 		});
 
@@ -516,7 +507,7 @@ suite("act.ts", () => {
 			assert.strictEqual(targetMessages.length, 1);
 			assert.strictEqual(
 				targetMessages[0],
-				"Alice hits you for 25 damage. [57%]"
+				"Alice hits you for 25 damage. [60%]"
 			);
 		});
 

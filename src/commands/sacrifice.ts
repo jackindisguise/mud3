@@ -21,7 +21,7 @@ import { Item } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { sacrificeItem } from "../utils/sacrifice.js";
 
-export default {
+export const command = {
 	pattern: "sacrifice~ <item:item@room>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor, room } = context;

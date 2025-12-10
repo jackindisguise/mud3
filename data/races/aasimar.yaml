@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 9
     maxMana: 11
-  skills:
+  abilities:
     - id: radiant-burst
       level: 1
   passives:

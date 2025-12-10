@@ -59,7 +59,7 @@ import type { MudClient } from "./io.js";
 import { CHANNEL, formatChannelMessage } from "./channel.js";
 import { formatPlaytime } from "./time.js";
 import { color, COLOR, COLOR_NAMES, stickyColor } from "./color.js";
-import type { ActionState } from "./command.js";
+import type { ActionState } from "../registry/command.js";
 
 /**
  * Message groups categorize outbound messages and control prompt emission.

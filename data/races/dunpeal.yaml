@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 11
     maxMana: 9
-  skills:
+  abilities:
     - id: bloodbound-lunge
       level: 1
   passives:

@@ -29,13 +29,16 @@
  */
 
 import { MudServer, MudClient } from "./core/io.js";
-import { CommandContext, CommandRegistry } from "./core/command.js";
+import { CommandContext } from "./core/command.js";
+import { executeCommand } from "./registry/command.js";
 import {
 	Character,
 	SerializedCharacter,
 	MESSAGE_GROUP,
 } from "./core/character.js";
-import { Room, getRoomByRef, DUNGEON_REGISTRY } from "./core/dungeon.js";
+import { Room } from "./core/dungeon.js";
+import { DUNGEON_REGISTRY } from "./registry/dungeon.js";
+import { getRoomByRef } from "./registry/dungeon.js";
 import { isNameBlocked } from "./registry/reserved-names.js";
 import { Race, Job } from "./core/archetype.js";
 import { showRoom } from "./utils/display.js";
@@ -65,20 +68,21 @@ import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
 import { LINEBREAK } from "./core/telnet.js";
 import { searchHelpfiles } from "./registry/help.js";
 import { processCombatRound } from "./combat.js";
-import { processWanderBehaviors } from "./behavior.js";
 import { WebClientServer } from "./web-client.js";
 import {
 	processRegeneration,
 	REGENERATION_INTERVAL_MS,
 } from "./regeneration.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
+import { EventEmitter } from "events";
+import { calendarEvents, getCurrentTime } from "./registry/calendar.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 4 * 1000; // 4 seconds
-export const DEFAULT_WANDER_INTERVAL_MS = 30 * 1000; // 30 seconds
 export const DEFAULT_BOARD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+export const DEFAULT_GAME_TICK_INTERVAL_MS = 60 * 1000; // 1 minute
 
 /**
  * Player authentication states during the login process.
@@ -137,11 +141,14 @@ let dungeonResetTimer: number | undefined;
 /** Combat round interval timer */
 let combatTimer: number | undefined;
 
-/** Wander behavior interval timer */
-let wanderTimer: number | undefined;
-
 /** Regeneration interval timer */
 let regenerationTimer: number | undefined;
+
+/** Game-wide tick event emitter (fires once per IRL minute) */
+export const gameTickEmitter = new EventEmitter();
+
+/** Game tick interval timer */
+let gameTickTimer: number | undefined;
 
 /** Next connection ID */
 let nextConnectionId = 1;
@@ -599,7 +606,7 @@ function handleGameplayInput(session: LoginSession, input: string): void {
 				? character.mob!.location
 				: undefined,
 	};
-	const executed = CommandRegistry.default.execute(input, context);
+	const executed = executeCommand(input, context);
 	if (!executed) {
 		character.sendMessage("Do what?", MESSAGE_GROUP.COMMAND_RESPONSE);
 	}
@@ -1169,18 +1176,42 @@ async function start(): Promise<void> {
 		processCombatRound();
 	}, DEFAULT_COMBAT_ROUND_INTERVAL_MS);
 
-	// Run initial wander cycle after dungeons are loaded
-	processWanderBehaviors();
-
-	// Set up wander behavior timer (every 30 seconds)
-	wanderTimer = setAbsoluteInterval(() => {
-		processWanderBehaviors();
-	}, DEFAULT_WANDER_INTERVAL_MS);
-
 	// Set up regeneration timer (every 30 seconds)
 	regenerationTimer = setAbsoluteInterval(() => {
 		processRegeneration();
 	}, REGENERATION_INTERVAL_MS);
+
+	// Set up game-wide tick events (fires every 60 seconds)
+	gameTickTimer = setAbsoluteInterval(() => {
+		gameTickEmitter.emit("tick");
+	}, DEFAULT_GAME_TICK_INTERVAL_MS);
+
+	// Connect AI system to game tick events
+	const { processAITick } = await import("./mob-ai.js");
+	gameTickEmitter.on("tick", () => {
+		processAITick();
+	});
+
+	// Listen for day/night changes and inform players
+	calendarEvents.on("morning", () => {
+		const result = Object.entries(getCurrentTime()!)
+			.map(([key, value]) => `${key}=${value}`)
+			.join(", ");
+		broadcast(
+			color(`The sun rises, bringing a new day. <${result}>`, COLOR.YELLOW),
+			MESSAGE_GROUP.SYSTEM
+		);
+	});
+
+	calendarEvents.on("night", () => {
+		const result = Object.entries(getCurrentTime()!)
+			.map(([key, value]) => `${key}=${value}`)
+			.join(", ");
+		broadcast(
+			color(`The sun sets, and darkness falls. <${result}>`, COLOR.TEAL),
+			MESSAGE_GROUP.SYSTEM
+		);
+	});
 }
 
 /**
@@ -1224,18 +1255,18 @@ async function stop(): Promise<void> {
 		logger.debug("Combat timer cleared");
 	}
 
-	// Clear wander timer
-	if (wanderTimer !== undefined) {
-		clearCustomInterval(wanderTimer);
-		wanderTimer = undefined;
-		logger.debug("Wander timer cleared");
-	}
-
 	// Clear regeneration timer
 	if (regenerationTimer !== undefined) {
 		clearCustomInterval(regenerationTimer);
 		regenerationTimer = undefined;
 		logger.debug("Regeneration timer cleared");
+	}
+
+	// Clear game tick timer
+	if (gameTickTimer !== undefined) {
+		clearCustomInterval(gameTickTimer);
+		gameTickTimer = undefined;
+		logger.debug("Game tick timer cleared");
 	}
 
 	// Save game state before shutdown
@@ -1298,7 +1329,7 @@ export function getGameStats(): {
  * Broadcast a message to all active playing characters.
  *
  * @param text The message to send
- * @param group The message group to use (defaults to INFO)
+ * @param group The message group to use
  *
  * @example
  * ```ts
@@ -1384,6 +1415,17 @@ export function forEachCharacter(
  * await stopGame();
  * ```
  */
+// Store the stop function globally so it can be accessed from commands
+let globalStopFunction: (() => Promise<void>) | null = null;
+
+/**
+ * Get the stop function for graceful shutdown.
+ * Returns null if the game hasn't been started yet.
+ */
+export function getStopGameFunction(): (() => Promise<void>) | null {
+	return globalStopFunction;
+}
+
 export async function startGame(): Promise<() => Promise<void>> {
 	// Initialize server
 	server = new MudServer();
@@ -1396,5 +1438,6 @@ export async function startGame(): Promise<() => Promise<void>> {
 	});
 
 	await start();
+	globalStopFunction = stop;
 	return stop;
 }

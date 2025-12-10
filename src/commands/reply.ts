@@ -22,7 +22,7 @@ import { CommandObject } from "../package/commands.js";
 import { CHANNEL } from "../core/channel.js";
 import { getCharacterById } from "../package/character.js";
 
-export default {
+export const command = {
 	pattern: "reply~ <message:text>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const message = args.get("message") as string;

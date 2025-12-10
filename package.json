@@ -19,7 +19,7 @@
 		"build:list-emitted": "node scripts/tsc-and-list.js",
 		"pretest:cycle": "npm run build",
 		"test:cycle": "npm run test",
-		"test": "npm run test:parallel:ts",
+		"test": "npm run test:ts",
 		"test:ts": "node scripts/test-ts.js",
 		"test:parallel": "node scripts/test-parallel.js",
 		"test:parallel:ts": "node scripts/test-parallel.js --ts",
@@ -27,23 +27,26 @@
 		"doc": "npx typedoc",
 		"deploy": "npm run clean && npm run build && npm run coverage && npm run doc",
 		"start": "node dist/index",
+		"prestart:keep-alive": "npm run build",
+		"start:keep-alive": "node scripts/keep-alive.js",
 		"prestart:rebuild": "npm run build",
 		"start:rebuild": "node dist/index",
 		"rerun": "npm run test && npm run start",
 		"rerun:ts": "npm run test:ts && npm run start",
 		"post-changelog": "node scripts/post-changelog-to-board.js",
 		"update-dungeon-version": "node scripts/increment-dungeon-version.js",
+		"start:map-editor": "node --import tsx/esm src/scripts/start-map-editor.ts",
 		"start:archetype-editor": "node --import tsx/esm src/scripts/start-archetype-editor.ts",
 		"start:helpfile-editor": "node --import tsx/esm src/scripts/start-helpfile-editor.ts",
 		"start:character-editor": "node --import tsx/esm src/scripts/start-character-editor.ts",
 		"icon": "node scripts/generate-icon.cjs",
-		"electron:dev": "npm run build && npm run icon && electron dist/src/electron/main.js",
+		"electron:map:dev": "npm run build && npm run icon && electron dist/src/electron/map-main.js",
 		"electron:archetype:dev": "npm run build && npm run icon && electron dist/src/electron/archetype-main.js",
 		"electron:helpfile:dev": "npm run build && npm run icon && electron dist/src/electron/helpfile-main.js",
 		"electron:character:dev": "npm run build && npm run icon && electron dist/src/electron/character-main.js",
-		"electron:win:portable": "npm run build && npm run icon && electron-builder --win portable --publish never && node scripts/post-win-portable.js",
-		"electron:mac": "npm run build && npm run icon && electron-builder --mac dmg --publish never && node scripts/post-mac.js",
-		"electron:mac:dir": "npm run build && npm run icon && electron-builder --mac dir --publish never && node scripts/post-mac-dir.js"
+		"electron:map:win:portable": "npm run build && npm run icon && electron-builder --win portable --publish never && node scripts/post-win-portable.js",
+		"electron:map:mac": "npm run build && npm run icon && electron-builder --mac dmg --publish never && node scripts/post-mac.js",
+		"electron:map:mac:dir": "npm run build && npm run icon && electron-builder --mac dir --publish never && node scripts/post-mac-dir.js"
 	},
 	"devDependencies": {
 		"@types/js-yaml": "^4.0.9",
@@ -73,14 +76,11 @@
 		},
 		"files": [
 			"dist/**/*",
-			"map-editor/**/*",
-			"archetype-editor/**/*",
-			"helpfile-editor/**/*",
-			"character-editor/**/*",
+			"editors/**/*",
 			"package.json"
 		],
 		"extraMetadata": {
-			"main": "dist/src/electron/main.js"
+			"main": "dist/src/electron/map-main.js"
 		},
 		"asar": true,
 		"win": {

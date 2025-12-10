@@ -43,9 +43,10 @@
  * console.log(again === dungeon); // true
  *
  * // 5) Create a tunnel between rooms (even across dungeons)
+ * import { createTunnel } from "../registry/dungeon.js";
  * const a = dungeon.getRoom({ x: 2, y: 2, z: 0 })!;
  * const b = dungeon.getRoom({ x: 0, y: 0, z: 0 })!;
- * RoomLink.createTunnel(a, DIRECTION.NORTH, b);
+ * createTunnel(a, DIRECTION.NORTH, b);
  *
  * // 6) Resolve a room by string reference
  * const refRoom = getRoomByRef("@midgar{1,1,0}");
@@ -62,20 +63,14 @@
  * @module core/dungeon
  */
 
+import { isDeepStrictEqual } from "node:util";
+import { EventEmitter } from "events";
 import { string } from "mud-ext";
 import { color, COLOR, COLOR_NAMES, COLOR_NAME_TO_COLOR } from "./color.js";
 import logger from "../logger.js";
-import {
-	addRoomLink,
-	removeRoomLink,
-	ROOM_LINKS,
-	getRoomByRef,
-	getDungeonById,
-	DUNGEON_REGISTRY,
-} from "../registry/dungeon.js";
 import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
-import { act, damageMessage } from "../act.js";
+import { act } from "../act.js";
 import { forEachCharacter } from "../game.js";
 import {
 	removeFromCombatQueue,
@@ -90,14 +85,12 @@ import {
 	HitType,
 	DEFAULT_HIT_TYPE,
 	COMMON_HIT_TYPES,
-	PHYSICAL_DAMAGE_TYPE,
 	mergeDamageRelationships,
 	DamageTypeRelationships,
 	DAMAGE_TYPE,
 } from "./damage-types.js";
 import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
-import { getAbilityById } from "../registry/ability.js";
 import { addToRegenerationSet } from "../regeneration.js";
 import {
 	EffectInstance,
@@ -116,7 +109,6 @@ import {
 	setupEffectTimers,
 	clearEffectTimersForEffect,
 } from "../effects.js";
-import { getEffectTemplateById } from "../registry/effect.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -151,7 +143,8 @@ import {
 	isEastward,
 	isWestward,
 } from "../direction.js";
-import { assert } from "console";
+import { checkMobArchetypeAbilities } from "../package/dungeon.js";
+import { resolveTemplateById } from "../registry/dungeon.js";
 
 const IS_TEST_MODE = Boolean(process.env.NODE_TEST_CONTEXT);
 let testObjectIdCounter = -1;
@@ -210,17 +203,6 @@ export interface DungeonOptions {
 	resetMessage?: string;
 	description?: string;
 }
-
-// Re-export registry functions for backward compatibility
-export {
-	DUNGEON_REGISTRY,
-	WANDERING_MOBS,
-	ROOM_LINKS,
-	getDungeonById,
-	getRoomByRef,
-	getRegisteredDungeonIds,
-	getAllDungeons,
-} from "../registry/dungeon.js";
 
 /**
  * The main container class that manages a three-dimensional map..
@@ -593,17 +575,8 @@ export class Dungeon {
 	 */
 	destroy() {
 		// Remove any room links that reference this dungeon's rooms
-		// Make a copy to avoid modifying array during iteration
-		const linksToRemove: RoomLink[] = [];
-		for (const link of ROOM_LINKS) {
-			// Check if either end of the link is in this dungeon
-			if (link.referencesDungeon(this)) {
-				linksToRemove.push(link);
-			}
-		}
-		for (const link of linksToRemove) {
-			link.remove();
-		}
+		// Note: This requires registry access, so the actual cleanup is done
+		// by the package layer or via removeDungeonRoomLinks() helper
 
 		// Note: Unregistration is handled by the package layer if needed
 		this._id = undefined;
@@ -877,7 +850,7 @@ export class Dungeon {
 	 *
 	 * @example
 	 * ```typescript
-	 * const reset = new Reset({
+	 * const reset = createReset({
 	 *   templateId: "coin-gold",
 	 *   roomRef: "@tower{0,0,0}",
 	 *   minCount: 2,
@@ -955,35 +928,6 @@ export class Dungeon {
 	 */
 	removeTemplate(templateId: string): void {
 		this._templates.delete(templateId);
-	}
-
-	/**
-	 * Executes all resets in this dungeon using the dungeon's template registry.
-	 * Each reset will spawn objects if the current count is below the minimum.
-	 *
-	 * @returns Total number of objects spawned across all resets
-	 *
-	 * @example
-	 * ```typescript
-	 * dungeon.addTemplate({
-	 *   id: "coin-gold",
-	 *   type: "Item",
-	 *   display: "Gold Coin"
-	 * });
-	 * const spawned = dungeon.executeResets();
-	 * console.log(`Spawned ${spawned} objects`);
-	 * ```
-	 */
-	executeResets(
-		createFn?: (template: DungeonObjectTemplate, oid?: number) => DungeonObject
-	): number {
-		let totalSpawned = 0;
-		for (const reset of this._resets) {
-			const spawned = reset.execute(this._templates, createFn);
-			totalSpawned += spawned.length;
-		}
-		if (this.resetMessage) this.broadcast(this.resetMessage);
-		return totalSpawned;
 	}
 }
 
@@ -1395,6 +1339,8 @@ export interface MobTemplate extends DungeonObjectTemplate {
 	mana?: number;
 	exhaustion?: number;
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
+	/** Optional AI script for mob behavior. Can be inline code or file path (prefix with "file:") */
+	aiScript?: string;
 }
 
 /**
@@ -1430,7 +1376,7 @@ export interface ResetOptions {
  * @example
  * ```typescript
  * // Create a reset that spawns 2-5 coins in a room
- * const reset = new Reset({
+ * const reset = createReset({
  *   templateId: "coin-gold",
  *   roomRef: "@tower{0,0,0}",
  *   minCount: 2,
@@ -1438,18 +1384,15 @@ export interface ResetOptions {
  * });
  *
  * // Create a mob reset with equipment and inventory
- * const mobReset = new Reset({
+ * const mobReset = createReset({
  *   templateId: "goblin-warrior",
  *   roomRef: "@dungeon{1,2,0}",
  *   equipped: ["sword-basic", "helmet-iron"],
  *   inventory: ["potion-healing", "coin-gold"]
  * });
- *
- * // Execute the reset (spawns objects if needed)
- * reset.execute(templateRegistry);
  * ```
  */
-export class Reset {
+export interface Reset {
 	/**
 	 * The ID of the template to spawn.
 	 */
@@ -1485,206 +1428,6 @@ export class Reset {
 	 * Only applies when spawning Mob objects.
 	 */
 	readonly inventory?: string[];
-
-	/**
-	 * Array of objects that this reset has spawned.
-	 * Objects notify the reset when they're destroyed so they can be removed from this array.
-	 * @private
-	 */
-	private _spawned: DungeonObject[] = [];
-
-	/**
-	 * Create a new Reset.
-	 *
-	 * @param options Reset configuration options
-	 */
-	constructor(options: ResetOptions) {
-		this.templateId = options.templateId;
-		this.roomRef = options.roomRef;
-		this.minCount = options.minCount ?? 1;
-		this.maxCount = options.maxCount ?? 1;
-		this.equipped = options.equipped;
-		this.inventory = options.inventory;
-	}
-
-	/**
-	 * Gets a copy of the spawned objects array.
-	 */
-	get spawned(): readonly DungeonObject[] {
-		return [...this._spawned];
-	}
-
-	/**
-	 * Counts how many spawned objects still exist anywhere in the game world.
-	 * Cleans up dead references (objects that are no longer in any dungeon).
-	 *
-	 * @returns The number of valid spawned objects that still exist
-	 */
-	countExisting(): number {
-		return this._spawned.length;
-	}
-
-	/**
-	 * Executes the reset, spawning objects if needed.
-	 *
-	 * @param templateRegistry Map of template IDs to templates
-	 * @returns Array of newly spawned objects (empty if none were spawned)
-	 */
-	execute(
-		templateRegistry: Map<string, DungeonObjectTemplate>,
-		createFn?: (template: DungeonObjectTemplate, oid?: number) => DungeonObject
-	): DungeonObject[] {
-		if (!createFn) {
-			throw new Error(
-				"Reset.execute() requires a createFn parameter. Use package layer factory functions."
-			);
-		}
-		const create = createFn;
-		// Get the target room
-		const targetRoom = getRoomByRef(this.roomRef);
-		if (!targetRoom) {
-			logger.warn(
-				`Reset for template "${this.templateId}" failed: room reference "${this.roomRef}" not found`
-			);
-			return [];
-		}
-
-		// Get the template (try local registry first, then cross-dungeon lookup)
-		const template =
-			templateRegistry.get(this.templateId) ||
-			resolveTemplateById(this.templateId);
-		if (!template) {
-			logger.warn(
-				`Reset for template "${this.templateId}" failed: template not found`
-			);
-			return [];
-		}
-
-		// Count existing spawned objects (anywhere in the game world)
-		const existingCount = this.countExisting();
-
-		// If we're at or above max, don't spawn
-		if (existingCount >= this.maxCount) {
-			return [];
-		}
-
-		// Calculate how many to spawn
-		// We need at least minCount, but can spawn up to maxCount
-		const needed = Math.max(
-			this.minCount - existingCount, // Need to reach minimum
-			0
-		);
-		const canSpawn = this.maxCount - existingCount; // Can spawn up to max
-
-		// Spawn the needed objects (up to maxCount)
-		const spawned: DungeonObject[] = [];
-		const toSpawn = Math.min(needed, canSpawn);
-		for (let i = 0; i < toSpawn; i++) {
-			const obj = create(template);
-			// Track which reset spawned this object BEFORE adding to room
-			// This ensures spawnedByReset is set before location changes
-			targetRoom.add(obj);
-			spawned.push(obj);
-			this.addSpawned(obj);
-
-			// If this is a Mob, handle equipped and inventory items
-			if (obj instanceof Mob) {
-				// Spawn and equip equipment templates
-				if (this.equipped) {
-					for (const equipmentTemplateId of this.equipped) {
-						const equipmentTemplate =
-							templateRegistry.get(equipmentTemplateId) ||
-							resolveTemplateById(equipmentTemplateId);
-						if (!equipmentTemplate) {
-							logger.warn(
-								`Reset for template "${this.templateId}" failed: equipment template "${equipmentTemplateId}" not found`
-							);
-							continue;
-						}
-
-						// Verify template is Equipment, Armor, or Weapon
-						if (
-							equipmentTemplate.type !== "Equipment" &&
-							equipmentTemplate.type !== "Armor" &&
-							equipmentTemplate.type !== "Weapon"
-						) {
-							logger.warn(
-								`Reset for template "${this.templateId}" failed: equipment template "${equipmentTemplateId}" is not an Equipment, Armor, or Weapon type (got "${equipmentTemplate.type}")`
-							);
-							continue;
-						}
-
-						const equipment = create(equipmentTemplate) as Equipment;
-						obj.equip(equipment);
-					}
-				}
-
-				// Spawn and add inventory item templates
-				if (this.inventory) {
-					for (const itemTemplateId of this.inventory) {
-						const itemTemplate =
-							templateRegistry.get(itemTemplateId) ||
-							resolveTemplateById(itemTemplateId);
-						if (!itemTemplate) {
-							logger.warn(
-								`Reset for template "${this.templateId}" failed: inventory template "${itemTemplateId}" not found`
-							);
-							continue;
-						}
-
-						const item = create(itemTemplate);
-						obj.add(item);
-					}
-				}
-			}
-		}
-
-		return spawned;
-	}
-
-	/**
-	 * Adds a spawned object to tracking.
-	 * Also sets the object's spawnedByReset property to this reset.
-	 *
-	 * @param obj The object to add to tracking
-	 *
-	 * @example
-	 * ```typescript
-	 * const reset = new Reset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
-	 * const obj = new DungeonObject();
-	 * reset.addSpawned(obj);
-	 * console.log(reset.spawned.includes(obj)); // true
-	 * console.log(obj.spawnedByReset === reset); // true
-	 * ```
-	 */
-	addSpawned(obj: DungeonObject): void {
-		if (this._spawned.includes(obj)) return;
-		this._spawned.push(obj);
-		if (obj.spawnedByReset !== this) obj.spawnedByReset = this;
-	}
-
-	/**
-	 * Removes a spawned object from tracking.
-	 * Also unsets the object's spawnedByReset property if it points to this reset.
-	 *
-	 * @param obj The object to remove from tracking
-	 *
-	 * @example
-	 * ```typescript
-	 * const reset = new Reset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
-	 * const obj = new DungeonObject();
-	 * reset.addSpawned(obj);
-	 * reset.removeSpawned(obj);
-	 * console.log(reset.spawned.includes(obj)); // false
-	 * console.log(obj.spawnedByReset === reset); // false
-	 * ```
-	 */
-	removeSpawned(obj: DungeonObject): void {
-		const index = this._spawned.indexOf(obj);
-		if (index === -1) return;
-		this._spawned.splice(index, 1);
-		if (obj.spawnedByReset === this) obj.spawnedByReset = undefined;
-	}
 }
 
 /**
@@ -1827,7 +1570,7 @@ export class DungeonObject {
 	 *
 	 * @example
 	 * ```typescript
-	 * const reset = new Reset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
+	 * const reset = createReset({ templateId: "goblin", roomRef: "@dungeon{0,0,0}" });
 	 * const obj = new DungeonObject();
 	 * obj.spawnedByReset = reset; // obj is now tracked in reset.spawned
 	 * ```
@@ -1835,16 +1578,11 @@ export class DungeonObject {
 	set spawnedByReset(reset: Reset | undefined) {
 		if (this.spawnedByReset === reset) return;
 
-		// unassign reset
-		if (this._spawnedByReset) {
-			const oldReset: Reset = this._spawnedByReset;
-			this._spawnedByReset = undefined;
-			oldReset.removeSpawned(this);
-		}
-
-		// update new reset
+		// Note: The actual tracking in the reset registry is handled by
+		// the helper functions in registry/dungeon.ts (addResetSpawned/removeResetSpawned).
+		// This setter only updates the local property. Callers should use the
+		// helper functions to properly maintain both sides of the relationship.
 		this._spawnedByReset = reset;
-		if (reset) reset.addSpawned(this);
 	}
 
 	/**
@@ -2015,11 +1753,12 @@ export class DungeonObject {
 
 		// If we were spawned by a reset and are moving to a different dungeon (or being removed),
 		// notify the reset to stop tracking us
-		if (this.spawnedByReset) {
-			const resetTargetRoom = getRoomByRef(this.spawnedByReset.roomRef);
-			const resetDungeon = resetTargetRoom?.dungeon;
-			if (!dungeon || !resetDungeon || dungeon !== resetDungeon)
+		// Note: Room resolution requires registry access, so this is handled by package layer
+		if (this.spawnedByReset && dungeon) {
+			// If we have a location, check if it's in a different dungeon
+			if (this.location?.dungeon && this.location.dungeon !== dungeon) {
 				this.spawnedByReset = undefined;
+			}
 		}
 
 		// inform our contents that we're in a new dungeon
@@ -2393,59 +2132,6 @@ export class DungeonObject {
 	}
 
 	/**
-	 * Applies a template to this object, setting only the fields specified in the template.
-	 * Fields not in the template remain unchanged.
-	 *
-	 * @param template - The template to apply
-	 *
-	 * @example
-	 * ```typescript
-	 * const obj = new Item();
-	 * const template: DungeonObjectTemplate = {
-	 *   id: "sword",
-	 *   type: "Item",
-	 *   display: "Iron Sword",
-	 *   description: "A sword.",
-	 *   baseWeight: 3.5
-	 * };
-	 * obj.applyTemplate(template);
-	 * // obj now has display="Iron Sword", description="A sword.", and baseWeight=3.5
-	 * // but keywords remains "dungeon object" (default)
-	 * ```
-	 */
-	applyTemplate(template: DungeonObjectTemplate): void {
-		if (template.keywords !== undefined) {
-			this.keywords = template.keywords;
-		}
-		if (template.display !== undefined) {
-			this.display = template.display;
-		}
-		if (template.description !== undefined) {
-			this.description = template.description;
-		}
-		if (template.roomDescription !== undefined) {
-			this.roomDescription = template.roomDescription;
-		}
-		if (template.mapText !== undefined) {
-			this.mapText = template.mapText;
-		}
-		if (template.mapColor !== undefined) {
-			// Convert string color name to COLOR enum integer
-			this.mapColor =
-				COLOR_NAME_TO_COLOR[
-					template.mapColor as keyof typeof COLOR_NAME_TO_COLOR
-				];
-		}
-		if (template.baseWeight !== undefined) {
-			this.baseWeight = template.baseWeight;
-			this.currentWeight = template.baseWeight;
-		}
-		if (template.value !== undefined) {
-			this.value = template.value;
-		}
-	}
-
-	/**
 	 * Completely destroy this object, removing all references and clearing all relationships.
 	 * This method:
 	 * - Removes the object from its location/container
@@ -2669,34 +2355,6 @@ export class Room extends DungeonObject {
 	}
 
 	/**
-	 * Applies a room template to this room, setting only the fields specified in the template.
-	 * Fields not in the template remain unchanged.
-	 *
-	 * @param template - The room template to apply
-	 *
-	 * @example
-	 * ```typescript
-	 * const room = new Room({ coordinates: { x: 0, y: 0, z: 0 } });
-	 * const template: RoomTemplate = {
-	 *   id: "room",
-	 *   type: "Room",
-	 *   display: "Chamber",
-	 *   allowedExits: DIRECTION.NORTH | DIRECTION.UP
-	 * };
-	 * room.applyTemplate(template);
-	 * ```
-	 */
-	applyTemplate(template: RoomTemplate): void {
-		super.applyTemplate(template);
-		// allowedExits is mandatory in RoomTemplate
-		this.allowedExits = template.allowedExits;
-		// dense is optional, only set if present in template
-		if (template.dense !== undefined) {
-			this.dense = template.dense;
-		}
-	}
-
-	/**
 	 * Add a RoomLink to this room.
 	 * This method is called by RoomLink when it is constructed.
 	 *
@@ -2752,7 +2410,7 @@ export class Room extends DungeonObject {
 		// Links override allowedExits
 		if (this._links) {
 			for (const link of this._links) {
-				const destination = link.getDestination(this, dir);
+				const destination = getRoomLinkDestination(link, this, dir);
 				if (destination) {
 					// Don't return dense rooms
 					if (destination.dense) return undefined;
@@ -2819,7 +2477,7 @@ export class Room extends DungeonObject {
 		// Links override allowedExits - if there's a link in this direction, allow exit
 		if (this._links) {
 			for (const link of this._links) {
-				const destination = link.getDestination(this, direction);
+				const destination = getRoomLinkDestination(link, this, direction);
 				if (destination) {
 					return true; // Link exists, allow exit regardless of allowedExits
 				}
@@ -2852,37 +2510,26 @@ export class Room extends DungeonObject {
 		// Process aggressive behavior: aggressive mobs attack character mobs that enter
 		if (movable instanceof Mob) {
 			const enterer = movable as Mob;
+
+			// Emit entrance event for all existing mobs in room (they see someone enter)
 			for (const obj of this.contents) {
-				if (!(obj instanceof Mob)) continue;
-				if (obj === enterer) continue;
-				const inhabitant = obj;
-
-				// Process aggressive behavior: player entering room with aggressive mob in it
-				// This should happen first to ensure aggro mobs attack even if threat table exists
-				if (inhabitant.hasBehavior(BEHAVIOR.AGGRESSIVE) && enterer.character) {
-					if (!inhabitant.combatTarget) {
-						initiateCombat(inhabitant, enterer);
+				if (obj instanceof Mob && obj !== enterer) {
+					const emitter = obj.aiEvents;
+					if (emitter) {
+						emitter.emit("entrance", enterer);
+						emitter.emit("sight", enterer);
 					}
-					inhabitant.addToThreatTable(enterer);
 				}
+			}
 
-				// Check threat table: if entering mob is in this mob's threat table, process threat switching
-				// This handles cases where the mob has the enterer on threat table (e.g., after fleeing)
-				if (inhabitant.threatTable && inhabitant.threatTable.get(enterer)) {
-					processThreatSwitching(inhabitant);
-				}
-
-				// Also check if the entering mob is aggressive - it should generate threat for character mobs in the room
-				if (enterer.hasBehavior(BEHAVIOR.AGGRESSIVE) && inhabitant.character) {
-					if (!enterer.combatTarget) {
-						initiateCombat(enterer, inhabitant);
+			// Emit entrance event for the entering mob (they see existing mobs)
+			const entererEmitter = enterer.aiEvents;
+			if (entererEmitter) {
+				// Emit entrance for each existing mob in the room
+				for (const obj of this.contents) {
+					if (obj instanceof Mob && obj !== enterer) {
+						entererEmitter.emit("sight", obj);
 					}
-					enterer.addToThreatTable(inhabitant);
-				}
-
-				// Check threat table for entering aggro mob: if inhabitant is in enterer's threat table, process threat switching
-				if (enterer.threatTable && enterer.threatTable.get(inhabitant)) {
-					processThreatSwitching(enterer);
 				}
 			}
 		}
@@ -2911,7 +2558,30 @@ export class Room extends DungeonObject {
 	 * }
 	 * ```
 	 */
-	onExit(movable: Movable, direction?: DIRECTION) {}
+	onExit(movable: Movable, direction?: DIRECTION) {
+		// Emit exit event for all mobs in room (they see someone leave)
+		if (movable instanceof Mob) {
+			const exiter = movable as Mob;
+			for (const obj of this.contents) {
+				if (obj instanceof Mob && obj !== exiter) {
+					const emitter = obj.aiEvents;
+					if (emitter) {
+						emitter.emit("exit", exiter);
+					}
+				}
+			}
+
+			// Emit exit event for the exiting mob (they see existing mobs they're leaving behind)
+			const exiterEmitter = exiter.aiEvents;
+			if (exiterEmitter) {
+				for (const obj of this.contents) {
+					if (obj instanceof Mob && obj !== exiter) {
+						exiterEmitter.emit("exit", obj);
+					}
+				}
+			}
+		}
+	}
 
 	/**
 	 * Generates a room reference string for this room in the format `@dungeon-id{x,y,z}`.
@@ -2978,66 +2648,6 @@ export class Room extends DungeonObject {
 			...(this.dense && { dense: this.dense }), // Only include if true
 		};
 		return result;
-	}
-
-	/**
-	 * Override destroy to handle Room-specific cleanup:
-	 * - Remove all RoomLinks that reference this room
-	 * - Remove from dungeon grid
-	 */
-	override destroy(destroyContents: boolean = true): void {
-		// Remove all RoomLinks that reference this room
-		// Use the room's own links array if available, otherwise search all links
-		if (this._links) {
-			// Make a copy to avoid modifying array during iteration
-			const linksToRemove = [...this._links];
-			for (const link of linksToRemove) {
-				link.remove();
-			}
-		} else {
-			// If _links is undefined, search all ROOM_LINKS for links referencing this room
-			const linksToRemove: RoomLink[] = [];
-			for (const link of ROOM_LINKS) {
-				// Access private properties via type assertion
-				const linkPrivate = link as any;
-				if (
-					linkPrivate._from?.room === this ||
-					linkPrivate._to?.room === this
-				) {
-					linksToRemove.push(link);
-				}
-			}
-			for (const link of linksToRemove) {
-				link.remove();
-			}
-		}
-
-		// Remove from dungeon grid if in a dungeon
-		const dungeon = this.dungeon;
-		if (dungeon) {
-			const { x, y, z } = this.coordinates;
-			// Check bounds before accessing grid
-			if (
-				z >= 0 &&
-				z < dungeon.dimensions.layers &&
-				y >= 0 &&
-				y < dungeon.dimensions.height &&
-				x >= 0 &&
-				x < dungeon.dimensions.width
-			) {
-				const gridRoom = dungeon.getRoom({ x, y, z });
-				if (gridRoom === this) {
-					// Access private _rooms array to set to undefined
-					(dungeon as any)._rooms[z][y][x] = undefined;
-				}
-			}
-		}
-
-		// Clear links array
-		this._links = undefined;
-
-		// Call parent destroy
-		super.destroy(destroyContents);
 	}
 }
 
@@ -3463,7 +3073,6 @@ export class Movable extends DungeonObject {
 
 		// Call onExit
 		if (sourceRoom) {
-			options.scripts?.beforeOnExit?.(this, sourceRoom, dir);
 			sourceRoom.onExit(this, dir);
 			options.scripts?.afterOnExit?.(this, sourceRoom, dir);
 		}
@@ -3560,20 +3169,6 @@ export class Item extends Movable {
 			...(this.isContainer && { isContainer: true }),
 		};
 		return result;
-	}
-
-	/**
-	 * Override applyTemplate to handle Item-specific properties.
-	 * Applies the isContainer value from the template if present.
-	 *
-	 * @param template - Template object containing item properties
-	 */
-	override applyTemplate(template: ItemTemplate): void {
-		super.applyTemplate(template);
-		const itemTemplate = template;
-		if (itemTemplate.isContainer !== undefined) {
-			this.isContainer = itemTemplate.isContainer;
-		}
 	}
 }
 
@@ -3958,46 +3553,6 @@ export class Equipment extends Item {
 			: uncompressed;
 		return etc;
 	}
-
-	/**
-	 * Override applyTemplate to handle Equipment-specific properties.
-	 * Applies slot, attributeBonuses, resourceBonuses, and secondaryAttributeBonuses
-	 * from the template.
-	 *
-	 * @param template - Template object containing equipment properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const equipment = new Equipment();
-	 * const template: EquipmentTemplate = {
-	 *   id: "ring-rare",
-	 *   type: "Equipment",
-	 *   slot: EQUIPMENT_SLOT.FINGER,
-	 *   attributeBonuses: { strength: 10 }
-	 * };
-	 * equipment.applyTemplate(template);
-	 * ```
-	 */
-	override applyTemplate(template: EquipmentTemplate): void {
-		// Call parent to apply base properties
-		super.applyTemplate(template);
-
-		// Handle Equipment-specific properties
-		const equipmentTemplate = template as EquipmentTemplate;
-		if (equipmentTemplate.slot !== undefined) {
-			this._slot = equipmentTemplate.slot;
-		}
-		if (equipmentTemplate.attributeBonuses !== undefined) {
-			this._attributeBonuses = equipmentTemplate.attributeBonuses;
-		}
-		if (equipmentTemplate.resourceBonuses !== undefined) {
-			this._resourceBonuses = equipmentTemplate.resourceBonuses;
-		}
-		if (equipmentTemplate.secondaryAttributeBonuses !== undefined) {
-			this._secondaryAttributeBonuses =
-				equipmentTemplate.secondaryAttributeBonuses;
-		}
-	}
 }
 
 /**
@@ -4099,42 +3654,6 @@ export class Armor extends Equipment {
 					(base as SerializedDungeonObject).templateId
 			  ) as SerializedArmor)
 			: uncompressed;
-	}
-
-	/**
-	 * Deserialize a SerializedArmor into an Armor instance.
-	 * Restores the armor's defense value and all other equipment properties.
-	 *
-	 * @param data - Serialized armor data
-	 * @returns New Armor instance with restored properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const serialized: SerializedArmor = {
-	 *   type: "Armor",
-	 *   slot: EQUIPMENT_SLOT.HEAD,
-	 *   defense: 5,
-	 *   keywords: "helmet",
-	 *   display: "Helmet"
-	 * };
-	 *
-	 * const armor = Armor.deserialize(serialized);
-	 * console.log(armor.defense); // 5
-	 * ```
-	 */
-
-	/**
-	 * Override applyTemplate to handle Armor-specific properties.
-	 * Applies the defense value from the template if present.
-	 *
-	 * @param template - Template object containing armor properties
-	 */
-	override applyTemplate(template: ArmorTemplate): void {
-		super.applyTemplate(template);
-		const armorTemplate = template;
-		if (armorTemplate.defense !== undefined) {
-			this._defense = armorTemplate.defense;
-		}
 	}
 }
 
@@ -4283,61 +3802,6 @@ export class Weapon extends Equipment {
 			  ) as SerializedWeapon)
 			: uncompressed;
 	}
-
-	/**
-	 * Deserialize a SerializedWeapon into a Weapon instance.
-	 * Restores the weapon's attackPower value and all other equipment properties.
-	 *
-	 * @param data - Serialized weapon data
-	 * @returns New Weapon instance with restored properties
-	 *
-	 * @example
-	 * ```typescript
-	 * const serialized: SerializedWeapon = {
-	 *   type: "Weapon",
-	 *   slot: EQUIPMENT_SLOT.MAIN_HAND,
-	 *   attackPower: 15,
-	 *   defense: 0,
-	 *   keywords: "sword",
-	 *   display: "Sword"
-	 * };
-	 *
-	 * const weapon = Weapon.deserialize(serialized);
-	 * console.log(weapon.attackPower); // 15
-	 * ```
-	 */
-
-	/**
-	 * Override applyTemplate to handle Weapon-specific properties.
-	 * Applies the attackPower, hitType, and type values from the template if present.
-	 *
-	 * @param template - Template object containing weapon properties
-	 */
-	override applyTemplate(template: WeaponTemplate): void {
-		super.applyTemplate(template);
-		const weaponTemplate = template;
-		if (weaponTemplate.attackPower !== undefined) {
-			this._attackPower = weaponTemplate.attackPower;
-		}
-		if (weaponTemplate.hitType !== undefined) {
-			if (typeof weaponTemplate.hitType === "string") {
-				// Look up in common hit types
-				const common = COMMON_HIT_TYPES.get(
-					weaponTemplate.hitType.toLowerCase()
-				);
-				if (!common)
-					throw new Error(
-						`Common hit type ${weaponTemplate.hitType} not found`
-					);
-				this._hitType = common;
-			} else {
-				this._hitType = weaponTemplate.hitType;
-			}
-		}
-		if (weaponTemplate.weaponType !== undefined) {
-			this._type = weaponTemplate.weaponType;
-		}
-	}
 }
 
 /**
@@ -4422,6 +3886,8 @@ export interface MobOptions extends DungeonObjectOptions {
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
 	/** Learned abilities map (Ability object -> number of uses) */
 	learnedAbilities?: Map<Ability, number>;
+	/** AI script for this mob */
+	aiScript?: string;
 }
 
 const MAX_EXHAUSTION = 100;
@@ -4532,6 +3998,10 @@ export class Mob extends Movable {
 	private _threatTable?: Map<Mob, ThreatEntry>;
 	private _threatExpirationTimer?: number;
 	private _behaviors: Map<BEHAVIOR, boolean>;
+	/** EventEmitter for AI events (only for NPCs) */
+	private _aiEventEmitter?: EventEmitter;
+	/** AI script for this mob */
+	private _aiScript?: string;
 	/** Map of Ability objects to number of uses */
 	/** @internal - Public for package deserializers */
 	public _learnedAbilities: Map<Ability, number>;
@@ -4604,16 +4074,24 @@ export class Mob extends Movable {
 			}
 		}
 
-		// Apply archetype passive effects (race and job passives)
-		// Note: _effects is already initialized earlier in constructor
-		this.applyArchetypePassives();
+		// Remove any existing archetype passives (in case of re-initialization)
+		this.removeArchetypePassives();
 
-		// Check and teach archetype abilities for starting level
-		this.checkArchetypeAbilities();
+		// Note: Archetype passives and abilities are applied by package layer
+		// helpers that have access to the registry (applyMobArchetypePassives,
+		// checkMobArchetypeAbilities)
 
 		// Initialize combat properties
 		// Only NPCs (mobs without a character) have threat tables
 		// Threat table will be initialized when character is set/cleared
+
+		// Initialize EventEmitter for AI events (only for NPCs)
+		if (!this._character) {
+			this._aiEventEmitter = new EventEmitter();
+		}
+		if (options?.aiScript) {
+			this._aiScript = options.aiScript;
+		}
 	}
 	/**
 	 * Gets the Character that controls this mob (if any).
@@ -4632,6 +4110,29 @@ export class Mob extends Movable {
 	 */
 	public get character(): Character | undefined {
 		return this._character;
+	}
+
+	/**
+	 * Gets the EventEmitter for AI events (only available for NPCs).
+	 * Returns undefined for player-controlled mobs.
+	 *
+	 * @returns The EventEmitter instance or undefined if not initialized
+	 */
+	public get aiEvents(): EventEmitter | undefined {
+		return this._aiEventEmitter;
+	}
+
+	/**
+	 * Initialize the AI EventEmitter if it doesn't exist.
+	 * This should only be called for NPCs (mobs without a character).
+	 *
+	 * @returns The EventEmitter instance (newly created or existing)
+	 */
+	public initializeAIEvents(): EventEmitter {
+		if (!this._aiEventEmitter) {
+			this._aiEventEmitter = new EventEmitter();
+		}
+		return this._aiEventEmitter;
 	}
 
 	/**
@@ -5273,79 +4774,6 @@ export class Mob extends Movable {
 		return this.removeAbility(ability);
 	}
 
-	/**
-	 * Override applyTemplate to handle Mob-specific properties.
-	 * Applies race, job, level, experience, bonuses, resources, and behaviors
-	 * from the template.
-	 *
-	 * @param template - Template object containing mob properties
-	 *
-	 * @example
-	 * ```typescript
-	 * import { BEHAVIOR } from "./dungeon.js";
-	 *
-	 * const mob = new Mob();
-	 * const template: MobTemplate = {
-	 *   id: "goblin-warrior",
-	 *   type: "Mob",
-	 *   race: "goblin",
-	 *   job: "warrior",
-	 *   level: 5,
-	 *   behaviors: {
-	 *     [BEHAVIOR.AGGRESSIVE]: true,
-	 *     [BEHAVIOR.WANDER]: true
-	 *   }
-	 * };
-	 * mob.applyTemplate(template);
-	 * ```
-	 */
-	override applyTemplate(template: DungeonObjectTemplate | MobTemplate): void {
-		// Call parent to apply base properties
-		super.applyTemplate(template);
-
-		// Handle Mob-specific properties
-		const mobTemplate = template as MobTemplate;
-
-		// Apply properties that might trigger attribute recalculation
-		if (mobTemplate.level !== undefined) {
-			this.level = mobTemplate.level;
-		}
-		if (mobTemplate.experience !== undefined) {
-			this.experience = mobTemplate.experience;
-		}
-		if (mobTemplate.attributeBonuses !== undefined) {
-			this.setAttributeBonuses(mobTemplate.attributeBonuses);
-		}
-		if (mobTemplate.resourceBonuses !== undefined) {
-			this.setResourceBonuses(mobTemplate.resourceBonuses);
-		}
-
-		// Apply health/mana if explicitly set in template (after potential recalculation)
-		if (mobTemplate.health !== undefined) {
-			this.health = mobTemplate.health;
-		} else {
-			this.health = this.maxHealth;
-		}
-		if (mobTemplate.mana !== undefined) {
-			this.mana = mobTemplate.mana;
-		} else {
-			this.mana = this.maxMana;
-		}
-		if (mobTemplate.exhaustion !== undefined) {
-			this.exhaustion = mobTemplate.exhaustion;
-		}
-
-		if (mobTemplate.behaviors !== undefined) {
-			// Apply behavior flags from template
-			for (const [key, value] of Object.entries(mobTemplate.behaviors)) {
-				// Validate that the key is a valid BEHAVIOR enum value
-				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR)) {
-					this.setBehavior(key as BEHAVIOR, !!value);
-				}
-			}
-		}
-	}
-
 	/** @internal - Public for package deserializers */
 	public captureResourceRatios(): {
 		healthRatio?: number;
@@ -5541,8 +4969,9 @@ export class Mob extends Movable {
 		this._level = Math.max(1, this._level + delta);
 		this.recalculateDerivedAttributes(ratios);
 
-		// Get newly learned abilities
-		const newlyLearnedAbilities = this.checkArchetypeAbilities();
+		// Note: Newly learned abilities are checked by package layer helper
+		// (checkMobArchetypeAbilities) that has access to the registry
+		const newlyLearnedAbilities: Ability[] = checkMobArchetypeAbilities(this);
 
 		// Get new displayed values
 		const newPrimary = this.primaryAttributes;
@@ -7123,7 +6552,12 @@ export class Mob extends Movable {
 	 *
 	 * @internal - Public for package deserializers
 	 */
-	public applyArchetypePassives(): void {
+	/**
+	 * Remove existing archetype passive effects.
+	 * This is called before applying new passives when race/job changes.
+	 * @internal
+	 */
+	public removeArchetypePassives(): void {
 		// Remove any existing archetype passives first (in case race/job changed)
 		const archetypePassiveIds = new Set<string>();
 		for (const passiveId of this._race.passives) {
@@ -7146,51 +6580,39 @@ export class Mob extends Movable {
 		for (const effect of toRemove) {
 			this._effects.delete(effect);
 		}
-
-		// Apply race passives
-		for (const passiveId of this._race.passives) {
-			const template = getEffectTemplateById(passiveId);
-			if (template) {
-				// Archetype passives are self-applied and never expire
-				this.addEffect(template, this);
-			} else {
-				logger.warn(
-					`Race "${this._race.id}" references passive effect "${passiveId}" which was not found in effect template registry`
-				);
-			}
-		}
-
-		// Apply job passives
-		for (const passiveId of this._job.passives) {
-			const template = getEffectTemplateById(passiveId);
-			if (template) {
-				// Archetype passives are self-applied and never expire
-				this.addEffect(template, this);
-			} else {
-				logger.warn(
-					`Job "${this._job.id}" references passive effect "${passiveId}" which was not found in effect template registry`
-				);
-			}
-		}
 	}
 
 	/**
-	 * Checks archetype abilities (from race and job) and teaches abilities
-	 * when the mob reaches the appropriate level.
-	 * Returns an array of newly learned abilities.
+	 * Apply a single archetype passive effect template.
+	 * This method is called by package layer helpers that have registry access.
+	 * @internal
 	 */
-	private checkArchetypeAbilities(): Ability[] {
+	public applyArchetypePassive(template: EffectTemplate): void {
+		// Archetype passives are self-applied and never expire
+		this.addEffect(template, this);
+	}
+
+	/**
+	 * Get the list of archetype ability definitions that should be learned
+	 * at the current level or below.
+	 * Returns ability definitions (id and level) that haven't been learned yet.
+	 * @internal
+	 */
+	public getUnlearnedArchetypeAbilities(): Array<{
+		id: string;
+		level: number;
+	}> {
 		const currentLevel = this._level;
 		const allAbilities: Array<{ id: string; level: number }> = [];
-		const newlyLearned: Ability[] = [];
+		const unlearned: Array<{ id: string; level: number }> = [];
 
 		// Collect abilities from race
-		for (const abilityDef of this._race.skills) {
+		for (const abilityDef of this._race.abilities) {
 			allAbilities.push(abilityDef);
 		}
 
 		// Collect abilities from job
-		for (const abilityDef of this._job.skills) {
+		for (const abilityDef of this._job.abilities) {
 			allAbilities.push(abilityDef);
 		}
 
@@ -7206,21 +6628,19 @@ export class Mob extends Movable {
 				continue;
 			}
 
-			// Get the ability from registry
-			const ability = getAbilityById(abilityDef.id);
-			if (!ability) {
-				logger.warn(
-					`Archetype references ability "${abilityDef.id}" which was not found in ability registry`
-				);
-				continue;
-			}
-
-			// Teach the ability
-			this.addAbility(ability, 0);
-			newlyLearned.push(ability);
+			unlearned.push(abilityDef);
 		}
 
-		return newlyLearned;
+		return unlearned;
+	}
+
+	/**
+	 * Teach an ability to this mob.
+	 * This method is called by package layer helpers that have registry access.
+	 * @internal
+	 */
+	public learnArchetypeAbility(ability: Ability): void {
+		this.addAbility(ability, 0);
 	}
 
 	/**
@@ -7407,7 +6827,13 @@ export class Mob extends Movable {
 			this._threatTable.clear();
 		}
 
-		// Note: Wandering mob removal is handled by the package layer
+		// Clean up AI system (if initialized)
+		if (this._aiEventEmitter) {
+			// Dynamic import to avoid circular dependency
+			import("../mob-ai.js").then((module) => {
+				module.cleanupMobAI(this);
+			});
+		}
 
 		// Call parent destroy
 		super.destroy(destroyContents);
@@ -7420,35 +6846,33 @@ export class Mob extends Movable {
  *
  * @example
  * ```typescript
- * import { Dungeon, RoomLink, DIRECTION } from "./dungeon.js";
+ * import { Dungeon, DIRECTION } from "./dungeon.js";
+ * import { createTunnel } from "../registry/dungeon.js";
  *
  * const midgar = Dungeon.generateEmptyDungeon({ dimensions: { width: 6, height: 6, layers: 1 } });
  * const sector7 = Dungeon.generateEmptyDungeon({ dimensions: { width: 1, height: 1, layers: 1 } });
  * const midgarRoom = midgar.getRoom({ x: 5, y: 5, z: 0 })!;
  * const sectorRoom = sector7.getRoom({ x: 0, y: 0, z: 0 })!;
  *
- * RoomLink.createTunnel(midgarRoom, DIRECTION.NORTH, sectorRoom);
+ * createTunnel(midgarRoom, DIRECTION.NORTH, sectorRoom);
  *
  * // The rooms are now connected via these directions
  * console.log(midgarRoom.getStep(DIRECTION.NORTH) === sectorRoom); // true
  * console.log(sectorRoom.getStep(DIRECTION.SOUTH) === midgarRoom); // true
  * ```
  */
-export class RoomLink {
+export interface RoomLink {
 	/**
 	 * The originating endpoint for this link.
 	 *
 	 * Contains the source `room` instance and the `direction` (a DIRECTION
 	 * flag) that, when used with Room.getStep() from that room, should resolve
-	 * to the other endpoint. This property is private and intended for use
-	 * only by the RoomLink implementation and the Room class (via
-	 * addLink/removeLink).
+	 * to the other endpoint.
 	 *
 	 * Example: `{ room: roomA, direction: DIRECTION.NORTH }` means "from
 	 * roomA moving NORTH you arrive at the other endpoint".
-	 * @private
 	 */
-	private _from: { room: Room; direction: DIRECTION };
+	from: { room: Room; direction: DIRECTION };
 
 	/**
 	 * The destination endpoint for this link.
@@ -7457,206 +6881,86 @@ export class RoomLink {
 	 * represents the return traversal (the reverse direction). For two-way
 	 * links the Room.getStep() call on the destination room using this
 	 * direction will resolve back to the originating room.
-	 * @private
 	 */
-	private _to: { room: Room; direction: DIRECTION };
+	to: { room: Room; direction: DIRECTION };
 
 	/**
 	 * When true the link only functions in the `from` -> `to` direction.
 	 *
-	 * A one-way link will be registered only on the `_from.room` so calls to
-	 * `getStep()` on the `_to.room` will not consider this link when resolving
-	 * movements. The flag is private and set at construction time.
-	 * @private
+	 * A one-way link will be registered only on the `from.room` so calls to
+	 * `getStep()` on the `to.room` will not consider this link when resolving
+	 * movements.
 	 */
-	private _oneWay: boolean = false;
+	oneWay: boolean;
+}
 
-	/**
-	 * Create a RoomLink instance.
-	 *
-	 * Note: the constructor only initialises the link state and DOES NOT
-	 * register the link with either room. This keeps `new RoomLink(...)` free
-	 * of side-effects. Use `RoomLink.createTunnel(...)` which will construct
-	 * the link and register it with the rooms (registering the `_to` room is
-	 * skipped for one-way links).
-	 *
-	 * @param options.from.room The originating Room instance
-	 * @param options.from.direction The direction on the originating room that leads to the destination
-	 * @param options.to.room The destination Room instance
-	 * @param options.to.direction The (reverse) direction on the destination room that leads back to the origin
-	 * @param options.oneWay When true the link is one-way (from -> to only)
-	 *
-	 * @remarks
-	 * The constructor accepts explicit from/to directions. The `createTunnel`
-	 * factory provides a more ergonomic API and will infer the reverse
-	 * direction automatically; the constructor remains available for internal
-	 * or advanced usage where callers want to control both endpoints explicitly.
-	 */
-	private constructor(options: {
-		from: { room: Room; direction: DIRECTION };
-		to: { room: Room; direction: DIRECTION };
-		oneWay?: boolean;
-	}) {
-		this._from = options.from;
-		this._to = options.to;
-		this._oneWay = !!options.oneWay;
+/**
+ * Check if a room link references a room in the specified dungeon.
+ * Returns true if either endpoint of the link is in the given dungeon.
+ *
+ * @param link The room link to check
+ * @param dungeon The dungeon to check against
+ * @returns true if either the from or to room is in the dungeon
+ *
+ * @example
+ * ```typescript
+ * const dungeon1 = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
+ * const dungeon2 = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
+ * const room1 = dungeon1.getRoom({ x: 0, y: 0, z: 0 });
+ * const room2 = dungeon2.getRoom({ x: 0, y: 0, z: 0 });
+ * const link = createTunnel(room1, DIRECTION.NORTH, room2);
+ *
+ * console.log(roomLinkReferencesDungeon(link, dungeon1)); // true
+ * console.log(roomLinkReferencesDungeon(link, dungeon2)); // true
+ * ```
+ */
+export function roomLinkReferencesDungeon(
+	link: RoomLink,
+	dungeon: Dungeon
+): boolean {
+	return link.from.room.dungeon === dungeon || link.to.room.dungeon === dungeon;
+}
+
+/**
+ * Resolve the linked destination when moving from `fromRoom` in `direction`.
+ *
+ * The Room class calls this function while evaluating `getStep()` so it can
+ * discover linked rooms that override spatial adjacency. The resolution
+ * rules are straightforward:
+ * - If `fromRoom` matches the link's `from.room` and `direction` equals
+ *   `from.direction`, return `to.room`.
+ * - If the link is two-way and `fromRoom` matches `to.room` with
+ *   `direction === to.direction`, return `from.room`.
+ * - Otherwise return `undefined` to indicate this link does not handle the
+ *   requested traversal.
+ *
+ * This function does not perform permission checks (canEnter/canExit) - it
+ * only resolves spatial/linked connectivity. Permission checks are done
+ * by the calling code (e.g., Movable.canStep).
+ *
+ * @param link The room link to check
+ * @param fromRoom The room where traversal begins
+ * @param direction The direction of traversal
+ * @returns The destination `Room` if this link handles the traversal, otherwise `undefined`
+ */
+export function getRoomLinkDestination(
+	link: RoomLink,
+	fromRoom: Room,
+	direction: DIRECTION
+): Room | undefined {
+	// Check from -> to
+	if (fromRoom === link.from.room && direction === link.from.direction) {
+		return link.to.room;
 	}
-
-	/**
-	 * Create and register a RoomLink between two rooms.
-	 *
-	 * This factory is the recommended way to create links because it performs
-	 * the necessary registration with the provided Room instances and infers
-	 * the reverse direction automatically. It never mutates the rooms in a way
-	 * that breaks invariants: the link is added to the `_from.room` and,
-	 * unless `oneWay` is true, also to the `_to.room`.
-	 *
-	 * @param fromRoom The room which will act as the source endpoint
-	 * @param direction The direction (on `fromRoom`) that will lead to `toRoom`
-	 * @param toRoom The room which will act as the destination endpoint
-	 * @param oneWay When true only `fromRoom` will register the link; traversal back from `toRoom` will not use this link
-	 * @returns The created RoomLink instance (already registered on the appropriate rooms)
-	 *
-	 * @example
-	 * // Two-way link: moving NORTH from roomA goes to roomB, and moving SOUTH from roomB returns to roomA
-	 * const link = RoomLink.createTunnel(roomA, DIRECTION.NORTH, roomB);
-	 *
-	 * @example
-	 * // One-way link: moving EAST from roomA goes to roomB, but moving WEST from roomB does not return to roomA
-	 * const oneWay = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB, true);
-	 */
-	static createTunnel(
-		fromRoom: Room,
-		direction: DIRECTION,
-		toRoom: Room,
-		oneWay: boolean = false
+	// Check to -> from (only if link is not one-way)
+	if (
+		!link.oneWay &&
+		fromRoom === link.to.room &&
+		direction === link.to.direction
 	) {
-		// infer the reverse direction automatically
-		const reverse = dir2reverse(direction);
-
-		const link = new RoomLink({
-			from: { room: fromRoom, direction },
-			to: { room: toRoom, direction: reverse },
-			oneWay,
-		});
-
-		// Register with the "from" room always
-		link._from.room.addLink(link);
-		// Register with the "to" room only for two-way links
-		if (!link._oneWay) link._to.room.addLink(link);
-		// Register in the global link registry for persistence/inspection
-		addRoomLink(link);
-
-		const fromRef =
-			fromRoom.getRoomRef() || `${fromRoom.x},${fromRoom.y},${fromRoom.z}`;
-		const toRef = toRoom.getRoomRef() || `${toRoom.x},${toRoom.y},${toRoom.z}`;
-		const dirText = dir2text(direction);
-		logger.debug("Created room link", {
-			type: oneWay ? "one-way" : "bidirectional",
-			from: fromRef,
-			direction: dirText,
-			to: toRef,
-		});
-
-		return link;
+		return link.from.room;
 	}
-
-	/**
-	 * Check if this link references a room in the specified dungeon.
-	 * Returns true if either endpoint of the link is in the given dungeon.
-	 *
-	 * @param dungeon The dungeon to check against
-	 * @returns true if either the from or to room is in the dungeon
-	 *
-	 * @example
-	 * ```typescript
-	 * const dungeon1 = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
-	 * const dungeon2 = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
-	 * const room1 = dungeon1.getRoom({ x: 0, y: 0, z: 0 });
-	 * const room2 = dungeon2.getRoom({ x: 0, y: 0, z: 0 });
-	 * const link = RoomLink.createTunnel(room1, DIRECTION.NORTH, room2);
-	 *
-	 * console.log(link.referencesDungeon(dungeon1)); // true
-	 * console.log(link.referencesDungeon(dungeon2)); // true
-	 * ```
-	 */
-	referencesDungeon(dungeon: Dungeon): boolean {
-		return (
-			this._from.room.dungeon === dungeon || this._to.room.dungeon === dungeon
-		);
-	}
-
-	/**
-	 * Resolve the linked destination when moving from `fromRoom` in `direction`.
-	 *
-	 * The Room class calls this method while evaluating `getStep()` so it can
-	 * discover linked rooms that override spatial adjacency. The resolution
-	 * rules are straightforward:
-	 * - If `fromRoom` matches the link's `_from.room` and `direction` equals
-	 *   `_from.direction`, return `_to.room`.
-	 * - If the link is two-way and `fromRoom` matches `_to.room` with
-	 *   `direction === _to.direction`, return `_from.room`.
-	 * - Otherwise return `undefined` to indicate this link does not handle the
-	 *   requested traversal.
-	 *
-	 * This method does not perform permission checks (canEnter/canExit) - it
-	 * only resolves spatial/linked connectivity. Permission checks are done
-	 * by the calling code (e.g., Movable.canStep).
-	 *
-	 * @param fromRoom The room where traversal begins
-	 * @param direction The direction of traversal
-	 * @returns The destination `Room` if this link handles the traversal, otherwise `undefined`
-	 */
-	getDestination(fromRoom: Room, direction: DIRECTION): Room | undefined {
-		// Check from -> to
-		if (fromRoom === this._from.room && direction === this._from.direction) {
-			return this._to.room;
-		}
-		// Check to -> from (only if link is not one-way)
-		if (
-			!this._oneWay &&
-			fromRoom === this._to.room &&
-			direction === this._to.direction
-		) {
-			return this._from.room;
-		}
-		return undefined;
-	}
-
-	/**
-	 * Remove this link from both connected rooms.
-	 *
-	 * This method detaches the link from any room that currently has it. The
-	 * operation is idempotent and safe to call multiple times: `removeLink`
-	 * on the rooms will simply ignore links that are not present.
-	 *
-	 * After calling `remove()` there are no references to this link left in
-	 * the connected rooms' _links arrays, but the RoomLink object itself is
-	 * not modified further - callers may keep or discard the instance as they
-	 * wish.
-	 */
-	remove() {
-		const fromRef =
-			this._from.room.getRoomRef() ||
-			`${this._from.room.x},${this._from.room.y},${this._from.room.z}`;
-		const toRef =
-			this._to.room.getRoomRef() ||
-			`${this._to.room.x},${this._to.room.y},${this._to.room.z}`;
-		const dirText = dir2text(this._from.direction);
-		logger.debug("Removing room link", {
-			type: this._oneWay ? "one-way" : "bidirectional",
-			from: fromRef,
-			direction: dirText,
-			to: toRef,
-		});
-
-		// Remove from connected rooms
-		this._from.room.removeLink(this);
-		this._to.room.removeLink(this);
-
-		// Remove from the global registry if present
-		removeRoomLink(this);
-	}
+	return undefined;
 }
 
 const baseSerializedTypes: Partial<
@@ -7671,7 +6975,7 @@ const baseSerializedTypes: Partial<
 			attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 			startingResourceCaps: { maxHealth: 0, maxMana: 0 },
 			resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-			skills: [],
+			abilities: [],
 			passives: [],
 			growthModifier: {
 				base: 1.0,
@@ -7684,7 +6988,7 @@ const baseSerializedTypes: Partial<
 			attributeGrowthPerLevel: { strength: 0, agility: 0, intelligence: 0 },
 			startingResourceCaps: { maxHealth: 0, maxMana: 0 },
 			resourceGrowthPerLevel: { maxHealth: 0, maxMana: 0 },
-			skills: [],
+			abilities: [],
 			passives: [],
 			growthModifier: {
 				base: 1.0,
@@ -7702,35 +7006,27 @@ const baseSerializedTypes: Partial<
 };
 
 /**
- * Global cache of templateId -> baseline serialization snapshots.
- * Populated when objects are created from templates outside of a dungeon registry.
- */
-const SAFE_TEMPLATE_BASE_CACHE: Map<string, SerializedDungeonObject> =
-	new Map();
-
-/**
  * Returns the baseline serialization for a given type and optional templateId.
  * Prefers the template baseline when available; falls back to type baseline.
  */
 function getCompressionBaseline(
 	type: SerializedDungeonObjectType,
-	templateId?: string
+	templateId?: string,
+	template?: DungeonObjectTemplate
 ): SerializedDungeonObject {
 	let base: SerializedDungeonObject | undefined = undefined;
-	if (templateId) {
-		const t = resolveTemplateById(templateId);
-		if (t) {
-			if (t.baseSerialized) {
-				base = t.baseSerialized;
-			} else {
-				// baseSerialized should be set by package layer during template loading
-				// If missing, fall back to type defaults
-				base = baseSerializedTypes[type];
-			}
+	if (templateId && template) {
+		// Template is provided by package layer (has registry access)
+		if (template.baseSerialized) {
+			base = template.baseSerialized;
 		} else {
-			const cached = SAFE_TEMPLATE_BASE_CACHE.get(templateId);
-			if (cached) base = cached;
+			// baseSerialized should be set by package layer during template loading
+			// If missing, fall back to type defaults
+			base = baseSerializedTypes[type];
 		}
+	} else if (templateId) {
+		const cached = resolveTemplateById(templateId);
+		if (cached) base = cached as SerializedDungeonObject;
 	}
 	return (base ?? baseSerializedTypes[type]) as SerializedDungeonObject;
 }
@@ -7738,17 +7034,18 @@ function getCompressionBaseline(
 /**
  * Produces a compressed serialized object by removing keys equal to baseline.
  * Always preserves 'type', 'oid' (if present), and includes 'templateId' when provided.
- * 
+ *
  * @param uncompressed The full serialized object to compress
  * @param templateId Optional template ID to use as baseline for compression
  * @returns Compressed serialized object with only fields that differ from baseline
  */
 export function compressSerializedObject<T extends SerializedDungeonObject>(
 	uncompressed: T,
-	templateId?: string
+	templateId?: string,
+	template?: DungeonObjectTemplate
 ): T {
 	const type = uncompressed.type;
-	const base = getCompressionBaseline(type, templateId);
+	const base = getCompressionBaseline(type, templateId, template);
 	const compressed: Partial<SerializedDungeonObject> = {
 		type,
 		...(uncompressed.oid !== undefined && { oid: uncompressed.oid }), // Include oid if present (instances only)
@@ -7762,40 +7059,21 @@ export function compressSerializedObject<T extends SerializedDungeonObject>(
 	>) {
 		if (key === "type") continue;
 		if (key === "templateId") continue;
-		if (key === "oid") continue; // Already handled above
-		if (key === "version") continue; // Always preserve version, skip compression
+		if (key === "oid") continue;
+		if (key === "version") continue;
 		const baseValue = (base as any)?.[key];
+		// if the value is an object and the base value is an object and the values are deep equal -- compress
+		if (
+			typeof value === "object" &&
+			typeof baseValue === "object" &&
+			isDeepStrictEqual(value, baseValue)
+		)
+			continue;
 		if (value !== baseValue) {
 			(compressed as any)[key] = value;
 		}
 	}
 	return compressed as T;
-}
-
-/**
- * Resolve a template id into a DungeonObjectTemplate.
- * Supports fully-qualified ids of the form "@<dungeonId>:<id>".
- * If no dungeon prefix is provided, attempts to find a matching template
- * in any registered dungeon (first match wins).
- */
-function resolveTemplateById(id: string): DungeonObjectTemplate | undefined {
-	// Parse @dungeon:id form
-	const m = id.match(/^@([^:]+):(.+)$/);
-	if (m) {
-		const dungeonId = m[1];
-		const templateId = m[2];
-		const dungeon = getDungeonById(dungeonId);
-		if (!dungeon) return undefined;
-		// Templates are stored with globalized IDs, so use the full id
-		return dungeon.templates.get(id);
-	}
-
-	// Fallback: scan all registered dungeons for a matching template id
-	for (const dungeon of DUNGEON_REGISTRY.values()) {
-		const t = dungeon.templates.get(id);
-		if (t) return t;
-	}
-	return undefined;
 }
 
 /**
@@ -7806,29 +7084,29 @@ function resolveTemplateById(id: string): DungeonObjectTemplate | undefined {
  * Exported for use by package layer deserializers.
  */
 export function normalizeSerializedData<T extends AnySerializedDungeonObject>(
-	data: T
+	data: T,
+	template?: DungeonObjectTemplate
 ): T {
 	const hasTemplate = data.templateId;
 	let base: Record<string, unknown> | undefined = undefined;
-	if (hasTemplate) {
-		const t = resolveTemplateById((data as any).templateId);
-		if (t) {
-			// Prefer cached template baseline when available
-			if (t.baseSerialized) {
-				base = { ...t.baseSerialized } as Record<string, unknown>;
-			} else {
-				// baseSerialized should be set by package layer during template loading
-				// If missing, fall back to type defaults
-				base = (baseSerializedTypes[t.type] ?? {}) as unknown as Record<
-					string,
-					unknown
-				>;
-			}
+	if (hasTemplate && template) {
+		// Template is provided by package layer (has registry access)
+		// Prefer cached template baseline when available
+		if (template.baseSerialized) {
+			base = { ...template.baseSerialized } as Record<string, unknown>;
 		} else {
-			// Fallback to global cache when not in registry
-			const cached = SAFE_TEMPLATE_BASE_CACHE.get(data.templateId!);
-			if (cached) base = { ...cached } as Record<string, unknown>;
+			// baseSerialized should be set by package layer during template loading
+			// If missing, fall back to type defaults
+			base = (baseSerializedTypes[template.type] ?? {}) as unknown as Record<
+				string,
+				unknown
+			>;
 		}
+	} else if (hasTemplate) {
+		// Fallback to global cache when template not provided
+
+		const cached = resolveTemplateById(data.templateId!);
+		if (cached) base = { ...cached } as Record<string, unknown>;
 	}
 
 	const type: SerializedDungeonObjectType =

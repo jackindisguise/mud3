@@ -20,7 +20,3 @@ export const effectTemplate: PassiveEffectTemplate = {
 	stackable: false,
 	incomingDamageMultiplier: 1.08,
 };
-
-
-
-

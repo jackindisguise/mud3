@@ -92,7 +92,7 @@ function displayHelpfile(actor: Mob, helpfile: Helpfile): void {
 	actor.sendMessage(box.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
-export default {
+export const command = {
 	pattern: "help~ <topic:word?>",
 	aliases: ["? <topic:word?>"],
 	execute(context: CommandContext, args: Map<string, any>): void {

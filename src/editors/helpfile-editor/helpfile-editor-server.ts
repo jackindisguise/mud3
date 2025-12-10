@@ -1,9 +1,8 @@
 /**
- * Archetype Editor HTTP Server
+ * Helpfile Editor HTTP Server
  *
- * Provides a web-based interface for editing race and job archetypes, including:
- * - Race archetype management
- * - Job archetype management
+ * Provides a web-based interface for editing helpfiles, including:
+ * - Helpfile management
  * - YAML editing with validation
  */
 
@@ -11,42 +10,38 @@ import { createServer, IncomingMessage, ServerResponse } from "http";
 import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "../logger.js";
+import logger from "../../logger.js";
 import {
-	createArchetypeEditorService,
-	ArchetypeEditorService,
-} from "./archetype-editor-service.js";
-import { getSafeRootDirectory } from "../utils/path.js";
+	createHelpfileEditorService,
+	HelpfileEditorService,
+} from "./helpfile-editor-service.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
 
-const PORT = 3001; // Different port from map editor
+const PORT = 3002; // Different port from archetype editor (3001) and map editor (3000)
 const ROOT_DIRECTORY = getSafeRootDirectory();
-const ARCHETYPE_EDITOR_DIR = join(ROOT_DIRECTORY, "archetype-editor");
+const HELPFILE_EDITOR_DIR = join(ROOT_DIRECTORY, "editors", "helpfile-editor");
 
-// Verify archetype editor directory exists at startup (async check)
-access(ARCHETYPE_EDITOR_DIR, FS_CONSTANTS.F_OK)
+// Verify helpfile editor directory exists at startup (async check)
+access(HELPFILE_EDITOR_DIR, FS_CONSTANTS.F_OK)
 	.then(() => {
-		logger.debug(`Archetype editor directory found: ${ARCHETYPE_EDITOR_DIR}`);
+		logger.debug(`Helpfile editor directory found: ${HELPFILE_EDITOR_DIR}`);
 	})
 	.catch((error) => {
-		logger.error(
-			`Archetype editor directory not found: ${ARCHETYPE_EDITOR_DIR}`
-		);
+		logger.error(`Helpfile editor directory not found: ${HELPFILE_EDITOR_DIR}`);
 		logger.error(`Current working directory: ${ROOT_DIRECTORY}`);
 	});
 
-interface ArchetypeEditorServer {
+interface HelpfileEditorServer {
 	server: ReturnType<typeof createServer>;
 	start(): Promise<void>;
 	stop(): Promise<void>;
 }
 
-class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
-	private readonly service: ArchetypeEditorService;
+class HelpfileEditorServerImpl implements HelpfileEditorServer {
+	private readonly service: HelpfileEditorService;
 	public server = createServer(this.handleRequest.bind(this));
 
-	constructor(
-		service: ArchetypeEditorService = createArchetypeEditorService()
-	) {
+	constructor(service: HelpfileEditorService = createHelpfileEditorService()) {
 		this.service = service;
 	}
 
@@ -74,7 +69,7 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 		try {
 			// Serve static files
 			if (path === "/" || path === "/index.html") {
-				const filePath = join(ARCHETYPE_EDITOR_DIR, "index.html");
+				const filePath = join(HELPFILE_EDITOR_DIR, "index.html");
 				logger.debug(`Serving index.html from: ${filePath}`);
 				await this.serveFile(res, filePath, "text/html");
 				return;
@@ -82,7 +77,7 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 
 			if (path.startsWith("/static/")) {
 				const filePath = path.replace("/static/", "");
-				const fullPath = join(ARCHETYPE_EDITOR_DIR, "static", filePath);
+				const fullPath = join(HELPFILE_EDITOR_DIR, "static", filePath);
 				logger.debug(`Serving static file: ${fullPath}`);
 				const ext = filePath.split(".").pop()?.toLowerCase();
 				const contentType =
@@ -96,77 +91,37 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 			}
 
 			// API endpoints
-			// List archetypes
-			if (path.startsWith("/api/races") && req.method === "GET") {
-				await this.listArchetypes(res, "race");
+			// List helpfiles
+			if (path === "/api/helpfiles" && req.method === "GET") {
+				await this.listHelpfiles(res);
 				return;
 			}
 
-			if (path.startsWith("/api/jobs") && req.method === "GET") {
-				await this.listArchetypes(res, "job");
-				return;
-			}
-
-			// Get archetype
-			if (path.startsWith("/api/races/") && req.method === "GET") {
+			// Get helpfile
+			if (path.startsWith("/api/helpfiles/") && req.method === "GET") {
 				const id = path.split("/")[3];
-				await this.getArchetype(res, id, "race");
+				await this.getHelpfile(res, id);
 				return;
 			}
 
-			if (path.startsWith("/api/jobs/") && req.method === "GET") {
+			// Create helpfile
+			if (path.startsWith("/api/helpfiles/") && req.method === "POST") {
 				const id = path.split("/")[3];
-				await this.getArchetype(res, id, "job");
+				await this.createHelpfile(req, res, id);
 				return;
 			}
 
-			// Create archetype
-			if (path.startsWith("/api/races/") && req.method === "POST") {
+			// Update helpfile
+			if (path.startsWith("/api/helpfiles/") && req.method === "PUT") {
 				const id = path.split("/")[3];
-				await this.createArchetype(req, res, id, "race");
+				await this.updateHelpfile(req, res, id);
 				return;
 			}
 
-			if (path.startsWith("/api/jobs/") && req.method === "POST") {
+			// Delete helpfile
+			if (path.startsWith("/api/helpfiles/") && req.method === "DELETE") {
 				const id = path.split("/")[3];
-				await this.createArchetype(req, res, id, "job");
-				return;
-			}
-
-			// Update archetype
-			if (path.startsWith("/api/races/") && req.method === "PUT") {
-				const id = path.split("/")[3];
-				await this.updateArchetype(req, res, id, "race");
-				return;
-			}
-
-			if (path.startsWith("/api/jobs/") && req.method === "PUT") {
-				const id = path.split("/")[3];
-				await this.updateArchetype(req, res, id, "job");
-				return;
-			}
-
-			// Delete archetype
-			if (path.startsWith("/api/races/") && req.method === "DELETE") {
-				const id = path.split("/")[3];
-				await this.deleteArchetype(res, id, "race");
-				return;
-			}
-
-			if (path.startsWith("/api/jobs/") && req.method === "DELETE") {
-				const id = path.split("/")[3];
-				await this.deleteArchetype(res, id, "job");
-				return;
-			}
-
-			// Get abilities list
-			if (path === "/api/abilities" && req.method === "GET") {
-				await this.getAbilities(res);
-				return;
-			}
-
-			if (path === "/api/passives" && req.method === "GET") {
-				await this.getPassives(res);
+				await this.deleteHelpfile(res, id);
 				return;
 			}
 
@@ -174,7 +129,7 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 			res.writeHead(404, { "Content-Type": "text/plain" });
 			res.end("Not Found");
 		} catch (error) {
-			logger.error(`Archetype editor server error: ${error}`);
+			logger.error(`Helpfile editor server error: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}
@@ -202,48 +157,40 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 		}
 	}
 
-	private async listArchetypes(
-		res: ServerResponse,
-		type: "race" | "job"
-	): Promise<void> {
+	private async listHelpfiles(res: ServerResponse): Promise<void> {
 		try {
-			const result = await this.service.listArchetypes(type);
+			const result = await this.service.listHelpfiles();
 			res.writeHead(200, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(result));
 		} catch (error) {
-			logger.error(`Failed to list ${type}s: ${error}`);
+			logger.error(`Failed to list helpfiles: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}
 	}
 
-	private async getArchetype(
-		res: ServerResponse,
-		id: string,
-		type: "race" | "job"
-	): Promise<void> {
+	private async getHelpfile(res: ServerResponse, id: string): Promise<void> {
 		try {
-			const data = await this.service.getArchetype(id, type);
+			const data = await this.service.getHelpfile(id);
 			res.writeHead(200, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(data));
 		} catch (error) {
 			const err = error as NodeJS.ErrnoException;
 			if (err.code === "ENOENT") {
 				res.writeHead(404, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ error: `${type} not found` }));
+				res.end(JSON.stringify({ error: "Helpfile not found" }));
 			} else {
-				logger.error(`Failed to read ${type} ${id}: ${error}`);
+				logger.error(`Failed to read helpfile ${id}: ${error}`);
 				res.writeHead(500, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: String(error) }));
 			}
 		}
 	}
 
-	private async createArchetype(
+	private async createHelpfile(
 		req: IncomingMessage,
 		res: ServerResponse,
-		id: string,
-		type: "race" | "job"
+		id: string
 	): Promise<void> {
 		let body = "";
 		for await (const chunk of req) {
@@ -253,36 +200,34 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 		const data = JSON.parse(body);
 
 		try {
-			const result = await this.service.createArchetype({
+			const result = await this.service.createHelpfile({
 				id,
-				type,
 				yaml: data.yaml,
 			});
 			res.writeHead(201, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(result));
 		} catch (error) {
 			const err = error as NodeJS.ErrnoException;
-			if (err.message === "Archetype already exists") {
+			if (err.message === "Helpfile already exists") {
 				res.writeHead(409, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: err.message }));
 				return;
 			}
-			if (err.message === "YAML data is required for archetype creation") {
+			if (err.message === "YAML data is required for helpfile creation") {
 				res.writeHead(400, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: err.message }));
 				return;
 			}
-			logger.error(`Failed to create ${type} ${id}: ${error}`);
+			logger.error(`Failed to create helpfile ${id}: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}
 	}
 
-	private async updateArchetype(
+	private async updateHelpfile(
 		req: IncomingMessage,
 		res: ServerResponse,
-		id: string,
-		type: "race" | "job"
+		id: string
 	): Promise<void> {
 		let body = "";
 		for await (const chunk of req) {
@@ -292,9 +237,8 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 		const data = JSON.parse(body);
 
 		try {
-			const result = await this.service.updateArchetype({
+			const result = await this.service.updateHelpfile({
 				id,
-				type,
 				yaml: data.yaml,
 			});
 			res.writeHead(200, { "Content-Type": "application/json" });
@@ -306,53 +250,25 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 				res.end(JSON.stringify({ error: err.message }));
 				return;
 			}
-			logger.error(`Failed to update ${type} ${id}: ${error}`);
+			logger.error(`Failed to update helpfile ${id}: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}
 	}
 
-	private async deleteArchetype(
-		res: ServerResponse,
-		id: string,
-		type: "race" | "job"
-	): Promise<void> {
+	private async deleteHelpfile(res: ServerResponse, id: string): Promise<void> {
 		try {
-			const result = await this.service.deleteArchetype(id, type);
+			const result = await this.service.deleteHelpfile(id);
 			res.writeHead(200, { "Content-Type": "application/json" });
 			res.end(JSON.stringify(result));
 		} catch (error) {
 			const err = error as Error;
-			if (err.message === `${type} not found`) {
+			if (err.message === "Helpfile not found") {
 				res.writeHead(404, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: err.message }));
 				return;
 			}
-			logger.error(`Failed to delete ${type} ${id}: ${error}`);
-			res.writeHead(500, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ error: String(error) }));
-		}
-	}
-
-	private async getAbilities(res: ServerResponse): Promise<void> {
-		try {
-			const abilities = this.service.getAbilities();
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ abilities }));
-		} catch (error) {
-			logger.error(`Failed to get abilities: ${error}`);
-			res.writeHead(500, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ error: String(error) }));
-		}
-	}
-
-	private async getPassives(res: ServerResponse): Promise<void> {
-		try {
-			const passives = this.service.getPassives();
-			res.writeHead(200, { "Content-Type": "application/json" });
-			res.end(JSON.stringify({ passives }));
-		} catch (error) {
-			logger.error(`Failed to get passives: ${error}`);
+			logger.error(`Failed to delete helpfile ${id}: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
 		}
@@ -362,7 +278,7 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 		return new Promise((resolve, reject) => {
 			this.server.listen(PORT, () => {
 				logger.info(
-					`Archetype editor server listening on http://localhost:${PORT}`
+					`Helpfile editor server listening on http://localhost:${PORT}`
 				);
 				resolve();
 			});
@@ -373,13 +289,13 @@ class ArchetypeEditorServerImpl implements ArchetypeEditorServer {
 	public async stop(): Promise<void> {
 		return new Promise((resolve) => {
 			this.server.close(() => {
-				logger.info("Archetype editor server stopped");
+				logger.info("Helpfile editor server stopped");
 				resolve();
 			});
 		});
 	}
 }
 
-export function createArchetypeEditorServer(): ArchetypeEditorServer {
-	return new ArchetypeEditorServerImpl();
+export function createHelpfileEditorServer(): HelpfileEditorServer {
+	return new HelpfileEditorServerImpl();
 }

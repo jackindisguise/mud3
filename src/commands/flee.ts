@@ -22,7 +22,7 @@ import { DIRECTION, DIRECTIONS, dir2text } from "../direction.js";
 import { CommandObject } from "../package/commands.js";
 import { act } from "../act.js";
 
-export default {
+export const command = {
 	pattern: "flee~",
 	aliases: ["run~", "escape~"],
 	priority: PRIORITY.HIGH,

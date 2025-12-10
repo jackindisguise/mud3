@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 8
     maxMana: 6
-  skills:
+  abilities:
     - id: lucky-escape
       level: 1
   passives:

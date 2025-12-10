@@ -1,0 +1,32 @@
+version: 1.0.0
+dungeon:
+  id: tower-basement
+  name: tower-basement
+  dimensions:
+    width: 10
+    height: 10
+    layers: 1
+  grid:
+    - - [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      - [0, 0, 1, 1, 1, 1, 1, 1, 0, 0]
+      - [0, 1, 1, 2, 2, 2, 2, 1, 1, 0]
+      - [0, 1, 2, 2, 2, 2, 2, 2, 1, 0]
+      - [0, 1, 2, 2, 2, 2, 2, 2, 1, 0]
+      - [0, 1, 2, 2, 2, 2, 2, 2, 1, 0]
+      - [0, 1, 2, 2, 2, 2, 2, 2, 1, 0]
+      - [0, 1, 1, 2, 2, 2, 2, 1, 1, 0]
+      - [0, 0, 1, 1, 1, 1, 1, 1, 0, 0]
+      - [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rooms:
+    - display: Tower Wall
+      description: ''
+      allowedExits: 255
+      mapText: '#'
+      mapColor: grey
+    - display: Tower Basement
+      description: It's the tower's basement.
+      mapText: .
+      mapColor: olive
+      allowedExits: 255
+  templates: []
+  resets: []

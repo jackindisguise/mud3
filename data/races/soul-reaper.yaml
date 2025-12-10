@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 10
     maxMana: 11
-  skills:
+  abilities:
     - id: zanpakuto-release
       level: 1
   passives:

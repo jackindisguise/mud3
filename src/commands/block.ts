@@ -23,7 +23,7 @@ import { CommandObject } from "../package/commands.js";
 import { color, COLOR } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
 
-export default {
+export const command = {
 	pattern: "block <username:word?>",
 	aliases: ["ignore <username:word?>"],
 	execute(context: CommandContext, args: Map<string, any>): void {

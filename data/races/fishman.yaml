@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 12
     maxMana: 7
-  skills:
+  abilities:
     - id: fishman-karate
       level: 1
   passives:

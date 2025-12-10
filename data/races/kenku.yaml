@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 7
     maxMana: 9
-  skills:
+  abilities:
     - id: mimic-call
       level: 1
   passives:

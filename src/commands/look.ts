@@ -34,7 +34,7 @@ import {
 import logger from "../logger.js";
 import { capitalizeFirst } from "../utils/string.js";
 
-export default {
+export const command = {
 	pattern: "look~",
 	aliases: [
 		"look~ <target:object@all>",

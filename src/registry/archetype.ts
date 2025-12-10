@@ -44,7 +44,6 @@ export function registerRace(definition: BaseArchetypeDefinition): Race {
 		logger.warn(`Overriding existing race archetype with id "${frozen.id}"`);
 	}
 	RACE_REGISTRY.set(frozen.id, frozen);
-	logger.debug(`Registered race: ${frozen.id} (${frozen.name})`);
 	return frozen;
 }
 
@@ -60,7 +59,6 @@ export function registerJob(definition: BaseArchetypeDefinition): Job {
 		logger.warn(`Overriding existing job archetype with id "${frozen.id}"`);
 	}
 	JOB_REGISTRY.set(frozen.id, frozen);
-	logger.debug(`Registered job: ${frozen.id} (${frozen.name})`);
 	return frozen;
 }
 

@@ -6,7 +6,7 @@ function describeCommand(entry: ActionQueueEntry | undefined): string {
 	return entry?.command?.pattern ?? "action";
 }
 
-export default {
+export const command = {
 	pattern: "cancel <scope:word?>",
 	execute(context, args): void {
 		const actor = context.actor;

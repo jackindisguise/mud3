@@ -24,7 +24,7 @@ import { restRegeneration } from "../regeneration.js";
 
 const REST_COOLDOWN_MS = 30 * 1000; // 30 seconds
 
-export default {
+export const command = {
 	pattern: "rest~",
 	priority: PRIORITY.HIGH,
 	cooldown: (context: CommandContext, args: Map<string, any>) => {

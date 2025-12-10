@@ -40,21 +40,21 @@
 					"$ref": "#/definitions/resourceCaps",
 					"description": "Amount maximum health and mana increase per level gained."
 				},
-				"skills": {
+				"abilities": {
 					"type": "array",
-					"description": "List of skills available to this archetype with their starting levels.",
+					"description": "List of abilities available to this archetype with their starting levels.",
 					"items": {
 						"type": "object",
 						"required": ["id", "level"],
 						"properties": {
 							"id": {
 								"type": "string",
-								"description": "Unique identifier of the skill."
+								"description": "Unique identifier of the ability."
 							},
 							"level": {
 								"type": "integer",
 								"minimum": 1,
-								"description": "Starting level of the skill (minimum 1)."
+								"description": "Starting level of the ability (minimum 1)."
 							}
 						},
 						"additionalProperties": false

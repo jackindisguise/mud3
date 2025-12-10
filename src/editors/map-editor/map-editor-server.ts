@@ -13,16 +13,16 @@ import { createServer, IncomingMessage, ServerResponse } from "http";
 import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "../logger.js";
+import logger from "../../logger.js";
 import {
 	createMapEditorService,
 	MapEditorService,
 } from "./map-editor-service.js";
-import { getSafeRootDirectory } from "../utils/path.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
 
 const PORT = 3000;
 const ROOT_DIRECTORY = getSafeRootDirectory();
-const MAP_EDITOR_DIR = join(ROOT_DIRECTORY, "map-editor");
+const MAP_EDITOR_DIR = join(ROOT_DIRECTORY, "editors", "map-editor");
 
 // Verify map editor directory exists at startup (async check)
 access(MAP_EDITOR_DIR, FS_CONSTANTS.F_OK)
@@ -144,6 +144,11 @@ class MapEditorServerImpl implements MapEditorServer {
 
 			if (path === "/api/weapon-types" && req.method === "GET") {
 				await this.getWeaponTypes(res);
+				return;
+			}
+
+			if (path === "/api/log-action" && req.method === "POST") {
+				await this.logAction(req, res);
 				return;
 			}
 
@@ -360,6 +365,36 @@ class MapEditorServerImpl implements MapEditorServer {
 			logger.error(`Failed to get weapon types: ${error}`);
 			res.writeHead(500, { "Content-Type": "application/json" });
 			res.end(JSON.stringify({ error: String(error) }));
+		}
+	}
+
+	private async logAction(
+		req: IncomingMessage,
+		res: ServerResponse
+	): Promise<void> {
+		let body = "";
+		for await (const chunk of req) {
+			body += chunk;
+		}
+
+		try {
+			const data = JSON.parse(body);
+			const result = await this.service.logAction({
+				dungeonId: data.dungeonId ?? null,
+				action: data.action,
+				actionTarget: data.actionTarget ?? null,
+				newParameters: data.newParameters,
+				oldParameters: data.oldParameters,
+				metadata: data.metadata,
+				timestamp: data.timestamp,
+			});
+			res.writeHead(200, { "Content-Type": "application/json" });
+			res.end(JSON.stringify(result));
+		} catch (error) {
+			logger.error(`Failed to log action: ${error}`);
+			const err = error as Error;
+			res.writeHead(400, { "Content-Type": "application/json" });
+			res.end(JSON.stringify({ error: err.message }));
 		}
 	}
 

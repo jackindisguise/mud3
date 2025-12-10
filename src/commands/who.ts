@@ -34,7 +34,7 @@ import { LINEBREAK } from "../core/telnet.js";
 import { color, COLOR, SIZER } from "../core/color.js";
 import { string } from "mud-ext";
 
-export default {
+export const command = {
 	pattern: "who~",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const { actor } = context;

@@ -34,6 +34,6 @@ months:
     days: 31
 millisecondsPerSecond: 16.666666666666667 # 60 in-game seconds per IRL second
 secondsPerMinute: 60 # 1 in-game minute per IRL second
-minutesPerHour: 60 # 1 in-game hour per IRL minute
-hoursPerDay: 24 # 1 in-game day per IRL 24 minutes
-# 60 in-game days per IRL day
+minutesPerHour: 30 # 2 in-game hours per IRL minute
+hoursPerDay: 24 # 1 in-game day per IRL 12 minutes
+# 120 in-game days per IRL day

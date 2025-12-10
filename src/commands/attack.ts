@@ -24,7 +24,7 @@ import { CommandObject } from "../package/commands.js";
 import { initiateCombat, addToCombatQueue } from "../combat.js";
 import { capitalizeFirst } from "../utils/string.js";
 
-export default {
+export const command = {
 	pattern: "attack~ <target:mob>",
 	aliases: ["engage~ <target:mob>", "kill~ <target:mob>"],
 	priority: PRIORITY.LOW,

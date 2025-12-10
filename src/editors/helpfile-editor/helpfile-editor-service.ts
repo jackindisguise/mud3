@@ -10,8 +10,8 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import { join, extname, dirname } from "path";
 import YAML from "js-yaml";
-import logger from "../logger.js";
-import { getSafeRootDirectory } from "../utils/path.js";
+import logger from "../../logger.js";
+import { getSafeRootDirectory } from "../../utils/path.js";
 
 export interface HelpfileListResponse {
 	helpfiles: string[];
@@ -149,4 +149,3 @@ export function createHelpfileEditorService(
 ): HelpfileEditorService {
 	return new HelpfileEditorService(config);
 }
-

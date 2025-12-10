@@ -23,7 +23,7 @@ import { CHANNEL, formatChannelMessage } from "../core/channel.js";
 import { getSocialCommand, getSocialCommandNames } from "../social.js";
 import { formatSocialMessage } from "./_social.js";
 
-export default {
+export const command = {
 	pattern: "gocial~ <emote:word> <target:character?>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const emoteName = (args.get("emote") as string).toLowerCase();

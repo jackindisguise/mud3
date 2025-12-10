@@ -20,7 +20,7 @@ import { CommandObject } from "../package/commands.js";
 import { saveCharacter } from "../package/character.js";
 import logger from "../logger.js";
 
-export default {
+export const command = {
 	pattern: "quit~",
 	aliases: ["savequit"],
 	execute(context: CommandContext): void {

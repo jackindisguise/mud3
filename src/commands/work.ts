@@ -4,7 +4,7 @@ import type { CommandObject } from "../package/commands.js";
 
 const WORK_COOLDOWN_MS = 3_000;
 
-export default {
+export const command = {
 	pattern: "work",
 	cooldown: WORK_COOLDOWN_MS,
 	execute(context: CommandContext): void {

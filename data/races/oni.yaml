@@ -17,7 +17,7 @@ archetype:
   resourceGrowthPerLevel:
     maxHealth: 15
     maxMana: 8
-  skills:
+  abilities:
     - id: blood-demon-art
       level: 1
   passives:

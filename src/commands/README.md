@@ -35,6 +35,7 @@ The `CommandObject` includes:
 - `pattern` - Command pattern string (e.g., `"north~"`, `"get <item:word>"`)
 - `execute` - Handler function that receives `CommandContext` and parsed arguments
 - `priority` - Optional priority level (HIGH, NORMAL, LOW)
+- `adminOnly` - Optional boolean flag to restrict command to admin users only
 - `cooldown` - Optional cooldown function/value
 
 ## Command Categories
@@ -47,6 +48,7 @@ The `CommandObject` includes:
 - **Boards** - `board.ts`, `boards.ts`, `changes.ts`
 - **Communication** - `busy.ts` - Busy mode and message queuing management
 - **System** - `save.ts`, `quit.ts`, `help.ts`, `commands.ts`, `config.ts`, `calendar.ts`
+- **Admin** - `exec.ts` - Execute JavaScript code in sandboxed context, `shutdown.ts` - Gracefully shutdown the game server
 
 ## Examples
 
@@ -62,6 +64,17 @@ export default {
     const {actor} = context;
     const location = getLocation(LOCATION.START);
     // Move character to start location
+  },
+} satisfies CommandObject;
+```
+
+```typescript
+// ✅ Good: Admin-only command
+export default {
+  pattern: "shutdown~",
+  adminOnly: true,
+  execute(context: CommandContext): void {
+    // Only admin users can execute this command
   },
 } satisfies CommandObject;
 ```

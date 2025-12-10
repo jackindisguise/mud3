@@ -17,7 +17,7 @@ import { CommandObject } from "../package/commands.js";
 import { getLocation, LOCATION } from "../registry/locations.js";
 import { act } from "../act.js";
 
-export default {
+export const command = {
 	pattern: "recall~",
 	priority: PRIORITY.HIGH,
 	execute(context: CommandContext): void {

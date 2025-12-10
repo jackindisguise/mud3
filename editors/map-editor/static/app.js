@@ -140,6 +140,9 @@ const EDITOR_ACTIONS = Object.freeze({
 	RESIZE_DUNGEON: "RESIZE_DUNGEON",
 	RESTORE_UNSAVED_WORK: "RESTORE_UNSAVED_WORK",
 	EDIT_ROOM_EXIT_OVERRIDE: "EDIT_ROOM_EXIT_OVERRIDE",
+	CREATE_SHOPKEEPER_INVENTORY: "CREATE_SHOPKEEPER_INVENTORY",
+	EDIT_SHOPKEEPER_INVENTORY: "EDIT_SHOPKEEPER_INVENTORY",
+	DELETE_SHOPKEEPER_INVENTORY: "DELETE_SHOPKEEPER_INVENTORY",
 });
 
 class MapEditor {
@@ -1211,6 +1214,107 @@ class MapEditor {
 					objectList.appendChild(item);
 				});
 		}
+
+		// Load shopkeeper inventories
+		this.loadShopkeeperInventories(dungeon);
+	}
+
+	loadShopkeeperInventories(dungeon) {
+		const list = document.getElementById("shopkeeper-inventories");
+		if (!list) return;
+		list.innerHTML = "";
+
+		if (
+			!dungeon.shopkeeperInventories ||
+			dungeon.shopkeeperInventories.length === 0
+		) {
+			const emptyMsg = document.createElement("div");
+			emptyMsg.className = "template-list-empty";
+			emptyMsg.textContent = "No shopkeeper inventories";
+			list.appendChild(emptyMsg);
+			return;
+		}
+
+		dungeon.shopkeeperInventories.forEach((inventory) => {
+			const item = this.createShopkeeperInventoryItem(inventory);
+			list.appendChild(item);
+		});
+	}
+
+	loadShopkeeperInventoryDropdown(selectedId) {
+		const select = document.getElementById("template-shopkeeper-inventory");
+		if (!select) return;
+
+		const dungeon = this.yamlData?.dungeon;
+		if (!dungeon) return;
+
+		// Clear existing options except the first one
+		select.innerHTML = '<option value="">Select inventory...</option>';
+
+		const inventories = dungeon.shopkeeperInventories || [];
+		inventories.forEach((inv) => {
+			const option = document.createElement("option");
+			option.value = inv.id;
+			option.textContent = inv.id;
+			// Handle both local and globalized IDs
+			if (
+				selectedId === inv.id ||
+				selectedId === `@${this.currentDungeonId}:${inv.id}`
+			) {
+				option.selected = true;
+			}
+			select.appendChild(option);
+		});
+	}
+
+	createShopkeeperInventoryItem(inventory) {
+		const item = document.createElement("div");
+		item.className = "template-item";
+		item.dataset.id = inventory.id;
+		const rulesCount = inventory.rules?.length || 0;
+		item.innerHTML = `
+			<div class="template-item-content">
+				<h3>${inventory.id}</h3>
+				<p>${rulesCount} restock rule${rulesCount !== 1 ? "s" : ""} • Buy: ${
+			inventory.buyPriceMultiplier ?? 1.25
+		}x • Sell: ${inventory.sellPriceMultiplier ?? 0.75}x</p>
+				<div class="template-item-actions">
+					<button class="template-edit-btn" title="Edit inventory">✏️</button>
+					<button class="template-delete-btn" title="Delete inventory">🗑️</button>
+				</div>
+			</div>
+		`;
+
+		item.addEventListener("click", () => {
+			document
+				.querySelectorAll(".template-item")
+				.forEach((i) => i.classList.remove("selected"));
+			item.classList.add("selected");
+		});
+
+		item.addEventListener("contextmenu", (e) => {
+			e.preventDefault();
+			this.editShopkeeperInventory(inventory.id);
+		});
+
+		const editBtn = item.querySelector(".template-edit-btn");
+		const deleteBtn = item.querySelector(".template-delete-btn");
+
+		if (editBtn) {
+			editBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this.editShopkeeperInventory(inventory.id);
+			});
+		}
+
+		if (deleteBtn) {
+			deleteBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				this.deleteShopkeeperInventory(inventory.id);
+			});
+		}
+
+		return item;
 	}
 
 	createTemplateItem(type, id, display, description) {
@@ -2850,6 +2954,493 @@ class MapEditor {
 		this.showTemplateModal(type, id, template);
 	}
 
+	async editShopkeeperInventory(id) {
+		const dungeon = this.yamlData.dungeon;
+		let inventory = dungeon.shopkeeperInventories?.find((inv) => inv.id === id);
+
+		if (!inventory) {
+			// Create new inventory
+			inventory = {
+				id: id || "",
+				buyPriceMultiplier: 1.25,
+				sellPriceMultiplier: 0.75,
+				rules: [],
+			};
+		}
+
+		await this.showShopkeeperInventoryModal(inventory);
+	}
+
+	deleteShopkeeperInventory(id) {
+		const dungeon = this.yamlData.dungeon;
+		if (!dungeon.shopkeeperInventories) return;
+
+		const index = dungeon.shopkeeperInventories.findIndex(
+			(inv) => inv.id === id
+		);
+		if (index === -1) return;
+
+		if (confirm(`Delete shopkeeper inventory "${id}"?`)) {
+			// Save state to history before making changes
+			this.saveStateToHistory();
+
+			const deletedInventory = dungeon.shopkeeperInventories[index];
+			dungeon.shopkeeperInventories.splice(index, 1);
+			if (dungeon.shopkeeperInventories.length === 0) {
+				delete dungeon.shopkeeperInventories;
+			}
+			this.loadShopkeeperInventories(dungeon);
+
+			this.makeChange({
+				action: EDITOR_ACTIONS.DELETE_SHOPKEEPER_INVENTORY,
+				actionTarget: id,
+				oldParameters: {
+					id: deletedInventory.id,
+					buyPriceMultiplier: deletedInventory.buyPriceMultiplier,
+					sellPriceMultiplier: deletedInventory.sellPriceMultiplier,
+					rulesCount: deletedInventory.rules?.length || 0,
+				},
+			});
+		}
+	}
+
+	async showShopkeeperInventoryModal(inventory) {
+		const modal = document.getElementById("template-modal");
+		const title = document.getElementById("modal-title");
+		const body = document.getElementById("modal-body");
+
+		title.textContent = inventory.id
+			? `Edit Shopkeeper Inventory: ${inventory.id}`
+			: "New Shopkeeper Inventory";
+
+		// Load all item templates for the restock rule selector
+		// Include Item, Equipment, Armor, and Weapon types (all are items)
+		const allTemplates = await this.loadAllDungeonTemplates();
+		const itemTemplates = allTemplates.filter(
+			(t) =>
+				t.type === "Item" ||
+				t.type === "Equipment" ||
+				t.type === "Armor" ||
+				t.type === "Weapon"
+		);
+
+		// Build restock rules HTML
+		const rulesHtml = (inventory.rules || [])
+			.map((rule, index) => {
+				const templateId = rule.templateId || "";
+				const template = itemTemplates.find(
+					(t) => t.globalId === templateId || t.localId === templateId
+				);
+				const templateDisplay = template
+					? template.display || template.localId
+					: templateId;
+				const isInfinite =
+					rule.minimum === undefined &&
+					rule.maximum === undefined &&
+					rule.cycleDelay === undefined;
+
+				return `
+					<div class="restock-rule-item" data-index="${index}">
+						<div class="restock-rule-header">
+							<select class="restock-rule-template" data-index="${index}">
+								<option value="">Select template...</option>
+								${itemTemplates
+									.map(
+										(t) =>
+											`<option value="${t.globalId}" ${
+												templateId === t.globalId || templateId === t.localId
+													? "selected"
+													: ""
+											}>${t.display || t.localId} (${t.dungeonId})</option>`
+									)
+									.join("")}
+							</select>
+							<button type="button" class="restock-rule-delete" data-index="${index}" title="Delete rule">🗑️</button>
+						</div>
+						<div class="restock-rule-fields">
+							<div class="form-group-inline">
+								<label>Min:</label>
+								<input type="number" class="restock-rule-min" data-index="${index}" value="${
+					rule.minimum ?? ""
+				}" placeholder="∞" min="0">
+							</div>
+							<div class="form-group-inline">
+								<label>Max:</label>
+								<input type="number" class="restock-rule-max" data-index="${index}" value="${
+					rule.maximum ?? ""
+				}" placeholder="∞" min="0">
+							</div>
+							<div class="form-group-inline">
+								<label>Cycle Delay:</label>
+								<input type="number" class="restock-rule-delay" data-index="${index}" value="${
+					rule.cycleDelay ?? ""
+				}" placeholder="∞" min="0">
+							</div>
+							${isInfinite ? '<span class="infinite-stock-badge">Infinite Stock</span>' : ""}
+						</div>
+					</div>
+				`;
+			})
+			.join("");
+
+		body.innerHTML = `
+			<div class="form-group">
+				<label>Inventory ID</label>
+				<input type="text" id="shopkeeper-inventory-id" value="${
+					inventory.id
+				}" placeholder="e.g., general-store" ${inventory.id ? "readonly" : ""}>
+				<p style="font-size: 0.85rem; color: #aaa; margin-top: 0.25rem;">
+					${
+						inventory.id
+							? "ID cannot be changed after creation"
+							: "Unique identifier for this inventory"
+					}
+				</p>
+			</div>
+			<div class="form-group">
+				<label>Buy Price Multiplier</label>
+				<input type="number" id="shopkeeper-buy-multiplier" value="${
+					inventory.buyPriceMultiplier ?? 1.25
+				}" step="0.01" min="0.01">
+				<p style="font-size: 0.85rem; color: #aaa; margin-top: 0.25rem;">
+					Multiplier applied to item value when players buy (default: 1.25)
+				</p>
+			</div>
+			<div class="form-group">
+				<label>Sell Price Multiplier</label>
+				<input type="number" id="shopkeeper-sell-multiplier" value="${
+					inventory.sellPriceMultiplier ?? 0.75
+				}" step="0.01" min="0.01">
+				<p style="font-size: 0.85rem; color: #aaa; margin-top: 0.25rem;">
+					Multiplier applied to item value when players sell (default: 0.75)
+				</p>
+			</div>
+			<div class="form-group">
+				<label>Restock Rules</label>
+				<p style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.75rem;">
+					Define what items this shopkeeper stocks. Leave min/max/delay empty for infinite stock.
+				</p>
+				<div id="restock-rules-container">
+					${
+						rulesHtml ||
+						'<div class="restock-rules-empty">No restock rules. Click "Add Rule" to add one.</div>'
+					}
+				</div>
+				<button type="button" id="add-restock-rule-btn" class="add-btn" style="margin-top: 0.5rem;">+ Add Restock Rule</button>
+			</div>
+		`;
+
+		// Set up event listeners
+		const addRuleBtn = document.getElementById("add-restock-rule-btn");
+		addRuleBtn.addEventListener("click", async () => {
+			await this.addRestockRule(itemTemplates);
+		});
+
+		// Store itemTemplates for use in addRestockRule
+		this.currentShopkeeperItemTemplates = itemTemplates;
+
+		// Set up delete buttons
+		body.querySelectorAll(".restock-rule-delete").forEach((btn) => {
+			btn.addEventListener("click", (e) => {
+				const index = parseInt(e.target.dataset.index);
+				this.removeRestockRule(index);
+			});
+		});
+
+		// Set up template change handlers to update infinite stock badge
+		body.querySelectorAll(".restock-rule-template").forEach((select) => {
+			select.addEventListener("change", () => {
+				this.updateRestockRuleInfiniteBadge(parseInt(select.dataset.index));
+			});
+		});
+
+		body
+			.querySelectorAll(
+				".restock-rule-min, .restock-rule-max, .restock-rule-delay"
+			)
+			.forEach((input) => {
+				input.addEventListener("input", () => {
+					this.updateRestockRuleInfiniteBadge(parseInt(input.dataset.index));
+				});
+			});
+
+		// Show modal
+		modal.classList.add("active");
+
+		// Set up save handler
+		const saveBtn = document.getElementById("modal-save");
+		if (saveBtn) {
+			saveBtn.onclick = () => {
+				this.saveShopkeeperInventory(inventory.id);
+			};
+		}
+
+		// Set up cancel handler
+		const cancelBtn = document.getElementById("modal-cancel");
+		if (cancelBtn) {
+			cancelBtn.onclick = () => {
+				modal.classList.remove("active");
+			};
+		}
+
+		// Set up close button handler
+		const closeBtn = modal.querySelector(".close");
+		if (closeBtn) {
+			closeBtn.onclick = () => {
+				modal.classList.remove("active");
+			};
+		}
+	}
+
+	async addRestockRule(itemTemplates) {
+		// If itemTemplates not provided, use stored ones or reload them
+		if (!itemTemplates || itemTemplates.length === 0) {
+			itemTemplates = this.currentShopkeeperItemTemplates;
+			if (!itemTemplates || itemTemplates.length === 0) {
+				const allTemplates = await this.loadAllDungeonTemplates();
+				itemTemplates = allTemplates.filter(
+					(t) =>
+						t.type === "Item" ||
+						t.type === "Equipment" ||
+						t.type === "Armor" ||
+						t.type === "Weapon"
+				);
+				this.currentShopkeeperItemTemplates = itemTemplates;
+			}
+		}
+
+		const container = document.getElementById("restock-rules-container");
+		const emptyMsg = container.querySelector(".restock-rules-empty");
+		if (emptyMsg) emptyMsg.remove();
+
+		const index = container.querySelectorAll(".restock-rule-item").length;
+		const ruleItem = document.createElement("div");
+		ruleItem.className = "restock-rule-item";
+		ruleItem.dataset.index = index;
+		ruleItem.innerHTML = `
+			<div class="restock-rule-header">
+				<select class="restock-rule-template" data-index="${index}">
+					<option value="">Select template...</option>
+					${itemTemplates
+						.map(
+							(t) =>
+								`<option value="${t.globalId}">${t.display || t.localId} (${
+									t.dungeonId
+								})</option>`
+						)
+						.join("")}
+				</select>
+				<button type="button" class="restock-rule-delete" data-index="${index}" title="Delete rule">🗑️</button>
+			</div>
+			<div class="restock-rule-fields">
+				<div class="form-group-inline">
+					<label>Min:</label>
+					<input type="number" class="restock-rule-min" data-index="${index}" placeholder="∞" min="0">
+				</div>
+				<div class="form-group-inline">
+					<label>Max:</label>
+					<input type="number" class="restock-rule-max" data-index="${index}" placeholder="∞" min="0">
+				</div>
+				<div class="form-group-inline">
+					<label>Cycle Delay:</label>
+					<input type="number" class="restock-rule-delay" data-index="${index}" placeholder="∞" min="0">
+				</div>
+			</div>
+		`;
+
+		// Set up event listeners
+		const deleteBtn = ruleItem.querySelector(".restock-rule-delete");
+		deleteBtn.addEventListener("click", () => {
+			this.removeRestockRule(index);
+		});
+
+		const templateSelect = ruleItem.querySelector(".restock-rule-template");
+		templateSelect.addEventListener("change", () => {
+			this.updateRestockRuleInfiniteBadge(index);
+		});
+
+		ruleItem
+			.querySelectorAll(
+				".restock-rule-min, .restock-rule-max, .restock-rule-delay"
+			)
+			.forEach((input) => {
+				input.addEventListener("input", () => {
+					this.updateRestockRuleInfiniteBadge(index);
+				});
+			});
+
+		container.appendChild(ruleItem);
+	}
+
+	removeRestockRule(index) {
+		const container = document.getElementById("restock-rules-container");
+		const ruleItem = container.querySelector(
+			`.restock-rule-item[data-index="${index}"]`
+		);
+		if (ruleItem) {
+			ruleItem.remove();
+			// Re-index remaining rules
+			container
+				.querySelectorAll(".restock-rule-item")
+				.forEach((item, newIndex) => {
+					item.dataset.index = newIndex;
+					item.querySelectorAll("[data-index]").forEach((el) => {
+						el.dataset.index = newIndex;
+					});
+				});
+			// Show empty message if no rules left
+			if (container.querySelectorAll(".restock-rule-item").length === 0) {
+				container.innerHTML =
+					'<div class="restock-rules-empty">No restock rules. Click "Add Rule" to add one.</div>';
+			}
+		}
+	}
+
+	updateRestockRuleInfiniteBadge(index) {
+		const container = document.getElementById("restock-rules-container");
+		const ruleItem = container.querySelector(
+			`.restock-rule-item[data-index="${index}"]`
+		);
+		if (!ruleItem) return;
+
+		const min = ruleItem.querySelector(".restock-rule-min").value;
+		const max = ruleItem.querySelector(".restock-rule-max").value;
+		const delay = ruleItem.querySelector(".restock-rule-delay").value;
+		const isInfinite = !min && !max && !delay;
+
+		let badge = ruleItem.querySelector(".infinite-stock-badge");
+		if (isInfinite) {
+			if (!badge) {
+				badge = document.createElement("span");
+				badge.className = "infinite-stock-badge";
+				ruleItem.querySelector(".restock-rule-fields").appendChild(badge);
+			}
+			badge.textContent = "Infinite Stock";
+		} else if (badge) {
+			badge.remove();
+		}
+	}
+
+	saveShopkeeperInventory(oldId) {
+		const dungeon = this.yamlData.dungeon;
+		const idInput = document.getElementById("shopkeeper-inventory-id");
+		const buyMultiplierInput = document.getElementById(
+			"shopkeeper-buy-multiplier"
+		);
+		const sellMultiplierInput = document.getElementById(
+			"shopkeeper-sell-multiplier"
+		);
+
+		const id = idInput.value.trim();
+		if (!id) {
+			alert("Inventory ID is required");
+			return;
+		}
+
+		// Check for duplicate IDs (unless editing the same one)
+		if (id !== oldId) {
+			const existing = dungeon.shopkeeperInventories?.find(
+				(inv) => inv.id === id
+			);
+			if (existing) {
+				alert(`Inventory ID "${id}" already exists`);
+				return;
+			}
+		}
+
+		// Collect restock rules
+		const rules = [];
+		const container = document.getElementById("restock-rules-container");
+		container.querySelectorAll(".restock-rule-item").forEach((ruleItem) => {
+			const templateSelect = ruleItem.querySelector(".restock-rule-template");
+			const templateId = templateSelect.value;
+			if (!templateId) return; // Skip rules without templates
+
+			const minInput = ruleItem.querySelector(".restock-rule-min");
+			const maxInput = ruleItem.querySelector(".restock-rule-max");
+			const delayInput = ruleItem.querySelector(".restock-rule-delay");
+
+			const rule = {
+				templateId: templateId,
+			};
+
+			if (minInput.value) rule.minimum = parseInt(minInput.value);
+			if (maxInput.value) rule.maximum = parseInt(maxInput.value);
+			if (delayInput.value) rule.cycleDelay = parseInt(delayInput.value);
+
+			rules.push(rule);
+		});
+
+		// Save state to history before making changes
+		this.saveStateToHistory();
+
+		// Create or update inventory
+		const inventory = {
+			id: id,
+			buyPriceMultiplier: parseFloat(buyMultiplierInput.value) || 1.25,
+			sellPriceMultiplier: parseFloat(sellMultiplierInput.value) || 0.75,
+			rules: rules,
+		};
+
+		// Initialize array if needed
+		if (!dungeon.shopkeeperInventories) {
+			dungeon.shopkeeperInventories = [];
+		}
+
+		// Determine if this is a create or edit operation
+		const isEdit = oldId && oldId !== id;
+		let oldInventory = null;
+		if (oldId) {
+			const index = dungeon.shopkeeperInventories.findIndex(
+				(inv) => inv.id === oldId
+			);
+			if (index !== -1) {
+				oldInventory = JSON.parse(
+					JSON.stringify(dungeon.shopkeeperInventories[index])
+				);
+				if (oldId === id) {
+					// Same ID, just update
+					dungeon.shopkeeperInventories[index] = inventory;
+				} else {
+					// ID changed, remove old and add new
+					dungeon.shopkeeperInventories.splice(index, 1);
+					dungeon.shopkeeperInventories.push(inventory);
+				}
+			} else {
+				dungeon.shopkeeperInventories.push(inventory);
+			}
+		} else {
+			dungeon.shopkeeperInventories.push(inventory);
+		}
+
+		// Reload list and close modal
+		this.loadShopkeeperInventories(dungeon);
+		document.getElementById("template-modal").classList.remove("active");
+
+		// Record change
+		const changeAction = oldInventory
+			? EDITOR_ACTIONS.EDIT_SHOPKEEPER_INVENTORY
+			: EDITOR_ACTIONS.CREATE_SHOPKEEPER_INVENTORY;
+		this.makeChange({
+			action: changeAction,
+			actionTarget: id,
+			newParameters: {
+				id: inventory.id,
+				buyPriceMultiplier: inventory.buyPriceMultiplier,
+				sellPriceMultiplier: inventory.sellPriceMultiplier,
+				rulesCount: inventory.rules.length,
+			},
+			oldParameters: oldInventory
+				? {
+						id: oldInventory.id,
+						buyPriceMultiplier: oldInventory.buyPriceMultiplier,
+						sellPriceMultiplier: oldInventory.sellPriceMultiplier,
+						rulesCount: oldInventory.rules?.length || 0,
+				  }
+				: null,
+		});
+	}
+
 	editExitOverride(x, y, z) {
 		if (!this.yamlData) return;
 
@@ -3922,8 +4513,22 @@ class MapEditor {
 							<button type="button" class="exit-btn behavior-btn ${
 								template.behaviors?.wander ? "enabled" : "disabled"
 							}" data-behavior="wander" title="Mob will randomly move around every 30 seconds">WANDER</button>
+							<button type="button" class="exit-btn behavior-btn ${
+								template.behaviors?.shopkeeper ? "enabled" : "disabled"
+							}" data-behavior="shopkeeper" title="Mob is a shopkeeper and can buy/sell items">SHOPKEEPER</button>
 						</div>
 					</div>
+				</div>
+				<div class="form-group" id="shopkeeper-inventory-group" style="display: ${
+					template.behaviors?.shopkeeper ? "block" : "none"
+				};">
+					<label>Shopkeeper Inventory</label>
+					<select id="template-shopkeeper-inventory">
+						<option value="">Select inventory...</option>
+					</select>
+					<p style="font-size: 0.85rem; color: #aaa; margin-top: 0.25rem;">
+						Select the inventory this shopkeeper uses for buying and selling items.
+					</p>
 				</div>
 				<div class="form-group">
 					<label>Gold</label>
@@ -3944,6 +4549,36 @@ class MapEditor {
 				</div>
 				</div>
 				<div id="weapon-fields" style="display: ${isWeapon ? "block" : "none"};">
+					<div class="form-group">
+						<label>Equipment Slot</label>
+						<select id="template-weapon-slot" class="template-equipment-slot">
+							<option value="head" ${template.slot === "head" ? "selected" : ""}>Head</option>
+							<option value="neck" ${template.slot === "neck" ? "selected" : ""}>Neck</option>
+							<option value="shoulders" ${
+								template.slot === "shoulders" ? "selected" : ""
+							}>Shoulders</option>
+							<option value="chest" ${
+								template.slot === "chest" ? "selected" : ""
+							}>Chest</option>
+							<option value="hands" ${
+								template.slot === "hands" ? "selected" : ""
+							}>Hands</option>
+							<option value="finger" ${
+								template.slot === "finger" ? "selected" : ""
+							}>Finger</option>
+							<option value="waist" ${
+								template.slot === "waist" ? "selected" : ""
+							}>Waist</option>
+							<option value="legs" ${template.slot === "legs" ? "selected" : ""}>Legs</option>
+							<option value="feet" ${template.slot === "feet" ? "selected" : ""}>Feet</option>
+							<option value="mainHand" ${
+								template.slot === "mainHand" ? "selected" : ""
+							}>Main Hand</option>
+							<option value="offHand" ${
+								template.slot === "offHand" ? "selected" : ""
+							}>Off Hand</option>
+						</select>
+					</div>
 					<div class="form-group">
 						<label>Weapon Type</label>
 						<select id="template-weapon-type">
@@ -3969,6 +4604,36 @@ class MapEditor {
 				</div>
 				<div id="armor-fields" style="display: ${isArmor ? "block" : "none"};">
 					<div class="form-group">
+						<label>Equipment Slot</label>
+						<select id="template-armor-slot" class="template-equipment-slot">
+							<option value="head" ${template.slot === "head" ? "selected" : ""}>Head</option>
+							<option value="neck" ${template.slot === "neck" ? "selected" : ""}>Neck</option>
+							<option value="shoulders" ${
+								template.slot === "shoulders" ? "selected" : ""
+							}>Shoulders</option>
+							<option value="chest" ${
+								template.slot === "chest" ? "selected" : ""
+							}>Chest</option>
+							<option value="hands" ${
+								template.slot === "hands" ? "selected" : ""
+							}>Hands</option>
+							<option value="finger" ${
+								template.slot === "finger" ? "selected" : ""
+							}>Finger</option>
+							<option value="waist" ${
+								template.slot === "waist" ? "selected" : ""
+							}>Waist</option>
+							<option value="legs" ${template.slot === "legs" ? "selected" : ""}>Legs</option>
+							<option value="feet" ${template.slot === "feet" ? "selected" : ""}>Feet</option>
+							<option value="mainHand" ${
+								template.slot === "mainHand" ? "selected" : ""
+							}>Main Hand</option>
+							<option value="offHand" ${
+								template.slot === "offHand" ? "selected" : ""
+							}>Off Hand</option>
+						</select>
+					</div>
+					<div class="form-group">
 						<label>Defense</label>
 						<input type="number" id="template-defense" value="${
 							template.defense || ""
@@ -3977,6 +4642,36 @@ class MapEditor {
 					${bonusesSection}
 				</div>
 				<div id="equipment-fields" style="display: ${isEquipment ? "block" : "none"};">
+					<div class="form-group">
+						<label>Equipment Slot</label>
+						<select id="template-equipment-slot" class="template-equipment-slot">
+							<option value="head" ${template.slot === "head" ? "selected" : ""}>Head</option>
+							<option value="neck" ${template.slot === "neck" ? "selected" : ""}>Neck</option>
+							<option value="shoulders" ${
+								template.slot === "shoulders" ? "selected" : ""
+							}>Shoulders</option>
+							<option value="chest" ${
+								template.slot === "chest" ? "selected" : ""
+							}>Chest</option>
+							<option value="hands" ${
+								template.slot === "hands" ? "selected" : ""
+							}>Hands</option>
+							<option value="finger" ${
+								template.slot === "finger" ? "selected" : ""
+							}>Finger</option>
+							<option value="waist" ${
+								template.slot === "waist" ? "selected" : ""
+							}>Waist</option>
+							<option value="legs" ${template.slot === "legs" ? "selected" : ""}>Legs</option>
+							<option value="feet" ${template.slot === "feet" ? "selected" : ""}>Feet</option>
+							<option value="mainHand" ${
+								template.slot === "mainHand" ? "selected" : ""
+							}>Main Hand</option>
+							<option value="offHand" ${
+								template.slot === "offHand" ? "selected" : ""
+							}>Off Hand</option>
+						</select>
+					</div>
 					${bonusesSection}
 				</div>
 				<div id="item-fields" style="display: ${isItemType ? "block" : "none"};">
@@ -4248,8 +4943,20 @@ class MapEditor {
 						e.target.classList.remove("disabled");
 						e.target.classList.add("enabled");
 					}
+					// Show/hide shopkeeper inventory field based on shopkeeper behavior
+					if (behavior === "shopkeeper") {
+						const shopkeeperGroup = document.getElementById(
+							"shopkeeper-inventory-group"
+						);
+						if (shopkeeperGroup) {
+							shopkeeperGroup.style.display = !isEnabled ? "block" : "none";
+						}
+					}
 				};
 			});
+
+			// Load shopkeeper inventories for dropdown
+			this.loadShopkeeperInventoryDropdown(template.shopkeeperInventoryId);
 		}
 
 		// Set up container toggle button handler
@@ -4567,6 +5274,22 @@ class MapEditor {
 				// Always set behaviors, even if empty, so disabled behaviors are properly cleared
 				newTemplate.behaviors = behaviors;
 
+				// Collect shopkeeper inventory ID if shopkeeper behavior is enabled
+				if (behaviors.shopkeeper) {
+					const shopkeeperInventorySelect = document.getElementById(
+						"template-shopkeeper-inventory"
+					);
+					if (shopkeeperInventorySelect && shopkeeperInventorySelect.value) {
+						newTemplate.shopkeeperInventoryId = shopkeeperInventorySelect.value;
+					} else {
+						// Remove shopkeeperInventoryId if no inventory selected
+						delete newTemplate.shopkeeperInventoryId;
+					}
+				} else {
+					// Remove shopkeeperInventoryId if shopkeeper behavior is not enabled
+					delete newTemplate.shopkeeperInventoryId;
+				}
+
 				// Collect AI script
 				const aiScriptInput = document.getElementById("template-ai-script");
 				if (aiScriptInput) {
@@ -4670,6 +5393,16 @@ class MapEditor {
 				templateType === "Armor" ||
 				templateType === "Equipment"
 			) {
+				// Equipment slot (required for all equipment types)
+				// Check all possible slot selectors (weapon, armor, equipment)
+				const slotSelect =
+					document.getElementById("template-weapon-slot") ||
+					document.getElementById("template-armor-slot") ||
+					document.getElementById("template-equipment-slot");
+				if (slotSelect && slotSelect.value) {
+					newTemplate.slot = slotSelect.value;
+				}
+
 				// Primary attribute bonuses
 				const primaryAttrs = ["strength", "agility", "intelligence"];
 				const attributeBonuses = {};
@@ -6104,6 +6837,8 @@ class MapEditor {
 			"rooms",
 			"templates",
 			"resets",
+			"exitOverrides",
+			"shopkeeperInventories",
 		];
 		const dungeonData = this.yamlData.dungeon || {};
 		const orderedDungeon = {};
@@ -6121,6 +6856,26 @@ class MapEditor {
 			if (!preferredOrder.includes(key) && dungeonData[key] !== undefined) {
 				orderedDungeon[key] = dungeonData[key];
 			}
+		}
+
+		// Localize shopkeeper inventory IDs before saving
+		if (orderedDungeon.shopkeeperInventories) {
+			orderedDungeon.shopkeeperInventories =
+				orderedDungeon.shopkeeperInventories.map((inv) => {
+					const localized = { ...inv };
+					// Localize inventory ID (remove @dungeon-id< prefix if it matches current dungeon)
+					if (
+						localized.id &&
+						localized.id.includes("@") &&
+						localized.id.includes("<")
+					) {
+						const match = localized.id.match(/^@([^<]+)<(.+)>$/);
+						if (match && match[1] === this.currentDungeonId) {
+							localized.id = match[2];
+						}
+					}
+					return localized;
+				});
 		}
 
 		this.yamlData.dungeon = orderedDungeon;
@@ -7108,6 +7863,12 @@ class MapEditor {
 		document.getElementById("add-object-btn").addEventListener("click", () => {
 			this.editTemplate("object", "");
 		});
+
+		document
+			.getElementById("add-shopkeeper-btn")
+			.addEventListener("click", () => {
+				this.editShopkeeperInventory("");
+			});
 
 		// Layer selector
 		document.getElementById("layer-select").addEventListener("change", (e) => {
@@ -8705,6 +9466,12 @@ class MapEditor {
 			[EDITOR_ACTIONS.DELETE_ROOM_TEMPLATE]: "Removed rooms",
 			[EDITOR_ACTIONS.PASTE_SELECTION]: "Pasted selection",
 			[EDITOR_ACTIONS.RESIZE_DUNGEON]: "Resized dungeon",
+			[EDITOR_ACTIONS.CREATE_SHOPKEEPER_INVENTORY]:
+				"Created shopkeeper inventory",
+			[EDITOR_ACTIONS.EDIT_SHOPKEEPER_INVENTORY]:
+				"Updated shopkeeper inventory",
+			[EDITOR_ACTIONS.DELETE_SHOPKEEPER_INVENTORY]:
+				"Deleted shopkeeper inventory",
 			[EDITOR_ACTIONS.EDIT_DUNGEON_FIELD]: "Edited dungeon info",
 			[EDITOR_ACTIONS.RESTORE_UNSAVED_WORK]: "Restored unsaved work",
 			[EDITOR_ACTIONS.EDIT_ROOM_EXIT_OVERRIDE]: "Edited exit override",

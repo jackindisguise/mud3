@@ -1140,6 +1140,65 @@ export interface SerializedWeapon extends SerializedEquipment {
 	hitType?: string;
 	weaponType?: WeaponType;
 }
+
+/**
+ * Restock rule for shopkeeper inventory.
+ * Defines what items a shopkeeper should stock and how they should be restocked.
+ *
+ * @property template - The item template to restock
+ * @property minimum - Minimum number of items to maintain (undefined = infinite stock)
+ * @property maximum - Maximum number of items to stock (undefined = infinite stock)
+ * @property cycleDelay - Number of cycles between restocks for rare items (undefined = infinite stock)
+ * @property cycleDelayRemaining - Runtime-only: cycles remaining before next restock
+ */
+export interface RestockRule {
+	template: ItemTemplate;
+	minimum?: number;
+	maximum?: number;
+	cycleDelay?: number;
+	cycleDelayRemaining?: number; // Runtime only, not serialized
+}
+
+/**
+ * Shopkeeper inventory configuration and runtime state.
+ * Manages what a shopkeeper is selling and the items currently in stock.
+ *
+ * @property id - Unique identifier for this inventory (local or globalized)
+ * @property buyPriceMultiplier - Multiplier for item value when buying (default 1.25)
+ * @property sellPriceMultiplier - Multiplier for item value when selling (default 0.75)
+ * @property stock - Runtime array of items currently in stock (not serialized)
+ * @property rules - Restock rules defining what should be stocked
+ */
+export interface ShopkeeperInventory {
+	id: string;
+	buyPriceMultiplier: number;
+	sellPriceMultiplier: number;
+	stock: DungeonObject[]; // Runtime only, not serialized
+	rules: RestockRule[];
+}
+
+/**
+ * Serialized form of a restock rule.
+ * Excludes runtime-only fields like cycleDelayRemaining.
+ */
+export interface SerializedRestockRule {
+	templateId: string; // Template ID instead of template object
+	minimum?: number;
+	maximum?: number;
+	cycleDelay?: number;
+}
+
+/**
+ * Serialized form of a shopkeeper inventory.
+ * Excludes runtime-only fields like stock.
+ */
+export interface SerializedShopkeeperInventory {
+	id: string;
+	buyPriceMultiplier?: number; // Optional, defaults to 1.25
+	sellPriceMultiplier?: number; // Optional, defaults to 0.75
+	rules: SerializedRestockRule[];
+}
+
 /**
  * Union type representing valid serialized object types.
  */
@@ -1341,6 +1400,8 @@ export interface MobTemplate extends DungeonObjectTemplate {
 	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
 	/** Optional AI script for mob behavior. Can be inline code or file path (prefix with "file:") */
 	aiScript?: string;
+	/** Shopkeeper inventory ID (local or globalized @dungeon-id<inventory-id>) */
+	shopkeeperInventoryId?: string;
 }
 
 /**
@@ -3857,6 +3918,8 @@ export enum BEHAVIOR {
 	WIMPY = "wimpy",
 	/** Wandering mobs randomly move around their dungeon */
 	WANDER = "wander",
+	/** Shopkeeper mobs cannot take damage, cause damage, move, or engage in combat */
+	SHOPKEEPER = "shopkeeper",
 }
 
 /**
@@ -3998,6 +4061,8 @@ export class Mob extends Movable {
 	private _threatTable?: Map<Mob, ThreatEntry>;
 	private _threatExpirationTimer?: number;
 	private _behaviors: Map<BEHAVIOR, boolean>;
+	/** Shopkeeper inventory reference (resolved from shopkeeperInventoryId) */
+	private _shopkeeperInventory?: ShopkeeperInventory;
 	/** EventEmitter for AI events (only for NPCs) */
 	private _aiEventEmitter?: EventEmitter;
 	/** AI script for this mob */
@@ -5849,6 +5914,27 @@ export class Mob extends Movable {
 	}
 
 	/**
+	 * Get the shopkeeper inventory for this mob, if it is a shopkeeper.
+	 *
+	 * @returns The shopkeeper inventory if this mob is a shopkeeper, undefined otherwise
+	 */
+	public getShopkeeperInventory(): ShopkeeperInventory | undefined {
+		return this._shopkeeperInventory;
+	}
+
+	/**
+	 * Set the shopkeeper inventory for this mob.
+	 * This is typically called during deserialization.
+	 *
+	 * @param inventory - The shopkeeper inventory to set
+	 */
+	public setShopkeeperInventory(
+		inventory: ShopkeeperInventory | undefined
+	): void {
+		this._shopkeeperInventory = inventory;
+	}
+
+	/**
 	 * @overload
 	 * @param options - StepOptions object with direction and optional scripts
 	 * @returns true if the move was successful, false otherwise
@@ -5860,6 +5946,10 @@ export class Mob extends Movable {
 	public override step(options: StepOptions): boolean;
 	public override step(direction: DIRECTION): boolean;
 	public override step(optionsOrDirection: StepOptions | DIRECTION): boolean {
+		// Shopkeepers cannot move
+		if (this.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
+			return false;
+		}
 		// Handle legacy signature: step(direction)
 		let options: StepOptions;
 		if (typeof optionsOrDirection === "number") {
@@ -6158,6 +6248,11 @@ export class Mob extends Movable {
 	 */
 	public damage(attacker: Mob, amount: number, damageType?: DAMAGE_TYPE): void {
 		if (amount <= 0) {
+			return;
+		}
+
+		// Shopkeepers cannot take damage
+		if (this.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
 			return;
 		}
 

@@ -31,6 +31,7 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Threat System**: Aggro management for NPCs with threat tables
 - **Resources**: Health, Mana, and Exhaustion with automatic recovery
 - **Effects System**: Damage over time, heal over time, passive effects, and dynamic modifiers with individual timers and expiration tracking
+- **Mob AI System**: Event-driven AI scripting system for NPCs with VM sandbox execution, custom AI scripts, default behavior scripts (aggressive, wimpy, wander), and per-mob persistence and memory
 
 ### Ability System
 
@@ -48,7 +49,7 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Error Handling**: Built-in error responses and user-friendly feedback
 - **Comprehensive Command Set**: Movement, combat, inventory, equipment, social, and administrative commands
 - **Exec Command**: Admin-only JavaScript execution in sandboxed context with per-character persistence
-- **Shutdown Command**: Admin-only graceful server shutdown command
+- **Shutdown Command**: Admin-only graceful server shutdown command that exits with code 2 to signal intentional shutdown
 
 ### Communication
 
@@ -90,11 +91,15 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Electron**: Cross-platform desktop application framework for the dungeon editor
 - **Semantic Versioning**: Version management using semver for data migrations
 
-## Dungeon Editor
+## Editors
 
-mud3 ships with a first-party, Electron-based dungeon editor that lives in this repository (see `map-editor/` and `src/electron/`).
+mud3 ships with first-party, Electron-based editors that live in this repository (see `editors/` and `src/electron/`).
 
-Launch the editor locally with:
+### Map Editor
+
+The dungeon map editor provides visual dungeon editing capabilities:
+
+Launch the map editor locally with:
 
 ```bash
 npm run electron:dev
@@ -109,9 +114,37 @@ The Electron shell loads the bundled `map-editor` frontend, talks directly to th
 - Template-aware dungeon creation and duplication
 - Attribute calculators for race/job combinations
 - Weapon template editing with weapon type selection
-- Mob template editing with ability configuration
+- Mob template editing with ability configuration and AI script editing
+- AI script editing for custom NPC behavior
 
-You can also create distributable builds:
+### Character Editor
+
+The character editor provides a visual interface for editing player characters:
+
+- Character creation and editing
+- Race and job assignment
+- Equipment and inventory management
+- Settings and configuration editing
+
+### Archetype Editor
+
+The archetype editor provides a visual interface for editing race and job archetypes:
+
+- Race and job creation and editing
+- Attribute bonus configuration
+- Ability assignment and level configuration
+- Passive effect management
+
+### Helpfile Editor
+
+The helpfile editor provides a visual interface for editing in-game help documentation:
+
+- Help file creation and editing
+- Content formatting and organization
+
+### Building Distributable Editors
+
+You can create distributable builds for all editors:
 - `npm run electron:mac` – build a signed DMG for macOS (ARM64)
 - `npm run electron:win:portable` – build a portable Windows executable
 
@@ -148,7 +181,7 @@ Run the server with automatic restart on crash:
 npm run start:keep-alive
 ```
 
-The keep-alive script monitors the game server and automatically restarts it if it crashes or exits unexpectedly. It respects intentional shutdowns (via the shutdown command) and implements rate limiting to prevent restart loops.
+The keep-alive script monitors the game server and automatically restarts it if it crashes or exits unexpectedly. It respects intentional shutdowns (via the shutdown command, which exits with code 2) and implements rate limiting to prevent restart loops.
 
 ### Development
 
@@ -180,10 +213,10 @@ npm run start:ts
 # Run with keep-alive (auto-restart on crash)
 npm run start:keep-alive
 
-# Launch the Electron-based dungeon editor
+# Launch the Electron-based editors (map, character, archetype, helpfile)
 npm run electron:dev
 
-# Package the dungeon editor (optional)
+# Package the editors (optional)
 npm run electron:mac
 npm run electron:win:portable
 ```
@@ -229,7 +262,7 @@ The package system automatically discovers all packages in `src/package/`, build
   - `boards/` - Message board data
   - `races/` - Race archetype definitions
   - `jobs/` - Job archetype definitions
-- `map-editor/` - Electron-based dungeon editor frontend
+- `editors/` - Electron-based editor frontends (map, character, archetype, helpfile)
 - `web-client/` - WebSocket-based web client frontend
 - `dist/` - Compiled JavaScript output
 - `docs/` - Generated TypeScript documentation

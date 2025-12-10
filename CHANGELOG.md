@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.26.0](https://github.com/jackindisguise/mud3/compare/v1.25.0...v1.26.0) (2025-12-10)
+
+
+### Features
+
+* **calendar:** updated morning/night events to trigger at 25%/75% of day ([b813ee8](https://github.com/jackindisguise/mud3/commit/b813ee88543a67c09354471c60c360493186874b))
+* **combat:** added AI event emissions for mob AI integration ([07f5f03](https://github.com/jackindisguise/mud3/commit/07f5f03313e547f52cc9a81dfc35ec0224823bb8))
+* **commands:** added adminOnly flag for command access control ([3ea04b2](https://github.com/jackindisguise/mud3/commit/3ea04b2bff41ab1af3040c763fc675730d05ced4))
+* **commands:** added AI event emissions for item interactions ([a8a5521](https://github.com/jackindisguise/mud3/commit/a8a552184a54dca4d31f5e2788928548e9099c83))
+* **commands:** added AI event emissions for say and whisper commands ([46d8b44](https://github.com/jackindisguise/mud3/commit/46d8b446df0e70c6d339348d2d77870f9ccdc651))
+* **commands:** added shutdown command for graceful server shutdown ([05690ea](https://github.com/jackindisguise/mud3/commit/05690eace61ee63060242e0974b7da0cc3dfa8a3))
+* **map-editor:** added AI script editing support for mob templates ([c73b731](https://github.com/jackindisguise/mud3/commit/c73b7315f15446d156eca0c1217dba686826efb2))
+* **mob-ai:** added event-driven AI scripting system for NPCs ([72eccfd](https://github.com/jackindisguise/mud3/commit/72eccfd46b5786916629a743c9b73586032db77b))
+* **mob-ai:** added updateMobBehaviorScripts function ([1326a7a](https://github.com/jackindisguise/mud3/commit/1326a7aea2dff7df8fe0a58d5546d13d42b0bab3))
+* **scripts:** added keep-alive script for automatic server restart ([4493ff4](https://github.com/jackindisguise/mud3/commit/4493ff4a0c7ec690879f3820dbd7bfab0c6861b1))
+* **utils:** added capitalize function for string utilities ([83deabd](https://github.com/jackindisguise/mud3/commit/83deabda07e61ac17f886867d14b7a0c9eb72d2c))
+
+
+### Bug Fixes
+
+* **electron:** corrected preload path for map editor window ([3062e0a](https://github.com/jackindisguise/mud3/commit/3062e0acc118812f975c94931b9c37daf62a289a))
+
 ## [1.25.0](https://github.com/jackindisguise/mud3/compare/v1.24.0...v1.25.0) (2025-12-04)
 
 

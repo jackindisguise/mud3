@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.27.0](https://github.com/jackindisguise/mud3/compare/v1.26.0...v1.27.0) (2025-12-10)
+
+
+### Features
+
+* **commands:** added shopkeeper interaction commands ([a8dedd6](https://github.com/jackindisguise/mud3/commit/a8dedd6a4ab63f1649697885cbb3563752cc27ec))
+* **commands:** updated appraise to use lore output and work on shopkeeper stock ([a99810c](https://github.com/jackindisguise/mud3/commit/a99810c289a9b297bd14732d9b6ed6d21c17002c))
+* **core:** added shopkeeper inventory system ([8cd01a8](https://github.com/jackindisguise/mud3/commit/8cd01a8a2dd2b7b2594ca224bd30b32d39528486))
+* **core:** integrated shopkeeper system into game systems ([ffd069a](https://github.com/jackindisguise/mud3/commit/ffd069aa7daf942a1eaba9d43820e237c581d035))
+* **map-editor:** added equipment slot selector for equipment templates ([401c11a](https://github.com/jackindisguise/mud3/commit/401c11ab4b0abca27c032b1d74197cc7f6efa19b))
+* **map-editor:** added shopkeeper inventory management UI ([e71443a](https://github.com/jackindisguise/mud3/commit/e71443ad615a95d7127fbe4991c80a72c65e2db3))
+
 ## [1.26.0](https://github.com/jackindisguise/mud3/compare/v1.25.0...v1.26.0) (2025-12-10)
 
 

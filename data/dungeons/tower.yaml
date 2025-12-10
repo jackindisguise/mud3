@@ -591,6 +591,17 @@ dungeon:
       isContainer: true
       value: 1
       baseWeight: 2
+    - id: ya-boy
+      type: Mob
+      display: Ya Boy
+      description: It's ya boy.
+      roomDescription: Ya Boy is here, chillin'.
+      keywords: ya boy
+      race: nobility
+      job: geomancer
+      level: 10000
+      behaviors: {shopkeeper: true}
+      shopkeeperInventoryId: ya-boy-store
   resets:
     - templateId: tower-guardian
       roomRef: '@tower{10,3,0}'
@@ -715,6 +726,10 @@ dungeon:
       minCount: 20
       maxCount: 100
       equipped: ['@tower:tower-sword', '@tower:tower-helmet']
+    - templateId: ya-boy
+      roomRef: '@tower{15,16,0}'
+      minCount: 1
+      maxCount: 1
   exitOverrides:
     - coordinates: {x: 7, 'y': 6, z: 0}
       allowedExits: 511
@@ -741,3 +756,8 @@ dungeon:
     - coordinates: {x: 2, 'y': 3, z: 0}
       allowedExits: 255
       roomLinks: {down: '@tower-basement{2,3,0}'}
+  shopkeeperInventories:
+    - id: ya-boy-store
+      buyPriceMultiplier: 1.25
+      sellPriceMultiplier: 0.75
+      rules: [{templateId: '@tower:tower-sword'}, {templateId: '@neo-tokyo:bubblegum-cannon'}]

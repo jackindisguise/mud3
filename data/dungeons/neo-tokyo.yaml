@@ -122,4 +122,5 @@ dungeon:
       hitType: blast
       attackPower: 12
       weaponType: club
+      slot: mainHand
   resets: []

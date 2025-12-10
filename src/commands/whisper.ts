@@ -105,7 +105,6 @@ export const command = {
 	},
 
 	onError(context: CommandContext, result: ParseResult): void {
-		console.log(Date.now(), result);
 		if (result.error === "Missing required argument: target") {
 			context.actor.sendMessage(
 				"Who do you want to whisper to?",

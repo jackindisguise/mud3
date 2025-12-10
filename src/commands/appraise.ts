@@ -20,7 +20,7 @@ import {
 	findShopkeeperInRoom,
 	getShopkeeperInventoryFromMob,
 } from "./_shopkeeper-helpers.js";
-import { getSellPrice } from "../core/shopkeeper-inventory.js";
+import { getBuyPrice, getSellPrice } from "../core/shopkeeper-inventory.js";
 import { color, COLOR, SIZER } from "../core/color.js";
 import { Item, Equipment, Weapon, Armor } from "../core/dungeon.js";
 import {
@@ -86,7 +86,7 @@ export const command = {
 
 		const result = results[0];
 		// Calculate sell price (what shopkeeper will pay if player sells this item)
-		const sellPrice = getSellPrice(inventory, result);
+		const buyPrice = getBuyPrice(inventory, result);
 
 		// Build lore information based on item type (same as lore command)
 		let lines: string[] = [];
@@ -128,9 +128,9 @@ export const command = {
 		}
 
 		// Add sell price information at the bottom
-		const sellPriceStr = color(`${formatNumber(sellPrice)} gold`, COLOR.YELLOW);
+		const buyPriceStr = color(`${formatNumber(buyPrice)} gold`, COLOR.YELLOW);
 		lines.push("");
-		lines.push(`${shopkeeper.display} will pay ${sellPriceStr} for this item.`);
+		lines.push(`${capitalizeFirst(shopkeeper.display)} will sell this item for ${buyPriceStr}.`);
 
 		actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},

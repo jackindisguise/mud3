@@ -35,7 +35,7 @@ export const ability: Ability = {
 
 export const COOLDOWN_MS = 1000;
 
-const BOX_WIDTH = 80;
+export const BOX_WIDTH = 80;
 
 /**
  * Format a bonus value with sign.
@@ -100,7 +100,7 @@ function formatBonusGrid(
 /**
  * Format container lore box.
  */
-function formatContainerBox(item: Item): string[] {
+export function formatContainerBox(item: Item): string[] {
 	const content: string[] = [];
 
 	// Title line: item name on left, "Container" on right
@@ -138,7 +138,7 @@ function formatContainerBox(item: Item): string[] {
 /**
  * Format equipment lore box.
  */
-function formatEquipmentBox(
+export function formatEquipmentBox(
 	item: Equipment,
 	isArmor: boolean = false,
 	isWeapon: boolean = false

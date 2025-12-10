@@ -10,7 +10,7 @@ import { CommandContext } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { getStopGameFunction } from "../game.js";
 
-export default {
+export const command = {
 	pattern: "shutdown~",
 	adminOnly: true,
 	/**

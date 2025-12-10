@@ -34,7 +34,7 @@ const slotMessages: Record<EQUIPMENT_SLOT, string> = {
 	[EQUIPMENT_SLOT.FINGER]: "You slip {equipment} off your finger.",
 };
 
-export default {
+export const command = {
 	pattern: "remove~ <equipment:item@equipment>",
 	aliases: ["unequip~ <equipment:item@equipment>"],
 	execute(context: CommandContext, args: Map<string, any>): void {

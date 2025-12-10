@@ -44,7 +44,7 @@ const slotMessages: Record<EQUIPMENT_SLOT, string> = {
 	[EQUIPMENT_SLOT.FINGER]: "You slip {equipment} onto your finger.",
 };
 
-export default {
+export const command = {
 	pattern: "wear~ <equipment:equipment@inventory>",
 	aliases: [
 		"equip~ <equipment:equipment@inventory>",

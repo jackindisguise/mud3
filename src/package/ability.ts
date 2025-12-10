@@ -102,7 +102,7 @@ async function loadAbilities() {
 							`Ability file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing ABILITY_ID export`
+							)} must export a named 'ABILITY_ID' constant`
 						);
 						continue;
 					}
@@ -135,7 +135,7 @@ async function loadAbilities() {
 							`Ability file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing ability export`
+							)} must export a named 'ability' constant`
 						);
 						continue;
 					}

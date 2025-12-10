@@ -108,7 +108,7 @@ function giveAllToTarget(target: Mob, actor: any, room: any): void {
 	}
 }
 
-export default {
+export const command = {
 	pattern: "give~ all to <target:mob@room>",
 	aliases: [
 		"give~ all <target:mob@room>",

@@ -21,7 +21,7 @@ import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { getEquipmentList } from "../core/equipment.js";
 
-export default {
+export const command = {
 	pattern: "equipment",
 	aliases: ["gear~", "eq"],
 	priority: PRIORITY.HIGH,

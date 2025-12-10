@@ -22,7 +22,7 @@ import { Mob } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { CHANNEL } from "../core/channel.js";
 
-export default {
+export const command = {
 	pattern: "say~ <message:text>",
 	aliases: ["'<message:text>"],
 	execute(context: CommandContext, args: Map<string, any>): void {

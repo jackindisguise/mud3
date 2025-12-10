@@ -22,7 +22,7 @@ import { MESSAGE_GROUP, Character } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { CHANNEL } from "../core/channel.js";
 
-export default {
+export const command = {
 	pattern: "whisper~ <target:character> <message:text>",
 	aliases: ["tell~ <target:character> <message:text>"],
 	priority: PRIORITY.LOW,

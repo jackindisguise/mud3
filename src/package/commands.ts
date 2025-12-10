@@ -5,7 +5,7 @@
  * - `data/commands` (runtime-extensible JS/YAML commands)
  * - `dist/src/commands` (compiled built-in commands)
  *
- * Each command file should export a default plain object with:
+ * Each command file should export a named `command` constant with:
  * - `pattern: string` - the command pattern
  * - `aliases?: string[]` - optional aliases
  * - `execute(context, args)` - handler function
@@ -16,7 +16,7 @@
  *
  * @example
  * // data/commands/say.js
- * export default {
+ * export const command = {
  *   pattern: 'say <...text:any>';
  *   aliases: ['"'],
  *   execute(ctx, args) { ctx.client.sendLine(args.get('text')); }
@@ -275,9 +275,19 @@ async function loadCommands() {
 						`Importing command from ${relative(ROOT_DIRECTORY, filePath)}`
 					);*/
 					const commandModule = await import(fileUrl);
-					const commandObj = commandModule.default;
+					const commandObj = commandModule.command;
 
-					if (commandObj && commandObj.pattern && commandObj.execute) {
+					if (!commandObj) {
+						logger.warn(
+							`Command file ${relative(
+								ROOT_DIRECTORY,
+								filePath
+							)} must export a named 'command' constant`
+						);
+						continue;
+					}
+
+					if (commandObj.pattern && commandObj.execute) {
 						const command = new JavaScriptCommandAdapter(commandObj);
 						registerCommand(command);
 						logger.debug(
@@ -294,7 +304,7 @@ async function loadCommands() {
 							`Invalid command structure in ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)}`
+							)}: missing pattern or execute function`
 						);
 					}
 				} catch (error) {

@@ -107,7 +107,7 @@ function formatCompactPercentageModifier(
 	return `${coloredPercent} ${formattedName}`;
 }
 
-export default {
+export const command = {
 	pattern: "effects~",
 	execute(context: CommandContext): void {
 		const { actor } = context;

@@ -177,7 +177,7 @@ function displaySearchResults(
 	actor.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
 
-export default {
+export const command = {
 	pattern: "help~ search <query:text>",
 	aliases: ["? search <query:text>"],
 	execute(context: CommandContext, args: Map<string, any>): void {

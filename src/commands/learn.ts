@@ -18,7 +18,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { getAbilityById } from "../registry/ability.js";
 
-export default {
+export const command = {
 	pattern: "learn~ <abilityId:text>",
 	execute(context: CommandContext, args: Map<string, any>): void {
 		const abilityId = args.get("abilityId") as string;

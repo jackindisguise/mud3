@@ -29,7 +29,7 @@ import { LINEBREAK } from "../core/telnet.js";
 import { color, COLOR } from "../core/color.js";
 import { formatNumber } from "../utils/number.js";
 
-export default {
+export const command = {
 	pattern: "inventory~ <mode:word?>",
 	priority: PRIORITY.HIGH,
 	execute(context: CommandContext, args: Map<string, any>): void {

@@ -13,8 +13,8 @@ import archetypePkg from "../package/archetype.js";
 import { Dungeon, DungeonObject, Room } from "../core/dungeon.js";
 import { Mob } from "../core/dungeon.js";
 import { Character } from "../core/character.js";
-import cancelCommand from "../commands/cancel.js";
-import queueCommand from "../commands/queue.js";
+import { command as cancelCommand } from "../commands/cancel.js";
+import { command as queueCommand } from "../commands/queue.js";
 import {
 	registerCommand,
 	unregisterCommand,

@@ -21,7 +21,7 @@ import {
 	getCooldownFunctionForDirection,
 } from "./_movement.js";
 
-export default {
+export const command = {
 	...DEFAULT_COMMAND_VALUES,
 	cooldown: getCooldownFunctionForDirection(DIRECTION.SOUTHWEST),
 	pattern: "southwest~",

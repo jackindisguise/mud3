@@ -91,7 +91,7 @@ function getPersistance(character: Character): Record<string, any> {
 	return data;
 }
 
-export default {
+export const command = {
 	pattern: "exec <code:text>",
 	adminOnly: true,
 	/**

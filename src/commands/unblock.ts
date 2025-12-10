@@ -20,7 +20,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { color, COLOR } from "../core/color.js";
 
-export default {
+export const command = {
 	pattern: "unblock <username:word>",
 	aliases: ["unignore <username:word>"],
 	execute(context: CommandContext, args: Map<string, any>): void {

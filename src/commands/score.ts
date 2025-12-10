@@ -61,7 +61,7 @@ function combineHorizontalBoxes(options: {
 	return lines;
 }
 
-export default {
+export const command = {
 	pattern: "score~",
 	aliases: ["info~", "me~"],
 	execute(context: CommandContext): void {

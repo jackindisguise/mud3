@@ -19,7 +19,7 @@ import { color, COLOR } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { formatNumber } from "../utils/number.js";
 
-export default {
+export const command = {
 	pattern: "worth~",
 	execute(context: CommandContext): void {
 		const { actor } = context;

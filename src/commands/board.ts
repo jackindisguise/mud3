@@ -37,7 +37,7 @@ import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
 import { showBoardsList } from "./boards.js";
 
-export default {
+export const command = {
 	pattern: "board <boardname:word?> <action:word?> <id:word?>",
 	async execute(context: CommandContext, args: Map<string, any>) {
 		const boardName = args.get("boardname") as string | undefined;

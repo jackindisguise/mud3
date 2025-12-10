@@ -22,7 +22,7 @@ import { LINEBREAK } from "../core/telnet.js";
 import { hasLineOfSight } from "../minimap.js";
 import { DIRECTION, dir2text } from "../direction.js";
 
-export default {
+export const command = {
 	pattern: "scan~",
 	execute(context: CommandContext): void {
 		const { actor, room } = context;

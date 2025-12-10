@@ -135,7 +135,7 @@ function putAllInContainer(
 	}
 }
 
-export default {
+export const command = {
 	pattern: "put~ all in <container:object@all>",
 	aliases: [
 		"put~ <amount:number> gold in <container:object@all>",

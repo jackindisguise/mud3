@@ -51,7 +51,7 @@ function formatAttributeName(name: string): string {
 		.trim();
 }
 
-export default {
+export const command = {
 	pattern: "bonuses~",
 	aliases: [],
 	execute(context: CommandContext): void {

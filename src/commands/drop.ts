@@ -80,7 +80,7 @@ function dropAll(actor: any, room: any): void {
 	}
 }
 
-export default {
+export const command = {
 	pattern: "drop~ all",
 	aliases: ["drop~ <item:item@inventory>", "drop~ <amount:number> gold"],
 	execute(context: CommandContext, args: Map<string, any>): void {

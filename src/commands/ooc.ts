@@ -24,7 +24,7 @@ import { CommandObject } from "../package/commands.js";
 import { forEachCharacter } from "../game.js";
 import { CHANNEL, formatChannelMessage } from "../core/channel.js";
 
-export default {
+export const command = {
 	pattern: "ooc~ <message:text>",
 	aliases: ['"<message:text>'],
 	/**

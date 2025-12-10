@@ -92,7 +92,7 @@ async function loadEffectTemplates() {
 							`Effect template file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing EFFECT_TEMPLATE_ID export`
+							)} must export a named 'EFFECT_TEMPLATE_ID' constant`
 						);
 						continue;
 					}
@@ -125,7 +125,7 @@ async function loadEffectTemplates() {
 							`Effect template file ${relative(
 								ROOT_DIRECTORY,
 								filePath
-							)} is missing effectTemplate export`
+							)} must export a named 'effectTemplate' constant`
 						);
 						continue;
 					}

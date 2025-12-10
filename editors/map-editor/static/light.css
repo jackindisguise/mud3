@@ -2353,6 +2353,109 @@ header h1 {
 	color: var(--green);
 }
 
+/* Shopkeeper Inventory Styles */
+.restock-rule-item {
+	background: var(--base02);
+	border: 1px solid var(--base01);
+	border-radius: 6px;
+	padding: 1rem;
+	margin-bottom: 0.75rem;
+}
+
+.restock-rule-header {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: 0.75rem;
+}
+
+.restock-rule-header select {
+	flex: 1;
+	padding: 0.5rem;
+	background: var(--base03);
+	border: 1px solid var(--base01);
+	border-radius: 4px;
+	color: var(--base1);
+	font-size: 0.9rem;
+}
+
+.restock-rule-header select:focus {
+	outline: none;
+	border-color: var(--accent-primary);
+}
+
+.restock-rule-delete {
+	padding: 0.5rem;
+	background: transparent;
+	border: 1px solid var(--base01);
+	border-radius: 4px;
+	color: var(--red);
+	cursor: pointer;
+	font-size: 1rem;
+	transition: all 0.2s;
+}
+
+.restock-rule-delete:hover {
+	background: var(--base02);
+	border-color: var(--red);
+}
+
+.restock-rule-fields {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.form-group-inline {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.form-group-inline label {
+	font-size: 0.85rem;
+	color: var(--base0);
+	font-weight: 500;
+	min-width: 60px;
+}
+
+.form-group-inline input {
+	width: 80px;
+	padding: 0.4rem;
+	background: var(--base03);
+	border: 1px solid var(--base01);
+	border-radius: 4px;
+	color: var(--base1);
+	font-size: 0.9rem;
+}
+
+.form-group-inline input:focus {
+	outline: none;
+	border-color: var(--accent-primary);
+}
+
+.infinite-stock-badge {
+	display: inline-block;
+	padding: 0.25rem 0.5rem;
+	background: var(--violet);
+	color: var(--base3);
+	border-radius: 4px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	margin-left: auto;
+}
+
+.restock-rules-empty {
+	text-align: center;
+	padding: 2rem;
+	color: var(--base00);
+	font-size: 0.9rem;
+	font-style: italic;
+}
+
 .action-btn {
 	padding: 0.5rem 1rem;
 	border-radius: 4px;

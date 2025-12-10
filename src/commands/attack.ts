@@ -19,7 +19,7 @@
 
 import { CommandContext, ParseResult, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Mob, Room } from "../core/dungeon.js";
+import { Mob, Room, BEHAVIOR } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { initiateCombat, addToCombatQueue } from "../combat.js";
 import { capitalizeFirst } from "../utils/string.js";
@@ -53,6 +53,15 @@ export const command = {
 		if (target === actor) {
 			actor.sendMessage(
 				"You cannot attack yourself.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
+		}
+
+		// Can't attack shopkeepers
+		if (target.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
+			actor.sendMessage(
+				"You cannot attack shopkeepers.",
 				MESSAGE_GROUP.COMMAND_RESPONSE
 			);
 			return;

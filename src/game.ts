@@ -76,6 +76,8 @@ import {
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
 import { calendarEvents, getCurrentTime } from "./registry/calendar.js";
+import { cycleShopkeeperInventories } from "./core/shopkeeper-inventory.js";
+import { processAITick } from "./mob-ai.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -1187,28 +1189,29 @@ async function start(): Promise<void> {
 	}, DEFAULT_GAME_TICK_INTERVAL_MS);
 
 	// Connect AI system to game tick events
-	const { processAITick } = await import("./mob-ai.js");
 	gameTickEmitter.on("tick", () => {
 		processAITick();
 	});
 
+	// Connect shopkeeper inventory restock cycle to game tick events
+	gameTickEmitter.on("tick", () => {
+		cycleShopkeeperInventories();
+	});
+
+	// Cycle shopkeeper inventories initially on game start
+	cycleShopkeeperInventories();
+
 	// Listen for day/night changes and inform players
 	calendarEvents.on("morning", () => {
-		const result = Object.entries(getCurrentTime()!)
-			.map(([key, value]) => `${key}=${value}`)
-			.join(", ");
 		broadcast(
-			color(`The sun rises, bringing a new day. <${result}>`, COLOR.YELLOW),
+			color(`The sun rises, bringing a new day.`, COLOR.YELLOW),
 			MESSAGE_GROUP.SYSTEM
 		);
 	});
 
 	calendarEvents.on("night", () => {
-		const result = Object.entries(getCurrentTime()!)
-			.map(([key, value]) => `${key}=${value}`)
-			.join(", ");
 		broadcast(
-			color(`The sun sets, and darkness falls. <${result}>`, COLOR.TEAL),
+			color(`The sun sets, and darkness falls.`, COLOR.TEAL),
 			MESSAGE_GROUP.SYSTEM
 		);
 	});

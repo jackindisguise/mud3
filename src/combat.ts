@@ -169,6 +169,11 @@ export function oneHit(options: OneHitOptions): number {
 		hitTypeOverride,
 	} = options;
 
+	// Shopkeepers cannot deal damage
+	if (attacker.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
+		return 0;
+	}
+
 	// Get the room where combat is occurring
 	const room = attacker.location;
 	if (!room || !(room instanceof Room)) {
@@ -1297,6 +1302,14 @@ export function initiateCombat(
 
 	// Prevent dead mobs from initiating combat
 	if (attacker.health <= 0 || defender.health <= 0) {
+		return;
+	}
+
+	// Shopkeepers cannot initiate or receive combat
+	if (
+		attacker.hasBehavior(BEHAVIOR.SHOPKEEPER) ||
+		defender.hasBehavior(BEHAVIOR.SHOPKEEPER)
+	) {
 		return;
 	}
 

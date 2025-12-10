@@ -77,6 +77,10 @@ import {
 	Equipment,
 	EquipmentOptions,
 	Armor,
+	ShopkeeperInventory,
+	RestockRule,
+	SerializedShopkeeperInventory,
+	SerializedRestockRule,
 	ArmorOptions,
 	Weapon,
 	WeaponOptions,
@@ -125,6 +129,12 @@ import {
 	DirectionText,
 } from "../direction.js";
 import { EffectOverrides } from "../core/effect.js";
+import {
+	getShopkeeperInventoryById,
+	globalizeShopkeeperInventoryId,
+	registerShopkeeperInventory,
+} from "../registry/shopkeeper-inventory.js";
+import { cycleInventory } from "../core/shopkeeper-inventory.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");
@@ -134,6 +144,16 @@ const DUNGEON_DIR = join(DATA_DIRECTORY, "dungeons");
  * Pending room links to be processed after all dungeons are loaded.
  */
 const pendingRoomLinks: PendingRoomLink[] = [];
+
+/**
+ * Pending shopkeeper inventories to be processed after all dungeons are loaded.
+ */
+interface PendingShopkeeperInventory {
+	dungeonId: string;
+	serializedInv: SerializedShopkeeperInventory;
+}
+
+const pendingShopkeeperInventories: PendingShopkeeperInventory[] = [];
 
 /**
  * Serialized reset format (for YAML persistence).
@@ -168,6 +188,7 @@ export interface SerializedDungeonFormat {
 			allowedExits?: number;
 			roomLinks?: Record<DirectionText, string>;
 		}>;
+		shopkeeperInventories?: SerializedShopkeeperInventory[];
 	};
 }
 
@@ -537,6 +558,34 @@ function createFromTemplate(
 			const mobTemplate = template as MobTemplate;
 			const options = mobTemplateToOptions(mobTemplate, providedOid);
 			obj = createMob(options);
+			// Resolve shopkeeper inventory if this mob template has one
+			// Skip for temporary instances (OID -1) used for baseSerialized generation
+			if (
+				mobTemplate.shopkeeperInventoryId &&
+				obj instanceof Mob &&
+				providedOid !== -1
+			) {
+				logger.debug(
+					`[createFromTemplate] Mob template "${mobTemplate.id}" has shopkeeperInventoryId: "${mobTemplate.shopkeeperInventoryId}"`
+				);
+				const inventory = getShopkeeperInventoryById(
+					mobTemplate.shopkeeperInventoryId
+				);
+				if (inventory) {
+					obj.setShopkeeperInventory(inventory);
+					logger.debug(
+						`[createFromTemplate] Successfully resolved and assigned shopkeeper inventory "${mobTemplate.shopkeeperInventoryId}" to mob ${obj.oid} from template "${mobTemplate.id}"`
+					);
+				} else {
+					logger.warn(
+						`[createFromTemplate] Shopkeeper inventory "${mobTemplate.shopkeeperInventoryId}" not found for mob ${obj.oid} from template "${mobTemplate.id}"`
+					);
+				}
+			} else if (obj instanceof Mob && providedOid !== -1) {
+				logger.debug(
+					`[createFromTemplate] Mob ${obj.oid} from template "${mobTemplate.id}" has no shopkeeperInventoryId`
+				);
+			}
 			break;
 		}
 		case "Equipment": {
@@ -742,6 +791,7 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			name,
 			description,
 			exitOverrides,
+			shopkeeperInventories,
 		} = data.dungeon;
 
 		// Validate dimensions
@@ -1065,7 +1115,28 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 			logger.debug(`[${id}] Stage 9 complete: No resets to load`);
 		}
 
-		logger.debug(`[${id}] Stage 10: Processing room links`);
+		// Stage 10: Queue shopkeeper inventories for processing after all dungeons are loaded
+		logger.debug(`[${id}] Stage 10: Queuing shopkeeper inventories`);
+		if (shopkeeperInventories && Array.isArray(shopkeeperInventories)) {
+			for (const serializedInv of shopkeeperInventories) {
+				pendingShopkeeperInventories.push({
+					dungeonId,
+					serializedInv,
+				});
+				logger.debug(
+					`[${id}] Queued shopkeeper inventory: ${serializedInv.id}`
+				);
+			}
+			logger.debug(
+				`[${id}] Stage 10 complete: Queued ${shopkeeperInventories.length} shopkeeper inventory/inventories`
+			);
+		} else {
+			logger.debug(
+				`[${id}] Stage 10 complete: No shopkeeper inventories to load`
+			);
+		}
+
+		logger.debug(`[${id}] Stage 11: Processing room links`);
 		logger.debug(
 			`Successfully loaded dungeon "${id}" from ${relative(
 				ROOT_DIRECTORY,
@@ -1270,6 +1341,88 @@ export async function migrateTemplateData(
  * Process all pending room links after all dungeons are loaded.
  * Detects bidirectional links and makes them two-way automatically.
  */
+function processPendingShopkeeperInventories(): void {
+	if (pendingShopkeeperInventories.length === 0) {
+		logger.debug("No pending shopkeeper inventories to process");
+		return;
+	}
+
+	logger.debug(
+		`Processing ${pendingShopkeeperInventories.length} pending shopkeeper inventory/inventories`
+	);
+
+	for (const pending of pendingShopkeeperInventories) {
+		const { dungeonId, serializedInv } = pending;
+		try {
+			// Globalize the inventory ID
+			const globalizedId = globalizeShopkeeperInventoryId(
+				serializedInv.id,
+				dungeonId
+			);
+
+			// Resolve restock rule templates (now all dungeons are loaded, so templates should be available)
+			const rules: RestockRule[] = [];
+			for (const serializedRule of serializedInv.rules) {
+				const template = resolveTemplateById(serializedRule.templateId);
+				if (
+					!template ||
+					(template.type !== "Item" &&
+						template.type !== "Equipment" &&
+						template.type !== "Armor" &&
+						template.type !== "Weapon")
+				) {
+					logger.warn(
+						`[${dungeonId}] Shopkeeper inventory "${serializedInv.id}": template "${serializedRule.templateId}" not found or not an Item template, skipping rule`
+					);
+					continue;
+				}
+
+				rules.push({
+					template: template as ItemTemplate,
+					minimum: serializedRule.minimum,
+					maximum: serializedRule.maximum,
+					cycleDelay: serializedRule.cycleDelay,
+					// cycleDelayRemaining is runtime-only, not loaded
+				});
+			}
+
+			// Create inventory instance
+			const inventory: ShopkeeperInventory = {
+				id: globalizedId,
+				buyPriceMultiplier: serializedInv.buyPriceMultiplier ?? 1.25,
+				sellPriceMultiplier: serializedInv.sellPriceMultiplier ?? 0.75,
+				stock: [], // Runtime only, will be populated by restock cycle
+				rules,
+			};
+
+			// Register inventory
+			try {
+				registerShopkeeperInventory(inventory);
+				logger.debug(
+					`[${dungeonId}] Registered shopkeeper inventory: ${globalizedId}`
+				);
+
+				// Cycle inventory initially to populate stock
+				cycleInventory(inventory);
+			} catch (error) {
+				logger.warn(
+					`[${dungeonId}] Failed to register shopkeeper inventory "${globalizedId}": ${error}`
+				);
+			}
+		} catch (error) {
+			logger.warn(
+				`[${dungeonId}] Failed to load shopkeeper inventory "${serializedInv.id}": ${error}`
+			);
+		}
+	}
+
+	logger.debug(
+		`Processed ${pendingShopkeeperInventories.length} shopkeeper inventory/inventories`
+	);
+	// Clear the queue
+	pendingShopkeeperInventories.length = 0;
+}
+
 function processPendingRoomLinks(): void {
 	if (pendingRoomLinks.length === 0) {
 		logger.debug("No pending room links to process");
@@ -1408,6 +1561,9 @@ export async function loadDungeons(): Promise<Dungeon[]> {
 
 	// Process all pending room links after all dungeons are loaded
 	processPendingRoomLinks();
+
+	// Process all pending shopkeeper inventories after all dungeons are loaded
+	processPendingShopkeeperInventories();
 
 	return dungeons;
 }
@@ -2305,10 +2461,13 @@ function hydrateMobTemplateData(
 	data: SerializedMob,
 	templateId: string
 ): MobTemplate {
-	const base = hydrateTemplateData(data, templateId);
+	const base = hydrateTemplateData(data, templateId) as MobTemplate;
 
 	// filter out invalid behaviors
 	const behaviors = filterBehaviors(data.behaviors);
+
+	// Extract shopkeeperInventoryId from raw data (it's not in SerializedMob but may be in YAML)
+	const rawData = data as SerializedMob;
 
 	return pruneUndefined({
 		...base,
@@ -2324,6 +2483,7 @@ function hydrateMobTemplateData(
 		exhaustion: data.exhaustion,
 		behaviors,
 		aiScript: (data as any).aiScript, // AI script from template (if present)
+		shopkeeperInventoryId: (data as any).shopkeeperInventoryId,
 	}) as MobTemplate;
 }
 

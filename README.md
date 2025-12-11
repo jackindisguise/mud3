@@ -32,6 +32,7 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Resources**: Health, Mana, and Exhaustion with automatic recovery
 - **Effects System**: Damage over time, heal over time, passive effects, and dynamic modifiers with individual timers and expiration tracking
 - **Mob AI System**: Event-driven AI scripting system for NPCs with VM sandbox execution, custom AI scripts, default behavior scripts (aggressive, wimpy, wander), and per-mob persistence and memory
+- **Shopkeeper System**: NPC shopkeepers that can buy and sell items with configurable price multipliers, restock rules with infinite stock support, and automatic inventory cycling
 
 ### Ability System
 
@@ -47,7 +48,7 @@ A Multi-User Dungeon (MUD) server implementation built with TypeScript and Node.
 - **Command Aliases**: Multiple patterns per command for natural language processing
 - **Admin-Only Commands**: Commands can be restricted to admin users using the `adminOnly` flag
 - **Error Handling**: Built-in error responses and user-friendly feedback
-- **Comprehensive Command Set**: Movement, combat, inventory, equipment, social, and administrative commands
+- **Comprehensive Command Set**: Movement, combat, inventory, equipment, social, shopkeeper interaction (list, buy, sell, appraise), and administrative commands
 - **Exec Command**: Admin-only JavaScript execution in sandboxed context with per-character persistence
 - **Shutdown Command**: Admin-only graceful server shutdown command that exits with code 2 to signal intentional shutdown
 

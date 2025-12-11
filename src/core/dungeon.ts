@@ -3223,13 +3223,19 @@ export class Item extends Movable {
 		compress?: boolean;
 		version?: string;
 	}): SerializedItem {
-		const base = super.serialize(options);
-		const result: SerializedItem = {
+		// Build uncompressed including subclass fields, then apply common compression if requested
+		const base = {
+			...(options?.version && { version: options.version }),
+			...super.serialize(options),
+		};
+		const uncompressed: SerializedItem = {
 			...base,
 			type: "Item",
 			...(this.isContainer && { isContainer: true }),
 		};
-		return result;
+		return options?.compress
+			? compressSerializedObject(uncompressed, base.templateId)
+			: uncompressed;
 	}
 }
 

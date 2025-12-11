@@ -8,7 +8,7 @@
  */
 
 import { MESSAGE_GROUP } from "../core/character.js";
-import { Room, DungeonObject } from "../core/dungeon.js";
+import { Room, DungeonObject, Item } from "../core/dungeon.js";
 import { getEquipmentList } from "../core/equipment.js";
 import { Mob } from "../core/dungeon.js";
 import { COLOR, color, SIZER } from "../core/color.js";
@@ -166,13 +166,56 @@ export function showObject(actor: Mob, obj: DungeonObject): void {
 }
 
 /**
+ * Groups an array of objects using a key function.
+ * Returns a Map where each key is determined by the keyFn,
+ * and the value contains one representative item and the count of items with that key.
+ *
+ * @param items Array of objects to group
+ * @param keyFn Function that takes an item and returns a string key for grouping
+ * @returns Map of grouped items with counts
+ *
+ * @example
+ * ```typescript
+ * const items = [item1, item2, item3];
+ * // Group by display and keywords
+ * const groups = groupItems(items, (item) => `${item.display}|${item.keywords}`);
+ * // groups.get("sword|sword") = { item: item1, count: 2 }
+ *
+ * // Group by templateId
+ * const groupsByTemplate = groupItems(items, (item) => item.templateId || 'no-template');
+ * ```
+ */
+export function groupItems<T>(
+	items: T[],
+	keyFn: (item: T) => string
+): Map<string, { item: T; count: number }> {
+	const groups = new Map<string, { item: T; count: number }>();
+
+	for (const item of items) {
+		const key = keyFn(item);
+
+		const existing = groups.get(key);
+		if (existing) {
+			existing.count++;
+		} else {
+			groups.set(key, { item, count: 1 });
+		}
+	}
+
+	return groups;
+}
+
+/**
  * Displays the contents of a container.
  * Shows the container's description and lists all items inside it.
  *
  * @param actor The mob viewing the container
  * @param container The container to look inside
  */
-export function showContainerContents(actor: Mob, container: DungeonObject): void {
+export function showContainerContents(
+	actor: Mob,
+	container: DungeonObject
+): void {
 	const character = actor.character;
 	if (!character) return;
 
@@ -204,4 +247,3 @@ export function showContainerContents(actor: Mob, container: DungeonObject): voi
 
 	character.sendMessage(lines.join(LINEBREAK), MESSAGE_GROUP.COMMAND_RESPONSE);
 }
-

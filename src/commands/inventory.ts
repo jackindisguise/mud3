@@ -28,6 +28,7 @@ import { CommandObject } from "../package/commands.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { color, COLOR } from "../core/color.js";
 import { formatNumber } from "../utils/number.js";
+import { groupItems } from "../utils/display.js";
 
 export const command = {
 	pattern: "inventory~ <mode:word?>",
@@ -61,9 +62,35 @@ export const command = {
 		if (unequippedItems.length === 0 && actor.value === 0) {
 			lines.push(" Nothing.");
 		} else {
+			// Group items by display and keywords string
+			const displayAndKeywordsKeyFn = (item: Item) =>
+				`${item.display}|${item.keywords}`;
+			const templateIdKeyFn = (item: Item) => item.templateId || "no-template";
+			const standardKeyFn = (item: Item) =>
+				`${displayAndKeywordsKeyFn(item)}|${templateIdKeyFn(item)}`;
+			const weightKeyFn = (item: Item) =>
+				`${standardKeyFn(item)}|weight ${item.currentWeight}`;
+			const valueKeyFn = (item: Item) =>
+				`${standardKeyFn(item)}|value ${item.value}`;
+			let itemGroups: Map<string, { item: Item; count: number }>;
+
 			// Format inventory list
-			const itemList = unequippedItems.map((item) => {
+			const itemList: string[] = [];
+			if (mode === "weight") {
+				itemGroups = groupItems(unequippedItems, weightKeyFn);
+			} else if (mode === "value") {
+				itemGroups = groupItems(unequippedItems, valueKeyFn);
+			} else {
+				itemGroups = groupItems(unequippedItems, standardKeyFn);
+			}
+			for (const { item, count } of itemGroups.values()) {
 				let line = ` ${item.display}`;
+
+				// Add count if more than one
+				if (count > 1) {
+					line += ` ${color(`(x${count})`, COLOR.GREY)}`;
+				}
+
 				if (mode === "weight") {
 					line += ` ${color(
 						`(${formatNumber(item.currentWeight)}lbs)`,
@@ -79,8 +106,8 @@ export const command = {
 						line += ` ${color(`(worthless)`, COLOR.GREY)}`;
 					}
 				}
-				return line;
-			});
+				itemList.push(line);
+			}
 			lines.push(...itemList);
 			if (actor.value > 0)
 				lines.push(

@@ -1,0 +1,18 @@
+keyword: ability-tempest-lance
+aliases:
+  - tempest lance
+topic:
+  - abilities
+  - combat
+content: |-
+  TEMPEST LANCE ABILITY
+
+    Hurl a lance of tempest energy at your target.
+
+    This ability hurls a lance of tempest energy at your target, dealing
+  damage. The damage scales with your proficiency in this ability.
+
+    Cooldown: 3.5 seconds
+
+    Usage: tempest lance <target>
+

@@ -1,0 +1,19 @@
+keyword: ability-whirlwind
+aliases:
+  - whirlwind
+topic:
+  - abilities
+  - combat
+content: |-
+  WHIRLWIND ABILITY
+
+    A spinning attack that hits all nearby enemies in the room.
+
+    This ability allows you to perform a spinning attack that damages all
+  enemies in the same room. The damage scales with your proficiency in this
+  ability.
+
+    Cooldown: 1 second
+
+    Usage: whirlwind
+

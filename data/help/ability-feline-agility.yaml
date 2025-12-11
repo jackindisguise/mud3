@@ -1,0 +1,19 @@
+keyword: ability-feline-agility
+aliases:
+  - feline agility
+topic:
+  - abilities
+  - buffs
+content: |-
+  FELINE AGILITY ABILITY
+
+    Channel the swift agility of a cat to move with incredible speed.
+
+    This ability applies a feline agility effect that enhances your mobility
+  and agility for a duration. The effect scales with your proficiency in this
+  ability.
+
+    Cooldown: 15 seconds
+
+    Usage: feline agility
+

@@ -1,0 +1,19 @@
+keyword: ability-electro-claw
+aliases:
+  - electro claw
+topic:
+  - abilities
+  - combat
+content: |-
+  ELECTRO CLAW ABILITY
+
+    Strike with claws charged with electrical energy.
+
+    This ability allows you to strike your target with claws charged with
+  electrical energy, dealing physical damage. The damage scales with your
+  proficiency in this ability.
+
+    Cooldown: 3 seconds
+
+    Usage: electro claw <target>
+

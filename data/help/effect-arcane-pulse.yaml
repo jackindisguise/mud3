@@ -1,0 +1,17 @@
+keyword: effect-arcane-pulse
+aliases:
+  - arcane pulse
+topic:
+  - effects
+  - passive
+content: |-
+  ARCANE PULSE EFFECT
+
+    Mages channel arcane energies, gaining enhanced spell power and mana reserves.
+
+    This passive effect represents mage mastery of arcane energies, providing
+  enhanced magical power and mana. It grants bonuses to intelligence, spell power,
+  wisdom, and resilience, as well as increased maximum mana and outgoing damage.
+
+    This effect is automatically applied to mages and is always active.
+

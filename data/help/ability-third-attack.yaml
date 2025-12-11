@@ -1,0 +1,18 @@
+keyword: ability-third-attack
+aliases:
+  - third attack
+topic:
+  - abilities
+  - passive
+content: |-
+  THIRD ATTACK ABILITY
+
+    A passive ability that grants an extra attack with your off hand weapon
+  during combat rounds.
+
+    This passive ability automatically triggers an additional attack with your
+  off hand weapon during each combat round. The chance to trigger improves with
+  your proficiency in this ability.
+
+    This ability has no command and procs automatically during combat.
+

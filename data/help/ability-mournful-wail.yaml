@@ -1,0 +1,19 @@
+keyword: ability-mournful-wail
+aliases:
+  - mournful wail
+topic:
+  - abilities
+  - combat
+content: |-
+  MOURNFUL WAIL ABILITY
+
+    Emit a mournful wail that weakens your enemies.
+
+    This ability emits a mournful wail that weakens your enemies, potentially
+  applying debuffs or dealing damage. The effectiveness scales with your
+  proficiency in this ability.
+
+    Cooldown: 10 seconds
+
+    Usage: mournful wail
+

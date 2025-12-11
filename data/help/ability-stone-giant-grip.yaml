@@ -1,0 +1,19 @@
+keyword: ability-stone-giant-grip
+aliases:
+  - stone giant grip
+topic:
+  - abilities
+  - combat
+content: |-
+  STONE GIANT GRIP ABILITY
+
+    Crush your target with the grip of a stone giant.
+
+    This ability allows you to crush your target with the grip of a stone giant,
+  dealing physical damage. The damage scales with your proficiency in this
+  ability.
+
+    Cooldown: 6 seconds
+
+    Usage: stone giant grip <target>
+

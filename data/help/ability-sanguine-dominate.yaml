@@ -1,0 +1,19 @@
+keyword: ability-sanguine-dominate
+aliases:
+  - sanguine dominate
+topic:
+  - abilities
+  - combat
+content: |-
+  SANGUINE DOMINATE ABILITY
+
+    Dominate your target through sanguine power.
+
+    This ability allows you to dominate your target through sanguine power,
+  dealing damage and potentially applying debuffs. The damage and effectiveness
+  scale with your proficiency in this ability.
+
+    Cooldown: 8 seconds
+
+    Usage: sanguine dominate <target>
+

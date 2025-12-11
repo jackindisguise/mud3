@@ -1,0 +1,19 @@
+keyword: ability-inspire
+aliases:
+  - inspire
+topic:
+  - abilities
+  - buffs
+content: |-
+  INSPIRE ABILITY
+
+    Inspire your allies with your presence and leadership.
+
+    This ability applies an inspire effect that enhances your attributes and
+  those of nearby allies for a duration. The effect scales with your proficiency
+  in this ability.
+
+    Cooldown: 20 seconds
+
+    Usage: inspire
+

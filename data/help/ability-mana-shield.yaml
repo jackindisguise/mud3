@@ -1,0 +1,18 @@
+keyword: ability-mana-shield
+aliases:
+  - mana shield
+topic:
+  - abilities
+  - defensive
+content: |-
+  MANA SHIELD ABILITY
+
+    Create a protective shield of pure mana around yourself.
+
+    This ability creates a protective shield of pure mana that absorbs incoming
+  damage. The absorption capacity scales with your proficiency in this ability.
+
+    Cooldown: 5 seconds
+
+    Usage: mana shield
+

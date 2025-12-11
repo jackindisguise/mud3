@@ -1,0 +1,17 @@
+keyword: ability-pure-power
+aliases:
+  - pure power
+topic:
+  - abilities
+  - passive
+content: |-
+  PURE POWER ABILITY
+
+    A passive ability that increases your attack power based on proficiency.
+
+    This passive ability automatically increases your attack power based on
+  your proficiency level. At 50% proficiency, you gain +100% attack power
+  (2x damage). At 100% proficiency, you gain +200% attack power (3x damage).
+
+    This ability has no command and is always active when you know it.
+

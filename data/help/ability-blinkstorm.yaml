@@ -1,0 +1,19 @@
+keyword: ability-blinkstorm
+aliases:
+  - blinkstorm
+topic:
+  - abilities
+  - combat
+content: |-
+  BLINKSTORM ABILITY
+
+    Teleport rapidly between enemies, striking them all.
+
+    This ability allows you to teleport rapidly between all enemies in the room,
+  striking each one with your weapon. The damage scales with your proficiency
+  in this ability.
+
+    Cooldown: 12 seconds
+
+    Usage: blinkstorm
+

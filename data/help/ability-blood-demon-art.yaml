@@ -1,0 +1,20 @@
+keyword: ability-blood-demon-art
+aliases:
+  - blood demon art
+  - bda
+topic:
+  - abilities
+  - combat
+content: |-
+  BLOOD DEMON ART ABILITY
+
+    Unleash a devastating demonic art powered by blood.
+
+    This ability unleashes a powerful demonic attack that deals corrupt damage
+  to your target. The damage scales with your proficiency in this ability.
+
+    Cooldown: 10 seconds
+
+    Usage: blood demon art <target>
+           bda <target>
+

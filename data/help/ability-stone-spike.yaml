@@ -1,0 +1,19 @@
+keyword: ability-stone-spike
+aliases:
+  - stone spike
+topic:
+  - abilities
+  - combat
+content: |-
+  STONE SPIKE ABILITY
+
+    Summon a spike of stone from the ground to impale your target.
+
+    This ability summons a spike of stone from the ground that impales your
+  target, dealing physical damage. The damage scales with your proficiency in
+  this ability.
+
+    Cooldown: 4 seconds
+
+    Usage: stone spike <target>
+

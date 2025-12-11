@@ -1,11 +1,11 @@
-keyword: class-warrior
+keyword: job-warrior
 aliases:
   - warrior
 topic:
-  - classes
+  - jobs
   - character-creation
 content: |-
-  WARRIOR CLASS OVERVIEW
+  WARRIOR JOB OVERVIEW
 
     Warriors are the anvil upon which every campaign is forged. They train in
   drills that mix shield-walls, endurance marches, and brutal pit bouts, stepping
@@ -19,3 +19,4 @@ content: |-
   and arcane finesse lag behind, so they excel as front-line bruisers who protect
   weaker allies and control space with shield bashes, grapples, and relentless
   pressure.
+

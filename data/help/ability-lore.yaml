@@ -1,0 +1,19 @@
+keyword: ability-lore
+aliases:
+  - lore
+topic:
+  - abilities
+  - utility
+content: |-
+  LORE ABILITY
+
+    Examine an item in detail to learn its properties.
+
+    This ability allows you to examine an item in great detail, revealing its
+  properties, bonuses, and statistics. The success rate improves with your
+  proficiency in this ability.
+
+    Cooldown: 1 second
+
+    Usage: lore <item>
+

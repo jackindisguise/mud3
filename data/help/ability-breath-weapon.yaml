@@ -1,0 +1,18 @@
+keyword: ability-breath-weapon
+aliases:
+  - breath weapon
+topic:
+  - abilities
+  - combat
+content: |-
+  BREATH WEAPON ABILITY
+
+    Unleash a devastating breath attack against your enemies.
+
+    This ability unleashes a powerful breath attack that deals scorch damage
+  to your target. The damage scales with your proficiency in this ability.
+
+    Cooldown: 8 seconds
+
+    Usage: breath weapon <target>
+

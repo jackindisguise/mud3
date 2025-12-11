@@ -1,0 +1,17 @@
+keyword: effect-poison
+aliases:
+  - poison
+topic:
+  - effects
+  - damage-over-time
+content: |-
+  POISON EFFECT
+
+    Deals damage over time from poison.
+
+    This damage-over-time effect deals poison damage at regular intervals. The
+  damage and duration depend on the source that applied it. Multiple instances
+  of this effect can stack.
+
+    This effect can be applied by various abilities and sources.
+

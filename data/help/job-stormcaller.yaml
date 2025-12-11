@@ -1,11 +1,11 @@
-keyword: class-stormcaller
+keyword: job-stormcaller
 aliases:
   - stormcaller
 topic:
-  - classes
+  - jobs
   - character-creation
 content: |-
-  STORMCALLER CLASS OVERVIEW
+  STORMCALLER JOB OVERVIEW
 
     Stormcallers braid bardic canticles with turbulent weather. They travel with
   choirs of thunder spirits, conducting lightning like an orchestra while their
@@ -18,3 +18,4 @@ content: |-
   control effects, and party buffs that ride crackling winds. In coordinated groups
   a stormcaller becomes the pulse of the team, setting tempo and keeping enemies
   constantly off-balance.
+

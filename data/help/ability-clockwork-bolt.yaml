@@ -1,0 +1,18 @@
+keyword: ability-clockwork-bolt
+aliases:
+  - clockwork bolt
+topic:
+  - abilities
+  - combat
+content: |-
+  CLOCKWORK BOLT ABILITY
+
+    Fire a precise mechanical bolt at your target.
+
+    This ability fires a precise mechanical bolt that deals zap damage to your
+  target. The damage scales with your proficiency in this ability.
+
+    Cooldown: 2 seconds
+
+    Usage: clockwork bolt <target>
+

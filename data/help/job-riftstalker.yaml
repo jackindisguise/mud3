@@ -1,11 +1,11 @@
-keyword: class-riftstalker
+keyword: job-riftstalker
 aliases:
   - riftstalker
 topic:
-  - classes
+  - jobs
   - character-creation
 content: |-
-  RIFTSTALKER CLASS OVERVIEW
+  RIFTSTALKER JOB OVERVIEW
 
     Riftstalkers are blade-dancers who treat reality as optional. They train in
   mirror halls where each step teaches a new angle from which to strike, then leap
@@ -17,3 +17,4 @@ content: |-
   remain sufficient for precise strikes and utility magic. Players who crave
   high-risk, high-reward playstyles will love weaving phase strikes, teleporting
   out of danger, and deleting enemies before anyone realizes the air flickered.
+

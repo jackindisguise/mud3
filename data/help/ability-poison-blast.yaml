@@ -1,0 +1,19 @@
+keyword: ability-poison-blast
+aliases:
+  - poison blast
+topic:
+  - abilities
+  - combat
+content: |-
+  POISON BLAST ABILITY
+
+    Blasts the target with a poison nova, inflicting poison.
+
+    This ability blasts your target with a poison nova, dealing damage and
+  potentially applying a poison effect. The damage and effectiveness scale
+  with your proficiency in this ability.
+
+    Cooldown: 3 seconds
+
+    Usage: poison blast <target>
+

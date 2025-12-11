@@ -1,11 +1,11 @@
-keyword: class-mage
+keyword: job-mage
 aliases:
   - mage
 topic:
-  - classes
+  - jobs
   - character-creation
 content: |-
-  MAGE CLASS OVERVIEW
+  MAGE JOB OVERVIEW
 
     Mages devote decades to the study of sigils, constellations, and the whispered
   names of elementals. They prize ornate robes over armor, treating each battlefield
@@ -17,3 +17,4 @@ content: |-
   on their feet. This comes at the expense of strength and resilience, so they rely
   on wards, clever positioning, and overwhelming arcane force instead of standing
   toe-to-toe with heavy hitters.
+

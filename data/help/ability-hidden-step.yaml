@@ -1,0 +1,18 @@
+keyword: ability-hidden-step
+aliases:
+  - hidden step
+topic:
+  - abilities
+  - buffs
+content: |-
+  HIDDEN STEP ABILITY
+
+    Step into the shadows, becoming harder to detect.
+
+    This ability applies a hidden step effect that makes you harder to detect
+  for a duration. The effect scales with your proficiency in this ability.
+
+    Cooldown: 15 seconds
+
+    Usage: hidden step
+

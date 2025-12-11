@@ -1,0 +1,17 @@
+keyword: effect-integrated-armor
+aliases:
+  - integrated armor
+topic:
+  - effects
+  - shield
+content: |-
+  INTEGRATED ARMOR EFFECT
+
+    Armor integrated into your body that absorbs incoming damage.
+
+    This shield effect absorbs damage until its absorption capacity is depleted.
+  The absorption capacity scales with the proficiency of the ability that applied
+  it. Multiple instances of this effect can stack.
+
+    This effect is applied by the Integrated Armor ability.
+

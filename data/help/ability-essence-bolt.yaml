@@ -1,0 +1,18 @@
+keyword: ability-essence-bolt
+aliases:
+  - essence bolt
+topic:
+  - abilities
+  - combat
+content: |-
+  ESSENCE BOLT ABILITY
+
+    Fire a bolt of pure essence energy at your target.
+
+    This ability fires a bolt of pure essence energy that deals blast damage
+  to your target. The damage scales with your proficiency in this ability.
+
+    Cooldown: 2.5 seconds
+
+    Usage: essence bolt <target>
+

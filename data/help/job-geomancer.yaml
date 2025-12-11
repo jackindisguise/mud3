@@ -1,11 +1,11 @@
-keyword: class-geomancer
+keyword: job-geomancer
 aliases:
   - geomancer
 topic:
-  - classes
+  - jobs
   - character-creation
 content: |-
-  GEOMANCER CLASS OVERVIEW
+  GEOMANCER JOB OVERVIEW
 
     Geomancers are earthshapers who read fault lines like scripture. They wander
   volcanic calderas and crystal caverns, bargaining with stone spirits for shards
@@ -18,3 +18,4 @@ content: |-
   salvos. They are slower than duelists and less surgical than pure mages, but they
   excel at controlling terrain, pinning foes in earthen cages, and turning any
   battlefield into a fortified stronghold.
+

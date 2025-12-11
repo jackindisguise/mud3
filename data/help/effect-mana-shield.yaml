@@ -1,0 +1,17 @@
+keyword: effect-mana-shield
+aliases:
+  - mana shield
+topic:
+  - effects
+  - shield
+content: |-
+  MANA SHIELD EFFECT
+
+    A protective shield of pure mana that absorbs incoming damage.
+
+    This shield effect absorbs damage until its absorption capacity is depleted.
+  The absorption capacity scales with the proficiency of the ability that applied
+  it. Multiple instances of this effect can stack.
+
+    This effect is applied by the Mana Shield ability.
+

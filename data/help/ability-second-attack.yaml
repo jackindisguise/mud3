@@ -1,0 +1,18 @@
+keyword: ability-second-attack
+aliases:
+  - second attack
+topic:
+  - abilities
+  - passive
+content: |-
+  SECOND ATTACK ABILITY
+
+    A passive ability that grants an extra attack with your main hand weapon
+  during combat rounds.
+
+    This passive ability automatically triggers an additional attack with your
+  main hand weapon during each combat round. The chance to trigger improves with
+  your proficiency in this ability.
+
+    This ability has no command and procs automatically during combat.
+

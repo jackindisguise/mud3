@@ -108,6 +108,12 @@ function putAllInContainer(
 			continue;
 		}
 
+		// Prevent putting containers in containers
+		if (invItem instanceof Item && invItem.isContainer) {
+			failedItems.push(invItem.display);
+			continue;
+		}
+
 		// Move item to container
 		container.add(invItem);
 		successCount++;
@@ -281,6 +287,15 @@ export const command = {
 				return;
 			}
 			current = current.location;
+		}
+
+		// Prevent putting containers in containers
+		if (item instanceof Item && item.isContainer) {
+			actor.sendMessage(
+				"You cannot put containers in containers.",
+				MESSAGE_GROUP.COMMAND_RESPONSE
+			);
+			return;
 		}
 
 		// Move item to container

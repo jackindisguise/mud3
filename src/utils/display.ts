@@ -235,13 +235,32 @@ export function showContainerContents(
 
 	// Show contents
 	const contents = container.contents;
-	if (contents.length === 0) {
+	const items = contents.filter((obj) => obj instanceof Item) as Item[];
+
+	if (items.length === 0) {
 		lines.push("> It is empty.");
 	} else {
 		lines.push("");
 		lines.push(`${color("Contents:", COLOR.YELLOW)}`);
-		for (const item of contents) {
-			lines.push(`  ${item.display || item.keywords}`);
+
+		// Group items by display, keywords, and templateId (same as inventory)
+		const displayAndKeywordsKeyFn = (item: Item) =>
+			`${item.display}|${item.keywords}`;
+		const templateIdKeyFn = (item: Item) => item.templateId || "no-template";
+		const standardKeyFn = (item: Item) =>
+			`${displayAndKeywordsKeyFn(item)}|${templateIdKeyFn(item)}`;
+
+		const itemGroups = groupItems(items, standardKeyFn);
+
+		for (const { item, count } of itemGroups.values()) {
+			let line = `  ${item.display || item.keywords}`;
+
+			// Add count if more than one
+			if (count > 1) {
+				line += ` ${color(`(x${count})`, COLOR.GREY)}`;
+			}
+
+			lines.push(line);
 		}
 	}
 

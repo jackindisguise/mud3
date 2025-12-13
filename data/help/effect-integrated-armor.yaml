@@ -1,5 +1,5 @@
 keyword: effect-integrated-armor
-aliases:
+related:
   - integrated armor
 topic:
   - effects
@@ -14,4 +14,3 @@ content: |-
   it. Multiple instances of this effect can stack.
 
     This effect is applied by the Integrated Armor ability.
-

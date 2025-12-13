@@ -1,5 +1,5 @@
 keyword: effect-mana-shield
-aliases:
+related:
   - mana shield
 topic:
   - effects
@@ -14,4 +14,3 @@ content: |-
   it. Multiple instances of this effect can stack.
 
     This effect is applied by the Mana Shield ability.
-

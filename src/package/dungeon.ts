@@ -337,7 +337,6 @@ export function createMob(options?: MobOptions): Mob {
 	applyMobArchetypePassives(mob);
 	checkMobArchetypeAbilities(mob);
 
-	logger.info(`Creating mob ${mob.oid} (${mob.display})`);
 	// Initialize AI for NPC mobs (mobs without character)
 	// Skip AI initialization for temporary template instances (OID -1) used for baseSerialized
 	if (!mob.character && oid >= 0) {
@@ -373,7 +372,6 @@ export function createMovable(options?: MovableOptions): Movable {
  * Factory function to create an Item with an auto-generated OID.
  */
 export function createItem(options?: ItemOptions): Item {
-	logger.info(`Creating item ${options?.oid} (${options?.display})`);
 	return new Item({
 		...options,
 		oid: options?.oid ?? getNextObjectId(),

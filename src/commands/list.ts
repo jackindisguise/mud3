@@ -96,7 +96,12 @@ export const command = {
 			}
 
 			// Show stock count/infinite indicator at the beginning: "[*]" or "[count]"
-			const stockIndicator = isInfinite ? "[*]" : `[${count}]`;
+			const stockCount = Math.min(count, 999);
+			const stockCountStr = `${color(
+				String(stockCount).padStart(3, " "),
+				COLOR.WHITE
+			)}`;
+			const stockIndicator = `[${isInfinite ? "***" : stockCountStr}]`;
 			// Pad item name to 25 characters for alignment
 			const paddedName = string.pad(
 				item.display,

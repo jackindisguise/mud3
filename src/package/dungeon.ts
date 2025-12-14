@@ -134,7 +134,7 @@ import {
 	globalizeShopkeeperInventoryId,
 	registerShopkeeperInventory,
 } from "../registry/shopkeeper-inventory.js";
-import { cycleInventory } from "../core/shopkeeper-inventory.js";
+import { cycleInventory } from "../registry/shopkeeper-inventory.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");

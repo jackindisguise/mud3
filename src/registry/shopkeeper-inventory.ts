@@ -3,7 +3,14 @@
  */
 
 import type { ShopkeeperInventory } from "../core/dungeon.js";
-import { getDungeonById } from "./dungeon.js";
+import {
+	addStock,
+	countStockByTemplate,
+	isInfiniteStock,
+} from "../core/shopkeeper-inventory.js";
+import { resolveTemplateById } from "./dungeon.js";
+import { createFromTemplateWithOid } from "../package/dungeon.js";
+import logger from "../logger.js";
 
 /**
  * Internal cache of shopkeeper inventories by their globalized IDs.
@@ -173,4 +180,151 @@ export function getAllShopkeeperInventoryIds(): string[] {
  */
 export function getAllShopkeeperInventories(): ShopkeeperInventory[] {
 	return Array.from(SHOPKEEPER_INVENTORY_CACHE.values());
+}
+
+/**
+ * Cycle/restock a shopkeeper inventory based on its restock rules.
+ * This processes each rule and restocks items according to minimum/maximum values.
+ * Infinite stock items are skipped.
+ *
+ * @param inventory - The shopkeeper inventory to cycle
+ */
+export async function cycleInventory(inventory: ShopkeeperInventory) {
+	await logger.block(`${inventory.id}`, async () => {
+		logger.debug(`Starting cycle for inventory: ${inventory.id}`);
+
+		for (const rule of inventory.rules) {
+			// Get template ID from the rule's template
+			const templateId = rule.template.id;
+			if (!templateId) {
+				logger.debug(
+					`Skipping rule with no template ID for inventory: ${inventory.id}`
+				);
+				continue;
+			}
+
+			// Handle infinite stock items: ensure at least one item exists
+			if (isInfiniteStock(rule)) {
+				const currentCount = countStockByTemplate(inventory, templateId);
+				logger.debug(
+					`Infinite stock rule for ${templateId} in ${inventory.id}: current count = ${currentCount}`
+				);
+				if (currentCount === 0) {
+					// Create one item for infinite stock if none exists
+					const template = resolveTemplateById(templateId);
+					if (
+						template &&
+						(template.type === "Item" ||
+							template.type === "Equipment" ||
+							template.type === "Armor" ||
+							template.type === "Weapon")
+					) {
+						const item = createFromTemplateWithOid(template);
+						addStock(inventory, item);
+						logger.debug(
+							`Created infinite stock item ${templateId} for inventory: ${inventory.id}`
+						);
+					}
+				}
+				continue;
+			}
+
+			// Skip if cycleDelay is active
+			if (
+				rule.cycleDelayRemaining !== undefined &&
+				rule.cycleDelayRemaining > 0
+			) {
+				rule.cycleDelayRemaining--;
+				logger.debug(
+					`Cycle delay active for ${templateId} in ${inventory.id}: ${rule.cycleDelayRemaining} cycles remaining`
+				);
+				continue;
+			}
+
+			// Count current stock for this template
+			const currentCount = countStockByTemplate(inventory, templateId);
+
+			// Determine how many to restock
+			let toRestock = 0;
+			if (rule.minimum !== undefined && currentCount < rule.minimum) {
+				// Fill to minimum
+				toRestock = rule.minimum - currentCount;
+				logger.debug(
+					`${templateId} in ${inventory.id}: below minimum (${currentCount} < ${rule.minimum}), restocking ${toRestock}`
+				);
+			} else if (
+				rule.maximum !== undefined &&
+				currentCount < rule.maximum &&
+				currentCount >= (rule.minimum ?? 0)
+			) {
+				// Add 1 if between minimum and maximum
+				toRestock = 1;
+				logger.debug(
+					`${templateId} in ${inventory.id}: between min/max (${currentCount}), restocking 1`
+				);
+			} else {
+				logger.debug(
+					`${templateId} in ${
+						inventory.id
+					}: no restock needed (count: ${currentCount}, min: ${
+						rule.minimum ?? "none"
+					}, max: ${rule.maximum ?? "none"})`
+				);
+			}
+
+			// Restock items
+			if (toRestock > 0) {
+				const template = resolveTemplateById(templateId);
+				if (
+					!template ||
+					(template.type !== "Item" &&
+						template.type !== "Equipment" &&
+						template.type !== "Armor" &&
+						template.type !== "Weapon")
+				) {
+					logger.debug(
+						`Skipping ${templateId} in ${inventory.id}: template not found or not an Item`
+					);
+					continue;
+				}
+
+				for (let i = 0; i < toRestock; i++) {
+					const item = createFromTemplateWithOid(template);
+					addStock(inventory, item);
+				}
+
+				logger.debug(
+					`Restocked ${toRestock} ${templateId} in ${
+						inventory.id
+					} (new count: ${countStockByTemplate(inventory, templateId)})`
+				);
+
+				// Activate cycleDelay if we restocked and delay is set
+				if (rule.cycleDelay !== undefined && rule.cycleDelay > 0) {
+					rule.cycleDelayRemaining = rule.cycleDelay;
+					logger.debug(
+						`Activated cycle delay for ${templateId} in ${inventory.id}: ${rule.cycleDelay} cycles`
+					);
+				}
+			}
+		}
+
+		logger.debug(`Completed cycle for inventory: ${inventory.id}`);
+	});
+}
+
+/**
+ * Cycle all shopkeeper inventories in the registry.
+ * This is called periodically (e.g., on game ticks) to restock all shopkeepers.
+ */
+export async function cycleShopkeeperInventories() {
+	await logger.block("shopkeepers", async () => {
+		logger.debug("Starting cycle for all shopkeeper inventories");
+		const inventories = getAllShopkeeperInventories();
+		logger.debug(`Found ${inventories.length} inventories`);
+		for (const inventory of inventories) {
+			await cycleInventory(inventory);
+		}
+		logger.debug("Completed cycle for all shopkeeper inventories");
+	});
 }

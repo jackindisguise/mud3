@@ -4,12 +4,9 @@
 
 import type {
 	DungeonObject,
-	ItemTemplate,
 	RestockRule,
 	ShopkeeperInventory,
 } from "./dungeon.js";
-import { createFromTemplateWithOid } from "../package/dungeon.js";
-import { resolveTemplateById } from "../registry/dungeon.js";
 
 /**
  * Check if a restock rule represents infinite stock.
@@ -101,99 +98,4 @@ export function countStockByTemplate(
 ): number {
 	return inventory.stock.filter((item) => item.templateId === templateId)
 		.length;
-}
-
-/**
- * Cycle/restock a shopkeeper inventory based on its restock rules.
- * This processes each rule and restocks items according to minimum/maximum values.
- * Infinite stock items are skipped.
- *
- * @param inventory - The shopkeeper inventory to cycle
- */
-export function cycleInventory(inventory: ShopkeeperInventory): void {
-	for (const rule of inventory.rules) {
-		// Get template ID from the rule's template
-		const templateId = rule.template.id;
-		if (!templateId) {
-			continue;
-		}
-
-		// Handle infinite stock items: ensure at least one item exists
-		if (isInfiniteStock(rule)) {
-			const currentCount = countStockByTemplate(inventory, templateId);
-			if (currentCount === 0) {
-				// Create one item for infinite stock if none exists
-				const template = resolveTemplateById(templateId);
-				if (
-					template &&
-					(template.type === "Item" ||
-						template.type === "Equipment" ||
-						template.type === "Armor" ||
-						template.type === "Weapon")
-				) {
-					const item = createFromTemplateWithOid(template);
-					addStock(inventory, item);
-				}
-			}
-			continue;
-		}
-
-		// Skip if cycleDelay is active
-		if (
-			rule.cycleDelayRemaining !== undefined &&
-			rule.cycleDelayRemaining > 0
-		) {
-			rule.cycleDelayRemaining--;
-			continue;
-		}
-
-		// Count current stock for this template
-		const currentCount = countStockByTemplate(inventory, templateId);
-
-		// Determine how many to restock
-		let toRestock = 0;
-		if (rule.minimum !== undefined && currentCount < rule.minimum) {
-			// Fill to minimum
-			toRestock = rule.minimum - currentCount;
-		} else if (
-			rule.maximum !== undefined &&
-			currentCount < rule.maximum &&
-			currentCount >= (rule.minimum ?? 0)
-		) {
-			// Add 1 if between minimum and maximum
-			toRestock = 1;
-		}
-
-		// Restock items
-		if (toRestock > 0) {
-			const template = resolveTemplateById(templateId);
-			if (!template || template.type !== "Item") {
-				continue;
-			}
-
-			for (let i = 0; i < toRestock; i++) {
-				const item = createFromTemplateWithOid(template);
-				addStock(inventory, item);
-			}
-
-			// Activate cycleDelay if we restocked and delay is set
-			if (rule.cycleDelay !== undefined && rule.cycleDelay > 0) {
-				rule.cycleDelayRemaining = rule.cycleDelay;
-			}
-		}
-	}
-}
-
-/**
- * Cycle all shopkeeper inventories in the registry.
- * This is called periodically (e.g., on game ticks) to restock all shopkeepers.
- */
-export function cycleShopkeeperInventories(): void {
-	// Use dynamic import to avoid circular dependency
-	import("../registry/shopkeeper-inventory.js").then((module) => {
-		const inventories = module.getAllShopkeeperInventories();
-		for (const inventory of inventories) {
-			cycleInventory(inventory);
-		}
-	});
 }

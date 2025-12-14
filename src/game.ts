@@ -75,16 +75,20 @@ import {
 } from "./regeneration.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
-import { calendarEvents, getCurrentTime } from "./registry/calendar.js";
-import { cycleShopkeeperInventories } from "./core/shopkeeper-inventory.js";
+import { calendarEvents } from "./registry/calendar.js";
+import { cycleShopkeeperInventories } from "./registry/shopkeeper-inventory.js";
 import { processAITick } from "./mob-ai.js";
 
 // Default intervals/timeouts (milliseconds)
-export const DEFAULT_SAVE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-export const DEFAULT_DUNGEON_RESET_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 4 * 1000; // 4 seconds
-export const DEFAULT_BOARD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 export const DEFAULT_GAME_TICK_INTERVAL_MS = 60 * 1000; // 1 minute
+export const DEFAULT_COMBAT_ROUND_INTERVAL_MS = 3 * 1000; // 4 seconds
+
+// default tick intervals/timeouts
+export let CURRENT_GAME_TICK = 0;
+export const DEFAULT_SAVE_INTERVAL_TICKS = 5; // 5 ticks
+export const DEFAULT_SHOPKEEPER_INVENTORY_INTERVAL_TICKS = 10; // 10 ticks
+export const DEFAULT_DUNGEON_RESET_INTERVAL_TICKS = 10; // 10 ticks
+export const DEFAULT_BOARD_CLEANUP_INTERVAL_TICKS = 60; // 60 ticks
 
 /**
  * Player authentication states during the login process.
@@ -1151,28 +1155,6 @@ async function start(): Promise<void> {
 		await webClientServer.start();
 	}
 
-	// Set up auto-save timer
-	saveTimer = setAbsoluteInterval(() => {
-		saveAllCharacters();
-	}, DEFAULT_SAVE_INTERVAL_MS);
-
-	// Set up board cleanup timer (runs every hour)
-	cleanupExpiredBoardMessages();
-	boardCleanupTimer = setAbsoluteInterval(() => {
-		cleanupExpiredBoardMessages();
-	}, DEFAULT_BOARD_CLEANUP_INTERVAL_MS); // 1 hour
-
-	// Set up periodic game state save (every 5 minutes)
-	gameStateSaveTimer = setAbsoluteInterval(() => {
-		saveGameStateInternal();
-	}, DEFAULT_SAVE_INTERVAL_MS);
-
-	// Set up dungeon reset timer
-	executeAllDungeonResets();
-	dungeonResetTimer = setAbsoluteInterval(() => {
-		executeAllDungeonResets();
-	}, DEFAULT_DUNGEON_RESET_INTERVAL_MS);
-
 	// Set up combat round timer (every 3 seconds)
 	combatTimer = setAbsoluteInterval(() => {
 		processCombatRound();
@@ -1185,21 +1167,45 @@ async function start(): Promise<void> {
 
 	// Set up game-wide tick events (fires every 60 seconds)
 	gameTickTimer = setAbsoluteInterval(() => {
-		gameTickEmitter.emit("tick");
+		gameTickEmitter.emit("tick", ++CURRENT_GAME_TICK);
 	}, DEFAULT_GAME_TICK_INTERVAL_MS);
 
 	// Connect AI system to game tick events
-	gameTickEmitter.on("tick", () => {
+	gameTickEmitter.on("tick", (tick: number) => {
 		processAITick();
 	});
 
 	// Connect shopkeeper inventory restock cycle to game tick events
-	gameTickEmitter.on("tick", () => {
-		cycleShopkeeperInventories();
+	await cycleShopkeeperInventories();
+	gameTickEmitter.on("tick", async (tick: number) => {
+		if (tick % DEFAULT_SHOPKEEPER_INVENTORY_INTERVAL_TICKS === 0) {
+			await cycleShopkeeperInventories();
+		}
 	});
 
-	// Cycle shopkeeper inventories initially on game start
-	cycleShopkeeperInventories();
+	// Set up board cleanup timer (runs every hour)
+	cleanupExpiredBoardMessages();
+	gameTickEmitter.on("tick", async (tick: number) => {
+		if (tick % DEFAULT_BOARD_CLEANUP_INTERVAL_TICKS === 0) {
+			cleanupExpiredBoardMessages();
+		}
+	});
+
+	// Set up periodic game state save (every 5 minutes)
+	gameTickEmitter.on("tick", async (tick: number) => {
+		if (tick % DEFAULT_SAVE_INTERVAL_TICKS === 0) {
+			await saveGameStateInternal();
+			await saveAllCharacters();
+		}
+	});
+
+	// Set up dungeon reset timer
+	executeAllDungeonResets();
+	gameTickEmitter.on("tick", async (tick: number) => {
+		if (tick % DEFAULT_DUNGEON_RESET_INTERVAL_TICKS === 0) {
+			executeAllDungeonResets();
+		}
+	});
 
 	// Listen for day/night changes and inform players
 	calendarEvents.on("morning", () => {

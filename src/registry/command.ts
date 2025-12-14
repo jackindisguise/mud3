@@ -10,34 +10,14 @@
 import {
 	Command,
 	CommandContext,
-	ParseResult,
 	AbilityCommand,
+	ActionQueueEntry,
+	ActionState,
 } from "../core/command.js";
 import { Character } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import logger from "../logger.js";
-
-/**
- * Entry in the action queue for commands with cooldowns.
- */
-export interface ActionQueueEntry {
-	input: string;
-	command: Command;
-	args: Map<string, any>;
-	cooldownMs: number;
-	enqueuedAt: number;
-}
-
-/**
- * Action state for a character, tracking queued actions and cooldowns.
- */
-export interface ActionState {
-	queue: ActionQueueEntry[];
-	cooldownTimer?: NodeJS.Timeout;
-	cooldownExpiresAt?: number;
-	isProcessing: boolean;
-}
 
 /** Registered commands */
 const commands: Command[] = [];

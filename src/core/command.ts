@@ -48,9 +48,7 @@ import { DungeonObject, Item, Room } from "./dungeon.js";
 import { DIRECTION } from "../direction.js";
 import { Mob, Equipment } from "./dungeon.js";
 import { Character } from "./character.js";
-import { MESSAGE_GROUP } from "./character.js";
 import { forEachCharacter } from "../game.js";
-import logger from "../logger.js";
 
 /**
  * Context provided to command execution.
@@ -212,6 +210,27 @@ export interface CommandOptions {
 	aliases?: string[];
 	priority?: PRIORITY;
 	adminOnly?: boolean;
+}
+
+/**
+ * Entry in the action queue for commands with cooldowns.
+ */
+export interface ActionQueueEntry {
+	input: string;
+	command: Command;
+	args: Map<string, any>;
+	cooldownMs: number;
+	enqueuedAt: number;
+}
+
+/**
+ * Action state for a character, tracking queued actions and cooldowns.
+ */
+export interface ActionState {
+	queue: ActionQueueEntry[];
+	cooldownTimer?: NodeJS.Timeout;
+	cooldownExpiresAt?: number;
+	isProcessing: boolean;
 }
 
 /**
@@ -1545,10 +1564,6 @@ export abstract class Command {
 		return dirMap[value.toLowerCase()];
 	}
 }
-
-// ActionQueueEntry and ActionState moved to src/registry/command.ts
-// Re-exported here for backward compatibility
-export type { ActionQueueEntry, ActionState } from "../registry/command.js";
 
 /**
  * Registry and executor for commands.

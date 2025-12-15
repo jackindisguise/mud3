@@ -62,7 +62,7 @@ import { Board } from "./core/board.js";
 import { saveGameState as saveGameStateFile } from "./package/gamestate.js";
 import { executeAllDungeonResets } from "./package/dungeon.js";
 import { color, COLOR } from "./core/color.js";
-import logger from "./logger.js";
+import logger from "./utils/logger.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
 import { LINEBREAK } from "./core/telnet.js";
@@ -76,7 +76,7 @@ import {
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
 import { calendarEvents } from "./registry/calendar.js";
-import { cycleShopkeeperInventories } from "./registry/shopkeeper-inventory.js";
+import { cycleShopkeeperInventories } from "./registry/shopkeeper.js";
 import { processAITick } from "./mob-ai.js";
 
 // Default intervals/timeouts (milliseconds)

@@ -22,7 +22,7 @@ import { Package } from "package-loader";
 import { join, relative } from "path";
 import { readFile, writeFile, rename, unlink } from "fs/promises";
 import YAML from "js-yaml";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import {
 	CONFIG,

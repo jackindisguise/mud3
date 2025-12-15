@@ -6,7 +6,7 @@
  */
 
 import { createArchetypeEditorServer } from "../editors/archetype-editor/archetype-editor-server.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 
 const server = createArchetypeEditorServer();
 

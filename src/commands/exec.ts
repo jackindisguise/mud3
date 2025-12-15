@@ -21,7 +21,7 @@ import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { runInNewContext } from "vm";
 import { inspect } from "util";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import {
 	broadcast,
 	forEachCharacter,

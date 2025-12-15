@@ -55,7 +55,7 @@ import {
 import { join, relative } from "path";
 import { mkdir, readFile, access, readdir } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import {
 	Dungeon,
 	Room,
@@ -77,10 +77,6 @@ import {
 	Equipment,
 	EquipmentOptions,
 	Armor,
-	ShopkeeperInventory,
-	RestockRule,
-	SerializedShopkeeperInventory,
-	SerializedRestockRule,
 	ArmorOptions,
 	Weapon,
 	WeaponOptions,
@@ -99,7 +95,6 @@ import {
 	SerializedWeapon,
 	EQUIPMENT_SLOT,
 	normalizeSerializedData,
-	compressSerializedObject,
 	type EquipmentTemplate,
 	type ArmorTemplate,
 	type WeaponTemplate,
@@ -107,6 +102,11 @@ import {
 	type equipmentType,
 	DungeonOptions,
 } from "../core/dungeon.js";
+import {
+	ShopkeeperInventory,
+	SerializedShopkeeperInventory,
+	RestockRule,
+} from "../core/shopkeeper.js";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
 import { getSafeRootDirectory } from "../utils/path.js";
@@ -122,7 +122,6 @@ import { COLOR_NAME_TO_COLOR, COLOR_NAMES, COLOR } from "../core/color.js";
 import assert from "assert";
 import {
 	DIRECTION,
-	DIRECTIONS,
 	dir2text,
 	text2dir,
 	dir2reverse,
@@ -133,8 +132,8 @@ import {
 	getShopkeeperInventoryById,
 	globalizeShopkeeperInventoryId,
 	registerShopkeeperInventory,
-} from "../registry/shopkeeper-inventory.js";
-import { cycleInventory } from "../registry/shopkeeper-inventory.js";
+} from "../registry/shopkeeper.js";
+import { cycleInventory } from "../registry/shopkeeper.js";
 
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const DATA_DIRECTORY = join(ROOT_DIRECTORY, "data");

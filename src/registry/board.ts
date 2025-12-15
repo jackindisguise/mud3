@@ -7,7 +7,7 @@
  * @module registry/board
  */
 
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { Board } from "../core/board.js";
 
 export { READONLY_BOARD_REGISTRY as BOARD_REGISTRY };

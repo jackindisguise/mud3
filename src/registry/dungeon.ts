@@ -20,7 +20,7 @@ import {
 	ResetOptions,
 } from "../core/dungeon.js";
 import { DIRECTION, dir2reverse, dir2text } from "../direction.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 
 export { READONLY_DUNGEON_REGISTRY as DUNGEON_REGISTRY };
 export { READONLY_WANDERING_MOBS as WANDERING_MOBS };

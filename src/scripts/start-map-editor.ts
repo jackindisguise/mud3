@@ -7,7 +7,7 @@
 
 import { loadPackage } from "package-loader";
 import { createMapEditorServer } from "../editors/map-editor/map-editor-server.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import dungeon from "../package/dungeon.js";
 import archetype from "../package/archetype.js";
 

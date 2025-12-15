@@ -17,7 +17,7 @@ import {
 import { Character } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
 import { MESSAGE_GROUP } from "../core/character.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 
 /** Registered commands */
 const commands: Command[] = [];

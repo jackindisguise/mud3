@@ -27,7 +27,7 @@ import {
 	MAGICAL_DAMAGE_TYPE,
 	PHYSICAL_DAMAGE_TYPE,
 } from "../../core/damage-types.js";
-import logger from "../../logger.js";
+import logger from "../../utils/logger.js";
 import { getSafeRootDirectory } from "../../utils/path.js";
 import { migrateDungeonData } from "../../migrations/dungeon/runner.js";
 

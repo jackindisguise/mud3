@@ -39,7 +39,7 @@ import { Package } from "package-loader";
 import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { AbilityCommand } from "../core/command.js";
 import { registerCommand } from "../registry/command.js";
 import { getSafeRootDirectory } from "../utils/path.js";

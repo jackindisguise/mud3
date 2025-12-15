@@ -37,7 +37,7 @@ import {
 	unlink,
 } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import {
 	Board,
 	SerializedBoard,

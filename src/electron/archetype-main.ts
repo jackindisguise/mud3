@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { fileURLToPath } from "url";
 import path from "path";
 import { appendFileSync } from "node:fs";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { loadPackage } from "package-loader";
 

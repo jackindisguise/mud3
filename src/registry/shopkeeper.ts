@@ -2,15 +2,15 @@
  * @module registry/shopkeeper-inventory
  */
 
-import type { ShopkeeperInventory } from "../core/dungeon.js";
+import { ShopkeeperInventory } from "../core/shopkeeper.js";
 import {
 	addStock,
 	countStockByTemplate,
 	isInfiniteStock,
-} from "../core/shopkeeper-inventory.js";
+} from "../core/shopkeeper.js";
 import { resolveTemplateById } from "./dungeon.js";
 import { createFromTemplateWithOid } from "../package/dungeon.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 
 /**
  * Internal cache of shopkeeper inventories by their globalized IDs.

@@ -14,7 +14,7 @@ import { extname, join, relative } from "path";
 import { readdir, readFile } from "fs/promises";
 import YAML from "js-yaml";
 import { Package } from "package-loader";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import {
 	BaseArchetypeDefinition,
@@ -116,7 +116,9 @@ function normalizeGrowthModifier(
 	};
 }
 
-function normalizeAbilities(raw?: Array<unknown>): ArchetypeAbilityDefinition[] {
+function normalizeAbilities(
+	raw?: Array<unknown>
+): ArchetypeAbilityDefinition[] {
 	if (!raw || raw.length === 0) return [];
 	const result: ArchetypeAbilityDefinition[] = [];
 	for (const entry of raw) {

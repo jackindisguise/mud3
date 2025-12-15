@@ -6,7 +6,7 @@
 
 import { findMigrationPath } from "./registry.js";
 import { getCurrentDungeonVersion, compareVersions } from "../version.js";
-import logger from "../../logger.js";
+import logger from "../../utils/logger.js";
 
 /**
  * Migrate data from its current version to the latest version.

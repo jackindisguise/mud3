@@ -14,8 +14,10 @@ import { dir2text } from "../direction.js";
 import { DIRECTION } from "../direction.js";
 import { CommandObject } from "../package/commands.js";
 import { showRoom } from "../utils/display.js";
+import { consumeExhaustion } from "../utils/resources.js";
 
 const DEFAULT_COOLDOWN_MS = 100;
+const MOVEMENT_EXHAUSTION_COST = 0.125;
 
 export function getCooldownFunctionForDirection(
 	direction: DIRECTION
@@ -81,6 +83,11 @@ export function executeMovement(
 			`You cannot go ${directionText}.`,
 			MESSAGE_GROUP.COMMAND_RESPONSE
 		);
+		return;
+	}
+
+	// Check and consume exhaustion cost
+	if (!consumeExhaustion(actor, MOVEMENT_EXHAUSTION_COST)) {
 		return;
 	}
 

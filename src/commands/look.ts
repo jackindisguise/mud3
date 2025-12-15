@@ -31,7 +31,7 @@ import {
 	showObject,
 	showContainerContents,
 } from "../utils/display.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { capitalizeFirst } from "../utils/string.js";
 
 export const command = {

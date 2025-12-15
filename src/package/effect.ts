@@ -33,7 +33,7 @@ import { Package } from "package-loader";
 import { readdir } from "fs/promises";
 import { join, relative } from "path";
 import { pathToFileURL } from "url";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { access, constants } from "fs/promises";
 import { EffectTemplate } from "../core/effect.js";

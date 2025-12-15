@@ -18,7 +18,7 @@ import { CommandContext } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { saveCharacter } from "../package/character.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 
 export const command = {
 	pattern: "quit~",

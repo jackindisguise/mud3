@@ -49,7 +49,7 @@ import {
 } from "fs/promises";
 import { constants as FS_CONSTANTS } from "fs";
 import { createHash } from "crypto";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import {
 	nameToColor,
 	COLOR,

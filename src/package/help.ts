@@ -34,7 +34,7 @@ import { Package } from "package-loader";
 import { readdir, readFile } from "node:fs/promises";
 import YAML from "js-yaml";
 import { join, extname, relative } from "node:path";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { Helpfile, SerializedHelpfile } from "../core/help.js";
 import { getHelpfileRegistry, registerHelpfile } from "../registry/help.js";

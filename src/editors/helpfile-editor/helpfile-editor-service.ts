@@ -10,7 +10,7 @@ import {
 import { constants as FS_CONSTANTS } from "fs";
 import { join, extname, dirname } from "path";
 import YAML from "js-yaml";
-import logger from "../../logger.js";
+import logger from "../../utils/logger.js";
 import { getSafeRootDirectory } from "../../utils/path.js";
 
 export interface HelpfileListResponse {

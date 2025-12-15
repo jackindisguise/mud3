@@ -39,7 +39,7 @@ import { join, relative } from "path";
 import { pathToFileURL } from "url";
 import { runInNewContext } from "vm";
 import YAML from "js-yaml";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import {
 	forEachCharacter,

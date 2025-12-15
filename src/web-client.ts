@@ -13,7 +13,7 @@ import { readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
-import logger from "./logger.js";
+import logger from "./utils/logger.js";
 import { MudClient } from "./core/io.js";
 import { LINEBREAK } from "./core/telnet.js";
 import {

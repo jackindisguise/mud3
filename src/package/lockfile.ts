@@ -19,7 +19,7 @@ import { join } from "path";
 import { readFile, writeFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import { hostname } from "node:os";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { unlinkSync } from "node:fs";
 import { getSafeRootDirectory } from "../utils/path.js";
 

@@ -24,7 +24,7 @@ import {
 	getBuyPrice,
 	removeStock,
 	isInfiniteStock,
-} from "../core/shopkeeper-inventory.js";
+} from "../core/shopkeeper.js";
 import { createFromTemplateWithOid } from "../package/dungeon.js";
 import { resolveTemplateById } from "../registry/dungeon.js";
 import { color, COLOR } from "../core/color.js";

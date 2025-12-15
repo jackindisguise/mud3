@@ -12,7 +12,7 @@ import { runInNewContext } from "vm";
 import { Mob, BEHAVIOR, Room, MobTemplate } from "./core/dungeon.js";
 import { DIRECTION, DIRECTIONS } from "./direction.js";
 import { initiateCombat, oneHit, OneHitOptions } from "./combat.js";
-import logger from "./logger.js";
+import logger from "./utils/logger.js";
 import { act } from "./act.js";
 import { MESSAGE_GROUP } from "./core/character.js";
 import { getSafeRootDirectory } from "./utils/path.js";

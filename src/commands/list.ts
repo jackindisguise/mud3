@@ -19,7 +19,7 @@ import {
 	findShopkeeperInRoom,
 	getShopkeeperInventoryFromMob,
 } from "./_shopkeeper-helpers.js";
-import { getBuyPrice, isInfiniteStock } from "../core/shopkeeper-inventory.js";
+import { getBuyPrice, isInfiniteStock } from "../core/shopkeeper.js";
 import { color, COLOR, SIZER } from "../core/color.js";
 import { string } from "mud-ext";
 

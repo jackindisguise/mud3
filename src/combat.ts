@@ -34,7 +34,7 @@ import {
 	wordColorStringTransformer,
 } from "./core/color.js";
 import { LINEBREAK } from "./core/telnet.js";
-import logger from "./logger.js";
+import logger from "./utils/logger.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { act, damageMessage } from "./act.js";
 import { showRoom } from "./utils/display.js";

@@ -2,7 +2,8 @@
  * @module commands/shopkeeper-helpers
  */
 
-import { Mob, Room, ShopkeeperInventory } from "../core/dungeon.js";
+import { Mob, Room } from "../core/dungeon.js";
+import { ShopkeeperInventory } from "../core/shopkeeper.js";
 import { BEHAVIOR } from "../core/dungeon.js";
 
 /**

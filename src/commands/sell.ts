@@ -20,7 +20,7 @@ import {
 	findShopkeeperInRoom,
 	getShopkeeperInventoryFromMob,
 } from "./_shopkeeper-helpers.js";
-import { getSellPrice, addStock } from "../core/shopkeeper-inventory.js";
+import { getSellPrice, addStock } from "../core/shopkeeper.js";
 import { color, COLOR } from "../core/color.js";
 import { act } from "../act.js";
 import type { Item } from "../core/dungeon.js";

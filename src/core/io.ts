@@ -38,7 +38,7 @@
 
 import { EventEmitter } from "events";
 import { createServer, Server, Socket } from "net";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { string } from "mud-ext";
 import { colorize as _colorize, stripColors } from "./color.js";
 import { buildIACCommand, IAC, LINEBREAK, TELNET_OPTION } from "./telnet.js";

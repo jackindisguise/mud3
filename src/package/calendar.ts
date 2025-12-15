@@ -20,7 +20,7 @@ import { Package } from "package-loader";
 import { join, relative } from "path";
 import { readFile } from "fs/promises";
 import YAML from "js-yaml";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { getSafeRootDirectory } from "../utils/path.js";
 import { Calendar, setCalendar } from "../registry/calendar.js";
 import gamestatePkg from "./gamestate.js";

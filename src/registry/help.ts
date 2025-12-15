@@ -7,7 +7,7 @@
  * @module registry/help
  */
 
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { Helpfile } from "../core/help.js";
 
 /**

@@ -18,7 +18,7 @@
  */
 
 import { Package } from "package-loader";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { DUNGEON_REGISTRY } from "../registry/dungeon.js";
 import dungeonPkg from "./dungeon.js";
 import { stripColors } from "../core/color.js";

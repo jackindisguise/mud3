@@ -20,7 +20,7 @@ import {
 	findShopkeeperInRoom,
 	getShopkeeperInventoryFromMob,
 } from "./_shopkeeper-helpers.js";
-import { getBuyPrice, getSellPrice } from "../core/shopkeeper-inventory.js";
+import { getBuyPrice, getSellPrice } from "../core/shopkeeper.js";
 import { color, COLOR, SIZER } from "../core/color.js";
 import { Item, Equipment, Weapon, Armor } from "../core/dungeon.js";
 import {
@@ -130,7 +130,11 @@ export const command = {
 		// Add sell price information at the bottom
 		const buyPriceStr = color(`${formatNumber(buyPrice)} gold`, COLOR.YELLOW);
 		lines.push("");
-		lines.push(`${capitalizeFirst(shopkeeper.display)} will sell this item for ${buyPriceStr}.`);
+		lines.push(
+			`${capitalizeFirst(
+				shopkeeper.display
+			)} will sell this item for ${buyPriceStr}.`
+		);
 
 		actor.sendMessage(lines.join("\n"), MESSAGE_GROUP.COMMAND_RESPONSE);
 	},

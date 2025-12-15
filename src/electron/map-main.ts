@@ -3,7 +3,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { appendFileSync } from "node:fs";
 import { loadPackage } from "package-loader";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import dungeon from "../package/dungeon.js";
 import archetype from "../package/archetype.js";
 import {

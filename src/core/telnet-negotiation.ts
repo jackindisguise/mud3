@@ -15,7 +15,7 @@ import {
 	TELNET_OPTION,
 	getProtocolName,
 } from "./telnet.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import {
 	createDeflate,
 	createInflate,

@@ -7,7 +7,7 @@
  * @module registry/archetype
  */
 
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import {
 	Race,
 	Job,

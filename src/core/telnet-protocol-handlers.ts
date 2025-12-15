@@ -17,7 +17,7 @@ import {
 	ProtocolData,
 } from "./telnet-negotiation.js";
 import { IAC, TELNET_OPTION, buildIACCommand } from "./telnet.js";
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { createDeflate, createInflate, Deflate, Inflate } from "zlib";
 
 /**

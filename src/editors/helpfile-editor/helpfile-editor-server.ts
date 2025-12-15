@@ -10,7 +10,7 @@ import { createServer, IncomingMessage, ServerResponse } from "http";
 import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants as FS_CONSTANTS } from "fs";
-import logger from "../../logger.js";
+import logger from "../../utils/logger.js";
 import {
 	createHelpfileEditorService,
 	HelpfileEditorService,

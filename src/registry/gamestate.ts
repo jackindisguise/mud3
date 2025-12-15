@@ -7,7 +7,7 @@
  * @module registry/gamestate
  */
 
-import logger from "../logger.js";
+import logger from "../utils/logger.js";
 import { DeepReadonly } from "../utils/types.js";
 
 export { READONLY_GAME_STATE as GAME_STATE };

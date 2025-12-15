@@ -36,7 +36,7 @@
 import winston from "winston";
 import path from "path";
 import { mkdirSync } from "fs";
-import { getSafeRootDirectory } from "./utils/path.js";
+import { getSafeRootDirectory } from "./path.js";
 
 // Detect if we're running tests
 // Check for node:test runner or jest/mocha

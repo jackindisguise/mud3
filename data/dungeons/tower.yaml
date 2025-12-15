@@ -578,7 +578,7 @@ dungeon:
       roomDescription: There is a shambling zombie here, ready to eat.
       keywords: zombie shambling undead
       race: human
-      job: geomancer
+      job: warrior
       level: 1
       value: 999
       behaviors: {aggressive: true}
@@ -597,8 +597,8 @@ dungeon:
       description: It's ya boy.
       roomDescription: Ya Boy is here, chillin'.
       keywords: ya boy
-      race: nobility
-      job: geomancer
+      race: human
+      job: riftstalker
       level: 10000
       behaviors: {shopkeeper: true}
       shopkeeperInventoryId: ya-boy-store
@@ -641,7 +641,6 @@ dungeon:
       roomRef: '@tower{11,17,0}'
       minCount: 20
       maxCount: 100
-      equipped: ['@tower:tower-sword', '@tower:tower-helmet']
     - templateId: ya-boy
       roomRef: '@tower{15,16,0}'
       minCount: 1

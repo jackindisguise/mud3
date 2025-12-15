@@ -17,7 +17,7 @@ import { showRoom } from "../utils/display.js";
 import { consumeExhaustion } from "../utils/resources.js";
 
 const DEFAULT_COOLDOWN_MS = 100;
-const MOVEMENT_EXHAUSTION_COST = 0.125;
+const MOVEMENT_EXHAUSTION_COST = 0.5;
 
 export function getCooldownFunctionForDirection(
 	direction: DIRECTION

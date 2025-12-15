@@ -163,7 +163,10 @@ function processMobRegeneration(mob: Mob): void {
 	}
 	if (exhaustionLoss > 0) {
 		recoveryParts.push(
-			`${color(`${exhaustionLoss}`, COLOR.YELLOW)}% exhaustion`
+			`${color(
+				`-${Math.max(1, Math.ceil(exhaustionLoss))}`,
+				COLOR.YELLOW
+			)}% exhaustion`
 		);
 	}
 	mob.sendMessage(

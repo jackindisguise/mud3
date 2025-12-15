@@ -11,10 +11,43 @@ import { Mob } from "../core/dungeon.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 
 /**
+ * Calculates the actual exhaustion cost after applying endurance mitigation.
+ * Every 50 endurance provides a 50% reduction in exhaustion cost.
+ * Formula: actualCost = baseCost * (0.5 ^ (endurance / 50))
+ *
+ * @param baseCost The base exhaustion cost before mitigation
+ * @param endurance The mob's endurance attribute
+ * @returns The actual exhaustion cost after endurance mitigation
+ *
+ * @example
+ * ```typescript
+ * // 50 endurance: 50% reduction
+ * calculateExhaustionCost(10, 50); // 5
+ * // 100 endurance: 75% reduction
+ * calculateExhaustionCost(10, 100); // 2.5
+ * // 150 endurance: 87.5% reduction
+ * calculateExhaustionCost(10, 150); // 1.25
+ * ```
+ */
+export function calculateExhaustionCost(
+	baseCost: number,
+	endurance: number
+): number {
+	if (endurance <= 0) {
+		return baseCost;
+	}
+	// Formula: multiplier = 0.5 ^ (endurance / 50)
+	// This gives us compounding 50% reductions every 50 endurance
+	const multiplier = Math.pow(0.5, endurance / 50);
+	return baseCost * multiplier;
+}
+
+/**
  * Checks if a mob has enough exhaustion to perform an action.
+ * Takes into account endurance mitigation when calculating the actual cost.
  *
  * @param mob The mob to check
- * @param cost The exhaustion cost to check
+ * @param cost The base exhaustion cost to check (before endurance mitigation)
  * @returns True if the mob has enough exhaustion capacity remaining
  *
  * @example
@@ -26,7 +59,8 @@ import { MESSAGE_GROUP } from "../core/character.js";
  * ```
  */
 export function hasEnoughExhaustion(mob: Mob, cost: number): boolean {
-	return mob.exhaustion + cost <= 100;
+	const actualCost = calculateExhaustionCost(cost, mob.endurance);
+	return mob.exhaustion + actualCost <= 100;
 }
 
 /**
@@ -50,10 +84,11 @@ export function hasEnoughMana(mob: Mob, cost: number): boolean {
 
 /**
  * Attempts to consume exhaustion from a mob.
+ * Takes into account endurance mitigation when calculating the actual cost.
  * Sends an error message if the mob doesn't have enough exhaustion capacity.
  *
  * @param mob The mob to consume exhaustion from
- * @param cost The amount of exhaustion to gain
+ * @param cost The base amount of exhaustion to gain (before endurance mitigation)
  * @param errorMessage Optional custom error message (default: "You are too exhausted!")
  * @returns True if exhaustion was successfully consumed, false otherwise
  *
@@ -70,14 +105,15 @@ export function consumeExhaustion(
 	cost: number,
 	errorMessage?: string
 ): boolean {
-	if (!hasEnoughExhaustion(mob, cost)) {
+	const actualCost = calculateExhaustionCost(cost, mob.endurance);
+	if (mob.exhaustion + actualCost > 100) {
 		mob.sendMessage(
 			errorMessage ?? "You are too exhausted!",
 			MESSAGE_GROUP.COMMAND_RESPONSE
 		);
 		return false;
 	}
-	mob.gainExhaustion(cost);
+	mob.gainExhaustion(actualCost);
 	return true;
 }
 

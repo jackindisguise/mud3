@@ -116,7 +116,7 @@ export const command = {
 		});
 		const exhaustionLine = string.pad({
 			string: `${color("Exhaustion:", COLOR.LIME)} ${formatStat(
-				actor.exhaustion
+				Number(actor.exhaustion.toFixed(2))
 			)} / ${formatStat(actor.maxExhaustion)}`,
 			width: 25,
 			sizer: SIZER,

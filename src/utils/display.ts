@@ -2,7 +2,6 @@
  * Display utility functions for showing rooms and objects to players.
  *
  * Helper functions for displaying room descriptions, object information, and container contents.
- * These functions are separated from command files to avoid circular dependencies.
  *
  * @module utils/display
  */

@@ -1,5 +1,5 @@
 import { loadAllPackages } from "./package.js";
-import logger from "./src/logger.js";
+import logger from "./src/utils/logger.js";
 import {
 	buildDungeonGraph,
 	findDirectionsBetweenRooms,

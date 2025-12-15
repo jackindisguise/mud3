@@ -13,7 +13,7 @@ import { dirname, join, resolve } from "path";
 import { readdir, stat } from "fs/promises";
 import { existsSync } from "fs";
 import { loadPackage, type Package } from "package-loader";
-import logger from "./src/logger.js";
+import logger from "./src/utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

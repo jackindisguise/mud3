@@ -2,11 +2,65 @@
  * @module core/shopkeeper-inventory
  */
 
-import type {
-	DungeonObject,
-	RestockRule,
-	ShopkeeperInventory,
-} from "./dungeon.js";
+import type { ItemTemplate, DungeonObject } from "./dungeon.js";
+
+/**
+ * Restock rule for shopkeeper inventory.
+ * Defines what items a shopkeeper should stock and how they should be restocked.
+ *
+ * @property template - The item template to restock
+ * @property minimum - Minimum number of items to maintain (undefined = infinite stock)
+ * @property maximum - Maximum number of items to stock (undefined = infinite stock)
+ * @property cycleDelay - Number of cycles between restocks for rare items (undefined = infinite stock)
+ * @property cycleDelayRemaining - Runtime-only: cycles remaining before next restock
+ */
+export interface RestockRule {
+	template: ItemTemplate;
+	minimum?: number;
+	maximum?: number;
+	cycleDelay?: number;
+	cycleDelayRemaining?: number; // Runtime only, not serialized
+}
+
+/**
+ * Shopkeeper inventory configuration and runtime state.
+ * Manages what a shopkeeper is selling and the items currently in stock.
+ *
+ * @property id - Unique identifier for this inventory (local or globalized)
+ * @property buyPriceMultiplier - Multiplier for item value when buying (default 1.25)
+ * @property sellPriceMultiplier - Multiplier for item value when selling (default 0.75)
+ * @property stock - Runtime array of items currently in stock (not serialized)
+ * @property rules - Restock rules defining what should be stocked
+ */
+export interface ShopkeeperInventory {
+	id: string;
+	buyPriceMultiplier: number;
+	sellPriceMultiplier: number;
+	stock: DungeonObject[]; // Runtime only, not serialized
+	rules: RestockRule[];
+}
+
+/**
+ * Serialized form of a restock rule.
+ * Excludes runtime-only fields like cycleDelayRemaining.
+ */
+export interface SerializedRestockRule {
+	templateId: string; // Template ID instead of template object
+	minimum?: number;
+	maximum?: number;
+	cycleDelay?: number;
+}
+
+/**
+ * Serialized form of a shopkeeper inventory.
+ * Excludes runtime-only fields like stock.
+ */
+export interface SerializedShopkeeperInventory {
+	id: string;
+	buyPriceMultiplier?: number; // Optional, defaults to 1.25
+	sellPriceMultiplier?: number; // Optional, defaults to 0.75
+	rules: SerializedRestockRule[];
+}
 
 /**
  * Check if a restock rule represents infinite stock.

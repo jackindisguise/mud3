@@ -161,9 +161,9 @@ function processMobRegeneration(mob: Mob): void {
 	if (manaGain > 0) {
 		recoveryParts.push(`${color(`+${manaGain}`, COLOR.CYAN)} mana`);
 	}
-	if (exhaustionRate < 0) {
+	if (exhaustionLoss > 0) {
 		recoveryParts.push(
-			`${color(`-${exhaustionRate}`, COLOR.YELLOW)}% exhaustion`
+			`${color(`${exhaustionLoss}`, COLOR.YELLOW)}% exhaustion`
 		);
 	}
 	mob.sendMessage(

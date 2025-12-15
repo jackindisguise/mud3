@@ -163,7 +163,7 @@ export const DEFAULT_CHANNELS: readonly CHANNEL[] = [
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 	receiveOOC: true,
 	verboseMode: true,
-	prompt: "{R%hh/%HH{rhp {C%mm/%MM{cmana {Y%ee{yexh {C%xp{cxp {B%XX{btnl{x > ",
+	prompt: "{R%hh/%HH{rhp {C%mm/%MM{cmana {Y%ee{ynrg {C%xp{cxp {B%XX{btnl{x > ",
 	colorEnabled: true,
 	autoLook: true,
 	briefMode: false,
@@ -782,7 +782,10 @@ export class Character {
 		// Replace placeholders with actual values
 		formatted = formatted.replace(/%hh/g, this.mob.health.toString());
 		formatted = formatted.replace(/%mm/g, this.mob.mana.toString());
-		formatted = formatted.replace(/%ee/g, this.mob.exhaustion.toString());
+		formatted = formatted.replace(
+			/%ee/g,
+			`${Math.floor(100 - this.mob.exhaustion).toString()}%`
+		);
 		formatted = formatted.replace(/%HH/g, this.mob.maxHealth.toString());
 		formatted = formatted.replace(/%MM/g, this.mob.maxMana.toString());
 		formatted = formatted.replace(/%xp/g, this.mob.experience.toString());

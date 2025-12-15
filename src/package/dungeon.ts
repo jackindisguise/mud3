@@ -2738,12 +2738,9 @@ export async function deserializeMob(
 	const mobOptions = hydrateSerializedMobData(normalized);
 	logger.debug(`Mob options`, mobOptions);
 
+	console.log(mobOptions);
 	const mob = createMob(mobOptions);
 	logger.debug(`Mob instance created successfully`);
-
-	// Apply archetype passives and abilities (requires registry access)
-	applyMobArchetypePassives(mob);
-	checkMobArchetypeAbilities(mob);
 
 	// Restore learned abilities if provided
 	if (learnedAbilitiesData) {
@@ -2767,6 +2764,10 @@ export async function deserializeMob(
 		}
 		mob._learnedAbilities = learnedAbilities;
 	}
+
+	// Learn archetype abilities
+	checkMobArchetypeAbilities(mob);
+
 	// Determine version to use for nested objects (mob's version or parent version)
 	if (normalized.contents && Array.isArray(normalized.contents)) {
 		logger.debug(`Restoring ${normalized.contents.length} content object(s)`);
@@ -2809,8 +2810,7 @@ export async function deserializeMob(
 		}
 		// Recalculate attributes with equipment bonuses
 		logger.debug(`Recalculating derived attributes with equipment bonuses`);
-		mob.recalculateDerivedAttributes(mob.captureResourceRatios());
-		logger.debug(`Mob deserialization complete`);
+		mob.recalculateDerivedAttributes();
 	}
 
 	// Re-apply archetype passive effects (race and job passives)
@@ -2881,8 +2881,12 @@ export async function deserializeMob(
 
 			mob.addEffect(template, caster, overrides);
 		}
+		mob.recalculateDerivedAttributes();
 	}
 
+	mob.health = mobOptions.health ?? mob.maxHealth;
+	mob.mana = mobOptions.mana ?? mob.maxMana;
+	mob.exhaustion = mobOptions.exhaustion ?? 0;
 	return mob;
 }
 

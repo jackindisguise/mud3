@@ -4088,17 +4088,6 @@ export class Mob extends Movable {
 			}
 		}
 
-		// Remove any existing archetype passives (in case of re-initialization)
-		this.removeArchetypePassives();
-
-		// Note: Archetype passives and abilities are applied by package layer
-		// helpers that have access to the registry (applyMobArchetypePassives,
-		// checkMobArchetypeAbilities)
-
-		// Initialize combat properties
-		// Only NPCs (mobs without a character) have threat tables
-		// Threat table will be initialized when character is set/cleared
-
 		// Initialize EventEmitter for AI events (only for NPCs)
 		if (!this._character) {
 			this._aiEventEmitter = new EventEmitter();

@@ -1,38 +1,46 @@
 import { test, suite } from "node:test";
 import assert from "node:assert";
 import {
-	PHYSICAL_DAMAGE_TYPE,
-	MAGICAL_DAMAGE_TYPE,
-	DAMAGE_TYPE,
+	MARTIAL_DAMAGE_TYPE,
 	DAMAGE_RELATIONSHIP,
 	HitType,
 	DEFAULT_HIT_TYPE,
 	COMMON_HIT_TYPES,
 	mergeDamageRelationships,
 	getDamageMultiplier,
+	ELEMENTAL_DAMAGE_TYPE,
+	ENERGY_DAMAGE_TYPE,
+	MISC_DAMAGE_TYPE,
 } from "./damage-types.js";
 
 suite("damage-types.ts", () => {
 	suite("DAMAGE_TYPE enums", () => {
 		test("PHYSICAL_DAMAGE_TYPE should have all physical types", () => {
-			assert.strictEqual(PHYSICAL_DAMAGE_TYPE.SLASH, "SLASH");
-			assert.strictEqual(PHYSICAL_DAMAGE_TYPE.STAB, "STAB");
-			assert.strictEqual(PHYSICAL_DAMAGE_TYPE.CRUSH, "CRUSH");
-			assert.strictEqual(PHYSICAL_DAMAGE_TYPE.EXOTIC, "EXOTIC");
+			assert.strictEqual(MARTIAL_DAMAGE_TYPE.SLASH, "SLASH");
+			assert.strictEqual(MARTIAL_DAMAGE_TYPE.STAB, "STAB");
+			assert.strictEqual(MARTIAL_DAMAGE_TYPE.CRUSH, "CRUSH");
+			assert.strictEqual(MARTIAL_DAMAGE_TYPE.EXOTIC, "EXOTIC");
 		});
 
-		test("MAGICAL_DAMAGE_TYPE should have all magical types", () => {
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.FIRE, "FIRE");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.ICE, "ICE");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.ELECTRIC, "ELECTRIC");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.WATER, "WATER");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.RADIANT, "RADIANT");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.NECROTIC, "NECROTIC");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.PSYCHIC, "PSYCHIC");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.FORCE, "FORCE");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.THUNDER, "THUNDER");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.POISON, "POISON");
-			assert.strictEqual(MAGICAL_DAMAGE_TYPE.ACID, "ACID");
+		test("ELEMENTAL_DAMAGE_TYPE should have all elemental types", () => {
+			assert.strictEqual(ELEMENTAL_DAMAGE_TYPE.FIRE, "FIRE");
+			assert.strictEqual(ELEMENTAL_DAMAGE_TYPE.ICE, "ICE");
+			assert.strictEqual(ELEMENTAL_DAMAGE_TYPE.ELECTRIC, "ELECTRIC");
+			assert.strictEqual(ELEMENTAL_DAMAGE_TYPE.WATER, "WATER");
+			assert.strictEqual(ELEMENTAL_DAMAGE_TYPE.AIR, "AIR");
+		});
+
+		test("ENERGY_DAMAGE_TYPE should have all energy types", () => {
+			assert.strictEqual(ENERGY_DAMAGE_TYPE.RADIANT, "RADIANT");
+			assert.strictEqual(ENERGY_DAMAGE_TYPE.NECROTIC, "NECROTIC");
+			assert.strictEqual(ENERGY_DAMAGE_TYPE.PSYCHIC, "PSYCHIC");
+			assert.strictEqual(ENERGY_DAMAGE_TYPE.FORCE, "FORCE");
+			assert.strictEqual(ENERGY_DAMAGE_TYPE.THUNDER, "THUNDER");
+		});
+
+		test("MISC_DAMAGE_TYPE should have all miscellaneous types", () => {
+			assert.strictEqual(MISC_DAMAGE_TYPE.POISON, "POISON");
+			assert.strictEqual(MISC_DAMAGE_TYPE.ACID, "ACID");
 		});
 	});
 
@@ -50,7 +58,7 @@ suite("damage-types.ts", () => {
 			assert.strictEqual(DEFAULT_HIT_TYPE.verbThirdPerson, "punches");
 			assert.strictEqual(
 				DEFAULT_HIT_TYPE.damageType,
-				PHYSICAL_DAMAGE_TYPE.CRUSH
+				MARTIAL_DAMAGE_TYPE.CRUSH
 			);
 		});
 	});
@@ -61,13 +69,13 @@ suite("damage-types.ts", () => {
 			assert(slash !== undefined);
 			assert.strictEqual(slash.verb, "slash");
 			assert.strictEqual(slash.verbThirdPerson, "slashes");
-			assert.strictEqual(slash.damageType, PHYSICAL_DAMAGE_TYPE.SLASH);
+			assert.strictEqual(slash.damageType, MARTIAL_DAMAGE_TYPE.SLASH);
 
 			const stab = COMMON_HIT_TYPES.get("stab");
 			assert(stab !== undefined);
 			assert.strictEqual(stab.verb, "stab");
 			assert.strictEqual(stab.verbThirdPerson, "stabs");
-			assert.strictEqual(stab.damageType, PHYSICAL_DAMAGE_TYPE.STAB);
+			assert.strictEqual(stab.damageType, MARTIAL_DAMAGE_TYPE.STAB);
 		});
 
 		test("should contain magical hit types", () => {
@@ -75,43 +83,43 @@ suite("damage-types.ts", () => {
 			assert(burn !== undefined);
 			assert.strictEqual(burn.verb, "burn");
 			assert.strictEqual(burn.verbThirdPerson, "burns");
-			assert.strictEqual(burn.damageType, MAGICAL_DAMAGE_TYPE.FIRE);
+			assert.strictEqual(burn.damageType, ELEMENTAL_DAMAGE_TYPE.FIRE);
 
 			const freeze = COMMON_HIT_TYPES.get("freeze");
 			assert(freeze !== undefined);
 			assert.strictEqual(freeze.verb, "freeze");
 			assert.strictEqual(freeze.verbThirdPerson, "freezes");
-			assert.strictEqual(freeze.damageType, MAGICAL_DAMAGE_TYPE.ICE);
+			assert.strictEqual(freeze.damageType, ELEMENTAL_DAMAGE_TYPE.ICE);
 		});
 
 		test("should contain obscure D&D damage types", () => {
 			const smite = COMMON_HIT_TYPES.get("smite");
 			assert(smite !== undefined);
-			assert.strictEqual(smite.damageType, MAGICAL_DAMAGE_TYPE.RADIANT);
+			assert.strictEqual(smite.damageType, ENERGY_DAMAGE_TYPE.RADIANT);
 
 			const wither = COMMON_HIT_TYPES.get("wither");
 			assert(wither !== undefined);
-			assert.strictEqual(wither.damageType, MAGICAL_DAMAGE_TYPE.NECROTIC);
+			assert.strictEqual(wither.damageType, ENERGY_DAMAGE_TYPE.NECROTIC);
 
 			const assault = COMMON_HIT_TYPES.get("assault");
 			assert(assault !== undefined);
-			assert.strictEqual(assault.damageType, MAGICAL_DAMAGE_TYPE.PSYCHIC);
+			assert.strictEqual(assault.damageType, ENERGY_DAMAGE_TYPE.PSYCHIC);
 
 			const pummel = COMMON_HIT_TYPES.get("pummel");
 			assert(pummel !== undefined);
-			assert.strictEqual(pummel.damageType, MAGICAL_DAMAGE_TYPE.FORCE);
+			assert.strictEqual(pummel.damageType, ENERGY_DAMAGE_TYPE.FORCE);
 
 			const resonate = COMMON_HIT_TYPES.get("resonate");
 			assert(resonate !== undefined);
-			assert.strictEqual(resonate.damageType, MAGICAL_DAMAGE_TYPE.THUNDER);
+			assert.strictEqual(resonate.damageType, ENERGY_DAMAGE_TYPE.THUNDER);
 
 			const venom = COMMON_HIT_TYPES.get("venom");
 			assert(venom !== undefined);
-			assert.strictEqual(venom.damageType, MAGICAL_DAMAGE_TYPE.POISON);
+			assert.strictEqual(venom.damageType, MISC_DAMAGE_TYPE.POISON);
 
 			const corrode = COMMON_HIT_TYPES.get("corrode");
 			assert(corrode !== undefined);
-			assert.strictEqual(corrode.damageType, MAGICAL_DAMAGE_TYPE.ACID);
+			assert.strictEqual(corrode.damageType, MISC_DAMAGE_TYPE.ACID);
 		});
 
 		test("all hit types should have verbThirdPerson", () => {
@@ -134,7 +142,7 @@ suite("damage-types.ts", () => {
 			const hitType: HitType = {
 				verb: "punch",
 				verbThirdPerson: "punches",
-				damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+				damageType: MARTIAL_DAMAGE_TYPE.CRUSH,
 			};
 			assert.strictEqual(hitType.verbThirdPerson, "punches");
 		});
@@ -143,24 +151,24 @@ suite("damage-types.ts", () => {
 			const hitType: HitType = {
 				verb: "slash",
 				verbThirdPerson: "slashes",
-				damageType: PHYSICAL_DAMAGE_TYPE.SLASH,
+				damageType: MARTIAL_DAMAGE_TYPE.SLASH,
 			};
 			assert.strictEqual(hitType.verbThirdPerson, "slashes");
-			assert.strictEqual(hitType.damageType, PHYSICAL_DAMAGE_TYPE.SLASH);
+			assert.strictEqual(hitType.damageType, MARTIAL_DAMAGE_TYPE.SLASH);
 		});
 
 		test("should handle verbs ending in s, x, z, ch, sh (add 'es')", () => {
 			const hitType1: HitType = {
 				verb: "punch",
 				verbThirdPerson: "punches",
-				damageType: PHYSICAL_DAMAGE_TYPE.CRUSH,
+				damageType: MARTIAL_DAMAGE_TYPE.CRUSH,
 			};
 			assert.strictEqual(hitType1.verbThirdPerson, "punches");
 
 			const hitType2: HitType = {
 				verb: "slash",
 				verbThirdPerson: "slashes",
-				damageType: PHYSICAL_DAMAGE_TYPE.SLASH,
+				damageType: MARTIAL_DAMAGE_TYPE.SLASH,
 			};
 			assert.strictEqual(hitType2.verbThirdPerson, "slashes");
 		});
@@ -169,7 +177,7 @@ suite("damage-types.ts", () => {
 			const hitType: HitType = {
 				verb: "purify",
 				verbThirdPerson: "purifies",
-				damageType: MAGICAL_DAMAGE_TYPE.RADIANT,
+				damageType: ENERGY_DAMAGE_TYPE.RADIANT,
 			};
 			assert.strictEqual(hitType.verbThirdPerson, "purifies");
 		});
@@ -277,7 +285,7 @@ suite("damage-types.ts", () => {
 	suite("getDamageMultiplier", () => {
 		test("should return 1.0 for normal damage (no relationships)", () => {
 			const multiplier = getDamageMultiplier(
-				MAGICAL_DAMAGE_TYPE.FIRE,
+				ELEMENTAL_DAMAGE_TYPE.FIRE,
 				undefined
 			);
 			assert.strictEqual(multiplier, 1.0);
@@ -288,7 +296,7 @@ suite("damage-types.ts", () => {
 				ICE: DAMAGE_RELATIONSHIP.RESIST,
 			};
 			const multiplier = getDamageMultiplier(
-				MAGICAL_DAMAGE_TYPE.FIRE,
+				ELEMENTAL_DAMAGE_TYPE.FIRE,
 				relationships
 			);
 			assert.strictEqual(multiplier, 1.0);
@@ -299,7 +307,7 @@ suite("damage-types.ts", () => {
 				FIRE: DAMAGE_RELATIONSHIP.IMMUNE,
 			};
 			const multiplier = getDamageMultiplier(
-				MAGICAL_DAMAGE_TYPE.FIRE,
+				ELEMENTAL_DAMAGE_TYPE.FIRE,
 				relationships
 			);
 			assert.strictEqual(multiplier, 0.0);
@@ -310,7 +318,7 @@ suite("damage-types.ts", () => {
 				FIRE: DAMAGE_RELATIONSHIP.RESIST,
 			};
 			const multiplier = getDamageMultiplier(
-				MAGICAL_DAMAGE_TYPE.FIRE,
+				ELEMENTAL_DAMAGE_TYPE.FIRE,
 				relationships
 			);
 			assert.strictEqual(multiplier, 0.5);
@@ -321,7 +329,7 @@ suite("damage-types.ts", () => {
 				FIRE: DAMAGE_RELATIONSHIP.VULNERABLE,
 			};
 			const multiplier = getDamageMultiplier(
-				MAGICAL_DAMAGE_TYPE.FIRE,
+				ELEMENTAL_DAMAGE_TYPE.FIRE,
 				relationships
 			);
 			assert.strictEqual(multiplier, 2.0);
@@ -332,7 +340,7 @@ suite("damage-types.ts", () => {
 				SLASH: DAMAGE_RELATIONSHIP.RESIST,
 			};
 			const multiplier = getDamageMultiplier(
-				PHYSICAL_DAMAGE_TYPE.SLASH,
+				MARTIAL_DAMAGE_TYPE.SLASH,
 				relationships
 			);
 			assert.strictEqual(multiplier, 0.5);
@@ -350,31 +358,31 @@ suite("damage-types.ts", () => {
 			};
 
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.RADIANT, relationships),
+				getDamageMultiplier(ENERGY_DAMAGE_TYPE.RADIANT, relationships),
 				0.0
 			);
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.NECROTIC, relationships),
+				getDamageMultiplier(ENERGY_DAMAGE_TYPE.NECROTIC, relationships),
 				0.5
 			);
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.PSYCHIC, relationships),
+				getDamageMultiplier(ENERGY_DAMAGE_TYPE.PSYCHIC, relationships),
 				2.0
 			);
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.FORCE, relationships),
+				getDamageMultiplier(ENERGY_DAMAGE_TYPE.FORCE, relationships),
 				0.5
 			);
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.THUNDER, relationships),
+				getDamageMultiplier(ENERGY_DAMAGE_TYPE.THUNDER, relationships),
 				2.0
 			);
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.POISON, relationships),
+				getDamageMultiplier(MISC_DAMAGE_TYPE.POISON, relationships),
 				0.0
 			);
 			assert.strictEqual(
-				getDamageMultiplier(MAGICAL_DAMAGE_TYPE.ACID, relationships),
+				getDamageMultiplier(MISC_DAMAGE_TYPE.ACID, relationships),
 				0.5
 			);
 		});

@@ -25,8 +25,10 @@ import { PrimaryAttributeSet, ResourceCapacities } from "../core/attribute.js";
 import {
 	DamageTypeRelationships,
 	DAMAGE_RELATIONSHIP,
-	PHYSICAL_DAMAGE_TYPE,
-	MAGICAL_DAMAGE_TYPE,
+	MARTIAL_DAMAGE_TYPE,
+	ELEMENTAL_DAMAGE_TYPE,
+	ENERGY_DAMAGE_TYPE,
+	MISC_DAMAGE_TYPE,
 	DAMAGE_TYPE,
 } from "../core/damage-types.js";
 import {
@@ -152,8 +154,10 @@ function normalizeDamageRelationships(
 
 	const result: DamageTypeRelationships = {};
 	const validTypes = new Set<DAMAGE_TYPE>([
-		...Object.values(PHYSICAL_DAMAGE_TYPE),
-		...Object.values(MAGICAL_DAMAGE_TYPE),
+		...Object.values(MARTIAL_DAMAGE_TYPE),
+		...Object.values(ELEMENTAL_DAMAGE_TYPE),
+		...Object.values(ENERGY_DAMAGE_TYPE),
+		...Object.values(MISC_DAMAGE_TYPE),
 	]);
 	const validRelationships = new Set<DAMAGE_RELATIONSHIP>(
 		Object.values(DAMAGE_RELATIONSHIP)

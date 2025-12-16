@@ -24,8 +24,10 @@ import { Mob, WEAPON_TYPES } from "../../core/dungeon.js";
 import { createMob } from "../../package/dungeon.js";
 import {
 	COMMON_HIT_TYPES,
-	MAGICAL_DAMAGE_TYPE,
-	PHYSICAL_DAMAGE_TYPE,
+	ELEMENTAL_DAMAGE_TYPE,
+	MARTIAL_DAMAGE_TYPE,
+	ENERGY_DAMAGE_TYPE,
+	MISC_DAMAGE_TYPE,
 } from "../../core/damage-types.js";
 import logger from "../../utils/logger.js";
 import { getSafeRootDirectory } from "../../utils/path.js";
@@ -64,8 +66,10 @@ export interface HitTypesResponse {
 			color?: number;
 		}
 	>;
-	physicalDamageTypes: typeof PHYSICAL_DAMAGE_TYPE;
-	magicalDamageTypes: typeof MAGICAL_DAMAGE_TYPE;
+	martialDamageTypes: typeof MARTIAL_DAMAGE_TYPE;
+	elementalDamageTypes: typeof ELEMENTAL_DAMAGE_TYPE;
+	energyDamageTypes: typeof ENERGY_DAMAGE_TYPE;
+	miscDamageTypes: typeof MISC_DAMAGE_TYPE;
 }
 
 export interface RacesResponse {
@@ -239,8 +243,10 @@ export class MapEditorService {
 		}
 		return {
 			hitTypes,
-			physicalDamageTypes: PHYSICAL_DAMAGE_TYPE,
-			magicalDamageTypes: MAGICAL_DAMAGE_TYPE,
+			martialDamageTypes: MARTIAL_DAMAGE_TYPE,
+			elementalDamageTypes: ELEMENTAL_DAMAGE_TYPE,
+			energyDamageTypes: ENERGY_DAMAGE_TYPE,
+			miscDamageTypes: MISC_DAMAGE_TYPE,
 		};
 	}
 

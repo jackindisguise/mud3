@@ -80,6 +80,10 @@
 						}
 					},
 					"additionalProperties": false
+				},
+				"damageRelationships": {
+					"$ref": "#/definitions/damageRelationships",
+					"description": "Damage type relationships defining resistances, immunities, and vulnerabilities. Keys and values should be lowercase (e.g., 'fire: resist'). They will be automatically uppercased during loading."
 				}
 			},
 			"additionalProperties": false
@@ -120,6 +124,18 @@
 					"type": "integer",
 					"minimum": 0,
 					"description": "Maximum mana points available for casting spells and abilities."
+				}
+			},
+			"additionalProperties": false
+		},
+		"damageRelationships": {
+			"type": "object",
+			"description": "Damage type relationships. Keys are damage types (lowercase), values are relationships (lowercase: 'resist', 'immune', or 'vulnerable'). Both will be uppercased during loading.",
+			"patternProperties": {
+				"^(slash|stab|crush|exotic|fire|ice|electric|water|radiant|necrotic|psychic|force|thunder|poison|acid)$": {
+					"type": "string",
+					"enum": ["resist", "immune", "vulnerable"],
+					"description": "Damage relationship: 'resist' (50% damage), 'immune' (0% damage), or 'vulnerable' (200% damage)."
 				}
 			},
 			"additionalProperties": false

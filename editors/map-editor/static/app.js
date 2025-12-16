@@ -159,8 +159,10 @@ class MapEditor {
 		this.jobs = [];
 		this.weaponTypes = [];
 		this.hitTypes = null; // COMMON_HIT_TYPES data from API
-		this.physicalDamageTypes = null;
-		this.magicalDamageTypes = null;
+		this.martialDamageTypes = null;
+		this.elementalDamageTypes = null;
+		this.energyDamageTypes = null;
+		this.miscDamageTypes = null;
 		this.isDragging = false;
 		this.lastPlacedCell = null;
 		this.processedCells = new Set();
@@ -520,36 +522,43 @@ class MapEditor {
 		try {
 			const data = await this.fetchHitTypesData();
 			this.hitTypes = data.hitTypes;
-			this.physicalDamageTypes = data.physicalDamageTypes;
-			this.magicalDamageTypes = data.magicalDamageTypes;
+			this.martialDamageTypes = data.martialDamageTypes;
+			this.elementalDamageTypes = data.elementalDamageTypes;
+			this.energyDamageTypes = data.energyDamageTypes;
+			this.miscDamageTypes = data.miscDamageTypes;
 		} catch (error) {
 			console.error("Failed to load hit types:", error);
 			// Fallback to empty data
 			this.hitTypes = {};
-			this.physicalDamageTypes = {};
-			this.magicalDamageTypes = {};
+			this.martialDamageTypes = {};
+			this.elementalDamageTypes = {};
+			this.energyDamageTypes = {};
+			this.miscDamageTypes = {};
 		}
 	}
 
 	generateHitTypeSelector(selectedHitType) {
 		// Color mapping for damage types - vibrant and readable
 		const damageTypeColors = {
-			// Physical damage types - metallic/silver tones
+			// Martial damage types - metallic/silver tones
 			SLASH: "#e0e0e0", // Bright Silver
 			STAB: "#b0b0b0", // Medium Grey
 			CRUSH: "#d0d0d0", // Light Silver
 			EXOTIC: "#f0f0f0", // Very Light Silver
-			// Magical damage types - vibrant colors
+			// Elemental damage types - vibrant colors
 			FIRE: "#ff6666", // Bright Red
 			ICE: "#66ddff", // Bright Cyan
 			ELECTRIC: "#ffdd44", // Bright Yellow
 			WATER: "#6699ff", // Bright Blue
-			ACID: "#66ff66", // Bright Lime Green
+			AIR: "#aaccff", // Light Sky Blue
+			// Energy damage types
 			RADIANT: "#ffffcc", // Bright Yellow-White
 			NECROTIC: "#cc66cc", // Bright Purple
 			PSYCHIC: "#ff66ff", // Bright Magenta
 			FORCE: "#dddddd", // Light Silver
 			THUNDER: "#ffaa66", // Bright Orange
+			// Misc damage types
+			ACID: "#66ff66", // Bright Lime Green
 			POISON: "#66cc66", // Bright Green
 		};
 
@@ -597,24 +606,69 @@ class MapEditor {
 			return damageType.charAt(0) + damageType.slice(1).toLowerCase();
 		};
 
-		// Add Physical damage types section
-		html +=
-			'<optgroup label="─── Physical ───" style="color: #e0e0e0; font-weight: 600;">';
-		if (this.physicalDamageTypes) {
-			for (const damageType of Object.values(this.physicalDamageTypes)) {
-				if (hitTypesByDamage[damageType]) {
+		// Add Martial damage types sections (individual sections for each)
+		if (this.martialDamageTypes) {
+			for (const damageType of Object.values(this.martialDamageTypes)) {
+				if (
+					hitTypesByDamage[damageType] &&
+					hitTypesByDamage[damageType].length > 0
+				) {
+					const damageTypeColor = damageTypeColors[damageType] || "#ffffff";
+					html += `<optgroup label="─── ${formatDamageTypeName(
+						damageType
+					)} ───" style="color: ${damageTypeColor}; font-weight: 600;">`;
 					html += this.generateHitTypeOptions(
 						hitTypesByDamage[damageType],
 						selectedKey
 					);
+					html += "</optgroup>";
 				}
 			}
 		}
-		html += "</optgroup>";
 
-		// Add Magical damage types sections
-		if (this.magicalDamageTypes) {
-			for (const damageType of Object.values(this.magicalDamageTypes)) {
+		// Add Elemental damage types section
+		if (this.elementalDamageTypes) {
+			for (const damageType of Object.values(this.elementalDamageTypes)) {
+				if (
+					hitTypesByDamage[damageType] &&
+					hitTypesByDamage[damageType].length > 0
+				) {
+					const damageTypeColor = damageTypeColors[damageType] || "#ffffff";
+					html += `<optgroup label="─── ${formatDamageTypeName(
+						damageType
+					)} ───" style="color: ${damageTypeColor}; font-weight: 600;">`;
+					html += this.generateHitTypeOptions(
+						hitTypesByDamage[damageType],
+						selectedKey
+					);
+					html += "</optgroup>";
+				}
+			}
+		}
+
+		// Add Energy damage types section
+		if (this.energyDamageTypes) {
+			for (const damageType of Object.values(this.energyDamageTypes)) {
+				if (
+					hitTypesByDamage[damageType] &&
+					hitTypesByDamage[damageType].length > 0
+				) {
+					const damageTypeColor = damageTypeColors[damageType] || "#ffffff";
+					html += `<optgroup label="─── ${formatDamageTypeName(
+						damageType
+					)} ───" style="color: ${damageTypeColor}; font-weight: 600;">`;
+					html += this.generateHitTypeOptions(
+						hitTypesByDamage[damageType],
+						selectedKey
+					);
+					html += "</optgroup>";
+				}
+			}
+		}
+
+		// Add Misc damage types section
+		if (this.miscDamageTypes) {
+			for (const damageType of Object.values(this.miscDamageTypes)) {
 				if (
 					hitTypesByDamage[damageType] &&
 					hitTypesByDamage[damageType].length > 0

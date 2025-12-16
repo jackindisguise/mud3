@@ -6463,7 +6463,7 @@ export class Mob extends Movable {
 
 		// Recalculate attributes if this is a passive effect with modifiers
 		if (isPassiveEffect(template)) {
-			this.recalculateDerivedAttributes();
+			this.recalculateDerivedAttributes(this.captureResourceRatios());
 		}
 
 		// If this is an offensive effect and target is not in combat, initiate combat
@@ -6525,7 +6525,7 @@ export class Mob extends Movable {
 
 			// Recalculate attributes if this was a passive effect with modifiers
 			if (isPassiveEffect(effect.template)) {
-				this.recalculateDerivedAttributes();
+				this.recalculateDerivedAttributes(this.captureResourceRatios());
 			}
 
 			// If no effects remain, remove from effects set

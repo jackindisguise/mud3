@@ -25,5 +25,8 @@ archetype:
   growthModifier:
     base: 1.08
     perLevel: 0.04
-
-
+  damageRelationships:
+    necrotic: immune
+    poison: immune
+    fire: immune
+    psychic: vulnerable

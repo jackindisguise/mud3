@@ -26,5 +26,18 @@ archetype:
   growthModifier:
     base: 1.08
     perLevel: 0.05
-
-
+  damageRelationships:
+    slash: resist
+    stab: resist
+    crush: resist
+    fire: resist
+    ice: resist
+    electric: resist
+    water: resist
+    radiant: resist
+    necrotic: resist
+    psychic: resist
+    force: resist
+    thunder: resist
+    poison: immune
+    acid: immune

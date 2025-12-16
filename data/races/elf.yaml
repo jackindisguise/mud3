@@ -25,3 +25,7 @@ archetype:
   growthModifier:
     base: 1.05
     perLevel: 0.04
+  damageRelationships:
+    stab: vulnerable
+    slash: vulnerable
+    crush: vulnerable

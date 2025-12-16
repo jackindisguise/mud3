@@ -25,5 +25,9 @@ archetype:
   growthModifier:
     base: 1.06
     perLevel: 0.04
-
-
+  damageRelationships:
+    electric: immune
+    thunder: immune
+    water: vulnerable
+    slash: resist
+    fire: vulnerable

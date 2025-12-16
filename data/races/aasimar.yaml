@@ -25,3 +25,5 @@ archetype:
   growthModifier:
     base: 1.05
     perLevel: 0.04
+  damageRelationships:
+    radiant: immune

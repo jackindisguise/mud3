@@ -334,6 +334,8 @@ export function createMob(options?: MobOptions): Mob {
 
 	// Apply archetype passives and abilities (requires registry access)
 	applyMobArchetypePassives(mob);
+	// Recalculate attributes after applying passives (passives can modify health/mana)
+	// Preserve health/mana ratios when recalculating
 	checkMobArchetypeAbilities(mob);
 
 	// Initialize AI for NPC mobs (mobs without character)
@@ -2738,7 +2740,6 @@ export async function deserializeMob(
 	const mobOptions = hydrateSerializedMobData(normalized);
 	logger.debug(`Mob options`, mobOptions);
 
-	console.log(mobOptions);
 	const mob = createMob(mobOptions);
 	logger.debug(`Mob instance created successfully`);
 

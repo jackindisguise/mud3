@@ -14,6 +14,7 @@ import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
 import { act } from "../act.js";
 import { oneHit } from "../combat.js";
+import { consumeExhaustion, hasEnoughExhaustion } from "../utils/resources.js";
 
 export const ABILITY_ID = "power-strike";
 
@@ -25,6 +26,7 @@ export const ability: Ability = {
 };
 
 const COOLDOWN_MS = 3000;
+const BASE_EXHAUSTION_COST = 25;
 const BASE_DAMAGE_MULTIPLIER = 2.0;
 
 export const command: CommandObject = {
@@ -40,6 +42,7 @@ export const command: CommandObject = {
 		let target = args.get("target") as Mob | undefined;
 		if (!target) target = actor.combatTarget;
 		if (!target) return 0;
+		if (!hasEnoughExhaustion(actor, BASE_EXHAUSTION_COST)) return 0;
 		return COOLDOWN_MS;
 	},
 
@@ -80,6 +83,7 @@ export const command: CommandObject = {
 			return;
 		}
 
+		if (!consumeExhaustion(actor, BASE_EXHAUSTION_COST)) return;
 		const mainHand = actor.getEquipped(EQUIPMENT_SLOT.MAIN_HAND);
 		const weapon = mainHand instanceof Weapon ? mainHand : undefined;
 

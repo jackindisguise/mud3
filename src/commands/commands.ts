@@ -8,8 +8,16 @@ export const command = {
 		CommandRegistry.default.getCommands().forEach((cmd: Command) => {
 			// Helper to extract first word and clean it
 			const extractWord = (pattern: string) => {
-				let word = pattern.trim().split(/[ <]/)[0];
-				if (word !== "?") word = word.replace(/[?~]/g, "");
+				const trimmed = pattern.trim();
+				let word: string;
+				if (trimmed.startsWith("'<")) word = "'";
+				else if (trimmed.startsWith("'")) {
+					const matched = trimmed.match(/^'([^']+)'/);
+					word = matched ? matched[1] : `-(${trimmed})`;
+				} else {
+					word = pattern.trim().split(/[ <]/)[0];
+					if (word !== "?") word = word.replace(/[?~]/g, "");
+				}
 				return word;
 			};
 			commandLabelsSet.add(extractWord(cmd.pattern));
@@ -21,6 +29,7 @@ export const command = {
 		});
 		const commandLabels = Array.from(commandLabelsSet);
 
+		commandLabels.sort();
 		const columns = 3;
 		const rows = Math.ceil(commandLabels.length / columns);
 		const table: string[] = ["Available commands:"];

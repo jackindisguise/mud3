@@ -14,6 +14,7 @@ import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
 import { act } from "../act.js";
 import { oneHit } from "../combat.js";
+import { consumeExhaustion, hasEnoughExhaustion } from "../utils/resources.js";
 
 export const ABILITY_ID = "blinkstorm";
 
@@ -25,12 +26,17 @@ export const ability: Ability = {
 };
 
 const COOLDOWN_MS = 12000;
+const BASE_DAMAGE_MULTIPLIER = 1.5;
+const EXHAUSTION_COST = 25;
 
 export const command: CommandObject = {
 	pattern: "blinkstorm~",
 	cooldown(context: CommandContext, args: Map<string, any>) {
 		const { actor, room } = context;
 		if (!actor.knowsAbilityById(ABILITY_ID)) {
+			return 0;
+		}
+		if (!hasEnoughExhaustion(actor, EXHAUSTION_COST)) {
 			return 0;
 		}
 		if (!room) {
@@ -54,17 +60,13 @@ export const command: CommandObject = {
 			return;
 		}
 
-		if (!room) {
-			actor.sendMessage(
-				"You are not in a room.",
-				MESSAGE_GROUP.COMMAND_RESPONSE
-			);
-			return;
-		}
-
-		const enemies = room.contents.filter(
+		const enemies = room!.contents.filter(
 			(obj) => obj instanceof Mob && obj !== actor && obj.health > 0
 		);
+
+		if (!consumeExhaustion(actor, EXHAUSTION_COST)) {
+			return;
+		}
 
 		if (enemies.length === 0) {
 			actor.sendMessage(
@@ -81,7 +83,7 @@ export const command: CommandObject = {
 			},
 			{
 				user: actor,
-				room: room,
+				room: room!,
 			},
 			{ messageGroup: MESSAGE_GROUP.COMBAT }
 		);

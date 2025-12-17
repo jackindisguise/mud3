@@ -72,7 +72,7 @@ import { WebClientServer } from "./clients/web-client.js";
 import {
 	processRegeneration,
 	REGENERATION_INTERVAL_MS,
-} from "./systems/regeneration.js";
+} from "./registry/regeneration.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
 import { calendarEvents } from "./registry/calendar.js";

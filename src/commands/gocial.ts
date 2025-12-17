@@ -20,7 +20,7 @@ import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { forEachCharacter } from "../game.js";
 import { CHANNEL, formatChannelMessage } from "../core/channel.js";
-import { getSocialCommand, getSocialCommandNames } from "../systems/social.js";
+import { getSocialCommand, getSocialCommandNames } from "../utils/social.js";
 import { formatSocialMessage } from "./_social.js";
 
 export const command = {

@@ -91,7 +91,7 @@ import {
 } from "./damage-types.js";
 import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
-import { addToRegenerationSet } from "../systems/regeneration.js";
+import { addToRegenerationSet } from "../registry/regeneration.js";
 import {
 	EffectInstance,
 	EffectTemplate,
@@ -108,7 +108,7 @@ import {
 	removeFromEffectsSet,
 	setupEffectTimers,
 	clearEffectTimersForEffect,
-} from "../systems/effects.js";
+} from "../registry/effects.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,

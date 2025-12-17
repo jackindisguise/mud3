@@ -54,6 +54,8 @@ import {
 /** Directory for compiled TypeScript abilities */
 const ROOT_DIRECTORY = getSafeRootDirectory();
 const SRC_ABILITY_DIRECTORY = join(ROOT_DIRECTORY, "dist", "src", "abilities");
+/** Directory for source TypeScript abilities (for development) */
+const SOURCE_ABILITY_DIRECTORY = join(ROOT_DIRECTORY, "src", "abilities");
 
 async function fileExists(path: string): Promise<boolean> {
 	try {
@@ -65,7 +67,8 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 async function loadAbilities() {
-	const directories = [SRC_ABILITY_DIRECTORY];
+	// Try dist first (compiled), then source (development)
+	const directories = [SRC_ABILITY_DIRECTORY, SOURCE_ABILITY_DIRECTORY];
 	let totalCommandsRegistered = 0;
 	for (const abilityDir of directories) {
 		if (!(await fileExists(abilityDir))) continue;
@@ -78,9 +81,12 @@ async function loadAbilities() {
 				`Found ${files.length} files in ${relative(ROOT_DIRECTORY, abilityDir)}`
 			);
 
-			// Filter for JavaScript files
+			// Filter for JavaScript or TypeScript files
+			// In dist, we get .js files; in source, we get .ts files
 			const jsFiles = files.filter(
-				(file) => file.endsWith(".js") && !file.startsWith("_")
+				(file) =>
+					(file.endsWith(".js") || file.endsWith(".ts")) &&
+					!file.startsWith("_")
 			);
 			logger.debug(
 				`Found ${jsFiles.length} JavaScript ability files in ${relative(

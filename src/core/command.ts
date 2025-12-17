@@ -218,8 +218,6 @@ export interface CommandOptions {
 export interface ActionQueueEntry {
 	input: string;
 	command: Command;
-	args: Map<string, any>;
-	cooldownMs: number;
 	enqueuedAt: number;
 }
 
@@ -579,6 +577,8 @@ export abstract class Command {
 	 * @returns {void}
 	 */
 	abstract execute(context: CommandContext, args: Map<string, any>): void;
+
+	abstract canCooldown(): boolean;
 
 	/**
 	 * Optional cooldown (in milliseconds) for action commands.
@@ -1662,6 +1662,7 @@ export abstract class Command {
  * ```
  */
 export class AbilityCommand extends Command {
+	private _canCooldown = false;
 	readonly abilityId: string;
 
 	constructor(
@@ -1690,9 +1691,13 @@ export class AbilityCommand extends Command {
 		this.errorFunction = commandObj.onError;
 		if (typeof commandObj.cooldown === "function") {
 			this.cooldownResolver = commandObj.cooldown;
+			this._canCooldown = true;
 		} else if (typeof commandObj.cooldown === "number") {
 			const value = commandObj.cooldown;
 			this.cooldownResolver = () => value;
+			if (value > 0) {
+				this._canCooldown = true;
+			}
 		}
 	}
 
@@ -1718,6 +1723,10 @@ export class AbilityCommand extends Command {
 			this.errorFunction(context, result);
 		}
 		// If no error handler, do nothing - the registry will treat this as unmatched
+	}
+
+	canCooldown(): boolean {
+		return this._canCooldown;
 	}
 
 	override getActionCooldownMs(

@@ -756,6 +756,9 @@ suite("command.ts", () => {
 				execute(): void {
 					executions.push(Date.now());
 				}
+				canCooldown(): boolean {
+					return true;
+				}
 				getActionCooldownMs(): number {
 					return 30;
 				}
@@ -794,6 +797,9 @@ suite("command.ts", () => {
 				}
 				execute(context: CommandContext): void {
 					seenRooms.push(context.room);
+				}
+				canCooldown(): boolean {
+					return true;
 				}
 				getActionCooldownMs(): number {
 					return 25;
@@ -839,6 +845,9 @@ suite("command.ts", () => {
 				execute(): void {
 					// no-op
 				}
+				canCooldown(): boolean {
+					return true;
+				}
 				getActionCooldownMs(): number {
 					return 40;
 				}
@@ -876,6 +885,9 @@ suite("command.ts", () => {
 				}
 				execute(): void {
 					// no-op
+				}
+				canCooldown(): boolean {
+					return true;
 				}
 				getActionCooldownMs(): number {
 					return 35;
@@ -915,6 +927,9 @@ suite("command.ts", () => {
 				}
 				execute(): void {
 					// no-op
+				}
+				canCooldown(): boolean {
+					return true;
 				}
 				getActionCooldownMs(): number {
 					return 40;

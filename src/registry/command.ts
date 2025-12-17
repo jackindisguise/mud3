@@ -131,11 +131,13 @@ export function executeCommand(
 	input = input.trim();
 	if (!input) return false;
 
+	const actor = context.actor;
+	const character = actor.character;
+
 	// Commands are already sorted by priority and pattern length
 	for (const command of commands) {
 		// Skip admin-only commands for non-admin characters
 		if (command.adminOnly) {
-			const character = context.actor.character;
 			if (!character || !character.isAdmin()) {
 				continue;
 			}
@@ -143,14 +145,38 @@ export function executeCommand(
 
 		// Skip ability commands if the actor doesn't know the ability
 		if (command instanceof AbilityCommand) {
-			if (!context.actor.knowsAbilityById(command.abilityId)) {
+			if (!actor.knowsAbilityById(command.abilityId)) {
 				continue;
 			}
 		}
+
 		const result = command.parse(input, context);
 		if (result.success) {
-			const cooldownMs = command.getActionCooldownMs(context, result.args) ?? 0;
-			if (cooldownMs > 0) {
+			// Check if there's an active cooldown - if so, queue commands with cooldowns
+			if (character && command.canCooldown()) {
+				const state = getActionState(character);
+				if (
+					state.cooldownTimer ||
+					state.isProcessing ||
+					state.queue.length > 0
+				) {
+					// There's an active cooldown or queue, queue this command immediately
+					// Don't check if it will succeed - just queue it
+					const entry: ActionQueueEntry = {
+						input,
+						command,
+						enqueuedAt: Date.now(),
+					};
+					state.queue.push(entry);
+					notifyQueued(actor, state);
+					return true;
+				}
+			}
+
+			// No active cooldown, or command has no cooldown - execute normally
+			if (command.canCooldown()) {
+				const cooldownMs =
+					command.getActionCooldownMs(context, result.args) ?? 0;
 				handleActionCommand(input, command, context, result.args, cooldownMs);
 			} else {
 				command.execute(context, result.args);
@@ -235,8 +261,6 @@ function handleActionCommand(
 	const entry: ActionQueueEntry = {
 		input,
 		command,
-		args: new Map(args),
-		cooldownMs,
 		enqueuedAt: Date.now(),
 	};
 
@@ -276,17 +300,42 @@ function tryProcessActionQueue(
 	state.isProcessing = true;
 	const executionContext = contextOverride ?? buildContextFromActor(actor);
 
-	try {
-		nextEntry.command.execute(executionContext, nextEntry.args);
-	} catch (error) {
-		logger.error(
-			`Failed to execute action command "${nextEntry.command.pattern}" for ${actor.display}: ${error}`
-		);
-	} finally {
-		state.isProcessing = false;
+	// Re-parse the input to get fresh args and re-evaluate cooldown
+	// This ensures the cooldown reflects the current game state
+	const parseResult = nextEntry.command.parse(
+		nextEntry.input,
+		executionContext
+	);
+
+	let cooldownMs = 0;
+	if (parseResult.success) {
+		// Re-evaluate cooldown with current context and fresh args
+		cooldownMs =
+			nextEntry.command.getActionCooldownMs(
+				executionContext,
+				parseResult.args
+			) ?? 0;
+
+		try {
+			nextEntry.command.execute(executionContext, parseResult.args);
+		} catch (error) {
+			logger.error(
+				`Failed to execute action command "${nextEntry.command.pattern}" for ${actor.display}: ${error}`
+			);
+			// If execution fails, don't apply cooldown
+			cooldownMs = 0;
+		}
+	} else {
+		// If parsing fails (e.g., target no longer exists), call onError if available
+		if (nextEntry.command.onError) {
+			nextEntry.command.onError(executionContext, parseResult);
+		}
+		// Don't apply cooldown if command can't be parsed/executed
+		cooldownMs = 0;
 	}
 
-	beginCooldown(actor, character, state, nextEntry.cooldownMs);
+	state.isProcessing = false;
+	beginCooldown(actor, character, state, cooldownMs == 0 ? 100 : cooldownMs);
 
 	if (!contextOverride) {
 		character.showPrompt();

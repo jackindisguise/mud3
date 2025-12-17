@@ -79,6 +79,7 @@ export interface YAMLCommandDefinition {
 }
 
 export class JavaScriptCommandAdapter extends Command {
+	private _canCooldown = false;
 	private executeFunction: (
 		context: CommandContext,
 		args: Map<string, any>
@@ -103,9 +104,13 @@ export class JavaScriptCommandAdapter extends Command {
 		this.errorFunction = commandObj.onError;
 		if (typeof commandObj.cooldown === "function") {
 			this.cooldownResolver = commandObj.cooldown;
+			this._canCooldown = true;
 		} else if (typeof commandObj.cooldown === "number") {
 			const value = commandObj.cooldown;
 			this.cooldownResolver = () => value;
+			if (value > 0) {
+				this._canCooldown = true;
+			}
 		}
 	}
 
@@ -128,87 +133,9 @@ export class JavaScriptCommandAdapter extends Command {
 		const value = this.cooldownResolver(context, args);
 		return typeof value === "number" ? value : undefined;
 	}
-}
 
-export class YAMLCommandAdapter extends Command {
-	private executeScript: string;
-	private errorScript?: string;
-
-	constructor(yamlDef: YAMLCommandDefinition) {
-		super({ pattern: yamlDef.pattern, aliases: yamlDef.aliases });
-		this.executeScript = yamlDef.execute;
-		this.errorScript = yamlDef.onError;
-	}
-
-	/**
-	 * Creates a sandboxed context for executing command scripts.
-	 * Provides minimal access to only what's needed for command execution.
-	 */
-	private createSandbox(
-		context: CommandContext,
-		args: Map<string, any>,
-		result?: ParseResult
-	): any {
-		return {
-			// Provide access to parsed arguments
-			args,
-			// Provide access to the actor (player executing the command)
-			actor: context.actor,
-			// Provide access to the current room if available
-			room: context.room,
-			// Provide MESSAGE_GROUP enum for message routing
-			MESSAGE_GROUP,
-			// Provide access to game functions for global operations
-			game: {
-				forEachCharacter,
-				broadcast,
-				announce,
-				forEachSession,
-				getGameStats,
-			},
-			// If this is an error handler, provide the parse result
-			result,
-			// Provide console for debugging (consider removing in production)
-			console: {
-				log: (...args: any[]) =>
-					logger.debug(`[YAML Command] ${args.join(" ")}`),
-				error: (...args: any[]) =>
-					logger.error(`[YAML Command] ${args.join(" ")}`),
-			},
-		};
-	}
-
-	execute(context: CommandContext, args: Map<string, any>): void {
-		try {
-			const sandbox = this.createSandbox(context, args);
-			runInNewContext(this.executeScript, sandbox, {
-				timeout: 5000, // 5 second timeout
-				displayErrors: true,
-			});
-		} catch (error) {
-			logger.error(
-				`YAML command execution error in pattern "${this.pattern}": ${error}`
-			);
-			context.actor.sendLine("An error occurred while executing the command.");
-		}
-	}
-
-	onError(context: CommandContext, result: ParseResult): void {
-		if (this.errorScript) {
-			try {
-				const sandbox = this.createSandbox(context, new Map(), result);
-				runInNewContext(this.errorScript, sandbox, {
-					timeout: 5000, // 5 second timeout
-					displayErrors: true,
-				});
-			} catch (error) {
-				logger.error(
-					`YAML command error handler failed in pattern "${this.pattern}": ${error}`
-				);
-				context.actor.sendLine(result.error ?? "Invalid command");
-			}
-		}
-		// If no error handler, do nothing - the registry will treat this as unmatched
+	canCooldown(): boolean {
+		return this._canCooldown;
 	}
 }
 
@@ -247,19 +174,6 @@ async function loadCommands() {
 			);
 			logger.debug(
 				`Found ${jsFiles.length} JavaScript command files in ${relative(
-					ROOT_DIRECTORY,
-					commandDir
-				)}`
-			);
-
-			// Filter for YAML files
-			const yamlFiles = files.filter(
-				(file) =>
-					(file.endsWith(".yaml") || file.endsWith(".yml")) &&
-					!file.startsWith("_")
-			);
-			logger.debug(
-				`Found ${yamlFiles.length} YAML command files in ${relative(
 					ROOT_DIRECTORY,
 					commandDir
 				)}`
@@ -310,48 +224,6 @@ async function loadCommands() {
 				} catch (error) {
 					logger.error(
 						`Failed to load command from ${relative(
-							ROOT_DIRECTORY,
-							join(commandDir, file)
-						)}: ${error}`
-					);
-				}
-			}
-
-			// Load YAML commands
-			for (const file of yamlFiles) {
-				logger.debug(`Processing YAML command file: ${file}`);
-				try {
-					const filePath = join(commandDir, file);
-					logger.debug(
-						`Loading YAML command from ${relative(ROOT_DIRECTORY, filePath)}`
-					);
-
-					const fileContent = await readFile(filePath, "utf-8");
-					const yamlDef = YAML.load(fileContent) as YAMLCommandDefinition;
-
-					if (yamlDef && yamlDef.pattern && yamlDef.execute) {
-						const command = new YAMLCommandAdapter(yamlDef);
-						registerCommand(command);
-						logger.info(
-							`Loaded YAML command "${yamlDef.pattern}" from ${relative(
-								ROOT_DIRECTORY,
-								filePath
-							)}`
-						);
-						if (yamlDef.aliases) {
-							logger.debug(`  Aliases: ${yamlDef.aliases.join(", ")}`);
-						}
-					} else {
-						logger.warn(
-							`Invalid YAML command structure in ${relative(
-								ROOT_DIRECTORY,
-								filePath
-							)}: missing pattern or execute`
-						);
-					}
-				} catch (error) {
-					logger.error(
-						`Failed to load YAML command from ${relative(
 							ROOT_DIRECTORY,
 							join(commandDir, file)
 						)}: ${error}`

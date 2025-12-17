@@ -28,7 +28,7 @@ import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Item, Currency, Mob, Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 import { createGold } from "../utils/currency.js";
 import { capitalizeFirst } from "../utils/string.js";
 

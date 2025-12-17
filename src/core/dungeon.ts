@@ -70,7 +70,7 @@ import { color, COLOR, COLOR_NAMES, COLOR_NAME_TO_COLOR } from "./color.js";
 import logger from "../utils/logger.js";
 import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 import { forEachCharacter } from "../game.js";
 import {
 	removeFromCombatQueue,
@@ -79,7 +79,7 @@ import {
 	addToCombatQueue,
 	processThreatSwitching,
 	handleNPCLeavingCombat,
-} from "../combat.js";
+} from "../systems/combat.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import {
 	HitType,
@@ -91,7 +91,7 @@ import {
 } from "./damage-types.js";
 import { Ability } from "./ability.js";
 import { getProficiencyAtUses } from "./ability.js";
-import { addToRegenerationSet } from "../regeneration.js";
+import { addToRegenerationSet } from "../systems/regeneration.js";
 import {
 	EffectInstance,
 	EffectTemplate,
@@ -108,7 +108,7 @@ import {
 	removeFromEffectsSet,
 	setupEffectTimers,
 	clearEffectTimersForEffect,
-} from "../effects.js";
+} from "../systems/effects.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -142,7 +142,7 @@ import {
 	isSouthward,
 	isEastward,
 	isWestward,
-} from "../direction.js";
+} from "../utils/direction.js";
 import { checkMobArchetypeAbilities } from "../package/dungeon.js";
 import { resolveTemplateById } from "../registry/dungeon.js";
 import { ShopkeeperInventory } from "./shopkeeper.js";
@@ -6863,7 +6863,7 @@ export class Mob extends Movable {
 		// Clean up AI system (if initialized)
 		if (this._aiEventEmitter) {
 			// Dynamic import to avoid circular dependency
-			import("../mob-ai.js").then((module) => {
+			import("../systems/mob-ai.js").then((module) => {
 				module.cleanupMobAI(this);
 			});
 		}

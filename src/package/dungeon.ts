@@ -36,7 +36,7 @@ import {
 	getDefaultRace,
 	getDefaultJob,
 } from "../registry/archetype.js";
-import { initializeMobAI, cacheAIScript } from "../mob-ai.js";
+import { initializeMobAI, cacheAIScript } from "../systems/mob-ai.js";
 import { getAbilityById } from "../registry/ability.js";
 import { getEffectTemplateById } from "../registry/effect.js";
 import { Ability, getProficiencyAtUses } from "../core/ability.js";
@@ -126,7 +126,7 @@ import {
 	text2dir,
 	dir2reverse,
 	DirectionText,
-} from "../direction.js";
+} from "../utils/direction.js";
 import { EffectOverrides } from "../core/effect.js";
 import {
 	getShopkeeperInventoryById,

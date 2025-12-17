@@ -20,7 +20,7 @@ import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Item, Currency, Equipment } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 import logger from "../utils/logger.js";
 import { createGold } from "../utils/currency.js";
 import { Room, Mob } from "../core/dungeon.js";

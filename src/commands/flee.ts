@@ -18,9 +18,9 @@
 import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
-import { DIRECTION, DIRECTIONS, dir2text } from "../direction.js";
+import { DIRECTION, DIRECTIONS, dir2text } from "../utils/direction.js";
 import { CommandObject } from "../package/commands.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 
 export const command = {
 	pattern: "flee~",

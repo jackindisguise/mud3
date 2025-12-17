@@ -22,7 +22,7 @@ import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Item, DungeonObject, Equipment, Currency } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 import { createGold } from "../utils/currency.js";
 import { capitalizeFirst } from "../utils/string.js";
 
@@ -33,10 +33,7 @@ function putAllInContainer(
 ): void {
 	// Check if actor is in a room
 	if (!room) {
-		actor.sendMessage(
-			"You are not in a room.",
-			MESSAGE_GROUP.COMMAND_RESPONSE
-		);
+		actor.sendMessage("You are not in a room.", MESSAGE_GROUP.COMMAND_RESPONSE);
 		return;
 	}
 
@@ -78,7 +75,10 @@ function putAllInContainer(
 	) as Item[];
 
 	if (inventoryItems.length === 0) {
-		actor.sendMessage("You don't have anything to put in it.", MESSAGE_GROUP.COMMAND_RESPONSE);
+		actor.sendMessage(
+			"You don't have anything to put in it.",
+			MESSAGE_GROUP.COMMAND_RESPONSE
+		);
 		return;
 	}
 
@@ -122,8 +122,12 @@ function putAllInContainer(
 	if (successCount > 0) {
 		act(
 			{
-				user: `You put ${successCount} item${successCount !== 1 ? "s" : ""} in ${container.display}.`,
-				room: `{User} puts ${successCount} item${successCount !== 1 ? "s" : ""} in ${container.display}.`,
+				user: `You put ${successCount} item${
+					successCount !== 1 ? "s" : ""
+				} in ${container.display}.`,
+				room: `{User} puts ${successCount} item${
+					successCount !== 1 ? "s" : ""
+				} in ${container.display}.`,
 			},
 			{
 				user: actor,

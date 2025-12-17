@@ -9,23 +9,23 @@
 
 import { EventEmitter } from "events";
 import { runInNewContext } from "vm";
-import { Mob, BEHAVIOR, Room, MobTemplate } from "./core/dungeon.js";
-import { DIRECTION, DIRECTIONS } from "./direction.js";
+import { Mob, BEHAVIOR, Room, MobTemplate } from "../core/dungeon.js";
+import { DIRECTION, DIRECTIONS } from "../utils/direction.js";
 import { initiateCombat, oneHit, OneHitOptions } from "./combat.js";
-import logger from "./utils/logger.js";
+import logger from "../utils/logger.js";
 import { act } from "./act.js";
-import { MESSAGE_GROUP } from "./core/character.js";
-import { getSafeRootDirectory } from "./utils/path.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 import { join } from "path";
 import { readFile } from "fs/promises";
-import { getAbilityById } from "./registry/ability.js";
-import { resolveTemplateById } from "./registry/dungeon.js";
-import { AbilityCommand, CommandContext } from "./core/command.js";
-import { getCommands } from "./registry/command.js";
-import { Ability } from "./core/ability.js";
-import { COLOR, color, COLOR_NAME_TO_COLOR, COLORS } from "./core/color.js";
-import { COMMON_HIT_TYPES } from "./core/damage-types.js";
-import { capitalize, capitalizeFirst } from "./utils/string.js";
+import { getAbilityById } from "../registry/ability.js";
+import { resolveTemplateById } from "../registry/dungeon.js";
+import { AbilityCommand, CommandContext } from "../core/command.js";
+import { getCommands } from "../registry/command.js";
+import { Ability } from "../core/ability.js";
+import { COLOR, color, COLOR_NAME_TO_COLOR, COLORS } from "../core/color.js";
+import { COMMON_HIT_TYPES } from "../core/damage-types.js";
+import { capitalize, capitalizeFirst } from "../utils/string.js";
 
 /**
  * Registry of all mobs with active AI scripts.

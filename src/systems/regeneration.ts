@@ -7,9 +7,9 @@
  * @module regeneration
  */
 
-import { MESSAGE_GROUP } from "./core/character.js";
-import { COLOR, color } from "./core/color.js";
-import { Mob } from "./core/dungeon.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { COLOR, color } from "../core/color.js";
+import { Mob } from "../core/dungeon.js";
 
 /**
  * Set of mobs that need to regenerate resources.

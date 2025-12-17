@@ -54,7 +54,7 @@ import {
 	SOCIAL_COMMANDS,
 	getSocialCommandNames,
 	type SocialDefinition,
-} from "../social.js";
+} from "../systems/social.js";
 import { executeSocial, onSocialError } from "../commands/_social.js";
 import { Mob } from "../core/dungeon.js";
 import { getSafeRootDirectory } from "../utils/path.js";

@@ -7,19 +7,19 @@
  * @module effects
  */
 
-import { Mob } from "./core/dungeon.js";
-import { MESSAGE_GROUP } from "./core/character.js";
-import { COLOR, color } from "./core/color.js";
+import { Mob } from "../core/dungeon.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { COLOR, color } from "../core/color.js";
 import {
 	EffectInstance,
 	isDamageOverTimeEffect,
 	isHealOverTimeEffect,
 	isEffectExpired,
 	shouldEffectTick,
-} from "./core/effect.js";
+} from "../core/effect.js";
 import { act, ActMessageTemplates } from "./act.js";
 import { initiateCombat, processEffectDamage } from "./combat.js";
-import { Room } from "./core/dungeon.js";
+import { Room } from "../core/dungeon.js";
 
 /**
  * Set of mobs that have active effects.

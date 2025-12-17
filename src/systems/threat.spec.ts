@@ -1,11 +1,11 @@
 import { test, suite, beforeEach, skip, afterEach } from "node:test";
 import assert from "node:assert";
-import { greaterThanOrEqual } from "./utils/assert.js";
-import { Dungeon, Mob, Room, BEHAVIOR, ThreatEntry } from "./core/dungeon.js";
-import { Character } from "./core/character.js";
+import { greaterThanOrEqual } from "../utils/assert.js";
+import { Dungeon, Mob, Room, BEHAVIOR, ThreatEntry } from "../core/dungeon.js";
+import { Character } from "../core/character.js";
 import { processThreatSwitching } from "./combat.js";
-import { freezeArchetype, Job, Race } from "./core/archetype.js";
-import { createMob } from "./package/dungeon.js";
+import { freezeArchetype, Job, Race } from "../core/archetype.js";
+import { createMob } from "../package/dungeon.js";
 
 const testRace: Race = {
 	id: "test_race",

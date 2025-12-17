@@ -13,7 +13,7 @@ import {
 	ResourceCapacities,
 } from "./attribute.js";
 import { Mob } from "./dungeon.js";
-import { ActMessageTemplates } from "../act.js";
+import { ActMessageTemplates } from "../systems/act.js";
 import { DAMAGE_TYPE, HitType } from "./damage-types.js";
 
 /**

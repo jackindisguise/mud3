@@ -45,7 +45,7 @@
  */
 
 import { DungeonObject, Item, Room } from "./dungeon.js";
-import { DIRECTION } from "../direction.js";
+import { DIRECTION } from "../utils/direction.js";
 import { Mob, Equipment } from "./dungeon.js";
 import { Character } from "./character.js";
 import { forEachCharacter } from "../game.js";

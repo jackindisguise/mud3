@@ -7,12 +7,12 @@ import {
 	ActOptions,
 	damageMessage,
 } from "./act.js";
-import archetypePkg from "./package/archetype.js";
-import { Mob, Room, Dungeon } from "./core/dungeon.js";
-import { Character, MESSAGE_GROUP } from "./core/character.js";
-import { freezeArchetype } from "./core/archetype.js";
-import { createMob } from "./package/dungeon.js";
-import { getDefaultJob, getDefaultRace } from "./registry/archetype.js";
+import archetypePkg from "../package/archetype.js";
+import { Mob, Room, Dungeon } from "../core/dungeon.js";
+import { Character, MESSAGE_GROUP } from "../core/character.js";
+import { freezeArchetype } from "../core/archetype.js";
+import { createMob } from "../package/dungeon.js";
+import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
 
 suite("act.ts", () => {
 	before(async () => {

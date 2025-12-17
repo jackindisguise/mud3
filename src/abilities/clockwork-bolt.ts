@@ -12,8 +12,8 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
-import { act } from "../act.js";
-import { oneMagicHit } from "../combat.js";
+import { act } from "../systems/act.js";
+import { oneMagicHit } from "../systems/combat.js";
 import { COMMON_HIT_TYPES } from "../core/damage-types.js";
 
 export const ABILITY_ID = "clockwork-bolt";

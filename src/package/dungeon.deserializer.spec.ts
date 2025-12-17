@@ -37,7 +37,7 @@ import archetypePkg from "./archetype.js";
 import abilitiesPkg from "./ability.js";
 import { getAllAbilities } from "../registry/ability.js";
 import { createMob } from "./dungeon.js";
-import { DIRECTION } from "../direction.js";
+import { DIRECTION } from "../utils/direction.js";
 import { getDefaultJob, getDefaultRace } from "../registry/archetype.js";
 
 function createTestMob(options: Partial<MobOptions>): Mob {

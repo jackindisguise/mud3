@@ -12,7 +12,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 
 export const ABILITY_ID = "zanpakuto-release";
 

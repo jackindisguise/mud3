@@ -1,7 +1,7 @@
 import { test, suite, beforeEach, skip, afterEach } from "node:test";
 import assert from "node:assert";
-import { Dungeon, Mob, Room, Weapon, EQUIPMENT_SLOT } from "./core/dungeon.js";
-import { Character } from "./core/character.js";
+import { Dungeon, Mob, Room, Weapon, EQUIPMENT_SLOT } from "../core/dungeon.js";
+import { Character } from "../core/character.js";
 import {
 	initiateCombat,
 	addToCombatQueue,
@@ -12,14 +12,14 @@ import {
 	oneHit,
 	applyDamageVariation,
 } from "./combat.js";
-import { DAMAGE_RELATIONSHIP, COMMON_HIT_TYPES } from "./core/damage-types.js";
-import { freezeArchetype } from "./core/archetype.js";
+import { DAMAGE_RELATIONSHIP, COMMON_HIT_TYPES } from "../core/damage-types.js";
+import { freezeArchetype } from "../core/archetype.js";
 import {
 	greaterThan,
 	greaterThanOrEqual,
 	lessThan,
 	lessThanOrEqual,
-} from "./utils/assert.js";
+} from "../utils/assert.js";
 
 const testJob = freezeArchetype({
 	id: "test_job",

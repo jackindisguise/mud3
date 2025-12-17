@@ -21,7 +21,7 @@ import { CommandContext, ParseResult, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room, BEHAVIOR } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { initiateCombat, addToCombatQueue } from "../combat.js";
+import { initiateCombat, addToCombatQueue } from "../systems/combat.js";
 import { capitalizeFirst } from "../utils/string.js";
 
 export const command = {

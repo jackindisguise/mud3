@@ -22,8 +22,8 @@ import {
 	Equipment,
 	Currency,
 	DungeonObject,
-} from "./core/dungeon.js";
-import { MESSAGE_GROUP } from "./core/character.js";
+} from "../core/dungeon.js";
+import { MESSAGE_GROUP } from "../core/character.js";
 import {
 	color,
 	COLOR,
@@ -32,30 +32,30 @@ import {
 	SIZER,
 	stickyColor,
 	wordColorStringTransformer,
-} from "./core/color.js";
-import { LINEBREAK } from "./core/telnet.js";
-import logger from "./utils/logger.js";
-import { getLocation, LOCATION } from "./registry/locations.js";
+} from "../core/color.js";
+import { LINEBREAK } from "../core/telnet.js";
+import logger from "../utils/logger.js";
+import { getLocation, LOCATION } from "../registry/locations.js";
 import { act, damageMessage } from "./act.js";
-import { showRoom } from "./utils/display.js";
-import { createItem, createProp } from "./package/dungeon.js";
-import { createGold } from "./utils/currency.js";
-import { getAllFromContainer } from "./utils/get.js";
-import { sacrificeContainer } from "./utils/sacrifice.js";
+import { showRoom } from "../utils/display.js";
+import { createItem, createProp } from "../package/dungeon.js";
+import { createGold } from "../utils/currency.js";
+import { getAllFromContainer } from "../utils/get.js";
+import { sacrificeContainer } from "../utils/sacrifice.js";
 import {
 	DEFAULT_HIT_TYPE,
 	getDamageMultiplier,
 	HitType,
-} from "./core/damage-types.js";
-import { ability as PURE_POWER } from "./abilities/pure-power.js";
-import { ability as SECOND_ATTACK } from "./abilities/second-attack.js";
-import { ability as THIRD_ATTACK } from "./abilities/third-attack.js";
+} from "../core/damage-types.js";
+import { ability as PURE_POWER } from "../abilities/pure-power.js";
+import { ability as SECOND_ATTACK } from "../abilities/second-attack.js";
+import { ability as THIRD_ATTACK } from "../abilities/third-attack.js";
 import { string } from "mud-ext";
 import {
 	EFFECT_DAMAGE_CATEGORY,
 	EffectInstance,
 	isDamageOverTimeEffect,
-} from "./core/effect.js";
+} from "../core/effect.js";
 
 /**
  * Options for damage variation.

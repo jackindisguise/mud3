@@ -19,8 +19,8 @@ import { CommandObject } from "../package/commands.js";
 import { Room, DungeonObject, Mob, Item, Prop } from "../core/dungeon.js";
 import { color, COLOR } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
-import { hasLineOfSight } from "../minimap.js";
-import { DIRECTION, dir2text } from "../direction.js";
+import { hasLineOfSight } from "../navigation/minimap.js";
+import { DIRECTION, dir2text } from "../utils/direction.js";
 
 export const command = {
 	pattern: "scan~",

@@ -15,8 +15,8 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { EQUIPMENT_SLOT, Mob, Weapon } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
-import { act, damageMessage } from "../act.js";
-import { oneHit } from "../combat.js";
+import { act, damageMessage } from "../systems/act.js";
+import { oneHit } from "../systems/combat.js";
 
 export const ABILITY_ID = "whirlwind";
 

@@ -24,7 +24,7 @@
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Room, DungeonObject, Item } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { DIRECTION, dir2text } from "../direction.js";
+import { DIRECTION, dir2text } from "../utils/direction.js";
 import { CommandContext, PRIORITY, ParseResult } from "../core/command.js";
 import {
 	showRoom,

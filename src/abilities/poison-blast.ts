@@ -14,7 +14,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
-import { act } from "../act.js";
+import { act } from "../systems/act.js";
 import { effectTemplate as poisonTemplate } from "../effects/poison.js";
 
 export const ABILITY_ID = "poison-blast";

@@ -31,9 +31,9 @@
  * @module act
  */
 
-import { Mob, Room } from "./core/dungeon.js";
-import { MESSAGE_GROUP } from "./core/character.js";
-import { capitalizeFirst } from "./utils/string.js";
+import { Mob, Room } from "../core/dungeon.js";
+import { MESSAGE_GROUP } from "../core/character.js";
+import { capitalizeFirst } from "../utils/string.js";
 
 /**
  * Message templates for an action from different perspectives.

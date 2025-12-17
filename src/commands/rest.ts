@@ -19,8 +19,8 @@ import { CommandContext, PRIORITY } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { CommandObject } from "../package/commands.js";
 import { color, COLOR } from "../core/color.js";
-import { act } from "../act.js";
-import { restRegeneration } from "../regeneration.js";
+import { act } from "../systems/act.js";
+import { restRegeneration } from "../systems/regeneration.js";
 
 const REST_COOLDOWN_MS = 30 * 1000; // 30 seconds
 

@@ -6185,12 +6185,24 @@ export class Mob extends Movable {
 	 * ```
 	 */
 	public damage(attacker: Mob, amount: number, damageType?: DAMAGE_TYPE): void {
-		if (amount <= 0) {
+		// Shopkeepers cannot take damage
+		if (this.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
 			return;
 		}
 
-		// Shopkeepers cannot take damage
-		if (this.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
+		// Generate threat for NPCs and initiate combat for characters
+		// This must happen even if amount is 0, so that misses and 0-damage attacks initiate combat
+		if (!this.character) {
+			this.addThreat(attacker, Math.max(amount, 1));
+		} else if (
+			!this.isInCombat() &&
+			attacker.location === this.location &&
+			this.location instanceof Room
+		) {
+			initiateCombat(this, attacker, true);
+		}
+
+		if (amount <= 0) {
 			return;
 		}
 
@@ -6273,18 +6285,7 @@ export class Mob extends Movable {
 
 		// Apply remaining damage to health
 		if (remainingDamage > 0) {
-			this.health = Math.max(0, this.health - remainingDamage);
-		}
-
-		// Generate threat for NPCs (use original amount for threat calculation)
-		if (!this.character) {
-			this.addThreat(attacker, Math.max(amount, 1));
-		} else if (
-			!this.isInCombat() &&
-			attacker.location === this.location &&
-			this.location instanceof Room
-		) {
-			initiateCombat(this, attacker, true);
+			this.health -= remainingDamage;
 		}
 
 		// Handle death

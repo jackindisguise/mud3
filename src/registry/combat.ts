@@ -195,6 +195,13 @@ export function oneHit(options: OneHitOptions): number {
 		return 0; // Target is dead
 	}
 
+	// Get hit type from weapon or use default (needed for miss handling)
+	const hitType = hitTypeOverride
+		? hitTypeOverride
+		: weapon
+		? weapon.hitType
+		: DEFAULT_HIT_TYPE;
+
 	// Check if attack hits (accuracy vs avoidance)
 	// Skip miss check if guaranteedHit is true
 	if (!guaranteedHit) {
@@ -220,6 +227,8 @@ export function oneHit(options: OneHitOptions): number {
 				},
 				{ messageGroup: MESSAGE_GROUP.COMBAT }
 			);
+			// Still initiate combat even on miss by calling damage with 0
+			target.damage(attacker, 0, hitType.damageType);
 			return 0;
 		}
 	}
@@ -243,13 +252,6 @@ export function oneHit(options: OneHitOptions): number {
 		attackPowerMultiplier * purePowerMultiplier;
 
 	// Attack hits - proceed with damage calculation
-	// Get hit type from weapon or use default
-	const hitType = hitTypeOverride
-		? hitTypeOverride
-		: weapon
-		? weapon.hitType
-		: DEFAULT_HIT_TYPE;
-
 	// Calculate base damage
 	// Base attack power comes from strength (without weapon bonuses)
 	// When using a weapon, add the weapon's attack power to the base
@@ -478,6 +480,8 @@ export function oneMagicHit(options: OneMagicHitOptions): number {
 				},
 				{ messageGroup: MESSAGE_GROUP.COMBAT }
 			);
+			// Still initiate combat even on miss by calling damage with 0
+			target.damage(attacker, 0, hitType.damageType);
 			return 0;
 		}
 	}

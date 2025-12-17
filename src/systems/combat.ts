@@ -36,7 +36,7 @@ import {
 import { LINEBREAK } from "../core/telnet.js";
 import logger from "../utils/logger.js";
 import { getLocation, LOCATION } from "../registry/locations.js";
-import { act, damageMessage } from "./act.js";
+import { act, damageMessage } from "../utils/act.js";
 import { showRoom } from "../utils/display.js";
 import { createItem, createProp } from "../package/dungeon.js";
 import { createGold } from "../utils/currency.js";

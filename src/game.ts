@@ -77,7 +77,7 @@ import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
 import { calendarEvents } from "./registry/calendar.js";
 import { cycleShopkeeperInventories } from "./registry/shopkeeper.js";
-import { processAITick } from "./systems/mob-ai.js";
+import { processAITick } from "./registry/mob-ai.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_GAME_TICK_INTERVAL_MS = 60 * 1000; // 1 minute

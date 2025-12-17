@@ -6863,7 +6863,7 @@ export class Mob extends Movable {
 		// Clean up AI system (if initialized)
 		if (this._aiEventEmitter) {
 			// Dynamic import to avoid circular dependency
-			import("../systems/mob-ai.js").then((module) => {
+			import("../registry/mob-ai.js").then((module) => {
 				module.cleanupMobAI(this);
 			});
 		}

@@ -36,7 +36,7 @@ import {
 	getDefaultRace,
 	getDefaultJob,
 } from "../registry/archetype.js";
-import { initializeMobAI, cacheAIScript } from "../systems/mob-ai.js";
+import { initializeMobAI, cacheAIScript } from "../registry/mob-ai.js";
 import { getAbilityById } from "../registry/ability.js";
 import { getEffectTemplateById } from "../registry/effect.js";
 import { Ability, getProficiencyAtUses } from "../core/ability.js";

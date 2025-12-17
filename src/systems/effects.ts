@@ -17,7 +17,7 @@ import {
 	isEffectExpired,
 	shouldEffectTick,
 } from "../core/effect.js";
-import { act, ActMessageTemplates } from "./act.js";
+import { act, ActMessageTemplates } from "../utils/act.js";
 import { initiateCombat, processEffectDamage } from "./combat.js";
 import { Room } from "../core/dungeon.js";
 

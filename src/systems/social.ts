@@ -7,7 +7,7 @@
  * @module social
  */
 
-import { ActMessageTemplates } from "./act.js";
+import { ActMessageTemplates } from "../utils/act.js";
 
 /**
  * Message templates for a social action.

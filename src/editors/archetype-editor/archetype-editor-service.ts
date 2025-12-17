@@ -162,7 +162,14 @@ export class ArchetypeEditorService {
 
 	public getAbilities(): Array<{ id: string; name: string }> {
 		try {
-			return getAllAbilities().map((ability) => ({
+			const abilities = getAllAbilities();
+			logger.debug(`getAbilities: found ${abilities.length} abilities`);
+			if (abilities.length === 0) {
+				logger.warn(
+					"getAbilities: ability registry is empty. Make sure ability package has been loaded."
+				);
+			}
+			return abilities.map((ability) => ({
 				id: ability.id,
 				name: ability.name,
 			}));

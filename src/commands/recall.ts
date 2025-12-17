@@ -15,7 +15,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { MoveOptions, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { getLocation, LOCATION } from "../registry/locations.js";
-import { act } from "../systems/act.js";
+import { act } from "../utils/act.js";
 
 export const command = {
 	pattern: "recall~",

@@ -70,7 +70,7 @@ import { color, COLOR, COLOR_NAMES, COLOR_NAME_TO_COLOR } from "./color.js";
 import logger from "../utils/logger.js";
 import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
-import { act } from "../systems/act.js";
+import { act } from "../utils/act.js";
 import { forEachCharacter } from "../game.js";
 import {
 	removeFromCombatQueue,

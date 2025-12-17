@@ -13,7 +13,7 @@
 import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob } from "../core/dungeon.js";
-import { act, ActMessageTemplates } from "../systems/act.js";
+import { act, ActMessageTemplates } from "../utils/act.js";
 import { capitalizeFirst } from "../utils/string.js";
 
 /**

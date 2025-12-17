@@ -22,7 +22,7 @@ import { CommandContext, ParseResult } from "../core/command.js";
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Item, DungeonObject, Equipment, Currency } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
-import { act } from "../systems/act.js";
+import { act } from "../utils/act.js";
 import { createGold } from "../utils/currency.js";
 import { capitalizeFirst } from "../utils/string.js";
 

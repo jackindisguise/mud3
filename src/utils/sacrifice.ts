@@ -9,7 +9,7 @@
 
 import { MESSAGE_GROUP } from "../core/character.js";
 import { Item, Currency, Mob, Room, DungeonObject } from "../core/dungeon.js";
-import { act } from "../systems/act.js";
+import { act } from "./act.js";
 import { color, COLOR } from "../core/color.js";
 import { capitalizeFirst } from "./string.js";
 

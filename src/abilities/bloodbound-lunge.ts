@@ -12,7 +12,7 @@ import { MESSAGE_GROUP } from "../core/character.js";
 import { Mob, Room, EQUIPMENT_SLOT, Weapon } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
-import { act } from "../systems/act.js";
+import { act } from "../utils/act.js";
 import { oneHit } from "../systems/combat.js";
 
 export const ABILITY_ID = "bloodbound-lunge";

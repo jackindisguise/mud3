@@ -28,7 +28,7 @@ import {
 import { createFromTemplateWithOid } from "../package/dungeon.js";
 import { resolveTemplateById } from "../registry/dungeon.js";
 import { color, COLOR } from "../core/color.js";
-import { act } from "../systems/act.js";
+import { act } from "../utils/act.js";
 import type { DungeonObject, Item } from "../core/dungeon.js";
 import { capitalizeFirst } from "../utils/string.js";
 import { LINEBREAK } from "../core/telnet.js";

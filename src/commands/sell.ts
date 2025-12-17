@@ -22,7 +22,7 @@ import {
 } from "./_shopkeeper-helpers.js";
 import { getSellPrice, addStock } from "../core/shopkeeper.js";
 import { color, COLOR } from "../core/color.js";
-import { act } from "../systems/act.js";
+import { act } from "../utils/act.js";
 import type { Item } from "../core/dungeon.js";
 
 export const command = {

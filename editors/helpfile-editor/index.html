@@ -96,22 +96,35 @@
 										"
 									>
 										<legend>Aliases</legend>
-										<div id="aliases-list"></div>
-										<button
-											type="button"
-											id="add-alias-btn"
+										<div
+											id="aliases-tag-input"
 											style="
-												margin-top: 0.5rem;
-												padding: 0.5rem 1rem;
+												display: flex;
+												flex-wrap: wrap;
+												gap: 0.5rem;
+												padding: 0.5rem;
 												background: var(--base02);
 												border: 1px solid var(--base01);
-												color: var(--base1);
 												border-radius: 4px;
-												cursor: pointer;
+												min-height: 2.5rem;
+												align-items: center;
 											"
 										>
-											+ Add Alias
-										</button>
+											<input
+												type="text"
+												id="aliases-input"
+												placeholder="Type an alias and press Tab"
+												style="
+													flex: 1;
+													min-width: 200px;
+													padding: 0.5rem;
+													background: transparent;
+													border: none;
+													color: var(--base1);
+													outline: none;
+												"
+											/>
+										</div>
 									</fieldset>
 
 									<fieldset
@@ -123,22 +136,34 @@
 										"
 									>
 										<legend>Related</legend>
-										<div id="related-list"></div>
-										<button
-											type="button"
-											id="add-related-btn"
+										<select
+											id="related-dropdown"
 											style="
-												margin-top: 0.5rem;
-												padding: 0.5rem 1rem;
+												width: 100%;
+												padding: 0.5rem;
 												background: var(--base02);
 												border: 1px solid var(--base01);
 												color: var(--base1);
 												border-radius: 4px;
-												cursor: pointer;
+												margin-bottom: 0.5rem;
 											"
 										>
-											+ Add Related
-										</button>
+											<option value="">-- Select a helpfile --</option>
+										</select>
+										<div
+											id="related-tag-input"
+											style="
+												display: flex;
+												flex-wrap: wrap;
+												gap: 0.5rem;
+												padding: 0.5rem;
+												background: var(--base02);
+												border: 1px solid var(--base01);
+												border-radius: 4px;
+												min-height: 2.5rem;
+												align-items: center;
+											"
+										></div>
 									</fieldset>
 
 									<fieldset
@@ -150,22 +175,50 @@
 										"
 									>
 										<legend>Topics</legend>
-										<div id="topics-list"></div>
-										<button
-											type="button"
-											id="add-topic-btn"
+										<select
+											id="topics-dropdown"
 											style="
-												margin-top: 0.5rem;
-												padding: 0.5rem 1rem;
+												width: 100%;
+												padding: 0.5rem;
 												background: var(--base02);
 												border: 1px solid var(--base01);
 												color: var(--base1);
 												border-radius: 4px;
-												cursor: pointer;
+												margin-bottom: 0.5rem;
 											"
 										>
-											+ Add Topic
-										</button>
+											<option value="">-- Select an existing topic --</option>
+										</select>
+										<div
+											id="topics-tag-input"
+											style="
+												display: flex;
+												flex-wrap: wrap;
+												gap: 0.5rem;
+												padding: 0.5rem;
+												background: var(--base02);
+												border: 1px solid var(--base01);
+												border-radius: 4px;
+												min-height: 2.5rem;
+												align-items: center;
+											"
+										>
+											<input
+												type="text"
+												id="topics-input"
+												placeholder="Type a topic and press Tab"
+												style="
+													flex: 1;
+													min-width: 200px;
+													border: none;
+													background: transparent;
+													color: var(--base1);
+													outline: none;
+													font-size: 0.9rem;
+													padding: 0.25rem;
+												"
+											/>
+										</div>
 									</fieldset>
 
 									<div class="form-group">
@@ -196,6 +249,37 @@
 										>
 											Main body text of the help file displayed to players
 										</small>
+									</div>
+
+									<div class="form-group">
+										<label
+											style="
+												display: block;
+												margin-bottom: 0.5rem;
+												color: var(--base1);
+												font-weight: 500;
+											"
+										>
+											Preview:
+										</label>
+										<div
+											id="helpfile-preview"
+											style="
+												width: 100%;
+												min-height: 300px;
+												padding: 0.75rem;
+												background: #000;
+												border: 1px solid var(--base01);
+												border-radius: 4px;
+												font-family: 'Courier New', monospace;
+												font-size: 0.85rem;
+												color: #ccc;
+												white-space: pre-wrap;
+												overflow-y: auto;
+												max-height: 500px;
+												line-height: 1.4;
+											"
+										></div>
 									</div>
 
 									<div class="modal-actions" style="margin-top: 2rem">
@@ -286,4 +370,3 @@
 		<script type="module" src="./static/app.js"></script>
 	</body>
 </html>
-

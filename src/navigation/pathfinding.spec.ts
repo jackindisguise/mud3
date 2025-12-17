@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { suite, test } from "node:test";
 
-import { Dungeon, Room, RoomLink } from "./core/dungeon.js";
+import { Dungeon, Room, RoomLink } from "../core/dungeon.js";
 import {
 	findDirectionsBetweenRooms,
 	findDirectionsViaRefs,
@@ -9,10 +9,10 @@ import {
 	clearPathCache,
 	clearDungeonGraphCache,
 } from "./pathfinding.js";
-import { registerDungeonInstance } from "./package/dungeon.js";
-import { dir2text } from "./direction.js";
-import { DIRECTION, DIRECTIONS } from "./direction.js";
-import { createTunnel, DUNGEON_REGISTRY } from "./registry/dungeon.js";
+import { registerDungeonInstance } from "../package/dungeon.js";
+import { dir2text } from "../utils/direction.js";
+import { DIRECTION, DIRECTIONS } from "../utils/direction.js";
+import { createTunnel, DUNGEON_REGISTRY } from "../registry/dungeon.js";
 
 suite("pathfinding - cross-dungeon linear chain (A->B->C->D->E)", () => {
 	test("should find a path from dungeon A to E via linear links", () => {

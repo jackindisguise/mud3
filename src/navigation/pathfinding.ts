@@ -1,5 +1,5 @@
-import { Room } from "./core/dungeon.js";
-import { DIRECTION, DIRECTIONS } from "./direction.js";
+import { Room } from "../core/dungeon.js";
+import { DIRECTION, DIRECTIONS } from "../utils/direction.js";
 
 export type PathCostFunction = (from: Room, to: Room, dir: DIRECTION) => number;
 
@@ -208,7 +208,7 @@ export function findPathDijkstra(
 
 // ---------- Cross-dungeon pathfinding ----------
 
-import { DUNGEON_REGISTRY, getRoomByRef } from "./registry/dungeon.js";
+import { DUNGEON_REGISTRY, getRoomByRef } from "../registry/dungeon.js";
 
 interface DungeonEdge {
 	toDungeonId: string;

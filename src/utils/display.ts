@@ -13,9 +13,9 @@ import { Mob } from "../core/dungeon.js";
 import { COLOR, color, SIZER } from "../core/color.js";
 import { LINEBREAK } from "../core/telnet.js";
 import { string } from "mud-ext";
-import { generateMinimap } from "../minimap.js";
-import { DIRECTION, dir2text } from "../direction.js";
-import { DIRECTIONS } from "../direction.js";
+import { generateMinimap } from "../navigation/minimap.js";
+import { DIRECTION, dir2text } from "./direction.js";
+import { DIRECTIONS } from "./direction.js";
 
 /**
  * Displays a room description to a player.

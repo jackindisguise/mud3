@@ -9,11 +9,10 @@ content: |-
 
     Strike your target by phasing through dimensions.
 
-    This ability allows you to phase through dimensions to strike your target,
-  dealing physical damage. The damage scales with your proficiency in this
-  ability.
+    This ability allows you to phase through dimensions to strike your target, dealing physical damage.
+
+    The damage scales with your proficiency in this ability.
 
     Cooldown: 5 seconds
 
     Usage: phase strike <target>
-

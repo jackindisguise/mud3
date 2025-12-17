@@ -9,11 +9,8 @@ content: |-
 
     Execute a powerful fishman karate technique.
 
-    This ability allows you to execute a powerful fishman karate technique
-  against your target, dealing physical damage. The damage scales with your
-  proficiency in this ability.
+    This ability allows you to execute a powerful fishman karate technique against your target, dealing physical damage. The damage scales with your proficiency in this ability.
 
     Cooldown: 4 seconds
 
     Usage: fishman karate <target>
-

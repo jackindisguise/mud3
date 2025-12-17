@@ -10,9 +10,9 @@ content: |-
     Launch a bolt of fire at your target.
 
     This ability launches a bolt of fire that deals burn damage to your target.
-  The damage scales with your proficiency in this ability.
+
+    The damage scales with your proficiency in this ability.
 
     Cooldown: 2 seconds
 
     Usage: firebolt <target>
-

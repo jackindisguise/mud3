@@ -13,8 +13,9 @@ topic:
   - channels
   - settings
   - preferences
-content: |-
+content: >-
   CHANNELS - Manage Channel Subscriptions
+
 
   Usage:
     channels                        - List all channels and their status
@@ -26,6 +27,7 @@ content: |-
   The channels command allows you to control which communication channels you
   are subscribed to. When you unsubscribe from a channel, you will no longer
   receive messages sent on that channel.
+
 
   Available Channels:
     OOC     - Out of Character      (Default: ON)

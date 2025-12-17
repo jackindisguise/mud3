@@ -10,11 +10,9 @@ content: |-
 
     Lunge at your target with blood-bound ferocity.
 
-    This ability allows you to lunge at your target, dealing physical damage.
-  When you successfully hit, you recover health equal to the damage dealt.
+    This ability allows you to lunge at your target, dealing physical damage. When you successfully hit, you recover health equal to the damage dealt.
 
     Cooldown: 4 seconds
 
     Usage: bloodbound lunge <target>
            bbl <target>
-

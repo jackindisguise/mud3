@@ -9,10 +9,10 @@ content: |-
 
     A burst of radiant energy that damages nearby enemies.
 
-    This ability creates a burst of radiant energy that damages all nearby
-  enemies in the room. The damage scales with your proficiency in this ability.
+    This ability creates a burst of radiant energy that damages all nearby enemies in the room.
+
+    The damage scales with your proficiency in this ability.
 
     Cooldown: 5 seconds
 
     Usage: radiant burst
-

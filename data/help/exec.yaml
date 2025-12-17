@@ -15,7 +15,7 @@ content: |-
 
   Usage:
     exec <code>
-    exec =<code>
+    exec :<code>
 
   The exec command allows administrators to execute arbitrary JavaScript code
   on the server. This is a powerful debugging and administration tool that
@@ -23,34 +23,94 @@ content: |-
 
   The command supports both synchronous and asynchronous code execution.
 
-  Return Value Prefix (=):
-    Starting your code with '=' ensures the return value is printed to you.
+  Return Value Prefix (:):
+    Starting your code with ':' ensures the return value is printed to you.
     This is useful for quickly inspecting values without writing sendMessage.
+    Example: exec :room.contents.length
+
+  Available Variables and Functions:
+
+  Character and Location:
+    user - The character executing the command (Character object)
+    mob  - The character's mob (Mob object)
+    room - The current room where the mob is located (Room object, may be undefined)
+
+  Game Functions (via game object):
+    game.forEachCharacter(callback)
+      Execute a function for each active playing character.
+      Example: game.forEachCharacter((char) => print(char.credentials.username))
+
+    game.broadcast(text, group?)
+      Broadcast a message to all active playing characters.
+      Example: game.broadcast("Server restart in 5 minutes!", MESSAGE_GROUP.SYSTEM)
+
+    game.announce(text)
+      Announce a message to all connected clients, regardless of login state.
+      Example: game.announce("Server is shutting down NOW!")
+
+    game.forEachSession(callback)
+      Execute a function for each login session.
+      Example: game.forEachSession((session) => print(session.state))
+
+    game.getGameStats()
+      Returns an object with game statistics:
+      { activeConnections: number, playersOnline: number }
+      Example: exec :game.getGameStats()
+
+  Object Creation:
+    createFromTemplate(templateId)
+      Create a dungeon object from a template and add it to your mob's inventory.
+      Returns the created DungeonObject or null if template not found.
+      Example: createFromTemplate("sword-basic")
+
+  Output Functions:
+    print(...args)
+      Print messages directly to the user (command response).
+      Example: print("Hello", "World", 123)
+
+    console.log(...args)
+      Log to server debug logs.
+      Example: console.log("Debug message")
+
+    console.error(...args)
+      Log error to server logs.
+      Example: console.error("Error occurred")
+
+    console.warn(...args)
+      Log warning to server logs.
+      Example: console.warn("Warning message")
+
+    console.info(...args)
+      Log info to server logs.
+      Example: console.info("Info message")
+
+  Utility Functions:
+    inspect(obj, options?)
+      Better object inspection than JSON.stringify.
+      Options: { depth?: number, colors?: boolean, compact?: boolean }
+      Example: inspect(room, { depth: 3 })
 
   Examples:
     exec console.log("Hello World")
-    exec =context.room.contents.length
-    exec context.actor.sendMessage("Test", MESSAGE_GROUP.SYSTEM)
-    exec =context.actor.mob.display
-    exec context.game.broadcast("Server announcement!")
-    exec =await someAsyncFunction()
-
-  Available Variables:
-    context - The command context containing:
-      - context.actor    - The mob executing the command
-      - context.room     - The current room (may be undefined)
+    exec :room.contents.length
+    exec print("Test message")
+    exec game.broadcast("Server announcement!")
+    exec :game.getGameStats()
+    exec game.forEachCharacter((char) => print(char.credentials.username))
+    exec :inspect(mob, { depth: 2 })
+    exec :await someAsyncFunction()
+    exec createFromTemplate("sword-basic")
 
   Return Values:
-    - When using '=', the return value will be displayed as JSON
-    - Without '=', return values are not automatically displayed
-    - If no value is returned (or without '='), you'll see "Code executed successfully"
+    - When using ':', the return value will be displayed using inspect()
+    - Without ':', return values are not automatically displayed
+    - If no value is returned (or without ':'), you'll see "Code executed successfully"
     - Errors are caught and displayed
     - Async functions are supported - use 'await' for promises
 
   Security:
     This command is RESTRICTED to admin users only. Regular players cannot
-    access this command. Admins are automatically granted to localhost
-    connections.
+    access this command.
 
   Warning:
     This command can modify game state, create/delete objects, and execute

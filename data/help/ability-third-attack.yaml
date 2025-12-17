@@ -1,6 +1,8 @@
 keyword: ability-third-attack
 aliases:
   - third attack
+related:
+  - ability-second-attack
 topic:
   - abilities
   - passive
@@ -15,4 +17,3 @@ content: |-
   your proficiency in this ability.
 
     This ability has no command and procs automatically during combat.
-

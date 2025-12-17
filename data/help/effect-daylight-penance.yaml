@@ -10,9 +10,6 @@ content: |-
 
     Dunpeal suffer from exposure to direct sunlight due to their vampiric nature.
 
-    This passive effect represents the dunpeal's vulnerability to sunlight, a
-  penalty for their vampiric nature. It increases incoming damage when exposed
-  to direct sunlight.
+    This passive effect represents the dunpeal's vulnerability to sunlight, a penalty for their vampiric nature. It increases incoming damage when exposed to direct sunlight.
 
     This effect is automatically applied to dunpeal and is always active.
-

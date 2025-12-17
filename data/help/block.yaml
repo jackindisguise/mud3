@@ -11,8 +11,9 @@ topic:
   - privacy
   - blocking
   - moderation
-content: |-
+content: >-
   BLOCK - Block Communication from Other Players
+
 
   Usage:
     block                   - List all blocked users
@@ -20,8 +21,8 @@ content: |-
     ignore <username>       - Same as block (alternative command)
 
   The block command (also known as "ignore") allows you to prevent specific
-  players from sending you messages on any channel. When you block someone,
-  they cannot communicate with you through:
+  players from sending you messages on any channel. When you block someone, they
+  cannot communicate with you through:
     - Whispers (private messages)
     - Say (room chat)
     - OOC (out of character)
@@ -29,6 +30,7 @@ content: |-
     - Any other communication channels
 
   To remove someone from your blocked list, use the "unblock" command.
+
 
   Examples:
     block

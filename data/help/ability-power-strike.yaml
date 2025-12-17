@@ -9,11 +9,10 @@ content: |-
 
     Deliver a powerful melee strike to your target.
 
-    This ability allows you to deliver a powerful melee strike that deals
-  increased physical damage. The damage scales with your proficiency in this
-  ability.
+    This ability allows you to deliver a powerful melee strike that deals increased physical damage.
+
+    The damage scales with your proficiency in this ability.
 
     Cooldown: 3 seconds
 
     Usage: power strike <target>
-

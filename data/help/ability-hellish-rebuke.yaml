@@ -10,9 +10,10 @@ content: |-
     Strike back at your attacker with hellish fury.
 
     This ability allows you to strike back at your attacker with hellish fury,
-  dealing damage. The damage scales with your proficiency in this ability.
+  dealing damage.
+
+    The damage scales with your proficiency in this ability.
 
     Cooldown: 6 seconds
 
     Usage: hellish rebuke <target>
-

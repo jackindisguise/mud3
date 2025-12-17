@@ -7,14 +7,10 @@ topic:
 content: |-
   SHIELD BASH ABILITY
 
-    Bash your target with your shield, dealing damage and potentially stunning
-  them.
+    Bash your target with your shield, dealing damage and potentially stunning them.
 
-    This ability allows you to bash your target with your shield, dealing
-  physical damage and potentially stunning them. The damage scales with your
-  proficiency in this ability.
+    This ability allows you to bash your target with your shield, dealing physical damage and potentially stunning them. The damage scales with your proficiency in this ability.
 
     Cooldown: 4 seconds
 
     Usage: shield bash <target>
-

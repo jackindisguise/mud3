@@ -211,7 +211,7 @@ suite("package/commands.ts", () => {
 
 		test("should load valid command file", async () => {
 			const testCommand = `
-export default {
+export const command = {
 	pattern: "testcmd <arg:word>",
 	aliases: ["tc"],
 	execute(context, args) {
@@ -235,13 +235,13 @@ export default {
 
 		test("should load multiple command files", async () => {
 			const command1 = `
-export default {
+export const command = {
 	pattern: "cmd1",
 	execute() {}
 };
 `;
 			const command2 = `
-export default {
+export const command = {
 	pattern: "cmd2",
 	execute() {}
 };
@@ -266,7 +266,7 @@ export default {
 
 		test("should handle command file with syntax error", async () => {
 			const badCommand = `
-export default {
+export const command = {
 	pattern: "bad",
 	execute() {
 		// Syntax error
@@ -287,7 +287,7 @@ export default {
 
 		test("should load command with only pattern and execute", async () => {
 			const minimalCommand = `
-export default {
+export const command = {
 	pattern: "minimal",
 	execute() {
 		// Minimal command
@@ -308,7 +308,7 @@ export default {
 
 		test("should register commands with aliases", async () => {
 			const aliasCommand = `
-export default {
+export const command = {
 	pattern: "longname",
 	aliases: ["ln", "long"],
 	execute() {}

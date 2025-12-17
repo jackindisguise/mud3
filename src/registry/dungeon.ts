@@ -19,7 +19,7 @@ import {
 	DungeonObject,
 	ResetOptions,
 } from "../core/dungeon.js";
-import { DIRECTION, dir2reverse, dir2text } from "../direction.js";
+import { DIRECTION, dir2reverse, dir2text } from "../utils/direction.js";
 import logger from "../utils/logger.js";
 
 export { READONLY_DUNGEON_REGISTRY as DUNGEON_REGISTRY };

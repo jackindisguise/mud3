@@ -2353,6 +2353,46 @@ header h1 {
 	color: var(--green);
 }
 
+/* Toggle Button */
+.toggle-btn {
+	padding: 0.5rem 1.5rem;
+	border-radius: 4px;
+	border: 2px solid var(--base01);
+	color: var(--base1);
+	font-size: 0.9rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s;
+	min-width: 80px;
+}
+
+.toggle-btn-disabled {
+	background: var(--base02);
+	border-color: var(--base01);
+	color: var(--base0);
+	opacity: 0.6;
+}
+
+.toggle-btn-disabled:hover {
+	background: var(--base01);
+	border-color: var(--base00);
+	opacity: 0.8;
+}
+
+.toggle-btn-enabled {
+	background: var(--accent-primary);
+	border-color: var(--accent-primary);
+	color: #ffffff;
+	box-shadow: var(--accent-glow);
+	opacity: 1;
+}
+
+.toggle-btn-enabled:hover {
+	background: var(--accent-secondary);
+	border-color: var(--accent-secondary);
+	box-shadow: var(--glow-brown);
+}
+
 .action-btn {
 	padding: 0.5rem 1rem;
 	border-radius: 4px;

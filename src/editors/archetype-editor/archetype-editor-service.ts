@@ -159,7 +159,9 @@ export class ArchetypeEditorService {
 		}
 	}
 
-	public async getAbilities(): Promise<Array<{ id: string; name: string }>> {
+	public async getAbilities(): Promise<{
+		abilities: Array<{ id: string; name: string }>;
+	}> {
 		try {
 			// Import dynamically to ensure we get the latest registry state
 			const { getAllAbilities } = await import("../../registry/ability.js");
@@ -170,27 +172,30 @@ export class ArchetypeEditorService {
 					"getAbilities: ability registry is empty. Make sure ability package has been loaded."
 				);
 			}
-			return abilities.map((ability) => ({
-				id: ability.id,
-				name: ability.name,
-			}));
+			return {
+				abilities: abilities.map((ability) => ({
+					id: ability.id,
+					name: ability.name,
+				})),
+			};
 		} catch (error) {
 			logger.error(`Failed to get abilities: ${error}`);
-			return [];
+			return { abilities: [] };
 		}
 	}
 
-	public getPassives(): Array<{ id: string; name: string }> {
+	public getPassives(): { passives: Array<{ id: string; name: string }> } {
 		try {
-			return getAllEffectTemplates()
+			const passives = getAllEffectTemplates()
 				.filter((effect) => effect.type === "passive")
 				.map((effect) => ({
 					id: effect.id,
 					name: effect.name,
 				}));
+			return { passives };
 		} catch (error) {
 			logger.error(`Failed to get passives: ${error}`);
-			return [];
+			return { passives: [] };
 		}
 	}
 }

@@ -335,8 +335,8 @@ class ArchetypeEditor {
 			document.getElementById("growth-per-level").value =
 				arch.growthModifier?.perLevel || 0.05;
 
-			// Abilities (formerly skills)
-			this.renderAbilities(arch.skills || []);
+			// Abilities
+			this.renderAbilities(arch.abilities || []);
 
 			// Passives
 			this.renderPassives(arch.passives || []);
@@ -394,10 +394,9 @@ class ArchetypeEditor {
 				perLevel:
 					parseFloat(document.getElementById("growth-per-level").value) || 0.05,
 			},
-			skills: this.getAbilitiesFromForm(),
+			abilities: this.getAbilitiesFromForm(),
 			passives: this.getPassivesFromForm(),
 		};
-
 
 		return jsyaml.dump({ archetype: arch });
 	}
@@ -792,7 +791,6 @@ class ArchetypeEditor {
 		const btn = document.getElementById("archetype-is-starter-btn");
 		return btn.dataset.enabled === "true";
 	}
-
 
 	async deleteCurrent() {
 		if (!this.currentId) return;

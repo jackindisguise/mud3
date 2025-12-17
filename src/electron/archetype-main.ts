@@ -177,8 +177,9 @@ function registerHandlers() {
 	);
 
 	// Abilities
-	ipcMain.handle("archetype-editor:get-abilities", async () =>
-		await service.getAbilities()
+	ipcMain.handle(
+		"archetype-editor:get-abilities",
+		async () => await service.getAbilities()
 	);
 
 	// Passives

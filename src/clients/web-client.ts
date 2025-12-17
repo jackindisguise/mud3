@@ -1,5 +1,5 @@
 /**
- * Web-based MUD client server
+ * Web-based MUD client.
  *
  * Provides a web interface for connecting to the MUD via WebSocket.
  * Serves an HTML client and bridges WebSocket connections to MudClient.
@@ -13,9 +13,9 @@ import { readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { EventEmitter } from "events";
-import logger from "./utils/logger.js";
-import { MudClient } from "./core/io.js";
-import { LINEBREAK } from "./core/telnet.js";
+import logger from "../utils/logger.js";
+import { MudClient } from "../core/io.js";
+import { LINEBREAK } from "../core/telnet.js";
 import {
 	stripColors,
 	COLOR_ESCAPE,
@@ -23,8 +23,8 @@ import {
 	COLOR_TAG,
 	TEXT_STYLE,
 	TEXT_STYLE_TAG,
-} from "./core/color.js";
-import { getSafeRootDirectory } from "./utils/path.js";
+} from "../core/color.js";
+import { getSafeRootDirectory } from "../utils/path.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

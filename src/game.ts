@@ -67,17 +67,17 @@ import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
 import { LINEBREAK } from "./core/telnet.js";
 import { searchHelpfiles } from "./registry/help.js";
-import { processCombatRound } from "./combat.js";
-import { WebClientServer } from "./web-client.js";
+import { processCombatRound } from "./systems/combat.js";
+import { WebClientServer } from "./clients/web-client.js";
 import {
 	processRegeneration,
 	REGENERATION_INTERVAL_MS,
-} from "./regeneration.js";
+} from "./systems/regeneration.js";
 import { getLocation, LOCATION } from "./registry/locations.js";
 import { EventEmitter } from "events";
 import { calendarEvents } from "./registry/calendar.js";
 import { cycleShopkeeperInventories } from "./registry/shopkeeper.js";
-import { processAITick } from "./mob-ai.js";
+import { processAITick } from "./systems/mob-ai.js";
 
 // Default intervals/timeouts (milliseconds)
 export const DEFAULT_GAME_TICK_INTERVAL_MS = 60 * 1000; // 1 minute

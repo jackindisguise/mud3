@@ -174,6 +174,11 @@ export function oneHit(options: OneHitOptions): number {
 		return 0;
 	}
 
+	// Shopkeepers cannot take damage
+	if (target.hasBehavior(BEHAVIOR.SHOPKEEPER)) {
+		return 0;
+	}
+
 	// Get the room where combat is occurring
 	const room = attacker.location;
 	if (!room || !(room instanceof Room)) {

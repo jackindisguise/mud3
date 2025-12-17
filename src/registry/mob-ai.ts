@@ -11,7 +11,7 @@ import { EventEmitter } from "events";
 import { runInNewContext } from "vm";
 import { Mob, BEHAVIOR, Room, MobTemplate } from "../core/dungeon.js";
 import { DIRECTION, DIRECTIONS } from "../utils/direction.js";
-import { initiateCombat, oneHit, OneHitOptions } from "../systems/combat.js";
+import { initiateCombat, oneHit, OneHitOptions } from "./combat.js";
 import logger from "../utils/logger.js";
 import { act } from "../utils/act.js";
 import { MESSAGE_GROUP } from "../core/character.js";

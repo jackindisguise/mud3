@@ -16,7 +16,7 @@ import { EQUIPMENT_SLOT, Mob, Weapon } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
 import { act, damageMessage } from "../utils/act.js";
-import { oneHit } from "../systems/combat.js";
+import { oneHit } from "../registry/combat.js";
 
 export const ABILITY_ID = "whirlwind";
 

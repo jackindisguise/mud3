@@ -79,7 +79,7 @@ import {
 	addToCombatQueue,
 	processThreatSwitching,
 	handleNPCLeavingCombat,
-} from "../systems/combat.js";
+} from "../registry/combat.js";
 import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import {
 	HitType,

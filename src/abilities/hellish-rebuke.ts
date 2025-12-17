@@ -13,7 +13,7 @@ import { Mob, Room } from "../core/dungeon.js";
 import { CommandObject } from "../package/commands.js";
 import { Ability } from "../core/ability.js";
 import { act } from "../utils/act.js";
-import { oneMagicHit } from "../systems/combat.js";
+import { oneMagicHit } from "../registry/combat.js";
 import { COMMON_HIT_TYPES } from "../core/damage-types.js";
 
 export const ABILITY_ID = "hellish-rebuke";

@@ -67,7 +67,7 @@ import { setAbsoluteInterval, clearCustomInterval } from "accurate-intervals";
 import { getStarterRaces, getStarterJobs } from "./registry/archetype.js";
 import { LINEBREAK } from "./core/telnet.js";
 import { searchHelpfiles } from "./registry/help.js";
-import { processCombatRound } from "./systems/combat.js";
+import { processCombatRound } from "./registry/combat.js";
 import { WebClientServer } from "./clients/web-client.js";
 import {
 	processRegeneration,

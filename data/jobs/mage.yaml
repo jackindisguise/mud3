@@ -22,6 +22,8 @@ archetype:
       level: 1
     - id: mana-shield
       level: 2
+    - id: colour-spray
+      level: 3
   passives:
     - arcane-pulse
   growthModifier:

@@ -12,6 +12,7 @@
 		"clean:orphans": "node scripts/clean-orphaned.js",
 		"clean:all": "npm run clean",
 		"postclean:all": "npm run clean:orphans",
+		"prebuild": "npm run clean:orphans",
 		"build": "npm run build:list-emitted",
 		"prebuild:clean": "npm run clean",
 		"build:clean": "npm run build",

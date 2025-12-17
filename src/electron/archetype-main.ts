@@ -62,9 +62,19 @@ function logElectronError(
 
 function getArchetypeEditorIndexPath(): string {
 	if (app.isPackaged) {
-		return path.join(app.getAppPath(), "archetype-editor", "index.html");
+		return path.join(
+			app.getAppPath(),
+			"editors",
+			"archetype-editor",
+			"index.html"
+		);
 	}
-	return path.join(getSafeRootDirectory(), "archetype-editor", "index.html");
+	return path.join(
+		getSafeRootDirectory(),
+		"editors",
+		"archetype-editor",
+		"index.html"
+	);
 }
 
 function createMainWindow(): BrowserWindow {
@@ -169,6 +179,11 @@ function registerHandlers() {
 	// Abilities
 	ipcMain.handle("archetype-editor:get-abilities", () =>
 		service.getAbilities()
+	);
+
+	// Passives
+	ipcMain.handle("archetype-editor:get-passives", () =>
+		service.getPassives()
 	);
 }
 

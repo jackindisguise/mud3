@@ -177,14 +177,12 @@ function registerHandlers() {
 	);
 
 	// Abilities
-	ipcMain.handle("archetype-editor:get-abilities", () =>
-		service.getAbilities()
+	ipcMain.handle("archetype-editor:get-abilities", async () =>
+		await service.getAbilities()
 	);
 
 	// Passives
-	ipcMain.handle("archetype-editor:get-passives", () =>
-		service.getPassives()
-	);
+	ipcMain.handle("archetype-editor:get-passives", () => service.getPassives());
 }
 
 app.whenReady().then(async () => {

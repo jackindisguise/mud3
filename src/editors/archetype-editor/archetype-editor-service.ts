@@ -12,7 +12,6 @@ import { join, extname, dirname } from "path";
 import YAML from "js-yaml";
 import logger from "../../utils/logger.js";
 import { getSafeRootDirectory } from "../../utils/path.js";
-import { getAllAbilities } from "../../registry/ability.js";
 import { getAllEffectTemplates } from "../../registry/effect.js";
 
 export interface ArchetypeListResponse {
@@ -160,8 +159,10 @@ export class ArchetypeEditorService {
 		}
 	}
 
-	public getAbilities(): Array<{ id: string; name: string }> {
+	public async getAbilities(): Promise<Array<{ id: string; name: string }>> {
 		try {
+			// Import dynamically to ensure we get the latest registry state
+			const { getAllAbilities } = await import("../../registry/ability.js");
 			const abilities = getAllAbilities();
 			logger.debug(`getAbilities: found ${abilities.length} abilities`);
 			if (abilities.length === 0) {

@@ -458,9 +458,11 @@ export function oneMagicHit(options: OneMagicHitOptions): number {
 	// Check if attack hits (accuracy vs avoidance)
 	// Skip miss check if guaranteedHit is true
 	if (!guaranteedHit) {
-		// Base hit chance is 50%, modified by the difference between accuracy and avoidance
-		// accuracy 10 vs avoidance 10 = 50% hit chance
-		const hitChance = 50 + (attacker.accuracy - target.avoidance);
+		// Base hit chance is 75% for magical attacks (higher than physical attacks),
+		// modified by the difference between accuracy and avoidance
+		// accuracy 10 vs avoidance 10 = 75% hit chance
+		// Spells are harder to avoid than physical attacks
+		const hitChance = 75 + (attacker.accuracy - target.avoidance);
 		// Clamp hit chance to reasonable bounds (5% to 95%)
 		const clampedHitChance = Math.max(5, Math.min(95, hitChance));
 		const roll = Math.random() * 100;

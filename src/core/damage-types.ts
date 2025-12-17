@@ -231,6 +231,15 @@ export const COMMON_HIT_TYPES: ReadonlyMap<string, HitType> = new Map([
 		},
 	],
 	[
+		"buffet",
+		{
+			verb: "buffet",
+			verbThirdPerson: "buffets",
+			damageType: ELEMENTAL_DAMAGE_TYPE.AIR,
+			color: COLOR.LIGHT_BLUE,
+		},
+	],
+	[
 		"melt",
 		{
 			verb: "melt",

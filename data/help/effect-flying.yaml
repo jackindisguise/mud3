@@ -1,0 +1,12 @@
+keyword: effect-flying
+aliases:
+  - flying
+topic:
+  - effects
+  - passive
+content: |-
+  FLYING EFFECT
+
+    You possess the ability to fly, allowing you to enter airborne rooms.
+
+    This passive effect represents the ability to fly. It grants access to rooms with the AIRBORNE flag, which require flying to enter.

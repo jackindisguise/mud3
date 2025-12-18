@@ -72,6 +72,7 @@ import { Race, Job, evaluateGrowthModifier } from "../core/archetype.js";
 import { Character, MESSAGE_GROUP } from "../core/character.js";
 import { act } from "../utils/act.js";
 import { forEachCharacter } from "../game.js";
+import { EFFECT_TEMPLATE_ID } from "../effects/flying.js";
 import {
 	removeFromCombatQueue,
 	handleDeath,
@@ -993,6 +994,7 @@ export interface RoomOptions extends DungeonObjectOptions {
 	coordinates: Coordinates;
 	allowedExits?: DIRECTION; // Bitmask of allowed exit directions (defaults to NSEW + diagonals if not provided)
 	dense?: boolean; // Whether this room is dense (solid/impassable)
+	flags?: ROOM_FLAGS[]; // Array of room flags
 }
 
 export interface ItemOptions extends DungeonObjectOptions {
@@ -1039,6 +1041,7 @@ export interface SerializedRoom extends SerializedDungeonObject {
 	coordinates: Coordinates;
 	allowedExits: DIRECTION; // Mandatory field - always present
 	dense?: boolean; // Whether this room is dense (solid/impassable)
+	flags?: string[]; // Array of room flag strings (serialized as strings for JSON compatibility)
 }
 
 /**
@@ -1047,29 +1050,6 @@ export interface SerializedRoom extends SerializedDungeonObject {
  */
 export interface SerializedMovable extends SerializedDungeonObject {
 	type: "Movable";
-}
-
-export interface SerializedMob extends SerializedDungeonObject {
-	type: "Mob";
-	level: number;
-	experience: number;
-	race: string;
-	job: string;
-	attributeBonuses?: Partial<PrimaryAttributeSet>;
-	resourceBonuses?: Partial<ResourceCapacities>;
-	health: number;
-	mana: number;
-	exhaustion: number;
-	equipped?: Record<
-		EQUIPMENT_SLOT,
-		SerializedEquipment | SerializedArmor | SerializedWeapon
-	>;
-	/** Behavior flags serialized as strings (enum values) */
-	behaviors?: Record<string, boolean>;
-	/** Learned abilities map (ability id -> number of uses) */
-	learnedAbilities?: Record<string, number>;
-	/** Active effects (excluding archetype passives) */
-	effects?: SerializedEffect[];
 }
 
 /**
@@ -1225,6 +1205,7 @@ export interface RoomTemplate extends DungeonObjectTemplate {
 	type: "Room";
 	allowedExits: DIRECTION; // Mandatory field - always present
 	dense?: boolean; // Whether this room is dense (solid/impassable)
+	flags?: ROOM_FLAGS[]; // Array of room flags
 	/**
 	 * Room links defined on this template.
 	 * Keys are direction names (e.g., "north", "up") and values are room references (e.g., "@tower{0,0,1}").
@@ -1322,10 +1303,7 @@ export interface WeaponTemplate extends EquipmentTemplate {
  *   race: "goblin",
  *   job: "warrior",
  *   level: 5,
- *   behaviors: {
- *     [BEHAVIOR.AGGRESSIVE]: true,
- *     [BEHAVIOR.WANDER]: true
- *   }
+ *   behaviors: [BEHAVIOR.AGGRESSIVE, BEHAVIOR.WANDER]
  * };
  * ```
  */
@@ -1340,7 +1318,7 @@ export interface MobTemplate extends DungeonObjectTemplate {
 	health?: number;
 	mana?: number;
 	exhaustion?: number;
-	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
+	behaviors?: BEHAVIOR[];
 	/** Optional AI script for mob behavior. Can be inline code or file path (prefix with "file:") */
 	aiScript?: string;
 	/** Shopkeeper inventory ID (local or globalized @dungeon-id<inventory-id>) */
@@ -2222,6 +2200,20 @@ export interface Coordinates {
 }
 
 /**
+ * Room flags that affect entry requirements or other behavior.
+ */
+export enum ROOM_FLAGS {
+	/** Airborne rooms require the "flying" passive effect to enter */
+	AIRBORNE = "airborne",
+	/** Underwater rooms require appropriate abilities/passives to enter */
+	UNDERWATER = "underwater",
+	/** Underground rooms are beneath the surface */
+	UNDERGROUND = "underground",
+	/** Indoor rooms are inside buildings or structures */
+	INDOORS = "indoors",
+}
+
+/**
  * Represents a single location within the dungeon.
  * Rooms are connected to adjacent rooms and can contain objects and characters.
  * Extends DungeonObject to inherit containment and identification features.
@@ -2285,6 +2277,11 @@ export class Room extends DungeonObject {
 	 * and cannot be looked into. Used for solid walls and barriers.
 	 */
 	dense: boolean;
+
+	/**
+	 * Array of room flags that can affect entry requirements or other behavior.
+	 */
+	flags: ROOM_FLAGS[];
 
 	/**
 	 * Returns a shallow copy of the room's coordinates.
@@ -2356,6 +2353,8 @@ export class Room extends DungeonObject {
 				DIRECTION.SOUTHWEST;
 		// Default dense to false
 		this.dense = options.dense ?? false;
+		// Default flags to empty array
+		this.flags = options.flags ? [...options.flags] : [];
 	}
 
 	/**
@@ -2454,6 +2453,19 @@ export class Room extends DungeonObject {
 	canEnter(movable: Movable, direction?: DIRECTION) {
 		// Dense rooms cannot be entered
 		if (this.dense) return false;
+
+		// Check for "airborne" flag - requires "flying" passive
+		if (this.flags.includes(ROOM_FLAGS.AIRBORNE)) {
+			if (movable instanceof Mob) {
+				if (!movable.hasEffect("flying")) {
+					return false;
+				}
+			} else {
+				// Non-mob objects cannot have flying passive
+				return false;
+			}
+		}
+
 		return true;
 	}
 
@@ -2650,6 +2662,9 @@ export class Room extends DungeonObject {
 			coordinates: this.coordinates,
 			allowedExits: this.allowedExits, // Mandatory field
 			...(this.dense && { dense: this.dense }), // Only include if true
+			...(this.flags.length > 0 && {
+				flags: this.flags.map((f) => f as string),
+			}), // Convert enum to strings
 		};
 		return result;
 	}
@@ -3853,10 +3868,7 @@ export class Weapon extends Equipment {
  * import { BEHAVIOR } from "./dungeon.js";
  *
  * const goblin = new Mob({
- *   behaviors: {
- *     [BEHAVIOR.AGGRESSIVE]: true,
- *     [BEHAVIOR.WANDER]: true
- *   }
+ *   behaviors: [BEHAVIOR.AGGRESSIVE, BEHAVIOR.WANDER]
  * });
  * ```
  */
@@ -3895,7 +3907,7 @@ export interface MobOptions extends DungeonObjectOptions {
 	mana?: number;
 	exhaustion?: number;
 	/** Behavior flags for NPCs (mobs without a character) */
-	behaviors?: Partial<Record<BEHAVIOR, boolean>>;
+	behaviors?: BEHAVIOR[];
 	/** Learned abilities map (Ability object -> number of uses) */
 	learnedAbilities?: Map<Ability, number>;
 	/** AI script for this mob */
@@ -3937,8 +3949,8 @@ export interface SerializedMob extends SerializedDungeonObject {
 		EQUIPMENT_SLOT,
 		SerializedEquipment | SerializedArmor | SerializedWeapon
 	>;
-	/** Behavior flags serialized as strings (enum values) */
-	behaviors?: Record<string, boolean>;
+	/** Behavior flags serialized as array of enabled behavior names */
+	behaviors?: BEHAVIOR[];
 	/** Learned abilities map (ability id -> number of uses) */
 	learnedAbilities?: Record<string, number>;
 	/** Active effects (excluding archetype passives) */
@@ -4009,7 +4021,7 @@ export class Mob extends Movable {
 	private _combatTarget?: Mob;
 	private _threatTable?: Map<Mob, ThreatEntry>;
 	private _threatExpirationTimer?: number;
-	private _behaviors: Map<BEHAVIOR, boolean>;
+	private _behaviors: BEHAVIOR[];
 	/** Shopkeeper inventory reference (resolved from shopkeeperInventoryId) */
 	private _shopkeeperInventory?: ShopkeeperInventory;
 	/** EventEmitter for AI events (only for NPCs) */
@@ -4067,14 +4079,17 @@ export class Mob extends Movable {
 		this.mana = options?.mana ?? this.maxMana;
 		this.exhaustion = options?.exhaustion ?? 0;
 
-		// Initialize behavior dictionary (only for NPCs)
-		this._behaviors = new Map<BEHAVIOR, boolean>();
+		// Initialize behavior array (only for NPCs)
+		this._behaviors = [];
 		if (options?.behaviors) {
 			for (const [key, value] of Object.entries(options.behaviors)) {
 				// Validate that the key is a valid BEHAVIOR enum value
-				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR)) {
-					// Use setBehavior to ensure cache is updated
-					this.setBehavior(key as BEHAVIOR, !!value);
+				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR) && value) {
+					// Only add if value is true
+					const behavior = key as BEHAVIOR;
+					if (!this._behaviors.includes(behavior)) {
+						this._behaviors.push(behavior);
+					}
 				}
 			}
 		}
@@ -4442,9 +4457,9 @@ export class Mob extends Movable {
 	/**
 	 * Gets the behavior flags for this mob.
 	 * Only NPCs (mobs without a character) have behavior flags.
-	 * Returns a readonly map of behavior enum to boolean value.
+	 * Returns a readonly array of enabled behaviors.
 	 *
-	 * @returns Readonly map of behavior flags
+	 * @returns Readonly array of behavior flags
 	 *
 	 * @example
 	 * ```typescript
@@ -4455,11 +4470,11 @@ export class Mob extends Movable {
 	 * mob.setBehavior(BEHAVIOR.WANDER, true);
 	 *
 	 * const behaviors = mob.behaviors;
-	 * console.log(behaviors.get(BEHAVIOR.AGGRESSIVE)); // true
-	 * console.log(behaviors.get(BEHAVIOR.WANDER)); // true
+	 * console.log(behaviors.includes(BEHAVIOR.AGGRESSIVE)); // true
+	 * console.log(behaviors.includes(BEHAVIOR.WANDER)); // true
 	 * ```
 	 */
-	public get behaviors(): ReadonlyMap<BEHAVIOR, boolean> {
+	public get behaviors(): readonly BEHAVIOR[] {
 		return this._behaviors;
 	}
 
@@ -4484,7 +4499,7 @@ export class Mob extends Movable {
 		if (this.character) {
 			return false; // Only NPCs have behaviors
 		}
-		return this._behaviors.get(behavior) ?? false;
+		return this._behaviors.includes(behavior);
 	}
 
 	/**
@@ -4510,9 +4525,14 @@ export class Mob extends Movable {
 			return; // Only NPCs can have behaviors
 		}
 		if (value) {
-			this._behaviors.set(behavior, true);
+			if (!this._behaviors.includes(behavior)) {
+				this._behaviors.push(behavior);
+			}
 		} else {
-			this._behaviors.delete(behavior);
+			const index = this._behaviors.indexOf(behavior);
+			if (index !== -1) {
+				this._behaviors.splice(index, 1);
+			}
 		}
 	}
 
@@ -6796,14 +6816,9 @@ export class Mob extends Movable {
 			mana: this._mana,
 			exhaustion: this._exhaustion,
 			...(equipped && Object.keys(equipped).length > 0 ? { equipped } : {}),
-			...(this._behaviors.size > 0
+			...(this._behaviors.length > 0
 				? {
-						behaviors: Object.fromEntries(
-							Array.from(this._behaviors.entries()).map(([key, value]) => [
-								key as string,
-								value,
-							])
-						) as Record<string, boolean>,
+						behaviors: [...this._behaviors],
 				  }
 				: {}),
 			...(this._learnedAbilities.size > 0

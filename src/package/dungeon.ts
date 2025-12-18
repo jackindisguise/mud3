@@ -81,6 +81,7 @@ import {
 	Weapon,
 	WeaponOptions,
 	RoomOptions,
+	ROOM_FLAGS,
 	Movable,
 	AnySerializedDungeonObject,
 	SerializedDungeonObject,
@@ -186,6 +187,8 @@ export interface SerializedDungeonFormat {
 			coordinates: { x: number; y: number; z: number };
 			allowedExits?: number;
 			roomLinks?: Record<DirectionText, string>;
+			mapText?: string;
+			mapColor?: string;
 		}>;
 		shopkeeperInventories?: SerializedShopkeeperInventory[];
 	};
@@ -666,6 +669,8 @@ function roomTemplateToOptions(
 	return {
 		...dungeonObjectTemplateToOptions(template, -1),
 		dense: template.dense,
+		allowedExits: template.allowedExits,
+		flags: template.flags,
 		coordinates,
 	};
 }
@@ -962,6 +967,19 @@ export async function loadDungeon(id: string): Promise<Dungeon | undefined> {
 							if (override.roomLinks) {
 								// Store roomLinks to process after room is added to dungeon
 								exitOverrideRoomLinks = override.roomLinks;
+							}
+							if (override.mapText !== undefined) {
+								room.mapText = override.mapText;
+							}
+							if (override.mapColor !== undefined) {
+								// Convert color name string to COLOR enum
+								const colorEnum =
+									COLOR_NAME_TO_COLOR[
+										override.mapColor as keyof typeof COLOR_NAME_TO_COLOR
+									];
+								if (colorEnum !== undefined) {
+									room.mapColor = colorEnum;
+								}
 							}
 						}
 					}
@@ -2235,12 +2253,19 @@ function hydrateSerializedRoomData(data: SerializedRoom): RoomOptions {
 		DIRECTION.NORTHWEST |
 		DIRECTION.SOUTHEAST |
 		DIRECTION.SOUTHWEST;
+	// Convert flag strings back to enum values
+	const flags = data.flags
+		? (data.flags.filter((f): f is ROOM_FLAGS =>
+				Object.values(ROOM_FLAGS).includes(f as ROOM_FLAGS)
+		  ) as ROOM_FLAGS[])
+		: undefined;
 	// coordinates is required, so we can safely cast back to RoomOptions
 	return pruneUndefined({
 		...base,
 		coordinates: data.coordinates,
 		allowedExits: data.allowedExits ?? defaultExits,
 		dense: data.dense,
+		flags,
 	}) as RoomOptions;
 }
 
@@ -2318,19 +2343,29 @@ function hydrateSerializedWeaponData(data: SerializedWeapon): WeaponOptions {
 }
 
 /**
- * Filters and converts serialized behaviors to valid BEHAVIOR enum keys.
- * Removes any invalid behavior keys and ensures values are boolean.
+ * Filters and converts serialized behaviors to valid BEHAVIOR enum values.
+ * Handles both array format (new) and object format (legacy) for backward compatibility.
+ * Returns an array of valid BEHAVIOR enum values.
  */
 function filterBehaviors(
-	behaviors: Record<string, boolean> | undefined
-): Partial<Record<BEHAVIOR, boolean>> | undefined {
-	return behaviors
-		? Object.fromEntries(
-				Object.entries(behaviors)
-					.filter(([key]) => Object.values(BEHAVIOR).includes(key as BEHAVIOR))
-					.map(([key, value]) => [key as BEHAVIOR, !!value])
-		  )
-		: undefined;
+	behaviors: string[] | BEHAVIOR[] | Record<string, boolean> | undefined
+): BEHAVIOR[] {
+	if (!behaviors) return [];
+
+	// Handle array format (new format)
+	if (Array.isArray(behaviors)) {
+		return behaviors.filter((b): b is BEHAVIOR =>
+			Object.values(BEHAVIOR).includes(b as BEHAVIOR)
+		) as BEHAVIOR[];
+	}
+
+	// Handle object format (legacy format for backward compatibility)
+	return Object.entries(behaviors)
+		.filter(
+			([key, value]) =>
+				Object.values(BEHAVIOR).includes(key as BEHAVIOR) && value
+		)
+		.map(([key]) => key as BEHAVIOR);
 }
 
 /**
@@ -2439,11 +2474,18 @@ function hydrateRoomTemplateData(
 		DIRECTION.NORTHWEST |
 		DIRECTION.SOUTHEAST |
 		DIRECTION.SOUTHWEST;
+	// Convert flag strings back to enum values
+	const flags = data.flags
+		? (data.flags.filter((f): f is ROOM_FLAGS =>
+				Object.values(ROOM_FLAGS).includes(f as ROOM_FLAGS)
+		  ) as ROOM_FLAGS[])
+		: undefined;
 	return pruneUndefined({
 		...base,
 		type: "Room",
 		allowedExits: data.allowedExits ?? defaultExits,
 		dense: data.dense,
+		flags,
 		// roomLinks is preserved from the original template data if present
 		roomLinks: (
 			data as SerializedRoom & { roomLinks?: Record<DirectionText, string> }

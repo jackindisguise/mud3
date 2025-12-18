@@ -32,6 +32,7 @@ import {
 import { createFromTemplateWithOid } from "../package/dungeon.js";
 import { DungeonObject } from "../core/dungeon.js";
 import { resolveTemplateById } from "../registry/dungeon.js";
+import { DIRECTION } from "../utils/direction.js";
 
 // allows each user to have their own persistant.
 const persistance = new Map<Character, Record<string, any>>();
@@ -58,6 +59,7 @@ function getPersistance(character: Character): Record<string, any> {
 				character.mob?.add(object);
 				return object;
 			},
+			DIRECTION,
 
 			// printing messages directly to user
 			print: (...args: any[]) =>

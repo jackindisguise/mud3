@@ -88,7 +88,23 @@
 								"description": "Single character or symbol displayed on the minimap for this room."
 							},
 							"mapColor": {
-								"type": "integer",
+								"type": "string",
+								"enum": [
+									"maroon",
+									"dark green",
+									"olive",
+									"dark blue",
+									"purple",
+									"teal",
+									"silver",
+									"grey",
+									"crimson",
+									"lime",
+									"yellow",
+									"light blue",
+									"cyan",
+									"white"
+								],
 								"description": "Color code used when rendering this room on the minimap."
 							},
 							"allowedExits": {
@@ -98,6 +114,14 @@
 							"dense": {
 								"type": "boolean",
 								"description": "If true, this room blocks line of sight and movement through it."
+							},
+							"flags": {
+								"type": "array",
+								"description": "Array of room flags that affect entry requirements or behavior. Valid values: 'airborne', 'underwater', 'underground', 'indoors'.",
+								"items": {
+									"type": "string",
+									"enum": ["airborne", "underwater", "underground", "indoors"]
+								}
 							},
 							"roomLinks": {
 								"type": "object",
@@ -151,8 +175,23 @@
 								"description": "Single character or symbol displayed on the minimap for this entity."
 							},
 							"mapColor": {
-								"type": "integer",
-								"description": "Color code used when rendering this entity on the minimap."
+								"type": "string",
+								"enum": [
+									"maroon",
+									"dark green",
+									"olive",
+									"dark blue",
+									"purple",
+									"teal",
+									"silver",
+									"grey",
+									"crimson",
+									"lime",
+									"yellow",
+									"light blue",
+									"cyan",
+									"white"
+								]
 							},
 							"slot": {
 								"type": "string",
@@ -184,9 +223,12 @@
 								"description": "Level of the mob spawned from this template (must be at least 0)."
 							},
 							"behaviors": {
-								"type": "object",
-								"description": "Map of behavior flags to their enabled state (for mobs).",
-								"additionalProperties": { "type": "boolean" }
+								"type": "array",
+								"description": "Array of enabled behavior flag names (for mobs). Valid values: 'aggressive', 'wimpy', 'wander', 'shopkeeper'.",
+								"items": {
+									"type": "string",
+									"enum": ["aggressive", "wimpy", "wander", "shopkeeper"]
+								}
 							},
 							"attributeBonuses": {
 								"type": "object",
@@ -290,6 +332,30 @@
 									}
 								},
 								"additionalProperties": false
+							},
+							"mapText": {
+								"type": "string",
+								"description": "Override for the character displayed on the minimap for this room."
+							},
+							"mapColor": {
+								"type": "string",
+								"enum": [
+									"maroon",
+									"dark green",
+									"olive",
+									"dark blue",
+									"purple",
+									"teal",
+									"silver",
+									"grey",
+									"crimson",
+									"lime",
+									"yellow",
+									"light blue",
+									"cyan",
+									"white"
+								],
+								"description": "Override for the color displayed on the minimap for this room (color name string, e.g., 'red', 'blue')."
 							}
 						},
 						"additionalProperties": false,

@@ -22,8 +22,7 @@ archetype:
       level: 1
   passives:
     - spirit-communion
+    - flying
   growthModifier:
     base: 1.06
     perLevel: 0.05
-
-

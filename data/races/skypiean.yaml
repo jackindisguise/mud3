@@ -22,8 +22,7 @@ archetype:
       level: 1
   passives:
     - cloud-glider
+    - flying
   growthModifier:
     base: 1.05
     perLevel: 0.04
-
-

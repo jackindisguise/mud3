@@ -22,6 +22,7 @@ archetype:
       level: 1
   passives:
     - shadow-flutter
+    - flying
   growthModifier:
     base: 1.03
     perLevel: 0.04

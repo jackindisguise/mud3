@@ -22,6 +22,7 @@ archetype:
       level: 1
   passives:
     - draconic-resilience
+    - flying
   growthModifier:
     base: 1.04
     perLevel: 0.04

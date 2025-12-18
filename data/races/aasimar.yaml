@@ -22,6 +22,7 @@ archetype:
       level: 1
   passives:
     - celestial-resistance
+    - flying
   growthModifier:
     base: 1.05
     perLevel: 0.04

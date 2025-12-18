@@ -376,9 +376,7 @@ suite("threat.ts", () => {
 	suite("Aggressive Behavior Threat Generation", () => {
 		test.skip("should generate some threat when character enters room with aggressive mob", () => {
 			const npc3 = createMob({
-				behaviors: {
-					[BEHAVIOR.AGGRESSIVE]: true,
-				},
+				behaviors: [BEHAVIOR.AGGRESSIVE],
 				race: testRace,
 				job: testJob,
 			});

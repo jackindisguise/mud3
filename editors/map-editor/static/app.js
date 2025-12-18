@@ -305,6 +305,12 @@ class MapEditor {
 			if (value.roomLinks !== undefined) {
 				override.roomLinks = value.roomLinks;
 			}
+			if (value.mapText !== undefined) {
+				override.mapText = value.mapText;
+			}
+			if (value.mapColor !== undefined) {
+				override.mapColor = value.mapColor;
+			}
 		}
 
 		if (existingIndex >= 0) {
@@ -821,11 +827,22 @@ class MapEditor {
 		// Get resets for this room
 		const resets = dungeon.resets?.filter((r) => r.roomRef === roomRef) || [];
 
-		// Priority: mob > object > room
+		// Priority: exit override > mob > object > room
 		let mapText = null;
 		let mapColor = null;
 
-		// Check for mobs first
+		// Check for exit override first (highest priority for map display)
+		const exitOverride = this.getExitOverride(dungeon, x, y, z);
+		if (exitOverride) {
+			if (exitOverride.mapText !== undefined) {
+				mapText = exitOverride.mapText || null;
+			}
+			if (exitOverride.mapColor !== undefined) {
+				mapColor = mapColorToInteger(exitOverride.mapColor);
+			}
+		}
+
+		// Check for mobs (only if exit override didn't specify the value)
 		for (const reset of resets) {
 			const template = dungeon.templates?.find(
 				(t) => t.id === reset.templateId
@@ -837,32 +854,44 @@ class MapEditor {
 			}
 		}
 
-		// Check for objects
+		// Check for objects (only if exit override didn't specify the value)
 		for (const reset of resets) {
 			const template = dungeon.templates?.find(
 				(t) => t.id === reset.templateId
 			);
 			if (template && template.type !== "Mob") {
-				if (template.mapText !== undefined) mapText = template.mapText;
-				const templateMapColor = mapColorToInteger(template.mapColor);
-				if (templateMapColor !== undefined) mapColor = templateMapColor;
+				if (mapText === null && template.mapText !== undefined) {
+					mapText = template.mapText;
+				}
+				if (mapColor === null) {
+					const templateMapColor = mapColorToInteger(template.mapColor);
+					if (templateMapColor !== undefined) {
+						mapColor = templateMapColor;
+					}
+				}
 				if (mapText !== null || mapColor !== null) {
 					return { mapText, mapColor };
 				}
 			}
 		}
 
-		// Use room defaults
-		const layerIndex = dungeon.dimensions.layers - 1 - z;
-		const layer = dungeon.grid[layerIndex] || [];
-		const row = layer[y] || [];
-		const roomIndex = row[x] || 0;
+		// Use room defaults (only if not already set by exit override)
+		if (mapText === null || mapColor === null) {
+			const layerIndex = dungeon.dimensions.layers - 1 - z;
+			const layer = dungeon.grid[layerIndex] || [];
+			const row = layer[y] || [];
+			const roomIndex = row[x] || 0;
 
-		if (roomIndex > 0) {
-			const room = dungeon.rooms[roomIndex - 1];
-			if (room) {
-				mapText = room.mapText !== undefined ? room.mapText : ".";
-				mapColor = mapColorToInteger(room.mapColor) ?? null;
+			if (roomIndex > 0) {
+				const room = dungeon.rooms[roomIndex - 1];
+				if (room) {
+					if (mapText === null) {
+						mapText = room.mapText !== undefined ? room.mapText : null;
+					}
+					if (mapColor === null) {
+						mapColor = mapColorToInteger(room.mapColor) ?? null;
+					}
+				}
 			}
 		}
 
@@ -3536,6 +3565,28 @@ class MapEditor {
 			currentRoomLinks = currentOverride.roomLinks || {};
 		}
 
+		// Get current mapText and mapColor (from override if exists, otherwise from room template)
+		const templateMapText = roomAtCell
+			? roomAtCell.mapText || ""
+			: room.mapText || "";
+		const templateMapColor = roomAtCell
+			? roomAtCell.mapColor !== undefined
+				? COLOR_ID_TO_NAME[roomAtCell.mapColor]
+				: undefined
+			: room.mapColor !== undefined
+			? COLOR_ID_TO_NAME[room.mapColor]
+			: undefined;
+		let currentMapText = templateMapText;
+		let currentMapColor = templateMapColor;
+		if (currentOverride) {
+			if (currentOverride.mapText !== undefined) {
+				currentMapText = currentOverride.mapText || "";
+			}
+			if (currentOverride.mapColor !== undefined) {
+				currentMapColor = currentOverride.mapColor || undefined;
+			}
+		}
+
 		// Initialize exitOverrides if it doesn't exist
 		if (!dungeon.exitOverrides) {
 			dungeon.exitOverrides = [];
@@ -3632,12 +3683,39 @@ class MapEditor {
 			</div>
 		`;
 
+		const mapDisplaySectionHtml = `
+			<div class="form-group" style="margin-top: 1.5rem;">
+				<label>Map Display Override (optional)</label>
+				<p style="font-size: 0.85rem; color: #aaa; margin-bottom: 0.75rem;">
+					Override how this room appears on the minimap. Template default: ${
+						templateMapText || "(none)"
+					} ${templateMapColor ? `(${templateMapColor})` : "(no color)"}
+				</p>
+				<div class="form-group">
+					<label>Map Text (1 letter)</label>
+					<input type="text" id="exit-override-map-text" value="${
+						currentMapText || ""
+					}" placeholder="${
+			templateMapText || ""
+		}" maxlength="1" style="width: 80px;">
+				</div>
+				<div class="form-group">
+					<label>Map Color</label>
+					${this.generateColorSelector(
+						"exit-override-map-color",
+						mapColorToInteger(currentMapColor)
+					)}
+				</div>
+			</div>
+		`;
+
 		body.innerHTML = `
 			<div class="form-group">
 				<label>Override exits for this specific room cell</label>
 				${exitButtonsHtml}
 			</div>
 			${roomLinksSectionHtml}
+			${mapDisplaySectionHtml}
 		`;
 
 		// Hide the default modal actions and use our custom ones
@@ -3937,6 +4015,8 @@ class MapEditor {
 					? {
 							allowedExits: oldOverride.allowedExits,
 							roomLinks: oldOverride.roomLinks,
+							mapText: oldOverride.mapText,
+							mapColor: oldOverride.mapColor,
 					  }
 					: null;
 
@@ -3973,16 +4053,42 @@ class MapEditor {
 					}
 				});
 
-				// Store the override - use object if roomLinks exist, otherwise use number
-				const overrideValue =
-					Object.keys(roomLinks).length > 0
-						? {
-								allowedExits: currentAllowedExitsValue,
-								roomLinks: roomLinks,
-						  }
-						: currentAllowedExitsValue;
+				// Get mapText and mapColor from form
+				const mapTextInput = document.getElementById("exit-override-map-text");
+				const mapColorSelect = document.getElementById(
+					"exit-override-map-color"
+				);
+				const mapTextValue = mapTextInput ? mapTextInput.value.trim() : "";
+				const mapColorInt =
+					mapColorSelect && mapColorSelect.value
+						? parseInt(mapColorSelect.value)
+						: undefined;
+				const mapColorValue = mapColorToString(mapColorInt);
 
-				this.setExitOverride(dungeon, x, y, z, overrideValue);
+				// Build override value - always use object format to support all properties
+				const overrideValue = {};
+				if (currentAllowedExitsValue !== templateAllowedExits) {
+					overrideValue.allowedExits = currentAllowedExitsValue;
+				}
+				if (Object.keys(roomLinks).length > 0) {
+					overrideValue.roomLinks = roomLinks;
+				}
+				// Include mapText if it differs from template (including empty string to clear it)
+				if (mapTextValue !== templateMapText) {
+					overrideValue.mapText = mapTextValue || undefined;
+				}
+				// Include mapColor if it differs from template
+				if (mapColorValue !== templateMapColor) {
+					overrideValue.mapColor = mapColorValue || undefined;
+				}
+
+				// Only set override if there's something to override
+				if (Object.keys(overrideValue).length > 0) {
+					this.setExitOverride(dungeon, x, y, z, overrideValue);
+				} else {
+					// Clear override if nothing is set
+					this.deleteExitOverride(dungeon, x, y, z);
+				}
 
 				// Re-render map to show updated exits
 				this.renderMap(dungeon);
@@ -4174,6 +4280,27 @@ class MapEditor {
 				denseBtn.dataset.dense = "false";
 			}
 		}
+
+		// Copy flags
+		const flagButtons = [
+			{ id: "template-flag-airborne-btn", flag: "airborne" },
+			{ id: "template-flag-underwater-btn", flag: "underwater" },
+			{ id: "template-flag-underground-btn", flag: "underground" },
+			{ id: "template-flag-indoors-btn", flag: "indoors" },
+		];
+		flagButtons.forEach(({ id, flag }) => {
+			const btn = document.getElementById(id);
+			if (btn) {
+				const hasFlag = sourceRoom.flags && sourceRoom.flags.includes(flag);
+				if (hasFlag) {
+					btn.classList.remove("disabled");
+					btn.classList.add("enabled");
+				} else {
+					btn.classList.remove("enabled");
+					btn.classList.add("disabled");
+				}
+			}
+		});
 
 		// Copy allowedExits
 		const DEFAULT_ALLOWED_EXITS =
@@ -4414,6 +4541,33 @@ class MapEditor {
 					</div>
 				</div>
 				<div class="form-group">
+					<label>Room Flags</label>
+					<div class="exits-container">
+						<div class="exits-buttons">
+							<button type="button" class="exit-btn ${
+								template.flags && template.flags.includes("airborne")
+									? "enabled"
+									: "disabled"
+							}" id="template-flag-airborne-btn" data-flag="airborne">AIRBORNE</button>
+							<button type="button" class="exit-btn ${
+								template.flags && template.flags.includes("underwater")
+									? "enabled"
+									: "disabled"
+							}" id="template-flag-underwater-btn" data-flag="underwater">UNDERWATER</button>
+							<button type="button" class="exit-btn ${
+								template.flags && template.flags.includes("underground")
+									? "enabled"
+									: "disabled"
+							}" id="template-flag-underground-btn" data-flag="underground">UNDERGROUND</button>
+							<button type="button" class="exit-btn ${
+								template.flags && template.flags.includes("indoors")
+									? "enabled"
+									: "disabled"
+							}" id="template-flag-indoors-btn" data-flag="indoors">INDOORS</button>
+						</div>
+					</div>
+				</div>
+				<div class="form-group">
 					<label>Allowed Exits</label>
 					<div class="exits-container">
 						<div class="exits-buttons">
@@ -4559,22 +4713,52 @@ class MapEditor {
 					<div class="exits-container">
 						<div class="exits-buttons">
 							<button type="button" class="exit-btn behavior-btn ${
-								template.behaviors?.aggressive ? "enabled" : "disabled"
+								(
+									Array.isArray(template.behaviors)
+										? template.behaviors.includes("aggressive")
+										: template.behaviors?.aggressive
+								)
+									? "enabled"
+									: "disabled"
 							}" data-behavior="aggressive" title="Mob will attack character mobs">AGGRESSIVE</button>
 							<button type="button" class="exit-btn behavior-btn ${
-								template.behaviors?.wimpy ? "enabled" : "disabled"
+								(
+									Array.isArray(template.behaviors)
+										? template.behaviors.includes("wimpy")
+										: template.behaviors?.wimpy
+								)
+									? "enabled"
+									: "disabled"
 							}" data-behavior="wimpy" title="Mob will flee when health reaches 25%">WIMPY</button>
 							<button type="button" class="exit-btn behavior-btn ${
-								template.behaviors?.wander ? "enabled" : "disabled"
+								(
+									Array.isArray(template.behaviors)
+										? template.behaviors.includes("wander")
+										: template.behaviors?.wander
+								)
+									? "enabled"
+									: "disabled"
 							}" data-behavior="wander" title="Mob will randomly move around every 30 seconds">WANDER</button>
 							<button type="button" class="exit-btn behavior-btn ${
-								template.behaviors?.shopkeeper ? "enabled" : "disabled"
+								(
+									Array.isArray(template.behaviors)
+										? template.behaviors.includes("shopkeeper")
+										: template.behaviors?.shopkeeper
+								)
+									? "enabled"
+									: "disabled"
 							}" data-behavior="shopkeeper" title="Mob is a shopkeeper and can buy/sell items">SHOPKEEPER</button>
 						</div>
 					</div>
 				</div>
 				<div class="form-group" id="shopkeeper-inventory-group" style="display: ${
-					template.behaviors?.shopkeeper ? "block" : "none"
+					(
+						Array.isArray(template.behaviors)
+							? template.behaviors.includes("shopkeeper")
+							: template.behaviors?.shopkeeper
+					)
+						? "block"
+						: "none"
 				};">
 					<label>Shopkeeper Inventory</label>
 					<select id="template-shopkeeper-inventory">
@@ -4899,6 +5083,30 @@ class MapEditor {
 				};
 			}
 
+			// Room flags button handlers
+			const flagButtons = [
+				"template-flag-airborne-btn",
+				"template-flag-underwater-btn",
+				"template-flag-underground-btn",
+				"template-flag-indoors-btn",
+			];
+			flagButtons.forEach((btnId) => {
+				const btn = document.getElementById(btnId);
+				if (btn) {
+					btn.onclick = () => {
+						const isEnabled = btn.classList.contains("enabled");
+						const flag = btn.dataset.flag;
+						if (isEnabled) {
+							btn.classList.remove("enabled");
+							btn.classList.add("disabled");
+						} else {
+							btn.classList.remove("disabled");
+							btn.classList.add("enabled");
+						}
+					};
+				}
+			});
+
 			// Direction change handlers - update other dropdowns when a direction changes
 			document.querySelectorAll(".room-link-direction").forEach((select) => {
 				select.onchange = () => {
@@ -5131,6 +5339,21 @@ class MapEditor {
 			const denseBtn = document.getElementById("template-dense-btn");
 			const dense = denseBtn ? denseBtn.classList.contains("enabled") : false;
 
+			// Get room flags from button states
+			const flags = [];
+			const flagButtons = [
+				{ id: "template-flag-airborne-btn", flag: "airborne" },
+				{ id: "template-flag-underwater-btn", flag: "underwater" },
+				{ id: "template-flag-underground-btn", flag: "underground" },
+				{ id: "template-flag-indoors-btn", flag: "indoors" },
+			];
+			flagButtons.forEach(({ id, flag }) => {
+				const btn = document.getElementById(id);
+				if (btn && btn.classList.contains("enabled")) {
+					flags.push(flag);
+				}
+			});
+
 			// Get allowedExits bitmap from modal data attribute
 			const modal = document.getElementById("template-modal");
 			let allowedExits = modal.dataset.allowedExits;
@@ -5213,6 +5436,12 @@ class MapEditor {
 				} else if (updated.dense !== undefined) {
 					delete updated.dense;
 				}
+				// Set flags (only include if non-empty)
+				if (flags.length > 0) {
+					updated.flags = flags;
+				} else if (updated.flags !== undefined) {
+					delete updated.flags;
+				}
 				if (Object.keys(roomLinks).length > 0) {
 					updated.roomLinks = roomLinks;
 				} else if (updated.roomLinks) {
@@ -5243,6 +5472,10 @@ class MapEditor {
 				// Set dense property (only include if true)
 				if (dense) {
 					newRoom.dense = true;
+				}
+				// Set flags (only include if non-empty)
+				if (flags.length > 0) {
+					newRoom.flags = flags;
 				}
 				if (Object.keys(roomLinks).length > 0) {
 					newRoom.roomLinks = roomLinks;
@@ -5317,19 +5550,23 @@ class MapEditor {
 					}
 				}
 
-				// Collect behaviors - always set behaviors object to ensure disabled behaviors are cleared
-				const behaviors = {};
+				// Collect behaviors as array of enabled behavior names
+				const behaviors = [];
 				document.querySelectorAll(".behavior-btn").forEach((btn) => {
 					const behavior = btn.dataset.behavior;
 					if (btn.classList.contains("enabled")) {
-						behaviors[behavior] = true;
+						behaviors.push(behavior);
 					}
 				});
-				// Always set behaviors, even if empty, so disabled behaviors are properly cleared
-				newTemplate.behaviors = behaviors;
+				// Only set behaviors if non-empty
+				if (behaviors.length > 0) {
+					newTemplate.behaviors = behaviors;
+				} else {
+					delete newTemplate.behaviors;
+				}
 
 				// Collect shopkeeper inventory ID if shopkeeper behavior is enabled
-				if (behaviors.shopkeeper) {
+				if (behaviors.includes("shopkeeper")) {
 					const shopkeeperInventorySelect = document.getElementById(
 						"template-shopkeeper-inventory"
 					);
@@ -5607,7 +5844,12 @@ class MapEditor {
 					delete updated.resourceBonuses;
 				}
 				// Remove behaviors if empty
-				if (updated.behaviors && Object.keys(updated.behaviors).length === 0) {
+				if (
+					updated.behaviors &&
+					(Array.isArray(updated.behaviors)
+						? updated.behaviors.length === 0
+						: Object.keys(updated.behaviors).length === 0)
+				) {
 					delete updated.behaviors;
 				}
 				// Remove roomDescription if empty
@@ -5617,11 +5859,13 @@ class MapEditor {
 				if (mapColor === undefined) delete updated.mapColor;
 				dungeon.templates[existing] = updated;
 			} else {
-				// For new templates, remove behaviors if empty to avoid including empty object in YAML
+				// For new templates, remove behaviors if empty to avoid including empty array in YAML
 				if (
 					templateType === "Mob" &&
 					newTemplate.behaviors &&
-					Object.keys(newTemplate.behaviors).length === 0
+					(Array.isArray(newTemplate.behaviors)
+						? newTemplate.behaviors.length === 0
+						: Object.keys(newTemplate.behaviors).length === 0)
 				) {
 					delete newTemplate.behaviors;
 				}

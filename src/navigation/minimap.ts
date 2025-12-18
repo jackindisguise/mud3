@@ -162,7 +162,7 @@ export function generateMinimap(
 						} else {
 							// Replace mapText with ^ for up exits or V for down exits
 							// If both exist, default to ^
-							const hasUp =
+							/*const hasUp =
 								targetRoom.canExit(mob, DIRECTION.UP) &&
 								targetRoom.getStep(DIRECTION.UP);
 							const hasDown =
@@ -174,7 +174,7 @@ export function generateMinimap(
 							} else if (hasDown) {
 								mapText = "V";
 								mapColor = COLOR.WHITE;
-							}
+							}*/
 						}
 					}
 				} else {

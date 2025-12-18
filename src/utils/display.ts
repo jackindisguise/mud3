@@ -104,7 +104,7 @@ export function showRoom(mob: Mob, room: Room, minimapSize: number = 5): void {
 	// Available exits - appears after minimap/room info block
 	const exits: DIRECTION[] = [];
 	for (const dir of DIRECTIONS) {
-		if (room.canExit(mob, dir) && room.getStep(dir)) {
+		if (room.canExit(mob, dir) && room.getStep(dir) && mob.canStep(dir)) {
 			exits.push(dir);
 		}
 	}

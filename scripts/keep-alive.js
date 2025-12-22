@@ -9,7 +9,7 @@ import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import path from "path";
 import { existsSync } from "node:fs";
-import logger from "../dist/src/logger.js";
+import logger from "../dist/src/utils/logger.js";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const ROOT_DIRECTORY = path.resolve(__dirname, "..");

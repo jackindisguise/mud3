@@ -7,6 +7,7 @@ import {
 import { DUNGEON_REGISTRY } from "./src/registry/dungeon.js";
 import { DIRECTIONS } from "./src/utils/direction.js";
 import { startGame } from "./src/game.js";
+import { startServerTUI } from "./src/tui/server-tui.js";
 
 await logger.block("packages", async () => {
 	logger.info("Loading packages...");
@@ -86,6 +87,10 @@ await logger.block("pathfinding", async () => {
 
 // Start the game
 const stopGame = await startGame();
+
+// Start the TUI
+startServerTUI();
+
 const timeout = 1000 * 6000;
 logger.info(
 	`Game server started. It will shut down automatically in ${

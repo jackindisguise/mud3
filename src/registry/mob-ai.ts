@@ -431,7 +431,7 @@ export function initializeMobAI(mob: Mob) {
 			//logger.info(`Initialized AI for mob ${mob.oid} (${mob.display})`);
 			aiMobRegistry.add(mob);
 		} else {
-			logger.info(`No AI script found for mob ${mob.oid} (${mob.display})`);
+			logger.debug(`No AI script found for mob ${mob.oid} (${mob.display})`);
 		}
 	} catch (error) {
 		logger.error(`Failed to initialize AI for mob ${mob.oid}: ${error}`);

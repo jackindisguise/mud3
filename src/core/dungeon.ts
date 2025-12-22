@@ -109,7 +109,7 @@ import {
 	removeFromEffectsSet,
 	setupEffectTimers,
 	clearEffectTimersForEffect,
-} from "../registry/effects.js";
+} from "../registry/effect-timers.js";
 import {
 	PrimaryAttributeSet,
 	SecondaryAttributeSet,
@@ -4082,13 +4082,14 @@ export class Mob extends Movable {
 		// Initialize behavior array (only for NPCs)
 		this._behaviors = [];
 		if (options?.behaviors) {
-			for (const [key, value] of Object.entries(options.behaviors)) {
-				// Validate that the key is a valid BEHAVIOR enum value
-				if (Object.values(BEHAVIOR).includes(key as BEHAVIOR) && value) {
-					// Only add if value is true
-					const behavior = key as BEHAVIOR;
-					if (!this._behaviors.includes(behavior)) {
-						this._behaviors.push(behavior);
+			// Handle array format (new format)
+			if (Array.isArray(options.behaviors)) {
+				for (const behavior of options.behaviors) {
+					// Validate that the behavior is a valid BEHAVIOR enum value
+					if (Object.values(BEHAVIOR).includes(behavior)) {
+						if (!this._behaviors.includes(behavior)) {
+							this._behaviors.push(behavior);
+						}
 					}
 				}
 			}

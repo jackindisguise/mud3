@@ -114,12 +114,6 @@ function replaceActPlaceholders(
 function processEffectTick(mob: Mob, effect: EffectInstance): void {
 	const now = Date.now();
 
-	// Check if effect has expired (shouldn't happen, but safety check)
-	if (isEffectExpired(effect, now)) {
-		mob.removeEffect(effect);
-		return;
-	}
-
 	// Check if it's actually time to tick
 	if (!shouldEffectTick(effect, now)) {
 		return;

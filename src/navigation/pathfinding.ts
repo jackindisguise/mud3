@@ -206,8 +206,6 @@ export function findPathDijkstra(
 	});
 }
 
-// ---------- Cross-dungeon pathfinding ----------
-
 import { DUNGEON_REGISTRY, getRoomByRef } from "../registry/dungeon.js";
 
 interface DungeonEdge {
